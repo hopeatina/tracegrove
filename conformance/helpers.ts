@@ -1,7 +1,7 @@
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadProject, localScope, ProjectLoader } from '../src/core/corpus.ts';
+import { loadProject, localScope, ProjectLoader, AUTHORING_SCOPE } from '../src/core/corpus.ts';
 import { materializeLogicalPayload } from '../src/core/generators.ts';
 import { SeedRecipe, parseAs } from '../src/protocol/index.ts';
 import { stringify } from 'yaml';
@@ -47,7 +47,7 @@ export function rematerializePayload(root: string): void {
   const recipePath = join(root, 'verification', 'fixtures', 'existing-note.recipe.yaml');
   const loader = new ProjectLoader(join(root, 'verification'));
   const recipe = parseAs(SeedRecipe, loader.loadDocument(recipePath).value, 'recipe');
-  const payload = materializeLogicalPayload(recipe, localScope());
+  const payload = materializeLogicalPayload(recipe, AUTHORING_SCOPE);
   const { scope: _s, ...rest } = payload;
   writeFileSync(join(root, 'verification', 'fixtures', 'existing-note.payload.yaml'), stringify({ ...rest, ref: { id: payload.ref.id, revision: payload.ref.revision } }));
 }

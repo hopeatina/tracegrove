@@ -43,3 +43,15 @@ describe('project corpus', () => {
     expect(() => compileCase(created, tiny, recipe)).toThrow(/step_limit_exceeded/);
   });
 });
+
+describe('definition identity is machine independent', () => {
+  it('the same corpus hashes identically regardless of the local owner', () => {
+    const before = process.env.WORKFLOW_VERIFY_OWNER;
+    process.env.WORKFLOW_VERIFY_OWNER = 'alice';
+    const a = loadProject(SAMPLE).corpus.manifest.ref.digest.hex;
+    process.env.WORKFLOW_VERIFY_OWNER = 'runner';
+    const b = loadProject(SAMPLE).corpus.manifest.ref.digest.hex;
+    if (before === undefined) delete process.env.WORKFLOW_VERIFY_OWNER; else process.env.WORKFLOW_VERIFY_OWNER = before;
+    expect(a).toBe(b);
+  });
+});

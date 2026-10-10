@@ -7,7 +7,7 @@ seedRecipeRef:
   revision: "1"
   digest:
     algorithm: sha256
-    hex: ab29887ca57b1dbc87f32c589033c68b37e93a466a5f9f76d205c551dea84d7d
+    hex: 1e858b98f27166343a5d7a7140840f1bab76df97b8cda1a439b13c40c71b1a9f
 entities:
   - entityKey: existing_note
     values:

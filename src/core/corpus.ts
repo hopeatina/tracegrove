@@ -16,11 +16,23 @@ import {
 
 export type LoadedDocument = { ref: Ref; schemaVersion: SchemaVersion; value: unknown; sourcePath: string; sourceDigest: string };
 
+/**
+ * Scope of the local actor: derived from the controller's process owner (or an explicit
+ * WORKFLOW_VERIFY_OWNER override). It is the requested scope on execution records only.
+ */
 export function localScope(): Scope {
-  let user = 'local';
-  try { user = userInfo().username.replace(/[^A-Za-z0-9._-]/g, '_') || 'local'; } catch { /* keep default */ }
+  let user = process.env.WORKFLOW_VERIFY_OWNER ?? '';
+  if (!user) { try { user = userInfo().username; } catch { user = 'local'; } }
+  user = user.replace(/[^A-Za-z0-9._-]/g, '_') || 'local';
   return { ownerId: `local:${user}`, tenantId: null, visibility: 'owner_private' };
 }
+
+/**
+ * Scope stamped into reviewed authoring definitions when the file declares none. It is a
+ * constant so a definition's content digest is identical on every machine; a scope is never
+ * an access grant, and the controller derives real authority separately at admission.
+ */
+export const AUTHORING_SCOPE: Scope = { ownerId: 'authoring', tenantId: null, visibility: 'owner_private' };
 
 export class CorpusStore {
   private readonly byKey = new Map<string, LoadedDocument>();
@@ -102,7 +114,7 @@ export class ProjectLoader {
   private readonly scope: Scope;
 
   constructor(readonly root: string, scope?: Scope) {
-    this.scope = scope ?? localScope();
+    this.scope = scope ?? AUTHORING_SCOPE;
   }
 
   /** Load a referenced document, freezing nested `$file` references first. */
@@ -191,7 +203,7 @@ export function loadProject(configPath: string, scope?: Scope): LoadedProject {
   const manifestBase = {
     schemaVersion: 'workflow.corpus/v1' as const,
     ref: { id: `${config.project}.corpus`, revision: '1', digest: { algorithm: 'sha256' as const, hex: '0'.repeat(64) } },
-    scope: scope ?? localScope(),
+    scope: scope ?? AUTHORING_SCOPE,
     projectId: config.project,
     members: documents
       .map((doc) => ({ ref: doc.ref, schemaVersion: doc.schemaVersion, sourcePath: doc.sourcePath, sourceDigest: doc.sourceDigest }))
