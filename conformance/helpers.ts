@@ -1,0 +1,53 @@
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { loadProject, localScope, ProjectLoader } from '../src/core/corpus.ts';
+import { materializeLogicalPayload } from '../src/core/generators.ts';
+import { SeedRecipe, parseAs } from '../src/protocol/index.ts';
+import { stringify } from 'yaml';
+import { plan, type FrozenBundle } from '../src/core/planner.ts';
+import { executeBundle, type RunOptions, type RunSummary } from '../src/core/executor.ts';
+import { LocalLedger } from '../src/core/ledger.ts';
+
+export const SAMPLE_ROOT = join(import.meta.dirname, '..', 'src', 'samples', 'notes-api');
+const temps: string[] = [];
+
+export function cleanupTemps(): void {
+  for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
+}
+
+/** Copy the sample to a temp directory and optionally mutate files before loading. */
+export function sampleCopy(mutate?: (root: string) => void): { root: string; configPath: string; stateDir: string } {
+  const root = mkdtempSync(join(tmpdir(), 'tracegrove-conf-'));
+  temps.push(root);
+  cpSync(SAMPLE_ROOT, root, { recursive: true });
+  mutate?.(root);
+  return { root, configPath: join(root, 'verification', 'workflow.yaml'), stateDir: join(root, '.state') };
+}
+
+export function editFile(path: string, edit: (text: string) => string): void {
+  writeFileSync(path, edit(readFileSync(path, 'utf8')));
+}
+
+export function planSample(configPath: string, profileName = 'native-real'): FrozenBundle {
+  return plan({ project: loadProject(configPath), profileName, scope: localScope() });
+}
+
+export async function runSample(bundle: FrozenBundle, stateDir: string, extra: Partial<RunOptions> = {}): Promise<RunSummary> {
+  const ledger = LocalLedger.open(stateDir);
+  try {
+    return await executeBundle({ bundle, stateDir, ledger, scope: localScope(), ...extra });
+  } finally {
+    ledger.close();
+  }
+}
+
+/** After editing a recipe, an author rematerializes and reviews the logical payload. */
+export function rematerializePayload(root: string): void {
+  const recipePath = join(root, 'verification', 'fixtures', 'existing-note.recipe.yaml');
+  const loader = new ProjectLoader(join(root, 'verification'));
+  const recipe = parseAs(SeedRecipe, loader.loadDocument(recipePath).value, 'recipe');
+  const payload = materializeLogicalPayload(recipe, localScope());
+  const { scope: _s, ...rest } = payload;
+  writeFileSync(join(root, 'verification', 'fixtures', 'existing-note.payload.yaml'), stringify({ ...rest, ref: { id: payload.ref.id, revision: payload.ref.revision } }));
+}

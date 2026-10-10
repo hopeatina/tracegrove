@@ -1,0 +1,32 @@
+name: tracegrove
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run test:conformance
+      - run: npm run build
+      - name: Zero-OrgX sample from the built distribution
+        run: |
+          node dist/cli/main.js sample-config --sample notes-api --output "$RUNNER_TEMP/notes"
+          node dist/cli/main.js plan --config "$RUNNER_TEMP/notes/verification/workflow.yaml" --output "$RUNNER_TEMP/out/request.json"
+          node dist/cli/main.js run --request "$RUNNER_TEMP/out/request.json" --json | tee "$RUNNER_TEMP/out/run.json"
+          exec_id=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/out/run.json")
+          node dist/cli/main.js export --execution "$exec_id" --state-dir "$RUNNER_TEMP/notes/verification/.workflow-verify" --output "$RUNNER_TEMP/out/bundle"
+          node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/out/bundle"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-bundle
+          path: ${{ runner.temp }}/out/bundle
+          if-no-files-found: ignore

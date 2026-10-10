@@ -3,3 +3,4 @@ dist/
 .workflow-verify/
 verification-output/
 *.tgz
+samples/
