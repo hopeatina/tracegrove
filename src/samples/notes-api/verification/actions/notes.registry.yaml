@@ -1,0 +1,6 @@
+schemaVersion: workflow.action-registry/v1
+ref: { id: example.actions.notes, revision: "1" }
+actions:
+  - { actionId: notes.create/v1, kind: http.request, effect: create, method: POST, path: /notes, body: { title: "{title}", body: "{body}" }, auth: { kind: persona }, expectStatus: 201, captures: [ { name: noteId, from: json, path: note.id } ] }
+  - { actionId: notes.read/v1, kind: http.request, effect: read, method: GET, path: "/notes/{noteId}", body: null, auth: { kind: persona }, expectStatus: null, captures: [] }
+  - { actionId: notes.delete/v1, kind: http.request, effect: delete, method: DELETE, path: "/notes/{noteId}", body: null, auth: { kind: persona }, expectStatus: 204, captures: [] }

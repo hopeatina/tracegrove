@@ -1,0 +1,6 @@
+schemaVersion: workflow.auth-recipe/v1
+ref: { id: example.auth.owner, revision: "1" }
+kind: host_issued
+credentialName: owner_token
+header: authorization
+scheme: Bearer

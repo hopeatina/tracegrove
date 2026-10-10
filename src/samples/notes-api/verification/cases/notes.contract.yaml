@@ -1,0 +1,51 @@
+schemaVersion: workflow.case/v1
+ref: { id: example.notes.contract, revision: "1" }
+purpose: Exercise the declared notes contract against a loopback stub. Teaches the schema; proves nothing about the real application.
+workflowId: notes.create
+requirementRefs: []
+sourceRefs: []
+sourceAnalysisRef: null
+risk: exploratory
+surface: api
+surfaceBindingRef: { $file: ../surfaces/http-api.binding.yaml }
+proofClaim: The case contract and reducer behave as declared under a stubbed application boundary. No live product claim.
+environmentClasses: [isolated_candidate]
+requiredCapabilities: [http.request, observe]
+requiredBoundaries:
+  - { boundaryId: application, mode: stubbed }
+dependencyCases: []
+personaRef: { $file: ../personas/owner.yaml }
+datasetRef: null
+fixturePlanRef: null
+navigationRef: null
+preconditions: []
+steps:
+  - id: create
+    kind: http.request
+    timeoutMs: 5000
+    inputs: { title: { kind: literal, value: Stub note } }
+    retry: { attempts: 1 }
+    method: POST
+    path: /notes
+    headers: {}
+    body: { title: "{title}", body: stub }
+    auth: { kind: persona }
+    expectStatus: 201
+    captures: [ { name: noteId, from: json, path: note.id } ]
+  - id: read_back
+    kind: observe
+    timeoutMs: 5000
+    inputs: { noteId: { kind: capture, stepId: create, name: noteId } }
+    retry: { attempts: 1 }
+    readback: { kind: http, method: GET, path: "/notes/{noteId}", auth: { kind: persona } }
+    predicate: { kind: status_equals, value: 200 }
+    pollIntervalMs: 100
+    captures: []
+assertions:
+  - { id: a.created, required: true, environmentClasses: [isolated_candidate], oracle: { name: step.result, version: "1" }, stepId: create, predicate: { kind: step_result, value: completed }, coverageTags: [notes.contract] }
+  - { id: a.readback, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, stepId: read_back, predicate: { kind: all, predicates: [ { kind: status_equals, value: 200 }, { kind: json_path_present, path: body.note.id } ] }, coverageTags: [notes.contract] }
+effects: { mode: designated_writes, allowedHosts: ["launch://notes-api"], allowedMethods: [GET, POST], allowedResourcePrefixes: ["/notes"], maxCreates: 1, maxMessages: 0, maxJobs: 0, cleanupRecipeRef: null }
+limits: { deadlineMs: 20000, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: 0, maxArtifactBytes: 1048576, diagnosticRetries: 0, concurrencyGroup: notes }
+capture: { stepEvents: true, networkMetadata: true, trace: optional, video: optional, redactionPolicyRef: null, retentionPolicyRef: null }
+baselineRef: null
+generation: null

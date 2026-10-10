@@ -1,0 +1,5 @@
+schemaVersion: workflow.mock-responses/v1
+ref: { id: example.mock.notes, revision: "1" }
+routes:
+  - { method: POST, path: /notes, status: 201, body: { note: { id: 00000000-0000-4000-8000-000000000001, title: Stub note, body: stub } }, requireBearer: true }
+  - { method: GET, path: "/notes/{id}", status: 200, body: { note: { id: 00000000-0000-4000-8000-000000000001, title: Stub note, body: stub } }, requireBearer: true }

@@ -1,0 +1,10 @@
+schemaVersion: workflow.intelligence-policy/v1
+ref: { id: example.policy.no-authoring-inference, revision: "1" }
+stages:
+  analysis: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+  drafting: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+  discovery: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+  diagnosis: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+  evaluation: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+  benchmark: { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 }
+replayInference: none

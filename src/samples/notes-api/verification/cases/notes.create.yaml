@@ -1,0 +1,123 @@
+schemaVersion: workflow.case/v1
+ref: { id: example.notes.create, revision: "1" }
+purpose: Create a note through the real API, read it back independently, confirm a foreign principal is denied, delete only that note and confirm absence while a seeded note stays intact.
+workflowId: notes.create
+requirementRefs: []
+sourceRefs: []
+sourceAnalysisRef: null
+risk: critical
+surface: api
+surfaceBindingRef: { $file: ../surfaces/http-api.binding.yaml }
+proofClaim: The locally launched notes application, at the attested source digest, persists and authorizes notes through its normal HTTP API. This establishes local application behavior, not production deployment identity.
+environmentClasses: [isolated_candidate]
+requiredCapabilities: [http.request, observe, fixture.http]
+requiredBoundaries:
+  - { boundaryId: application, mode: real }
+  - { boundaryId: storage, mode: real }
+dependencyCases: []
+personaRef: { $file: ../personas/owner.yaml }
+datasetRef: null
+fixturePlanRef: { $file: ../fixtures/existing-note.plan.yaml }
+navigationRef: null
+preconditions: []
+steps:
+  - id: create
+    kind: http.request
+    timeoutMs: 5000
+    inputs:
+      title: { kind: literal, value: Fresh note }
+      body: { kind: literal, value: Written through the real API. }
+    retry: { attempts: 1 }
+    method: POST
+    path: /notes
+    headers: {}
+    body: { title: "{title}", body: "{body}" }
+    auth: { kind: persona }
+    expectStatus: 201
+    captures:
+      - { name: noteId, from: json, path: note.id }
+  - id: read_back
+    kind: observe
+    timeoutMs: 5000
+    inputs:
+      noteId: { kind: capture, stepId: create, name: noteId }
+    retry: { attempts: 1 }
+    readback: { kind: http, method: GET, path: "/notes/{noteId}", auth: { kind: persona } }
+    predicate:
+      kind: all
+      predicates:
+        - { kind: status_equals, value: 200 }
+        - { kind: json_path_equals, path: body.note.title, value: Fresh note }
+    pollIntervalMs: 100
+    captures: []
+  - id: intruder_read
+    kind: http.request
+    timeoutMs: 5000
+    inputs:
+      noteId: { kind: capture, stepId: create, name: noteId }
+      intruder: { kind: credential, name: intruder_token }
+    retry: { attempts: 1 }
+    method: GET
+    path: "/notes/{noteId}"
+    headers: {}
+    body: null
+    auth: { kind: credential, name: intruder_token }
+    expectStatus: null
+    captures: []
+  - id: delete
+    kind: http.request
+    timeoutMs: 5000
+    inputs:
+      noteId: { kind: capture, stepId: create, name: noteId }
+    retry: { attempts: 1 }
+    method: DELETE
+    path: "/notes/{noteId}"
+    headers: {}
+    body: null
+    auth: { kind: persona }
+    expectStatus: 204
+    captures: []
+  - id: confirm_absent
+    kind: observe
+    timeoutMs: 5000
+    inputs:
+      noteId: { kind: capture, stepId: create, name: noteId }
+    retry: { attempts: 1 }
+    readback: { kind: http, method: GET, path: "/notes/{noteId}", auth: { kind: persona } }
+    predicate: { kind: status_equals, value: 404 }
+    pollIntervalMs: 100
+    captures: []
+  - id: existing_intact
+    kind: observe
+    timeoutMs: 5000
+    inputs:
+      existingId: { kind: fixture, entityKey: existing_note, outputName: noteId }
+    retry: { attempts: 1 }
+    readback: { kind: http, method: GET, path: "/notes/{existingId}", auth: { kind: persona } }
+    predicate:
+      kind: all
+      predicates:
+        - { kind: status_equals, value: 200 }
+        - { kind: json_path_equals, path: body.note.title, value: Existing note }
+    pollIntervalMs: 100
+    captures: []
+assertions:
+  - { id: a.created, required: true, environmentClasses: [isolated_candidate], oracle: { name: step.result, version: "1" }, stepId: create, predicate: { kind: step_result, value: completed }, coverageTags: [notes.create] }
+  - { id: a.readback, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, stepId: read_back, predicate: { kind: all, predicates: [ { kind: status_equals, value: 200 }, { kind: json_path_equals, path: body.note.title, value: Fresh note }, { kind: json_path_equals, path: body.note.body, value: Written through the real API. } ] }, coverageTags: [notes.read] }
+  - { id: a.denied, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, stepId: intruder_read, predicate: { kind: all, predicates: [ { kind: status_equals, value: 403 }, { kind: json_path_absent, path: body.note } ] }, coverageTags: [notes.authz] }
+  - { id: a.deleted, required: true, environmentClasses: [isolated_candidate], oracle: { name: step.result, version: "1" }, stepId: delete, predicate: { kind: step_result, value: completed }, coverageTags: [notes.delete] }
+  - { id: a.absent, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, stepId: confirm_absent, predicate: { kind: status_equals, value: 404 }, coverageTags: [notes.delete] }
+  - { id: a.existing_intact, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, stepId: existing_intact, predicate: { kind: all, predicates: [ { kind: status_equals, value: 200 }, { kind: json_path_equals, path: body.note.title, value: Existing note } ] }, coverageTags: [notes.isolation] }
+effects:
+  mode: designated_writes
+  allowedHosts: ["launch://notes-api"]
+  allowedMethods: [GET, POST, DELETE]
+  allowedResourcePrefixes: ["/notes"]
+  maxCreates: 2
+  maxMessages: 0
+  maxJobs: 0
+  cleanupRecipeRef: null
+limits: { deadlineMs: 30000, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: 0, maxArtifactBytes: 1048576, diagnosticRetries: 0, concurrencyGroup: notes }
+capture: { stepEvents: true, networkMetadata: true, trace: optional, video: optional, redactionPolicyRef: null, retentionPolicyRef: null }
+baselineRef: null
+generation: null

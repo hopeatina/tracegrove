@@ -1,0 +1,381 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter": {
+      "enum": [
+        "local_process",
+        "mock_loopback"
+      ],
+      "type": "string"
+    },
+    "captureRequirements": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "cleanupReserveMs": {
+      "maximum": 2592000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "isolationPolicy": {
+      "enum": [
+        "fresh_directory_and_port",
+        "none"
+      ],
+      "type": "string"
+    },
+    "launch": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": {
+                "maxLength": 400,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "command": {
+              "maxLength": 400,
+              "minLength": 1,
+              "type": "string"
+            },
+            "componentId": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "credentialsEnv": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "cwd": {
+              "maxLength": 400,
+              "type": "string"
+            },
+            "dataDirEnv": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "env": {
+              "additionalProperties": {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "propertyNames": {
+                "maxLength": 64,
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "identitySourceFiles": {
+              "items": {
+                "maxLength": 400,
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            "issuedCredentials": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "subject": {
+                    "maxLength": 400,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "subject"
+                ],
+                "type": "object"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "portEnv": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "readiness": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "pattern": "^\\/",
+                  "type": "string"
+                },
+                "timeoutMs": {
+                  "maximum": 2592000000,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "timeoutMs"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "componentId",
+            "command",
+            "args",
+            "cwd",
+            "env",
+            "portEnv",
+            "dataDirEnv",
+            "credentialsEnv",
+            "readiness",
+            "identitySourceFiles",
+            "issuedCredentials"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mockResponsesRef": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "networkRules": {
+      "items": {
+        "maxLength": 400,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "placement": {
+      "enum": [
+        "local",
+        "agent_cli",
+        "agent_cloud",
+        "container",
+        "managed_sandbox",
+        "cloud_vm",
+        "customer_ci",
+        "device_service"
+      ],
+      "type": "string"
+    },
+    "ref": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "requestedResources": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "diskMb": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memoryMb": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu",
+        "memoryMb",
+        "diskMb"
+      ],
+      "type": "object"
+    },
+    "requiredCapabilities": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "workflow.host-plan/v1",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "tenantId": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "owner_private",
+            "tenant_private"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "tenantId",
+        "visibility"
+      ],
+      "type": "object"
+    },
+    "sessionLifetimeMs": {
+      "maximum": 2592000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "transportPolicy": {
+      "const": "in_process",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "ref",
+    "scope",
+    "placement",
+    "adapter",
+    "launch",
+    "mockResponsesRef",
+    "transportPolicy",
+    "isolationPolicy",
+    "networkRules",
+    "requestedResources",
+    "requiredCapabilities",
+    "captureRequirements",
+    "sessionLifetimeMs",
+    "cleanupReserveMs"
+  ],
+  "type": "object"
+}

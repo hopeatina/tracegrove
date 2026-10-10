@@ -1,0 +1,16 @@
+schemaVersion: workflow.persona/v1
+ref: { id: example.persona.owner, revision: "1" }
+traits: [new_user]
+accountBindingRef: null
+roleScopes: [notes.owner]
+stateRecipeRef: null
+dataVolumeRecipeRef: null
+entitlementRef: null
+connectorStateRef: null
+authRecipeRef: { $file: ../auth/host-issued-owner.yaml }
+locale: en-US
+timezone: UTC
+viewport: { width: 1280, height: 800 }
+inputMode: keyboard
+reducedMotion: true
+cleanupPolicyRef: null

@@ -1,0 +1,11 @@
+schemaVersion: workflow.environment-plan/v1
+ref: { id: example.env.local-notes, revision: "1" }
+class: isolated_candidate
+origins: ["launch://notes-api"]
+componentProfileRef: { $file: ../components/notes-api.profile.yaml }
+credentialRecipeRef: { $file: ../auth/host-issued-owner.yaml }
+actionEnvelopeRef: null
+personaLeasePolicyRef: null
+budgetPolicyRef: null
+networkProfileRef: null
+clockProfileRef: null

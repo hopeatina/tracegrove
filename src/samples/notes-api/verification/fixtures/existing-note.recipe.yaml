@@ -1,0 +1,29 @@
+schemaVersion: workflow.seed-recipe/v1
+ref: { id: example.recipe.existing-note, revision: "1" }
+intent: One pre-existing note owned by the persona that the case must leave intact.
+modelCatalogRef: null
+actionRegistryRef: { $file: ../actions/notes.registry.yaml }
+entities:
+  - entityKey: existing_note
+    modelId: note
+    actionId: notes.create/v1
+    dependsOn: []
+    traits: []
+    values:
+      title: { kind: literal, value: Existing note }
+      body: { kind: generator, generatorId: words, args: { count: 6 } }
+    outputNames: [noteId]
+    readback:
+      actionId: notes.read/v1
+      predicate:
+        kind: all
+        predicates:
+          - { kind: status_equals, value: 200 }
+          - { kind: json_path_equals, path: body.note.title, value: Existing note }
+    cleanup:
+      actionId: notes.delete/v1
+      absenceReadback: { actionId: notes.read/v1, expectStatus: 404 }
+relationBindings: []
+cleanupStrategy: reverse_dependency_order
+lifecyclePolicy: application_api
+generation: { logicalSeed: notes-existing-note-1, generatorVersion: "1", locale: en-US, timezone: UTC, logicalClock: "2026-10-10T00:00:00Z" }

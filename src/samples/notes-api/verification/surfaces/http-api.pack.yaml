@@ -1,0 +1,7 @@
+schemaVersion: workflow.surface-pack/v1
+ref: { id: tracegrove.pack.http-api, revision: "1" }
+kind: http_api
+protocol: http
+stepKinds: [http.request, observe]
+oracles: [http.observation/1, step.result/1]
+captureFormats: [application/json]

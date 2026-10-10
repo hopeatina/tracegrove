@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "defaultProfile": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "executionHostRef": {
+      "maxLength": 400,
+      "minLength": 1,
+      "pattern": "^\\.\\/",
+      "type": "string"
+    },
+    "intelligencePolicyRef": {
+      "maxLength": 400,
+      "minLength": 1,
+      "pattern": "^\\.\\/",
+      "type": "string"
+    },
+    "outputDir": {
+      "maxLength": 400,
+      "minLength": 1,
+      "type": "string"
+    },
+    "profiles": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "additionalProperties": false,
+            "properties": {
+              "costCeilingCents": {
+                "maximum": 1000000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "deadlineMs": {
+                "maximum": 2592000000,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "deadlineMs",
+              "costCeilingCents"
+            ],
+            "type": "object"
+          },
+          "class": {
+            "enum": [
+              "isolated_candidate",
+              "deployed_preview",
+              "deployed_canary",
+              "production_observation"
+            ],
+            "type": "string"
+          },
+          "environmentPlanRef": {
+            "maxLength": 400,
+            "minLength": 1,
+            "pattern": "^\\.\\/",
+            "type": "string"
+          },
+          "fidelityProfileRef": {
+            "maxLength": 400,
+            "minLength": 1,
+            "pattern": "^\\.\\/",
+            "type": "string"
+          },
+          "fixturePlanRef": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "minLength": 1,
+                "pattern": "^\\.\\/",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hostPlanRef": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "minLength": 1,
+                "pattern": "^\\.\\/",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "personaRef": {
+            "maxLength": 400,
+            "minLength": 1,
+            "pattern": "^\\.\\/",
+            "type": "string"
+          },
+          "runnerRef": {
+            "maxLength": 400,
+            "minLength": 1,
+            "pattern": "^\\.\\/",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class",
+          "environmentPlanRef",
+          "hostPlanRef",
+          "personaRef",
+          "fixturePlanRef",
+          "fidelityProfileRef",
+          "runnerRef",
+          "budget"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "maxLength": 200,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "project": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "workflow.config/v1",
+      "type": "string"
+    },
+    "sourceSetRef": {
+      "anyOf": [
+        {
+          "maxLength": 400,
+          "minLength": 1,
+          "pattern": "^\\.\\/",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "suiteRef": {
+      "maxLength": 400,
+      "minLength": 1,
+      "pattern": "^\\.\\/",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "project",
+    "suiteRef",
+    "defaultProfile",
+    "outputDir",
+    "sourceSetRef",
+    "executionHostRef",
+    "intelligencePolicyRef",
+    "profiles"
+  ],
+  "type": "object"
+}

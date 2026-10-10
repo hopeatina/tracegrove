@@ -1,0 +1,9 @@
+schemaVersion: workflow.fixture-plan/v1
+kind: case
+ref: { id: example.fixture-plan.existing-note, revision: "1" }
+seedRecipeRef: { $file: ./existing-note.recipe.yaml }
+modelCatalogRef: null
+logicalPayloadRef: { $file: ./existing-note.payload.yaml }
+outputBindingsSchemaRef: null
+effectEnvelopeRef: null
+limitPolicyRef: null

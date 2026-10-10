@@ -1,0 +1,27 @@
+schemaVersion: workflow.host-plan/v1
+ref: { id: example.host.local-process, revision: "1" }
+placement: local
+adapter: local_process
+launch:
+  componentId: notes-api
+  command: node
+  args: [app/app.mjs]
+  cwd: ..
+  env: { NOTES_BUILD: sample }
+  portEnv: PORT
+  dataDirEnv: NOTES_DIR
+  credentialsEnv: NOTES_TOKENS
+  readiness: { path: /health, timeoutMs: 5000 }
+  identitySourceFiles: [app/app.mjs]
+  issuedCredentials:
+    - { name: owner_token, subject: alice }
+    - { name: intruder_token, subject: bob }
+mockResponsesRef: null
+transportPolicy: in_process
+isolationPolicy: fresh_directory_and_port
+networkRules: [loopback_only]
+requestedResources: { cpu: 1, memoryMb: 128, diskMb: 16 }
+requiredCapabilities: [shell, network_origin:loopback, confirmed_cancel, artifact_delivery]
+captureRequirements: []
+sessionLifetimeMs: 120000
+cleanupReserveMs: 10000

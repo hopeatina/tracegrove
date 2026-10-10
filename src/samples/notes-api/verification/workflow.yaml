@@ -1,0 +1,27 @@
+schemaVersion: workflow.config/v1
+project: notes
+suiteRef: ./cases/notes.suite.yaml
+defaultProfile: native-real
+outputDir: ./verification-output
+sourceSetRef: null
+executionHostRef: ./hosts/local-process.yaml
+intelligencePolicyRef: ./policies/no-authoring-inference.yaml
+profiles:
+  native-real:
+    class: isolated_candidate
+    environmentPlanRef: ./environments/local-notes.yaml
+    hostPlanRef: null
+    personaRef: ./personas/owner.yaml
+    fixturePlanRef: null
+    fidelityProfileRef: ./fidelity/full-live-sandbox.yaml
+    runnerRef: ./runners/http.yaml
+    budget: { deadlineMs: 60000, costCeilingCents: 0 }
+  offline-contract:
+    class: isolated_candidate
+    environmentPlanRef: ./environments/mock-notes.yaml
+    hostPlanRef: ./hosts/mock-loopback.yaml
+    personaRef: ./personas/owner.yaml
+    fixturePlanRef: null
+    fidelityProfileRef: ./fidelity/mock-contract.yaml
+    runnerRef: ./runners/http.yaml
+    budget: { deadlineMs: 20000, costCeilingCents: 0 }

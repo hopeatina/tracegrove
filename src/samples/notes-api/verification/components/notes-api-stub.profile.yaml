@@ -1,0 +1,8 @@
+schemaVersion: workflow.component-profile/v1
+ref: { id: example.components.notes-api-stub, revision: "1" }
+components:
+  - componentId: notes-api
+    kind: application
+    required: true
+    expectedIdentity: { kind: declared_release, release: stub }
+    exclusionReason: null

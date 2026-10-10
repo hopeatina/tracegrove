@@ -1,0 +1,15 @@
+schemaVersion: workflow.logical-payload/v1
+ref:
+  id: example.recipe.existing-note.payload
+  revision: "1"
+seedRecipeRef:
+  id: example.recipe.existing-note
+  revision: "1"
+  digest:
+    algorithm: sha256
+    hex: ab29887ca57b1dbc87f32c589033c68b37e93a466a5f9f76d205c551dea84d7d
+entities:
+  - entityKey: existing_note
+    values:
+      title: Existing note
+      body: zephyr pebble nectar velvet quartz thistle

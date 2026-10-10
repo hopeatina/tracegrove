@@ -1,0 +1,11 @@
+schemaVersion: workflow.surface-binding/v1
+ref: { id: example.surface.notes-http, revision: "1" }
+kind: http_api
+packRef: { $file: ./http-api.pack.yaml }
+driverProfileRef: null
+componentProfileRef: { $file: ../components/notes-api.profile.yaml }
+interaction: protocol
+configurationSchemaRef: null
+configurationRef: null
+variantPolicyRef: null
+requiredCapabilities: [http.request, observe]

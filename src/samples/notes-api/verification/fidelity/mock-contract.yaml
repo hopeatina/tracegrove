@@ -1,0 +1,6 @@
+schemaVersion: workflow.fidelity-profile/v1
+ref: { id: example.fidelity.mock-contract, revision: "1" }
+lane: mock_contract
+boundaryProfileRef: null
+boundaryRules:
+  - { boundaryId: application, adapterRef: null, mode: stubbed, required: true, exclusionReasonRef: null, accountClass: none, readbackOracleRef: null, interceptorRef: null }

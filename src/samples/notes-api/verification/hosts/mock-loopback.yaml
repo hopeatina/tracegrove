@@ -1,0 +1,14 @@
+schemaVersion: workflow.host-plan/v1
+ref: { id: example.host.mock-loopback, revision: "1" }
+placement: local
+adapter: mock_loopback
+launch: null
+mockResponsesRef: { $file: ../mocks/notes.responses.yaml }
+transportPolicy: in_process
+isolationPolicy: fresh_directory_and_port
+networkRules: [loopback_only]
+requestedResources: { cpu: 1, memoryMb: 64, diskMb: 1 }
+requiredCapabilities: [network_origin:loopback, confirmed_cancel, artifact_delivery]
+captureRequirements: []
+sessionLifetimeMs: 60000
+cleanupReserveMs: 5000

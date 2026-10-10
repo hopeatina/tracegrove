@@ -1,0 +1,7 @@
+schemaVersion: workflow.fidelity-profile/v1
+ref: { id: example.fidelity.full-live-sandbox, revision: "1" }
+lane: full_live_sandbox
+boundaryProfileRef: null
+boundaryRules:
+  - { boundaryId: application, adapterRef: null, mode: real, required: true, exclusionReasonRef: null, accountClass: local, readbackOracleRef: null, interceptorRef: null }
+  - { boundaryId: storage, adapterRef: null, mode: real, required: true, exclusionReasonRef: null, accountClass: local, readbackOracleRef: null, interceptorRef: null }
