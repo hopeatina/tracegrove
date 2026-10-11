@@ -40,6 +40,12 @@ fixture completeness and boundary observations. It rejects empty/traversal manif
 producer resealing that removes required observations. This verifies portable integrity and
 record consistency; the importer still needs its own issuer trust and access policy.
 
+`verifySourceCitation` checks exact repository/commit/path identity, document and
+file digests, and inclusive line excerpt bytes through authorized trusted host ports.
+It preserves UTF-8 and CRLF bytes, rejects traversal, unsupported files and unavailable
+objects, and never falls back to the current checkout. These checks establish cited
+source bytes; connecting citations to change elements and review policy remains open.
+
 The initial Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
 digests and scopes. Every specification edit clears its review. Concurrent edits and
 reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
