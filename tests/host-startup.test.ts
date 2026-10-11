@@ -23,3 +23,27 @@ it('stops a child and removes its workspace when it never announces readiness', 
   expect(() => process.kill(pid, 0)).toThrow();
   expect(existsSync(workspaceDir)).toBe(false);
 });
+
+it('does not confirm cleanup when the trusted supervisor is killed', async () => {
+  const copy = sampleCopy(); const project = loadProject(copy.configPath);
+  const base = project.corpus.getAs(HostPlan, project.fileRefs.get('./hosts/local-process.yaml')!);
+  const pidPath = join(copy.root, 'child.pid');
+  const plan = freeze({ ...base, launch: { ...base.launch!, command: process.execPath,
+    args: ['-e', "require('node:fs').writeFileSync(process.argv[1], String(process.pid)); const s=require('node:http').createServer((q,r)=>r.end('{}')); s.listen(0,'127.0.0.1',()=>console.log('listening '+s.address().port))", pidPath],
+  } });
+  const workspaceDir = join(copy.stateDir, 'host');
+  const session = await new LocalProcessHost().start({ hostPlan: plan, projectRoot: project.root, workspaceDir,
+    scope: localScope(), campaignId: 'campaign.test', executionId: 'exec.test', attemptId: 'attempt.test',
+    generation: 1, actorId: localScope().ownerId, credentialNames: [], signal: new AbortController().signal, mockResponses: null,
+  });
+  const appPid = Number(readFileSync(pidPath, 'utf8'));
+  try {
+    process.kill(Number(session.lease.observedRuntimeIdentity.pid), 'SIGKILL');
+    const first = await session.stop('supervisor failed');
+    expect(first.confirmed).toBe(false);
+    expect(await session.stop('repeated request')).toEqual(first);
+    expect(existsSync(workspaceDir)).toBe(true);
+  } finally {
+    try { process.kill(-appPid, 'SIGKILL'); } catch { /* test app already exited */ }
+  }
+});

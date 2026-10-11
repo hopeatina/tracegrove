@@ -94,6 +94,10 @@ export class LocalProcessHost implements ExecutorHost {
     const child: ChildProcess = fork(new URL(`./localSupervisor.${extension}`, import.meta.url), [], {
       cwd, env: { PATH: process.env.PATH ?? '' }, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
+    let ownedCleanupConfirmed = false;
+    child.on('message', (message: unknown) => {
+      if (message && typeof message === 'object' && 'kind' in message && message.kind === 'host.cleaned') ownedCleanupConfirmed = true;
+    });
     // Candidate output may contain credentials. Drain it without exporting it as proof.
     child.stderr?.resume();
     try {
@@ -149,7 +153,7 @@ export class LocalProcessHost implements ExecutorHost {
         const graceful = await Promise.race([exited, sleep(5000).then(() => false)]);
         if (!graceful && child.connected) child.disconnect();
         if (!graceful) await Promise.race([exited, sleep(2000).then(() => false)]);
-        const confirmed = child.exitCode !== null || child.signalCode !== null;
+        const confirmed = ownedCleanupConfirmed && (child.exitCode !== null || child.signalCode !== null);
         if (confirmed) rmSync(context.workspaceDir, { recursive: true, force: true });
         const workspaceGone = !existsSync(context.workspaceDir);
         return { confirmed: confirmed && workspaceGone, detail: `${reason}; process ${confirmed ? 'exited' : 'still running'}; workspace ${workspaceGone ? 'removed' : 'remains'}` };

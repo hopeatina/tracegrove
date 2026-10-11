@@ -26,7 +26,8 @@ async function stop(): Promise<void> {
     await exited;
   } else signalApp('SIGKILL');
   if (workspaceDir) rmSync(workspaceDir, { recursive: true, force: true });
-  process.exit(0);
+  if (process.connected) process.send?.({ kind: 'host.cleaned' }, undefined, undefined, () => process.exit(0));
+  else process.exit(0);
 }
 
 process.once('disconnect', () => { void stop(); });
