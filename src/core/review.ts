@@ -58,8 +58,8 @@ export async function editPlan(ports: PlanReviewPorts, token: PlanRevisionToken,
   nextRef = RefSchema.parse(nextRef);
   await ports.authorize(ScopeSchema.parse(token.scope), 'edit');
   const snapshot = await current(ports, token);
-  if (nextRef.id !== snapshot.projection.sourcePlanRef.id || refKey(nextRef) === refKey(snapshot.projection.sourcePlanRef)) {
-    throw new Conflict('edit requires a new specification of the same plan');
+  if (nextRef.id !== snapshot.projection.sourcePlanRef.id || nextRef.revision === snapshot.projection.sourcePlanRef.revision) {
+    throw new Conflict('edit requires a new immutable revision of the same plan');
   }
   await resolved(ports, nextRef, token.scope);
   const next = PlanEditProjection.parse({ ...snapshot.projection, editRevision: snapshot.projection.editRevision + 1, sourcePlanRef: nextRef, currentReviewRef: null });

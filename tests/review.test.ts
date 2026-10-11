@@ -106,6 +106,13 @@ describe('exact-plan review and edit arbitration', () => {
     expect(f.snapshot().storageVersion).toBe(1);
   });
 
+  it('refuses changed bytes under an already published specification revision', async () => {
+    const f = fixture();
+    const reused = freeze({ ...f.after, ref: { ...f.after.ref, revision: f.before.ref.revision } });
+    await expect(editPlan(f.ports, f.token(), reused.ref)).rejects.toThrow('new immutable revision');
+    expect(f.snapshot().storageVersion).toBe(1);
+  });
+
   it('keeps rejected reviews separate from activation and editable revision', async () => {
     const f = fixture();
     const review = await reviewPlan(f.ports, f.token(), 'rejected', [ref('reason')]);
