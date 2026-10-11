@@ -3,6 +3,11 @@ export { loadProject, localScope, CorpusStore, ProjectLoader } from './core/corp
 export { plan, runnerCapabilitiesFor, type FrozenBundle, type Blocker } from './core/planner.ts';
 export { executeBundle, EXIT_CODES, type RunSummary, type RunOptions } from './core/executor.ts';
 export { LocalLedger } from './core/ledger.ts';
+export { startController, delegateRun } from './core/controller.ts';
+export { searchCases, getCase } from './core/lookup.ts';
+export { createRerun } from './core/rerun.ts';
+export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, type ReviewSnapshot } from './core/review.ts';
+export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
 export { verifyBundle, writeExecutionBundle } from './core/bundle.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';

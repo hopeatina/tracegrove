@@ -6,12 +6,13 @@
  */
 import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Conflict } from './errors.ts';
 import { nowIso } from './clock.ts';
 
 export type JournalEntry = { seq: number; at: string; aggregateId: string; version: number; type: string; data: Record<string, unknown> };
-type LockFile = { pid: number; startedAt: string; host: string; endpoint: string | null; tokenDigest: string | null };
+export type LockFile = { writerId: string; pid: number; startedAt: string; host: string; endpoint: string | null; tokenDigest: string | null };
 
 function pidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }
@@ -23,30 +24,35 @@ export class LocalLedger {
   private readonly latest = new Map<string, JournalEntry>();
   private seq = 0;
   private closed = false;
+  private readonly writerId = randomUUID();
   readonly recovered: Array<{ aggregateId: string; lastType: string }> = [];
 
   private constructor(readonly dir: string, private readonly lockPath: string, private readonly journalPath: string) {}
 
   static open(stateDir: string): LocalLedger {
     const dir = join(stateDir, 'ledger');
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
     const lockPath = join(dir, 'lock.json');
     const journalPath = join(dir, 'journal.jsonl');
     const ledger = new LocalLedger(dir, lockPath, journalPath);
-    ledger.load();
-    if (existsSync(lockPath)) {
-      let lock: LockFile | null = null;
-      try { lock = JSON.parse(readFileSync(lockPath, 'utf8')) as LockFile; } catch { lock = null; }
-      if (lock && lock.pid !== process.pid && pidAlive(lock.pid)) {
-        throw new Conflict(`ledger at ${dir} is held by live process ${lock.pid} (started ${lock.startedAt}); ` +
-          `delegation endpoint ${lock.endpoint ?? 'not published'}; stop that process or use its controller`);
-      }
-      if (lock) {
+    const guardPath = join(dir, 'acquire.lock');
+    let guard: number;
+    try { guard = openSync(guardPath, 'wx', 0o600); }
+    catch { throw new Conflict(`ledger acquisition in progress at ${dir}; reconcile an abandoned acquire.lock before retrying`); }
+    try {
+      if (existsSync(lockPath)) {
+        const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as LockFile;
+        if (lock.host !== hostname()) throw new Conflict(`ledger ${dir} belongs to another host; local fencing cannot recover it`);
+        if (pidAlive(lock.pid)) {
+          throw new Conflict(`ledger at ${dir} is held by live process ${lock.pid} (started ${lock.startedAt}); delegation endpoint ${lock.endpoint ?? 'not published'}`);
+        }
+        ledger.load();
         ledger.recoverInterrupted(lock);
-      }
-    }
-    const lock: LockFile = { pid: process.pid, startedAt: nowIso(), host: hostname(), endpoint: null, tokenDigest: null };
-    writeFileSync(lockPath, JSON.stringify(lock));
+        rmSync(lockPath);
+      } else ledger.load();
+      const lock: LockFile = { writerId: ledger.writerId, pid: process.pid, startedAt: nowIso(), host: hostname(), endpoint: null, tokenDigest: null };
+      writeFileSync(lockPath, JSON.stringify(lock), { flag: 'wx', mode: 0o600 });
+    } finally { closeSync(guard); rmSync(guardPath); }
     return ledger;
   }
 
@@ -55,6 +61,9 @@ export class LocalLedger {
     const lines = readFileSync(this.journalPath, 'utf8').split('\n').filter((line) => line.trim().length > 0);
     for (const line of lines) {
       const entry = JSON.parse(line) as JournalEntry;
+      if (entry.seq !== this.seq + 1 || entry.version !== this.version(entry.aggregateId) + 1) {
+        throw new Conflict(`corrupt journal at sequence ${entry.seq}: non-contiguous sequence or aggregate version`);
+      }
       this.entries.push(entry);
       this.seq = Math.max(this.seq, entry.seq);
       this.versions.set(entry.aggregateId, entry.version);
@@ -102,12 +111,18 @@ export class LocalLedger {
     return entry;
   }
 
+  publishController(endpoint: string, tokenDigest: string): void {
+    const lock = JSON.parse(readFileSync(this.lockPath, 'utf8')) as LockFile;
+    if (lock.writerId !== this.writerId || this.closed) throw new Conflict('ledger ownership lost');
+    writeFileSync(this.lockPath, JSON.stringify({ ...lock, endpoint, tokenDigest }), { mode: 0o600 });
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
     try {
       const lock = JSON.parse(readFileSync(this.lockPath, 'utf8')) as LockFile;
-      if (lock.pid === process.pid) rmSync(this.lockPath, { force: true });
+      if (lock.writerId === this.writerId) rmSync(this.lockPath, { force: true });
     } catch { /* lock already gone */ }
   }
 }

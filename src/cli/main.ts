@@ -10,6 +10,9 @@ import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
 import { LocalLedger } from '../core/ledger.ts';
+import { delegateRun, startController } from '../core/controller.ts';
+import { searchCases } from '../core/lookup.ts';
+import { createRerun } from '../core/rerun.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
@@ -66,6 +69,9 @@ const HELP = `workflow-verify <command> [--flags]
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
   seed --request <request.json> --preview              show planned fixture resources and cleanup (no effects)
   run --request <request.json> [--jsonl]               admit and execute the frozen request
+  controller --state-dir <dir> --project-root <dir>    own the local ledger; CLI runs delegate
+  cases --config <workflow.yaml> [--id <id>] [--cursor <cursor>]
+  rerun --request <request.json> --output <new.json>   freeze a fresh attempt on the same cases
   inspect --execution <id> --state-dir <dir> [--failed-step]
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
@@ -93,6 +99,26 @@ async function main(argv: string[]): Promise<number> {
       const project = loadProject(requireFlag(args, 'config'));
       out(args, { project: project.config.project, corpusDigest: project.corpus.manifest.ref.digest.hex, members: project.corpus.manifest.members.length, cases: project.suiteCases.map((c) => c.ref.id) },
         `valid: ${project.corpus.manifest.members.length} definitions, corpus ${project.corpus.manifest.ref.digest.hex.slice(0, 12)}; ${project.suiteCases.length} suite cases. Validation approves nothing and verifies no product.`);
+      return 0;
+    }
+
+    case 'cases': {
+      const project = loadProject(requireFlag(args, 'config'));
+      const query: import('../core/lookup.ts').CaseQuery = {};
+      for (const name of ['id', 'workflow', 'surface', 'text', 'cursor'] as const) {
+        const value = flag(args, name); if (value) query[name] = value;
+      }
+      if (flag(args, 'limit')) query.limit = Number(flag(args, 'limit'));
+      const page = searchCases(project, query);
+      out(args, page, JSON.stringify(page, null, 2)); return 0;
+    }
+
+    case 'rerun': {
+      const bundle = createRerun(readBundle(requireFlag(args, 'request')));
+      const output = resolve(requireFlag(args, 'output'));
+      mkdirSync(dirname(output), { recursive: true });
+      writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
+      out(args, { output, requestRef: bundle.request!.ref, replayOf: bundle.request!.replayOf }, `fresh rerun request: ${output}`);
       return 0;
     }
 
@@ -155,22 +181,37 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case 'controller': {
+      const controller = await startController(requireFlag(args, 'state-dir'), requireFlag(args, 'project-root'));
+      out(args, { endpoint: controller.endpoint }, `controller ready: ${controller.endpoint}`);
+      await new Promise<void>((done) => {
+        const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); done(); };
+        process.on('SIGINT', stop); process.on('SIGTERM', stop);
+      });
+      await controller.close();
+      return 0;
+    }
+
     case 'run': {
       const bundle = readBundle(requireFlag(args, 'request'));
       if (!bundle.request) { out(args, { outcome: 'blocked', blockers: bundle.blockers }, `BLOCKED: ${bundle.blockers.map((b) => b.code).join(', ')}`); return 2; }
       const stateDir = flag(args, 'state-dir') ?? stateDirFor(bundle.projectRoot);
-      const ledger = LocalLedger.open(stateDir);
+      let ledger: LocalLedger | null = null;
+      try { ledger = LocalLedger.open(stateDir); }
+      catch (error) { if (!(error instanceof Conflict)) throw error; }
       const controller = new AbortController();
       const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
       process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
       try {
-        const summary = await executeBundle({ bundle, stateDir, ledger, scope: localScope(), signal: controller.signal, ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) });
+        const summary = ledger
+          ? await executeBundle({ bundle, stateDir, ledger, scope: localScope(), signal: controller.signal, ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) })
+          : await delegateRun(stateDir, bundle, controller.signal);
         const result = { executionId: summary.executionId, attemptId: summary.attemptId, campaignId: summary.campaignId, outcome: summary.outcome, exitCode: summary.exitCode, reasonCodes: summary.reasonCodes, redelivered: summary.redelivered, executionDir: summary.executionDir, cells: summary.receipts.map((r) => ({ cell: r.selectionCellId, outcome: r.outcome, proofClaim: r.proofClaim, firstFailure: r.steps.find((s) => s.result !== 'completed')?.stepId ?? null, failedAssertions: r.assertions.filter((a) => a.result === 'fail').map((a) => a.assertionId) })) };
         out(args, result, `${summary.outcome.toUpperCase()} (${summary.redelivered ? 'reconciled existing execution ' : 'execution '}${summary.executionId})\n` + result.cells.map((c) => `  ${c.cell}: ${c.outcome}${c.firstFailure ? `; first failure at step ${c.firstFailure}` : ''}${c.failedAssertions.length ? `; failed ${c.failedAssertions.join(', ')}` : ''}`).join('\n') + `\nreasons: ${summary.reasonCodes.join(', ') || 'none'}\nbundle: ${summary.executionDir}`);
         return summary.exitCode;
       } finally {
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
-        ledger.close();
+        ledger?.close();
       }
     }
 

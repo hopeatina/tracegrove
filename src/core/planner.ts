@@ -197,7 +197,8 @@ export function plan(input: PlanInput): FrozenBundle {
   }), 'effective config');
   keep(selection); keep(fidelityPlan); if (fixturePlan) keep(fixturePlan); keep(effectiveConfig);
 
-  const idempotencyKey = `req_${createHash('sha256').update([selection.ref.digest.hex, fidelityPlan.ref.digest.hex, fixturePlan?.ref.digest.hex ?? 'none', effectiveConfig.ref.digest.hex, hostPlan.ref.digest.hex, intelligencePolicy.ref.digest.hex].join('|')).digest('hex').slice(0, 32)}`;
+  const campaignId = newId('campaign');
+  const idempotencyKey = `req_${createHash('sha256').update([campaignId, selection.ref.digest.hex, fidelityPlan.ref.digest.hex, fixturePlan?.ref.digest.hex ?? 'none', effectiveConfig.ref.digest.hex, hostPlan.ref.digest.hex, intelligencePolicy.ref.digest.hex].join('|')).digest('hex').slice(0, 32)}`;
   let request: RunRequest | null = null;
   if (blockers.length === 0) {
     request = parseAs(RunRequest, freeze({
@@ -206,7 +207,7 @@ export function plan(input: PlanInput): FrozenBundle {
       clientRequestId: newId('client'),
       idempotencyKey,
       requestedScope: scope,
-      campaignId: newId('campaign'),
+      campaignId,
       purpose: input.purpose ?? 'trial',
       sourcePlanRef: null, reviewRef: null, scenarioRefs: [], qualificationRoundRef: null,
       effectiveConfigRef: effectiveConfig.ref,

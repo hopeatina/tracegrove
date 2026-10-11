@@ -4,6 +4,7 @@ import * as E from './schemas/execution.ts';
 import { Suite, WorkflowConfig } from './schemas/config.ts';
 import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
+import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -12,12 +13,15 @@ export * from './schemas/execution.ts';
 export * from './schemas/config.ts';
 export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
+export * from './schemas/review.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
   'workflow.config/v1': WorkflowConfig,
   'workflow.suite/v1': Suite,
   'workflow.corpus/v1': CorpusManifest,
+  'workflow.source-plan/v1': SourcePlan,
+  'workflow.plan-review/v1': PlanReview,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -56,6 +60,7 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.plan-edit-projection/v1': PlanEditProjection,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
   'workflow.runner-protocol/v1.host': HostFrame,

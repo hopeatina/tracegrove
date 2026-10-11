@@ -3,8 +3,10 @@
  * hashes, every self digest, re-derives assertions from the frozen case and step observations and
  * re-reduces the outcome. A bundle whose reduction disagrees with its receipt is not evidence.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, lstatSync } from 'node:fs';
+import { join, isAbsolute } from 'node:path';
+import { z } from 'zod';
+import { checkCellEvidence } from './bundleEvidence.ts';
 import {
   CampaignResult, CaseFixturePlan, CaseSpec, ExecutionReceipt, RunRequest, SeedRecipe, SelectionManifest, canonicalize, digestOfBytes, parseAs,
   refKey, sameDigest, verifySelfDigest, type Ref,
@@ -70,15 +72,38 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
 export type BundleVerification = { ok: boolean; problems: string[]; outcome: CampaignResult['outcome'] | null; receipts: number };
 
 export function verifyBundle(dir: string): BundleVerification {
+  try { return verifyBundleRecords(dir); }
+  catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 }; }
+}
+
+function verifyBundleRecords(dir: string): BundleVerification {
   const problems: string[] = [];
   const manifestPath = join(dir, 'manifest.json');
   if (!existsSync(manifestPath)) return { ok: false, problems: ['manifest.json missing'], outcome: null, receipts: 0 };
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { files: Array<{ path: string; sha256: string }> };
+  const manifest = z.object({
+    schemaVersion: z.literal(BUNDLE_SCHEMA_VERSION), executionId: z.string().nullable(), campaignId: z.string(),
+    reducer: z.unknown(), runner: z.unknown(), createdAt: z.string(),
+    files: z.array(z.object({ path: z.string(), sha256: z.string().regex(/^[0-9a-f]{64}$/), bytes: z.number().int().nonnegative() }).strict()).min(1).max(10_000),
+  }).strict().parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
+  const listed = new Set<string>();
   for (const file of manifest.files) {
+    if (isAbsolute(file.path) || file.path.includes('\\') || file.path.split('/').some((part) => !part || part === '.' || part === '..') || listed.has(file.path)) {
+      problems.push(`unsafe or duplicate manifest path ${file.path}`); continue;
+    }
+    listed.add(file.path);
     const full = join(dir, file.path);
+    let segment = dir;
+    for (const part of file.path.split('/')) {
+      segment = join(segment, part);
+      if (existsSync(segment) && lstatSync(segment).isSymbolicLink()) throw new Error(`symlink in bundle ${file.path}`);
+    }
     if (!existsSync(full)) { problems.push(`missing ${file.path}`); continue; }
-    if (digestOfBytes(readFileSync(full)).hex !== file.sha256) problems.push(`hash mismatch ${file.path}`);
+    const bytes = readFileSync(full);
+    if (bytes.length !== file.bytes || digestOfBytes(bytes).hex !== file.sha256) problems.push(`hash mismatch ${file.path}`);
   }
+  const requireListed = (file: string) => { if (!listed.has(file)) problems.push(`unsealed required file ${file}`); };
+  for (const file of ['request.json', 'selection.json', 'campaign.json', 'documents.json']) requireListed(file);
+  if (problems.length) return { ok: false, problems, outcome: null, receipts: 0 };
   const request = parseAs(RunRequest, JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8')), 'request');
   const selection = parseAs(SelectionManifest, JSON.parse(readFileSync(join(dir, 'selection.json'), 'utf8')), 'selection');
   const campaign = parseAs(CampaignResult, JSON.parse(readFileSync(join(dir, 'campaign.json'), 'utf8')), 'campaign');
@@ -86,12 +111,19 @@ export function verifyBundle(dir: string): BundleVerification {
     if (!verifySelfDigest(doc)) problems.push(`${label} self digest mismatch`);
   }
   const documents = existsSync(join(dir, 'documents.json')) ? (JSON.parse(readFileSync(join(dir, 'documents.json'), 'utf8')) as Record<string, unknown>) : {};
+  for (const [key, doc] of Object.entries(documents)) {
+    const record = doc as { ref: Ref };
+    if (!record?.ref || !verifySelfDigest(record) || refKey(record.ref) !== key) problems.push(`document digest mismatch ${key}`);
+  }
+  if (!sameDigest(request.selectionManifestRef.digest, selection.ref.digest) || !sameDigest(campaign.selectionManifestRef.digest, selection.ref.digest) || !sameDigest(campaign.requestRef.digest, request.ref.digest)) problems.push('request/selection/campaign binding mismatch');
   const receipts: ExecutionReceipt[] = [];
   const cellsDir = join(dir, 'cells');
   for (const name of existsSync(cellsDir) ? readdirSync(cellsDir) : []) {
+    for (const file of ['receipt.json', 'events.jsonl', 'environment.json', 'fixtures.json', 'boundaries.json', 'host.json', 'accounting.json', 'assertions.json', 'cleanup.json', 'finalization.json']) requireListed(`cells/${name}/${file}`);
     const receiptPath = join(cellsDir, name, 'receipt.json');
     if (!existsSync(receiptPath)) { problems.push(`cell ${name} has no receipt`); continue; }
     const receipt = parseAs(ExecutionReceipt, JSON.parse(readFileSync(receiptPath, 'utf8')), 'receipt');
+    checkCellEvidence({ dir, name, receipt, request, selection, documents, problems });
     if (!verifySelfDigest(receipt)) problems.push(`receipt ${name} self digest mismatch`);
     const events = readFileSync(join(cellsDir, name, 'events.jsonl'));
     if (!sameDigest(digestOfBytes(events), receipt.eventsDigest)) problems.push(`events digest mismatch for ${name}`);

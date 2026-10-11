@@ -200,7 +200,7 @@ describe('verifier.surface_parity', () => {
     const out = join(copy.root, 'cli-request.json');
     execFileSync('node', ['--import', 'tsx', join(import.meta.dirname, '..', 'src', 'cli', 'main.ts'), 'plan', '--config', copy.configPath, '--output', out], { stdio: 'pipe' });
     const cli = JSON.parse(readFileSync(out, 'utf8')) as typeof library;
-    expect(cli.request!.idempotencyKey).toBe(library.request!.idempotencyKey);
+    expect(cli.request!.idempotencyKey).not.toBe(library.request!.idempotencyKey); // independent campaigns, identical semantic selection
     expect(cli.request!.selectionManifestRef.digest.hex).toBe(library.request!.selectionManifestRef.digest.hex);
     expect(cli.request!.effectiveConfigRef.digest.hex).toBe(library.request!.effectiveConfigRef.digest.hex);
   });
