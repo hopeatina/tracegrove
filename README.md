@@ -28,6 +28,13 @@ for one project. CLI runs delegate to that writer; concurrent redelivery reconci
 execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
 campaign while preserving case digests and original request lineage.
 
+The POSIX local host uses a trusted supervisor with an IPC ownership channel. If
+the controller is killed, the supervisor terminates the application process group
+and removes its owned workspace. A process-kill test checks both effects. This
+does not establish recovery after the supervisor itself is killed, distributed
+fencing, or cleanup of external provider resources. Windows local launches are
+blocked until a process-tree ownership implementation exists.
+
 Bundle verification checks sealed required files, host capability records, target attestations,
 fixture completeness and boundary observations. It rejects empty/traversal manifests and
 producer resealing that removes required observations. This verifies portable integrity and
