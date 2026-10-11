@@ -90,8 +90,9 @@ export class LocalProcessHost implements ExecutorHost {
     }
     const env: Record<string, string> = { ...launch.env, PATH: process.env.PATH ?? '', [launch.portEnv]: '0', [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
     const child: ChildProcess = spawn(launch.command, launch.args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
-    const stderr: string[] = [];
-    child.stderr?.on('data', (chunk: Buffer) => { if (stderr.length < 50) stderr.push(chunk.toString('utf8')); });
+    // Candidate output may contain credentials. Drain it without exporting it as proof.
+    child.stderr?.resume();
+    try {
     const port = await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
       const timer = setTimeout(() => reject(new InfrastructureFailure(`application did not report a port within ${launch.readiness.timeoutMs} ms`)), launch.readiness.timeoutMs);
@@ -100,7 +101,7 @@ export class LocalProcessHost implements ExecutorHost {
         const match = buffer.match(/listening (\d+)/);
         if (match) { clearTimeout(timer); resolvePort(Number(match[1])); }
       });
-      child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code}): ${stderr.join('').slice(0, 500)}`)); });
+      child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`)); });
       child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)); });
     });
     const origin = `http://127.0.0.1:${port}`;
@@ -150,5 +151,17 @@ export class LocalProcessHost implements ExecutorHost {
     };
     if (context.signal.aborted) { await session.stop('cancelled during start'); throw new InfrastructureFailure('cancelled during host start'); }
     return session;
+    } catch (error) {
+      child.kill('SIGKILL');
+      if (child.exitCode === null && child.signalCode === null) {
+        await new Promise<void>((done) => {
+          const timeout = setTimeout(done, context.hostPlan.cleanupReserveMs);
+          child.once('exit', () => { clearTimeout(timeout); done(); });
+        });
+      }
+      credentials.clear();
+      if (child.exitCode !== null || child.signalCode !== null) rmSync(context.workspaceDir, { recursive: true, force: true });
+      throw error;
+    }
   }
 }

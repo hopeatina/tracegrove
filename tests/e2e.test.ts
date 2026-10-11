@@ -77,7 +77,7 @@ describe('end to end', () => {
   it('refuses a second live writer and recovers a stale lock', () => {
     const dir = stateDir();
     const first = LocalLedger.open(dir);
-    expect(() => LocalLedger.open(dir)).not.toThrow(); // same pid re-opens
+    expect(() => LocalLedger.open(dir)).toThrow(/live process/);
     first.close();
     expect(existsSync(join(dir, 'ledger', 'lock.json'))).toBe(false);
   });

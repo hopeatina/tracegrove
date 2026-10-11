@@ -95,6 +95,9 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   if (!bundle.request) throw new Blocked(bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, owner: b.owner, action: b.action })));
   const request = bundle.request;
   if (!verifySelfDigest(request)) throw new Blocked([{ code: 'request_digest_mismatch', detail: 'the frozen request was modified after planning', owner: 'operator', action: 'plan again' }]);
+  if (digestOfValue(request.requestedScope).hex !== digestOfValue(scope).hex) {
+    throw new Blocked([{ code: 'scope_mismatch', detail: 'request scope differs from the authenticated controller owner' }]);
+  }
   const docs = new DocStore(bundle.documents);
   const selection = docs.get<SelectionManifest>(SelectionManifest, request.selectionManifestRef, 'selection');
   const fidelityPlan = docs.get<FidelityPlan>(FidelityPlan, request.fidelityPlanRef, 'fidelity plan');

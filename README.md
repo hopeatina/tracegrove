@@ -19,13 +19,23 @@ What exists and is exercised by tests:
   reverse-order cleanup, boundary observations, sealed receipts, trusted reducer.
 - Evidence bundle writer and `verify-bundle`, which rehashes every file, rechecks every self
   digest, re-derives assertions from the frozen case and re-reduces the verdict.
-- `workflow-verify` CLI: `sample-config`, `validate`, `doctor`, `plan`, `seed --preview`,
+- `workflow-verify` CLI: `sample-config`, `validate`, `doctor`, `plan`, `cases`, `rerun`, `controller`, `seed --preview`,
   `run`, `inspect`, `export`, `verify-bundle`, `schema`. Exit codes 0/1/2/3/4.
 - A real file-backed notes API sample with its corpus, plus an offline contract lane.
 
+The local controller owns an exclusive ledger and accepts authenticated loopback commands
+for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
+execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
+campaign while preserving case digests and original request lineage.
+
+Bundle verification checks sealed required files, host capability records, target attestations,
+fixture completeness and boundary observations. It rejects empty/traversal manifests and
+producer resealing that removes required observations. This verifies portable integrity and
+record consistency; the importer still needs its own issuer trust and access policy.
+
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
 source selection resolver, review/qualification lifecycle, authoring inference, hosted
-coordinator, CLI delegation to a running local controller, `seed --apply`.
+coordinator, `seed --apply`, distributed crash recovery and required media capture.
 
 ## Zero-OrgX quickstart
 
@@ -48,13 +58,13 @@ npm run verify            # typecheck, schema sync, unit and end-to-end tests
 npm run test:conformance  # verifier conformance cases (refusals and non-green results)
 ```
 
-## Moving this directory to its own repository
+## Repository provenance
 
-The package is self-contained. From the orgx checkout:
+This private repository was extracted with `git subtree split` from
+`hopeatina/orgx:packages/tracegrove` at OrgX commit
+`6da4205e0cef9fbd75b0e8e04cdfc6d5de669910`. The extracted bootstrap commit is
+`92f163c49812e373bdb04550ea3771b278eab0cd`.
 
-```text
-git subtree split --prefix=packages/tracegrove -b tracegrove-main
-git push <tracegrove-remote> tracegrove-main:main
-```
-
-`.github/workflows/ci.yml` in this directory becomes the new repository's CI.
+`codex/bootstrap` is the initial default branch. Changes remain reviewable in a PR;
+no release has been published. The standalone sample installs a pinned package archive,
+so its CI needs no cross-repository credential.
