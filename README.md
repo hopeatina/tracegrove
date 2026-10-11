@@ -40,8 +40,17 @@ fixture completeness and boundary observations. It rejects empty/traversal manif
 producer resealing that removes required observations. This verifies portable integrity and
 record consistency; the importer still needs its own issuer trust and access policy.
 
+The initial Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
+digests and scopes. Every specification edit clears its review. Concurrent edits and
+reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
+review nor projection. Reviewer identity and policy come from authenticated host
+admission. Tests exercise stale tokens, concurrent writers, resolver tampering and
+denied authority. This API has no hosted store, execution-admission integration or
+scenario activation. Resolving and validating source citations and coverage policy
+remain separate work; these records alone are not authority for product execution.
+
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
-source selection resolver, review/qualification lifecycle, authoring inference, hosted
+source selection resolver, complete review/qualification lifecycle, authoring inference, hosted
 coordinator, `seed --apply`, distributed crash recovery and required media capture.
 
 ## Zero-OrgX quickstart

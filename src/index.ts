@@ -6,6 +6,7 @@ export { LocalLedger } from './core/ledger.ts';
 export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
 export { createRerun } from './core/rerun.ts';
+export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, type ReviewSnapshot } from './core/review.ts';
 export { verifyBundle, writeExecutionBundle } from './core/bundle.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';

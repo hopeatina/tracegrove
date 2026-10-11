@@ -1,0 +1,756 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidates": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilityRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "caseRef": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "algorithm": {
+                        "const": "sha256",
+                        "type": "string"
+                      },
+                      "hex": {
+                        "pattern": "^[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "algorithm",
+                      "hex"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disposition": {
+            "enum": [
+              "runnable",
+              "blocked",
+              "excluded",
+              "not_derivable"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "reasonRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "sourceElementIds": {
+            "items": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "sourceElementIds",
+          "caseRef",
+          "disposition",
+          "reasonRefs",
+          "capabilityRefs"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "changeModelRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "coverageObligationRefs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "additionalProperties": false,
+            "properties": {
+              "algorithm": {
+                "const": "sha256",
+                "type": "string"
+              },
+              "hex": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "algorithm",
+              "hex"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "revision": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "disposition": {
+      "enum": [
+        "scenario_set",
+        "no_e2e_warranted",
+        "surface_unresolved"
+      ],
+      "type": "string"
+    },
+    "dispositionReasonRefs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "additionalProperties": false,
+            "properties": {
+              "algorithm": {
+                "const": "sha256",
+                "type": "string"
+              },
+              "hex": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "algorithm",
+              "hex"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "revision": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "gapRefs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "additionalProperties": false,
+            "properties": {
+              "algorithm": {
+                "const": "sha256",
+                "type": "string"
+              },
+              "hex": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "algorithm",
+              "hex"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "revision": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "invalidFlows": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnosticRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "flowRef": {
+            "additionalProperties": false,
+            "properties": {
+              "digest": {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "revision": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "digest"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "flowRef",
+          "diagnosticRefs"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "ref": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "revisionMatrixRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "workflow.source-plan/v1",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "tenantId": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "owner_private",
+            "tenant_private"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "tenantId",
+        "visibility"
+      ],
+      "type": "object"
+    },
+    "validFlowRefs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "additionalProperties": false,
+            "properties": {
+              "algorithm": {
+                "const": "sha256",
+                "type": "string"
+              },
+              "hex": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "algorithm",
+              "hex"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "revision": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "withheldFlows": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "flowRef": {
+            "additionalProperties": false,
+            "properties": {
+              "digest": {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "revision": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "reasonRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          }
+        },
+        "required": [
+          "flowRef",
+          "reasonRefs"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "ref",
+    "scope",
+    "revisionMatrixRef",
+    "changeModelRef",
+    "disposition",
+    "dispositionReasonRefs",
+    "candidates",
+    "validFlowRefs",
+    "withheldFlows",
+    "invalidFlows",
+    "coverageObligationRefs",
+    "gapRefs"
+  ],
+  "type": "object"
+}
