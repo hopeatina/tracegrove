@@ -98,8 +98,15 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   if (digestOfValue(request.requestedScope).hex !== digestOfValue(scope).hex) {
     throw new Blocked([{ code: 'scope_mismatch', detail: 'request scope differs from the authenticated controller owner' }]);
   }
+  if (request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length) {
+    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'reviewed source plans, qualification and activated regression admission require the unimplemented lifecycle authority' }]);
+  }
   const docs = new DocStore(bundle.documents);
   const selection = docs.get<SelectionManifest>(SelectionManifest, request.selectionManifestRef, 'selection');
+  if (digestOfValue(selection.scope).hex !== digestOfValue(scope).hex) throw new Blocked([{ code: 'selection_scope_mismatch', detail: 'selection is outside the admitted owner scope' }]);
+  const selectedCases = [...new Set(selection.cells.map((cell) => refKey(cell.caseRef)))].sort();
+  const requestedCases = request.caseRefs.map(refKey).sort();
+  if (digestOfValue(selectedCases).hex !== digestOfValue(requestedCases).hex) throw new Blocked([{ code: 'request_selection_mismatch', detail: 'request cases must exactly match the frozen selection' }]);
   const fidelityPlan = docs.get<FidelityPlan>(FidelityPlan, request.fidelityPlanRef, 'fidelity plan');
   if (!sameDigest(fidelityPlan.selectionManifestRef.digest, selection.ref.digest)) throw new Blocked([{ code: 'fidelity_plan_foreign_selection', detail: 'fidelity plan binds a different selection manifest' }]);
   const campaignFixturePlan = request.fixturePlanRef ? docs.get<CampaignFixturePlan>(CampaignFixturePlan, request.fixturePlanRef, 'fixture plan') : null;
@@ -145,6 +152,8 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   let attemptNumber = 1;
   if (existing) {
     const executionId = String(existing.data.executionId);
+    const admitted = ledger.history(`execution:${executionId}`).find((entry) => entry.type === 'admitted');
+    if (admitted?.data.requestDigest !== request.ref.digest.hex) throw new Conflict('idempotency key is already bound to a different frozen request');
     const state = ledger.current(`execution:${executionId}`);
     if (state && state.type === 'finalized') {
       return { ...(state.data.summary as RunSummary), redelivered: true };

@@ -19,11 +19,12 @@ describe('plan', () => {
     expect(Object.keys(bundle.documents).length).toBeGreaterThan(15);
   });
 
-  it('is deterministic for the same frozen inputs (idempotency key) while campaign ids differ', () => {
+  it('freezes deterministic selection while separate plans receive fresh campaign keys', () => {
     const project = loadProject(SAMPLE);
     const a = plan({ project, profileName: 'native-real', scope: localScope() });
     const b = plan({ project, profileName: 'native-real', scope: localScope() });
-    expect(a.request!.idempotencyKey).toBe(b.request!.idempotencyKey);
+    expect(a.request!.idempotencyKey).not.toBe(b.request!.idempotencyKey);
+    expect(a.request!.selectionManifestRef.digest).toEqual(b.request!.selectionManifestRef.digest);
     expect(a.request!.campaignId).not.toBe(b.request!.campaignId);
   });
 
