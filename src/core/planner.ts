@@ -148,6 +148,10 @@ export function plan(input: PlanInput): FrozenBundle {
       if (!sameDigest(regenerated.ref.digest, payload.ref.digest)) cellBlock('stale_logical_payload', `${caseFixturePlan.logicalPayloadRef.id} no longer matches recipe ${recipe.ref.id}; rematerialize and review`, 'case author', 'run materialize-payload and review the diff');
       const registry = corpus.getAs(ActionRegistry, recipe.actionRegistryRef);
       for (const entity of recipe.entities) {
+        const allocation = registry.actions.find(action => action.actionId === entity.actionId);
+        if (allocation && allocation.effect !== 'create') cellBlock('fixture_ownership_unavailable',
+          `${recipe.ref.id}.${entity.entityKey}: ${allocation.actionId} does not allocate an owned resource`,
+          'case author', 'use a registered create action; borrowed resources require a separately qualified adapter');
         for (const actionId of [entity.actionId, entity.readback?.actionId, entity.cleanup?.actionId, entity.cleanup?.absenceReadback.actionId].filter((a): a is string => !!a)) {
           if (!registry.actions.some((a) => a.actionId === actionId)) cellBlock('unregistered_action', `${recipe.ref.id}.${entity.entityKey}: ${actionId}`);
         }

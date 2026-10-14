@@ -35,3 +35,10 @@ Takeover requires an explicit bounded `ttlMs` (at most five minutes) and creates
 a fresh reconciliation lease. The current worker may heartbeat that lease, but
 cannot admit new effects. Expired heartbeat and release commands fail; another
 worker must recover with a higher fence before cleanup can release the persona.
+
+The portable executor's cleanup report retains unknown allocations and owned
+fixtures without cleanup handles. A lost captured ID never becomes an invented
+resource identifier. Host cleanup failure is sealed as unconfirmed evidence.
+Planning refuses read actions as owned allocation. These observations are not
+independent admission to release a hosted lease; the trusted adapter must still
+obtain and verify provider readbacks under the current fence.
