@@ -174,7 +174,11 @@ export class LocalProcessHost implements ExecutorHost {
         });
       }
       credentials.clear();
-      if (child.exitCode !== null || child.signalCode !== null) rmSync(context.workspaceDir, { recursive: true, force: true });
+      // Supervisor exit alone says nothing about its owned process group. Keep
+      // the inventory/workspace unless the trusted owner acknowledged cleanup.
+      if (ownedCleanupConfirmed && (child.exitCode !== null || child.signalCode !== null)) {
+        rmSync(context.workspaceDir, { recursive: true, force: true });
+      }
       throw error;
     }
   }
