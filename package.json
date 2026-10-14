@@ -13,7 +13,7 @@
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" }
   },
-  "files": ["dist", "schema", "samples", "LICENSE", "README.md"],
+  "files": ["dist", "schema", "samples", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
