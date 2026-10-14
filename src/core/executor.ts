@@ -317,7 +317,9 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         if (typeof observedId !== 'string' && !(typeof observedId === 'number' && Number.isFinite(observedId))) {
           throw new HttpStepError('fixture_identity_unobserved', 'fixture allocation did not return a physical resource ID');
         }
-        const physicalId = FixtureManifest.shape.entities.element.shape.physicalId.parse(String(observedId));
+        const parsedId = FixtureManifest.shape.entities.element.shape.physicalId.safeParse(String(observedId));
+        if (!parsedId.success) throw new HttpStepError('fixture_identity_unobserved', 'captured fixture ID is invalid');
+        const physicalId = parsedId.data;
         const cleanupHandle = entity.cleanup ? { actionId: entity.cleanup.actionId, args: { ...variables, ...outputs } } : null;
         const allocatedEvent = log.emit('fixture.allocated', null, { entityKey, physicalId, status: observation.status, requestId: observation.requestId, cleanupHandle }, { requestId: observation.requestId });
         allocated.push({ entityKey, physicalId, cleanup: cleanupHandle, absence: entity.cleanup ? entity.cleanup.absenceReadback : null });
