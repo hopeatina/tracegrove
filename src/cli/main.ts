@@ -14,6 +14,7 @@ import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
 import { verifyBundle } from '../core/bundle.ts';
+import { checkCleanupFiles } from './cleanup.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
@@ -75,6 +76,8 @@ const HELP = `workflow-verify <command> [--flags]
   inspect --execution <id> --state-dir <dir> [--failed-step]
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
+                                                       check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
@@ -246,6 +249,15 @@ async function main(argv: string[]): Promise<number> {
       const verification = verifyBundle(resolve(requireFlag(args, 'bundle')));
       out(args, verification, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
       return verification.ok ? 0 : 2;
+    }
+
+    case 'verify-cleanup': {
+      const result = checkCleanupFiles(resolve(requireFlag(args, 'proof')),
+        resolve(requireFlag(args, 'expectation')), resolve(requireFlag(args, 'trust')));
+      out(args, result, result.ok
+        ? `cleanup follow-up integrity valid: ${result.proofDigest}\n${result.resourceCount} resource(s); hosted release is not admitted`
+        : `cleanup follow-up INVALID:\n  ${result.problems.join('\n  ')}`);
+      return result.ok ? 0 : 2;
     }
 
     case 'schema': {

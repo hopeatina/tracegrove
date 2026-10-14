@@ -4,6 +4,7 @@ import * as E from './schemas/execution.ts';
 import { Suite, WorkflowConfig } from './schemas/config.ts';
 import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
+import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 
 export * from './canonical.ts';
@@ -13,6 +14,7 @@ export * from './schemas/execution.ts';
 export * from './schemas/config.ts';
 export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
+export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
@@ -60,6 +62,9 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.cleanup-expectation/v1': CleanupExpectationSchema,
+  'workflow.cleanup-followup/v1': CleanupFollowupSchema,
+  'workflow.signed-cleanup-followup/v1': SignedCleanupFollowupSchema,
   'workflow.plan-edit-projection/v1': PlanEditProjection,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
