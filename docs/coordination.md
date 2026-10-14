@@ -28,3 +28,10 @@ lease quarantine, takeover fencing, persisted uncertain effects, retained spend,
 scope/version substitution and ordinary-caller cleanup rejection. The storage
 adapter, live PostgreSQL race tests and provider reconciliation remain required
 before enabling hosted execution.
+
+## Recovery ownership
+
+Takeover requires an explicit bounded `ttlMs` (at most five minutes) and creates
+a fresh reconciliation lease. The current worker may heartbeat that lease, but
+cannot admit new effects. Expired heartbeat and release commands fail; another
+worker must recover with a higher fence before cleanup can release the persona.

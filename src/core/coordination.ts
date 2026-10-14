@@ -3,6 +3,7 @@ import { Conflict } from './errors.ts';
 
 const Key = z.string().min(1).max(256);
 const Counter = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const LeaseDuration = Counter.positive().max(300_000);
 const LeaseSchema = z.object({
   attemptId: Key, workerId: Key, personaId: Key, generation: Counter.positive(),
   expiresAt: Counter, reservedCents: Counter.positive(),
@@ -36,11 +37,11 @@ export type CoordinationFence = { attemptId: string; workerId: string; generatio
 
 const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('reserve'), attemptId: Key, workerId: Key, personaId: Key,
-    reservedCents: Counter.positive(), ttlMs: Counter.positive().max(300_000) }).strict(),
+    reservedCents: Counter.positive(), ttlMs: LeaseDuration }).strict(),
   z.object({ type: z.literal('heartbeat'), attemptId: Key, workerId: Key, generation: Counter.positive(),
-    ttlMs: Counter.positive().max(300_000) }).strict(),
+    ttlMs: LeaseDuration }).strict(),
   z.object({ type: z.literal('effect'), attemptId: Key, workerId: Key, generation: Counter.positive(), effectId: Key }).strict(),
-  z.object({ type: z.literal('recover'), attemptId: Key, workerId: Key }).strict(),
+  z.object({ type: z.literal('recover'), attemptId: Key, workerId: Key, ttlMs: LeaseDuration }).strict(),
   z.object({ type: z.literal('release'), attemptId: Key, workerId: Key, generation: Counter.positive(), cleanupProof: Key }).strict(),
 ]);
 export type CoordinationCommand = z.infer<typeof CommandSchema>;
@@ -72,16 +73,18 @@ export function transitionCoordination(raw: unknown, scopeId: string, expectedVe
       lease.generation = state.generation;
       lease.workerId = command.workerId;
       lease.state = 'reconciling';
+      lease.expiresAt = observedAt + command.ttlMs;
       // Recovery admits cleanup/readback only. It never replays an uncertain effect.
     } else {
       if (lease.workerId !== command.workerId || lease.generation !== command.generation) throw new Conflict('Stale coordination fence');
+      if (lease.expiresAt <= observedAt) throw new Conflict('Coordination lease expired; recover before continuing');
       if (command.type === 'release') {
         lease.state = 'released';
         lease.cleanupProof = command.cleanupProof;
       } else {
-        if (lease.state !== 'active' || lease.expiresAt <= observedAt) throw new Conflict('Coordination lease cannot admit effects');
         if (command.type === 'heartbeat') lease.expiresAt = observedAt + command.ttlMs;
         else {
+          if (lease.state !== 'active') throw new Conflict('Coordination lease cannot admit effects');
           if (lease.effectIds.includes(command.effectId)) throw new Conflict('Effect already admitted; reconcile its provider receipt');
           lease.effectIds.push(command.effectId);
         }
