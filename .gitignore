@@ -1,4 +1,5 @@
 node_modules/
+/node_modules
 dist/
 .workflow-verify/
 verification-output/
@@ -6,3 +7,4 @@ verification-output/
 /samples/
 __pycache__/
 .venv/
+/artifacts/qa/

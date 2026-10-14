@@ -75,6 +75,8 @@ proof claim is local application behavior at the attested source digest, not dep
 
 ## Checks
 
+For clean, credential-free Docker runs, see [container qualification](containers/README.md). Native real HTTP and offline contract lanes produce separate saved bundles.
+
 ```text
 npm run verify            # typecheck, schema sync, unit and end-to-end tests
 npm run test:conformance  # verifier conformance cases (refusals and non-green results)

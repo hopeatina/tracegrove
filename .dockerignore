@@ -1,0 +1,13 @@
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!src/
+!src/**
+!scripts/
+!scripts/copy-samples.mjs
+!containers/
+!containers/Dockerfile
+!containers/run.mjs
+!containers/contracts.mjs
