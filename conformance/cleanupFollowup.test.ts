@@ -19,7 +19,8 @@ it('signs a follow-up only after an independent local HTTP absence observation',
   const expected: CleanupExpectation = {
     schemaVersion: 'workflow.cleanup-expectation/v1', scopeId: 'test:workspace', attemptId: 'test:attempt',
     workerId: 'executing-worker', generation: 1, coordinationVersion: 3, effectIds: ['create-owned-1'],
-    unresolvedEffectIds: [], resources: [{ entityKey: 'fixture', physicalId: 'owned-1', boundaryId: 'application', check: 'http_absence' }],
+    unresolvedEffectIds: [], ownershipLedgerHeadDigest: 'sha256:' + 'c'.repeat(64),
+    resources: [{ entityKey: 'fixture', physicalId: 'owned-1', boundaryId: 'application', check: 'http_absence' }],
   };
   const keys = generateKeyPairSync('ed25519'); // Independent collector's ephemeral test key.
   const observe = async () => {

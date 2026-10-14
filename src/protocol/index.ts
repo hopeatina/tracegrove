@@ -4,7 +4,7 @@ import * as E from './schemas/execution.ts';
 import { Suite, WorkflowConfig } from './schemas/config.ts';
 import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
-import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema } from './schemas/cleanup.ts';
+import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 
 export * from './canonical.ts';
@@ -62,6 +62,7 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.ownership/v1': WorkflowOwnershipSchema,
   'workflow.cleanup-expectation/v1': CleanupExpectationSchema,
   'workflow.cleanup-followup/v1': CleanupFollowupSchema,
   'workflow.signed-cleanup-followup/v1': SignedCleanupFollowupSchema,

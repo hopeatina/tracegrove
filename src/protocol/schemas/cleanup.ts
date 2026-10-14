@@ -16,6 +16,7 @@ const Binding = {
 export const CleanupExpectationSchema = z.object({
   schemaVersion: z.literal('workflow.cleanup-expectation/v1'), ...Binding,
   effectIds: z.array(Key).max(1000), unresolvedEffectIds: z.array(Key).max(1000),
+  ownershipLedgerHeadDigest: Digest,
   resources: z.array(Resource).max(1000),
 }).strict().superRefine((value, ctx) => {
   if (new Set(value.effectIds).size !== value.effectIds.length ||
@@ -25,6 +26,21 @@ export const CleanupExpectationSchema = z.object({
   }
 });
 export type CleanupExpectation = z.infer<typeof CleanupExpectationSchema>;
+
+export const WorkflowOwnershipSchema = z.object({
+  hostReceiptDigest: Digest, hostResources: z.array(Resource).max(1000),
+  effects: z.array(z.object({ effectId: Key, receiptDigest: Digest,
+    resources: z.array(Resource).max(1000) }).strict()).max(1000),
+}).strict().superRefine((value, ctx) => {
+  const resources = [...value.hostResources, ...value.effects.flatMap(effect => effect.resources)];
+  if (resources.length > 1000 || new Set(resources.map(item => item.entityKey)).size !== resources.length ||
+    new Set(value.effects.map(item => item.effectId)).size !== value.effects.length ||
+    value.hostResources.some(item => item.check !== 'host_stop') ||
+    value.effects.some(effect => effect.resources.some(item => item.check !== 'http_absence'))) {
+    ctx.addIssue({ code: 'custom', message: 'Workflow ownership closure is invalid' });
+  }
+});
+export type WorkflowOwnership = z.infer<typeof WorkflowOwnershipSchema>;
 
 const Evidence = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http_absence'), entityKey: Key, receiptDigest: Digest,

@@ -10,6 +10,7 @@ const expected: CleanupExpectation = {
   workerId: 'worker:1', generation: 2, coordinationVersion: 4, effectIds: ['create:1'],
   unresolvedEffectIds: [], resources: [{ entityKey: 'fixture:1', physicalId: 'resource:1', boundaryId: 'api', check: 'http_absence' },
     { entityKey: 'host:1', physicalId: 'host:1', boundaryId: 'host', check: 'host_stop' }],
+  ownershipLedgerHeadDigest: 'sha256:' + 'c'.repeat(64),
 };
 const proof = (expectation = expected): CleanupFollowup => ({
   schemaVersion: 'workflow.cleanup-followup/v1', scopeId: expectation.scopeId, attemptId: expectation.attemptId,

@@ -11,7 +11,8 @@ it('CLI reports integrity separately from hosted release and returns 2 for untru
   const keys = generateKeyPairSync('ed25519');
   const now = Date.now();
   const expected = { schemaVersion: 'workflow.cleanup-expectation/v1', scopeId: 'test', attemptId: 'a',
-    workerId: 'worker', generation: 1, coordinationVersion: 1, effectIds: [], unresolvedEffectIds: [], resources: [] };
+    workerId: 'worker', generation: 1, coordinationVersion: 1, effectIds: [], unresolvedEffectIds: [], resources: [],
+    ownershipLedgerHeadDigest: 'sha256:' + 'c'.repeat(64) };
   const proof = signCleanupFollowup({ schemaVersion: 'workflow.cleanup-followup/v1', scopeId: 'test', attemptId: 'a',
     workerId: 'worker', generation: 1, coordinationVersion: 1, observerId: 'janitor',
     expectationDigest: cleanupExpectationDigest(expected), observedAt: now, expiresAt: now + 30_000, evidence: [] }, 'key', keys.privateKey);

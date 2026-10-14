@@ -26,6 +26,10 @@
       "maximum": 9007199254740991,
       "type": "integer"
     },
+    "ownershipLedgerHeadDigest": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
     "resources": {
       "items": {
         "additionalProperties": false,
@@ -97,6 +101,7 @@
     "coordinationVersion",
     "effectIds",
     "unresolvedEffectIds",
+    "ownershipLedgerHeadDigest",
     "resources"
   ],
   "type": "object"

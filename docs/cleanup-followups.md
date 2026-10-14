@@ -25,6 +25,14 @@ The expectation digest includes every expectation field. Base64url signatures
 must use canonical unpadded encoding. Key IDs select configured public keys;
 the verifier never trusts a public key carried by the proof itself.
 
+`deriveCleanupExpectation` combines the current coordination snapshot with the
+protected ownership record. Missing host inventory prevents derivation. Admitted
+effects without independent resolution remain unresolved; extra effects and
+duplicate resources are refused. Takeover derives the current worker and fence
+while retaining prior resource identities. `ownershipLedgerHeadDigest` anchors
+the expectation to the exact canonical ledger event, including issuer receipts.
+The helper cannot establish that caller-supplied files came from that ledger.
+
 ## Offline inspection
 
 ```sh
