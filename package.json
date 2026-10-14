@@ -11,7 +11,8 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" }
+    "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" },
+    "./coordination": { "types": "./dist/core/coordination.d.ts", "default": "./dist/core/coordination.js" }
   },
   "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
   "scripts": {
