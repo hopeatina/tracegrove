@@ -3,6 +3,7 @@ import type { HttpDriver } from '../adapters/http/driver.ts';
 import type { HostSession } from '../hosts/types.ts';
 import type { Deadline } from './deadline.ts';
 import type { EventLog } from './events.ts';
+import { cleanupActionError } from './cleanupActions.ts';
 
 export type AllocatedFixture = {
   entityKey: string; physicalId: string;
@@ -27,7 +28,9 @@ export async function collectCleanup(input: {
     try {
       const action = registry.actions.find(item => item.actionId === entry.cleanup!.actionId);
       const absenceAction = registry.actions.find(item => item.actionId === entry.absence?.actionId);
-      if (!action || !entry.absence || !absenceAction) throw new Error('cleanup requires registered deletion and absence readback');
+      const error = cleanupActionError(action, absenceAction, entry.absence?.expectStatus ?? 0);
+      if (error) throw new Error(error);
+      if (!action || !entry.absence || !absenceAction) throw new Error('cleanup actions unavailable');
       const result = await driver.request({ origin, method: action.method, path: action.path, body: action.body,
         auth: action.auth, variables: entry.cleanup.args, deadline: deadline.child(5000) });
       const readback = await driver.request({ origin, method: absenceAction.method, path: absenceAction.path,

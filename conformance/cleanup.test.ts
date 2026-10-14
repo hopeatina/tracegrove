@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy } from './helpers.ts';
 import { LocalProcessHost, sourceIdentityDigest } from '../src/hosts/local.ts';
+import { ActionRegistry } from '../src/protocol/index.ts';
+import { collectCleanup } from '../src/core/cleanup.ts';
+import { Deadline } from '../src/core/deadline.ts';
+import { EventLog } from '../src/core/events.ts';
 
 afterEach(cleanupTemps);
 
@@ -40,6 +44,40 @@ describe('verifier.cleanup_ownership', () => {
     const copy = sampleCopy(root => editFile(join(root, 'verification/actions/notes.registry.yaml'), text =>
       text.replace('effect: create', 'effect: read')));
     expect(planSample(copy.configPath).blockers.some(reason => reason.code === 'fixture_ownership_unavailable')).toBe(true);
+  });
+  it.each([
+    ['non-delete cleanup', 'verification/actions/notes.registry.yaml', 'effect: delete', 'effect: update'],
+    ['mutating absence readback', 'verification/fixtures/existing-note.recipe.yaml', 'absenceReadback: { actionId: notes.read/v1, expectStatus: 404 }', 'absenceReadback: { actionId: notes.delete/v1, expectStatus: 404 }'],
+    ['success response as absence', 'verification/fixtures/existing-note.recipe.yaml', 'expectStatus: 404', 'expectStatus: 200'],
+  ])('blocks %s before fixture execution', (_name, file, before, after) => {
+    const copy = sampleCopy(root => editFile(join(root, file), text => text.replace(before, after)));
+    rematerializePayload(copy.root);
+    const bundle = planSample(copy.configPath);
+    expect(bundle.blockers.some(reason => reason.code === 'fixture_cleanup_invalid')).toBe(true);
+    expect(bundle.request).toBeNull();
+  });
+  it('refuses unsafe cleanup even when a caller bypasses planning', async () => {
+    const copy = sampleCopy();
+    const bundle = planSample(copy.configPath);
+    const registry = Object.values(bundle.documents).map(value => ActionRegistry.safeParse(value))
+      .find(result => result.success)?.data;
+    expect(registry).toBeDefined();
+    const deletion = registry!.actions.find(action => action.effect === 'delete')!;
+    const read = registry!.actions.find(action => action.effect === 'read')!;
+    deletion.effect = 'update';
+    let requests = 0;
+    const result = await collectCleanup({
+      allocated: [{ entityKey: 'fixture', physicalId: 'owned-id',
+        cleanup: { actionId: deletion.actionId, args: {} },
+        absence: { actionId: read.actionId, expectStatus: 404 } }],
+      uncertainAllocations: 0, registry: registry!, origin: 'http://127.0.0.1',
+      driver: { async request() { requests++; throw new Error('must not contact provider'); } },
+      deadline: Deadline.in(1000), session: null, reason: 'test', log: new EventLog('test', 'test', 1),
+    });
+    expect(requests).toBe(0);
+    expect(result.cleanup.remainingUnknownMutations).toBe(1);
+    expect(result.cleanup.confirmed).toEqual([]);
+    expect(result.criticalCleanupConfirmed).toBe(false);
   });
   it('seals a non-green receipt when host cleanup acknowledgement fails', async () => {
     const copy = sampleCopy();
