@@ -16,7 +16,7 @@ export const CoordinationSnapshotSchema = z.object({
 }).strict().superRefine((snapshot, ctx) => {
   const attempts = new Set<string>();
   const personas = new Set<string>();
-  let reserved = 0n;
+  let reserved = BigInt(0);
   for (const lease of snapshot.leases) {
     if (attempts.has(lease.attemptId) || lease.generation > snapshot.generation ||
       new Set(lease.effectIds).size !== lease.effectIds.length ||
@@ -35,7 +35,7 @@ export const CoordinationSnapshotSchema = z.object({
 export type CoordinationSnapshot = z.infer<typeof CoordinationSnapshotSchema>;
 export type CoordinationFence = { attemptId: string; workerId: string; generation: number };
 
-const CommandSchema = z.discriminatedUnion('type', [
+export const CoordinationCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('reserve'), attemptId: Key, workerId: Key, personaId: Key,
     reservedCents: Counter.positive(), ttlMs: LeaseDuration }).strict(),
   z.object({ type: z.literal('heartbeat'), attemptId: Key, workerId: Key, generation: Counter.positive(),
@@ -44,13 +44,13 @@ const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('recover'), attemptId: Key, workerId: Key, ttlMs: LeaseDuration }).strict(),
   z.object({ type: z.literal('release'), attemptId: Key, workerId: Key, generation: Counter.positive(), cleanupProof: Key }).strict(),
 ]);
-export type CoordinationCommand = z.infer<typeof CommandSchema>;
+export type CoordinationCommand = z.infer<typeof CoordinationCommandSchema>;
 
 /** Pure transition only. The trusted storage owner supplies time, CAS and cleanup proof admission. */
 export function transitionCoordination(raw: unknown, scopeId: string, expectedVersion: number,
   input: CoordinationCommand, observedAt: number): CoordinationSnapshot {
   const state = CoordinationSnapshotSchema.parse(raw);
-  const command = CommandSchema.parse(input);
+  const command = CoordinationCommandSchema.parse(input);
   Counter.parse(observedAt);
   if (state.scopeId !== scopeId || state.version !== expectedVersion) throw new Conflict('Coordination scope or version changed');
   if (state.version === Number.MAX_SAFE_INTEGER || state.generation === Number.MAX_SAFE_INTEGER) throw new Conflict('Coordination counter exhausted');
@@ -59,7 +59,7 @@ export function transitionCoordination(raw: unknown, scopeId: string, expectedVe
     if (lease) throw new Conflict('Attempt already reserved; reconcile its existing reservation');
     // Expiry alone cannot make a persona safe to reuse: cleanup must be independently admitted.
     if (state.leases.some(item => item.personaId === command.personaId && item.state !== 'released')) throw new Conflict('Persona requires reconciliation');
-    const spent = state.leases.reduce((sum, item) => sum + BigInt(item.reservedCents), 0n);
+    const spent = state.leases.reduce((sum, item) => sum + BigInt(item.reservedCents), BigInt(0));
     if (spent + BigInt(command.reservedCents) > BigInt(state.budgetCents)) throw new Conflict('Shared coordination budget exhausted');
     state.generation++;
     state.leases.push({ attemptId: command.attemptId, workerId: command.workerId, personaId: command.personaId,
