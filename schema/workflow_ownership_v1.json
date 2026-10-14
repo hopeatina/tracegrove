@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "effects": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "effectId": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "receiptDigest": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "resources": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "boundaryId": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "check": {
+                  "enum": [
+                    "http_absence",
+                    "host_stop"
+                  ],
+                  "type": "string"
+                },
+                "entityKey": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "physicalId": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "entityKey",
+                "physicalId",
+                "boundaryId",
+                "check"
+              ],
+              "type": "object"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "effectId",
+          "receiptDigest",
+          "resources"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1000,
+      "type": "array"
+    },
+    "hostReceiptDigest": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "hostResources": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "boundaryId": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "check": {
+            "enum": [
+              "http_absence",
+              "host_stop"
+            ],
+            "type": "string"
+          },
+          "entityKey": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "physicalId": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityKey",
+          "physicalId",
+          "boundaryId",
+          "check"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1000,
+      "type": "array"
+    }
+  },
+  "required": [
+    "hostReceiptDigest",
+    "hostResources",
+    "effects"
+  ],
+  "type": "object"
+}

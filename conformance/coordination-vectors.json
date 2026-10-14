@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "vectors": [
+    {
+      "id": "reserve",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 1,
+        "generation": 0,
+        "budgetCents": 500,
+        "leases": []
+      },
+      "command": {
+        "type": "reserve",
+        "attemptId": "attempt:1",
+        "workerId": "worker:1",
+        "personaId": "persona:1",
+        "reservedCents": 300,
+        "ttlMs": 300000
+      },
+      "observedAt": 1000,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 2,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 301000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": [
+        "attempt:1"
+      ]
+    },
+    {
+      "id": "effect",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 2,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 301000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "command": {
+        "type": "effect",
+        "attemptId": "attempt:1",
+        "workerId": "worker:1",
+        "generation": 1,
+        "effectId": "effect:1"
+      },
+      "observedAt": 2000,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 3,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 301000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": []
+    },
+    {
+      "id": "heartbeat",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 3,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 301000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "command": {
+        "type": "heartbeat",
+        "attemptId": "attempt:1",
+        "workerId": "worker:1",
+        "generation": 1,
+        "ttlMs": 300000
+      },
+      "observedAt": 3000,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 4,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 303000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": [
+        "attempt:1"
+      ]
+    },
+    {
+      "id": "shared_budget",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 4,
+        "generation": 1,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 303000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "command": {
+        "type": "reserve",
+        "attemptId": "attempt:2",
+        "workerId": "worker:1",
+        "personaId": "persona:2",
+        "reservedCents": 200,
+        "ttlMs": 300000
+      },
+      "observedAt": 4000,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 5,
+        "generation": 2,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 303000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          },
+          {
+            "attemptId": "attempt:2",
+            "workerId": "worker:1",
+            "personaId": "persona:2",
+            "generation": 2,
+            "expiresAt": 304000,
+            "reservedCents": 200,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": [
+        "attempt:2"
+      ]
+    },
+    {
+      "id": "recover",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 5,
+        "generation": 2,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:1",
+            "personaId": "persona:1",
+            "generation": 1,
+            "expiresAt": 303000,
+            "reservedCents": 300,
+            "state": "active",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          },
+          {
+            "attemptId": "attempt:2",
+            "workerId": "worker:1",
+            "personaId": "persona:2",
+            "generation": 2,
+            "expiresAt": 304000,
+            "reservedCents": 200,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "command": {
+        "type": "recover",
+        "attemptId": "attempt:1",
+        "workerId": "worker:2",
+        "ttlMs": 300000
+      },
+      "observedAt": 303000,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 6,
+        "generation": 3,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:2",
+            "personaId": "persona:1",
+            "generation": 3,
+            "expiresAt": 603000,
+            "reservedCents": 300,
+            "state": "reconciling",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          },
+          {
+            "attemptId": "attempt:2",
+            "workerId": "worker:1",
+            "personaId": "persona:2",
+            "generation": 2,
+            "expiresAt": 304000,
+            "reservedCents": 200,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": [
+        "attempt:1"
+      ]
+    },
+    {
+      "id": "reconcile_heartbeat",
+      "before": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 6,
+        "generation": 3,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:2",
+            "personaId": "persona:1",
+            "generation": 3,
+            "expiresAt": 603000,
+            "reservedCents": 300,
+            "state": "reconciling",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          },
+          {
+            "attemptId": "attempt:2",
+            "workerId": "worker:1",
+            "personaId": "persona:2",
+            "generation": 2,
+            "expiresAt": 304000,
+            "reservedCents": 200,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "command": {
+        "type": "heartbeat",
+        "attemptId": "attempt:1",
+        "workerId": "worker:2",
+        "generation": 3,
+        "ttlMs": 300000
+      },
+      "observedAt": 303100,
+      "after": {
+        "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 7,
+        "generation": 3,
+        "budgetCents": 500,
+        "leases": [
+          {
+            "attemptId": "attempt:1",
+            "workerId": "worker:2",
+            "personaId": "persona:1",
+            "generation": 3,
+            "expiresAt": 603100,
+            "reservedCents": 300,
+            "state": "reconciling",
+            "effectIds": [
+              "effect:1"
+            ],
+            "cleanupProof": null
+          },
+          {
+            "attemptId": "attempt:2",
+            "workerId": "worker:1",
+            "personaId": "persona:2",
+            "generation": 2,
+            "expiresAt": 304000,
+            "reservedCents": 200,
+            "state": "active",
+            "effectIds": [],
+            "cleanupProof": null
+          }
+        ]
+      },
+      "clockUpdatedAttempts": [
+        "attempt:1"
+      ]
+    }
+  ]
+}

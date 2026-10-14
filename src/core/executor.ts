@@ -11,7 +11,7 @@ import {
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, RunnerProfile, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
-  type Accounting, type CampaignResult, type CleanupObservation, type Ref, type Scope, type Step, type StepObservation,
+  type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
   type TargetTuple, type VariableSource,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
@@ -19,6 +19,7 @@ import { LocalProcessHost } from '../hosts/local.ts';
 import { MockLoopbackHost } from '../hosts/mock.ts';
 import type { ExecutorHost, HostSession } from '../hosts/types.ts';
 import { LocalArtifactStore } from './artifacts.ts';
+import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
 import { writeExecutionBundle } from './bundle.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { compileCase, type CompiledCase } from './compiler.ts';
@@ -217,7 +218,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   let fixtureState: 'verified' | 'failed' | 'blocked' | 'cancelled' | 'unknown' | 'not_required' = item.fixture ? 'unknown' : 'not_required';
   let infrastructureFailure = false;
   let cancelled = false;
-  const allocated: Array<{ entityKey: string; physicalId: string; cleanup: { actionId: string; args: Record<string, unknown> } | null; absence: { actionId: string; expectStatus: number } | null }> = [];
+  const allocated: AllocatedFixture[] = [];
+  const uncertainAllocations = new Set<string>();
   const fixtureOutputs: Record<string, Record<string, unknown>> = {};
   const costs: CostObservation[] = [];
   const hostStartedMs = monotonicMs();
@@ -305,14 +307,23 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const action = registry.actions.find((a) => a.actionId === entity.actionId)!;
       const allocatingEvent = log.emit('fixture.allocating', null, { entityKey, actionId: action.actionId, effectKey: `${attemptId}:${entityKey}` });
       try {
+        if (action.effect !== 'create') throw new HttpStepError('fixture_ownership_unavailable', 'only a registered create action can allocate an owned fixture');
+        uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
         if (action.expectStatus !== null && observation.status !== action.expectStatus) throw new HttpStepError('unexpected_status', `${action.actionId} returned ${observation.status}, expected ${action.expectStatus}`);
         const outputs = captureValues(observation, action.captures);
         fixtureOutputs[entityKey] = { ...variables, ...outputs };
-        const physicalId = String(outputs[entity.outputNames[0] ?? ''] ?? `${entityKey}:${attemptId}`);
+        const observedId = outputs[entity.outputNames[0] ?? ''];
+        if (typeof observedId !== 'string' && !(typeof observedId === 'number' && Number.isFinite(observedId))) {
+          throw new HttpStepError('fixture_identity_unobserved', 'fixture allocation did not return a physical resource ID');
+        }
+        const parsedId = FixtureManifest.shape.entities.element.shape.physicalId.safeParse(String(observedId));
+        if (!parsedId.success) throw new HttpStepError('fixture_identity_unobserved', 'captured fixture ID is invalid');
+        const physicalId = parsedId.data;
         const cleanupHandle = entity.cleanup ? { actionId: entity.cleanup.actionId, args: { ...variables, ...outputs } } : null;
         const allocatedEvent = log.emit('fixture.allocated', null, { entityKey, physicalId, status: observation.status, requestId: observation.requestId, cleanupHandle }, { requestId: observation.requestId });
         allocated.push({ entityKey, physicalId, cleanup: cleanupHandle, absence: entity.cleanup ? entity.cleanup.absenceReadback : null });
+        uncertainAllocations.delete(entityKey);
         let readbackRefs: Ref[] = [];
         if (entity.readback) {
           const readAction = registry.actions.find((a) => a.actionId === entity.readback!.actionId)!;
@@ -427,44 +438,10 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
   const cleanupDeadline = Deadline.in(hostPlan.cleanupReserveMs);
-  const attempted: string[] = [];
-  const confirmed: string[] = [];
-  for (const entry of [...allocated].reverse()) {
-    if (!entry.cleanup || !driver) continue;
-    attempted.push(entry.entityKey);
-    try {
-      const action = item.fixture!.registry.actions.find((a) => a.actionId === entry.cleanup!.actionId)!;
-      const result = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables: entry.cleanup.args, deadline: cleanupDeadline.child(5000) });
-      let absent = false;
-      if (entry.absence) {
-        const absenceAction = item.fixture!.registry.actions.find((a) => a.actionId === entry.absence!.actionId)!;
-        const check = await driver.request({ origin, method: absenceAction.method, path: absenceAction.path, body: absenceAction.body, auth: absenceAction.auth, variables: entry.cleanup.args, deadline: cleanupDeadline.child(5000) });
-        absent = check.status === entry.absence.expectStatus;
-      }
-      const ok = (action.expectStatus === null || result.status === action.expectStatus) && (!entry.absence || absent);
-      if (ok) confirmed.push(entry.entityKey);
-      log.emit('cleanup.entity', null, { entityKey: entry.entityKey, status: result.status, absenceConfirmed: absent, confirmed: ok });
-    } catch (error) {
-      log.emit('cleanup.entity', null, { entityKey: entry.entityKey, confirmed: false, error: String((error as Error).message) });
-    }
-  }
-  let hostStopConfirmed = false;
-  if (session) {
-    const stop = await session.stop(cancelled ? 'cancelled' : 'cell complete');
-    hostStopConfirmed = stop.confirmed;
-    log.emit('cleanup.host', null, { confirmed: stop.confirmed, detail: stop.detail });
-  }
+  const { cleanup, criticalCleanupConfirmed } = await collectCleanup({ allocated,
+    uncertainAllocations: uncertainAllocations.size, registry: item.fixture?.registry ?? null,
+    driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
   const hostSeconds = (monotonicMs() - hostStartedMs) / 1000;
-  const ownedResources: CleanupObservation['ownedResources'] = [...allocated.map((a) => ({ entityKey: a.entityKey, physicalId: a.physicalId, boundaryId: 'application' })), ...(session?.ownedResources ?? [])];
-  const criticalKeys = [...allocated.map((a) => a.entityKey), ...(session?.ownedResources.map((r) => r.entityKey) ?? [])];
-  const unconfirmedFixtures = allocated.filter((a) => a.cleanup && !confirmed.includes(a.entityKey)).length;
-  const cleanup: CleanupObservation = {
-    ownedResources, attempted: [...attempted, ...(session?.ownedResources.map((r) => r.entityKey) ?? [])],
-    confirmed: [...confirmed, ...(session && hostStopConfirmed ? session.ownedResources.map((r) => r.entityKey) : [])],
-    remainingUnknownMutations: unconfirmedFixtures, critical: criticalKeys, janitorReceiptRef: null,
-    reasonCodes: [...(unconfirmedFixtures > 0 ? ['fixture_cleanup_unconfirmed'] : []), ...(session && !hostStopConfirmed ? ['host_stop_unconfirmed'] : [])],
-  };
-  const criticalCleanupConfirmed = unconfirmedFixtures === 0 && (!session || hostStopConfirmed);
 
   // ---- sealing ----
   const finishedAt = nowIso();

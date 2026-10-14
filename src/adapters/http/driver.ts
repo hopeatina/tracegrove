@@ -78,15 +78,16 @@ export class HttpDriver {
     const started = monotonicMs();
     const signal = spec.deadline.signal(spec.signal);
     let response: Response;
+    let text: string;
     try {
       response = await fetch(url, { method: spec.method, headers, ...(bodyText !== undefined ? { body: bodyText } : {}), signal, redirect: 'manual' });
+      text = await response.text();
     } catch (error) {
       const err = error as Error & { name?: string; cause?: unknown };
       if (spec.signal?.aborted) throw new HttpStepError('cancelled', 'request cancelled');
       if (err.name === 'TimeoutError' || err.name === 'AbortError' || signal.aborted) throw new HttpStepError('deadline_exceeded', `${spec.method} ${path} exceeded its deadline`);
       throw new HttpStepError('transport_failure', `${spec.method} ${path}: ${err.message}`);
     }
-    const text = await response.text();
     const durationMs = monotonicMs() - started;
     const recorded: Record<string, string> = {};
     for (const name of RECORDED_HEADERS) { const value = response.headers.get(name); if (value) recorded[name] = value; }
@@ -103,12 +104,24 @@ export class HttpDriver {
     let attempts = 0;
     let last: HttpObservation | null = null;
     while (true) {
-      attempts += 1;
-      last = await this.request(spec);
-      last.attempts = attempts;
-      if (evaluatePredicate(predicate, { status: last.status, body: last.body }).pass) return last;
-      if (spec.deadline.remainingMs() <= pollIntervalMs) return last;
-      await sleep(pollIntervalMs, spec.deadline.signal(spec.signal));
+      if (spec.signal?.aborted) throw new HttpStepError('cancelled', 'observation cancelled');
+      if (last && spec.deadline.expired()) return last;
+      try {
+        attempts++;
+        last = await this.request(spec);
+        last.attempts = attempts;
+        if (evaluatePredicate(predicate, { status: last.status, body: last.body }).pass) return last;
+        if (spec.deadline.remainingMs() <= pollIntervalMs) return last;
+        await sleep(pollIntervalMs, spec.deadline.signal(spec.signal));
+      } catch (error) {
+        if (spec.signal?.aborted) throw new HttpStepError('cancelled', 'observation cancelled');
+        const timeout = error instanceof HttpStepError ? error.code === 'deadline_exceeded'
+          : error instanceof Error && error.name === 'TimeoutError';
+        // A later timeout cannot erase a completed product observation. Actual
+        // transport errors and cancellation remain failures, not fabricated reads.
+        if (last && timeout && spec.deadline.expired()) { last.attempts = attempts; return last; }
+        throw error;
+      }
     }
   }
 }

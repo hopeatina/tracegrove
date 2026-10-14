@@ -14,38 +14,19 @@ import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
 import { verifyBundle } from '../core/bundle.ts';
+import { checkCleanupFiles } from './cleanup.ts';
+import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 
-type Args = { command: string; flags: Record<string, string | boolean> };
-
-function parseArgs(argv: string[]): Args {
-  const [command = 'help', ...rest] = argv;
-  const flags: Record<string, string | boolean> = {};
-  for (let i = 0; i < rest.length; i += 1) {
-    const token = rest[i]!;
-    if (!token.startsWith('--')) continue;
-    const key = token.slice(2);
-    const next = rest[i + 1];
-    if (next !== undefined && !next.startsWith('--')) { flags[key] = next; i += 1; } else flags[key] = true;
-  }
-  return { command, flags };
-}
-
 function flag(args: Args, name: string): string | null {
-  const value = args.flags[name];
+  const value = (args.flags as Record<string, unknown>)[name];
   return typeof value === 'string' ? value : null;
 }
 
-function requireFlag(args: Args, name: string): string {
-  const value = flag(args, name);
-  if (!value) throw new Blocked([{ code: 'missing_argument', detail: `--${name} is required`, owner: 'operator', action: `pass --${name}` }]);
-  return value;
-}
-
 function out(args: Args, value: unknown, text: string): void {
-  if (args.flags.json || args.flags.jsonl) process.stdout.write(`${JSON.stringify(value)}\n`);
+  if (('json' in args.flags && args.flags.json) || ('jsonl' in args.flags && args.flags.jsonl)) process.stdout.write(`${JSON.stringify(value)}\n`);
   else process.stdout.write(`${text}\n`);
 }
 
@@ -75,6 +56,8 @@ const HELP = `workflow-verify <command> [--flags]
   inspect --execution <id> --state-dir <dir> [--failed-step]
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
+                                                       check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
@@ -82,11 +65,11 @@ Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructur
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
-    case 'help': case '--help': case '-h': process.stdout.write(`${HELP}\n`); return 0;
+    case 'help': process.stdout.write(`${HELP}\n`); return 0;
 
     case 'sample-config': {
       const sample = flag(args, 'sample') ?? 'notes-api';
-      const output = resolve(requireFlag(args, 'output'));
+      const output = resolve(args.flags['output']);
       const source = join(samplesDir(), sample);
       if (!existsSync(source)) throw new Blocked([{ code: 'unknown_sample', detail: sample, owner: 'operator', action: `choose one of ${readdirSync(samplesDir()).join(', ')}` }]);
       mkdirSync(output, { recursive: true });
@@ -96,14 +79,14 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'validate': {
-      const project = loadProject(requireFlag(args, 'config'));
+      const project = loadProject(args.flags['config']);
       out(args, { project: project.config.project, corpusDigest: project.corpus.manifest.ref.digest.hex, members: project.corpus.manifest.members.length, cases: project.suiteCases.map((c) => c.ref.id) },
         `valid: ${project.corpus.manifest.members.length} definitions, corpus ${project.corpus.manifest.ref.digest.hex.slice(0, 12)}; ${project.suiteCases.length} suite cases. Validation approves nothing and verifies no product.`);
       return 0;
     }
 
     case 'cases': {
-      const project = loadProject(requireFlag(args, 'config'));
+      const project = loadProject(args.flags['config']);
       const query: import('../core/lookup.ts').CaseQuery = {};
       for (const name of ['id', 'workflow', 'surface', 'text', 'cursor'] as const) {
         const value = flag(args, name); if (value) query[name] = value;
@@ -114,8 +97,8 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'rerun': {
-      const bundle = createRerun(readBundle(requireFlag(args, 'request')));
-      const output = resolve(requireFlag(args, 'output'));
+      const bundle = createRerun(readBundle(args.flags['request']));
+      const output = resolve(args.flags['output']);
       mkdirSync(dirname(output), { recursive: true });
       writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
       out(args, { output, requestRef: bundle.request!.ref, replayOf: bundle.request!.replayOf }, `fresh rerun request: ${output}`);
@@ -123,7 +106,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'doctor': {
-      const project = loadProject(requireFlag(args, 'config'));
+      const project = loadProject(args.flags['config']);
       const profileName = flag(args, 'profile') ?? project.config.defaultProfile;
       const profile = project.config.profiles[profileName];
       if (!profile) throw new Blocked([{ code: 'unknown_profile', detail: profileName }]);
@@ -149,10 +132,10 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'plan': {
-      const project = loadProject(requireFlag(args, 'config'));
+      const project = loadProject(args.flags['config']);
       const profileName = flag(args, 'profile') ?? project.config.defaultProfile;
-      const output = resolve(requireFlag(args, 'output'));
-      const bundle = plan({ project, profileName, scope: localScope(), purpose: (flag(args, 'purpose') as FrozenBundle['request'] extends infer R ? R extends { purpose: infer P } ? P : never : never) ?? 'trial' });
+      const output = resolve(args.flags['output']);
+      const bundle = plan({ project, profileName, scope: localScope(), purpose: args.flags.purpose ?? 'trial' });
       mkdirSync(dirname(output), { recursive: true });
       writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
       const summary = { output, profile: profileName, requestDigest: bundle.request?.ref.digest.hex ?? null, idempotencyKey: bundle.request?.idempotencyKey ?? null, cells: bundle.request?.caseRefs.length ?? 0, excluded: bundle.excludedCells, blockers: bundle.blockers, estimatedCostCents: bundle.estimatedCostCents, requirements: bundle.requirements };
@@ -163,7 +146,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'seed': {
-      const bundle = readBundle(requireFlag(args, 'request'));
+      const bundle = readBundle(args.flags['request']);
       if (!args.flags.preview) throw new Blocked([{ code: 'seed_apply_not_separate', detail: 'seed --apply is not implemented in this prototype; run prepares the same admitted attempt once', owner: 'operator', action: 'use seed --preview or run' }]);
       if (!bundle.request) { out(args, { blockers: bundle.blockers }, `plan is blocked; nothing to preview`); return 2; }
       const rows: Array<Record<string, unknown>> = [];
@@ -182,7 +165,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'controller': {
-      const controller = await startController(requireFlag(args, 'state-dir'), requireFlag(args, 'project-root'));
+      const controller = await startController(args.flags['state-dir'], args.flags['project-root']);
       out(args, { endpoint: controller.endpoint }, `controller ready: ${controller.endpoint}`);
       await new Promise<void>((done) => {
         const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); done(); };
@@ -193,7 +176,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'run': {
-      const bundle = readBundle(requireFlag(args, 'request'));
+      const bundle = readBundle(args.flags['request']);
       if (!bundle.request) { out(args, { outcome: 'blocked', blockers: bundle.blockers }, `BLOCKED: ${bundle.blockers.map((b) => b.code).join(', ')}`); return 2; }
       const stateDir = flag(args, 'state-dir') ?? stateDirFor(bundle.projectRoot);
       let ledger: LocalLedger | null = null;
@@ -216,8 +199,8 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'inspect': {
-      const stateDir = resolve(requireFlag(args, 'state-dir'));
-      const executionId = requireFlag(args, 'execution');
+      const stateDir = resolve(args.flags['state-dir']);
+      const executionId = args.flags['execution'];
       const dir = join(stateDir, 'executions', executionId);
       if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId, owner: 'operator', action: 'check the execution id and state dir' }]);
       const campaign = parseAs(CampaignResult, JSON.parse(readFileSync(join(dir, 'campaign.json'), 'utf8')), 'campaign');
@@ -230,9 +213,9 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'export': {
-      const stateDir = resolve(requireFlag(args, 'state-dir'));
-      const executionId = requireFlag(args, 'execution');
-      const output = resolve(requireFlag(args, 'output'));
+      const stateDir = resolve(args.flags['state-dir']);
+      const executionId = args.flags['execution'];
+      const output = resolve(args.flags['output']);
       const dir = join(stateDir, 'executions', executionId);
       if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId }]);
       mkdirSync(output, { recursive: true });
@@ -243,14 +226,23 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'verify-bundle': {
-      const verification = verifyBundle(resolve(requireFlag(args, 'bundle')));
+      const verification = verifyBundle(resolve(args.flags['bundle']));
       out(args, verification, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
       return verification.ok ? 0 : 2;
     }
 
+    case 'verify-cleanup': {
+      const result = checkCleanupFiles(resolve(args.flags['proof']),
+        resolve(args.flags['expectation']), resolve(args.flags['trust']));
+      out(args, result, result.ok
+        ? `cleanup follow-up integrity valid: ${result.proofDigest}\n${result.resourceCount} resource(s); hosted release is not admitted`
+        : `cleanup follow-up INVALID:\n  ${result.problems.join('\n  ')}`);
+      return result.ok ? 0 : 2;
+    }
+
     case 'schema': {
       const { exportJsonSchemas } = await import('../protocol/index.ts');
-      const output = resolve(requireFlag(args, 'output'));
+      const output = resolve(args.flags['output']);
       mkdirSync(output, { recursive: true });
       const schemas = exportJsonSchemas();
       for (const [name, schema] of Object.entries(schemas)) writeFileSync(join(output, `${name.replace(/[\/.]/g, '_')}.json`), `${JSON.stringify(schema, null, 2)}\n`);
@@ -258,9 +250,11 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
-    default:
-      process.stderr.write(`unknown command ${args.command}\n${HELP}\n`);
-      return 2;
+    default: {
+      const unreachable: never = args;
+      void unreachable;
+      throw new InfrastructureFailure('Parsed CLI command has no implementation');
+    }
   }
 }
 
