@@ -20,6 +20,7 @@ import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
+import { writeSample } from './samples/write.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -45,7 +46,8 @@ function samplesDir(): string {
 
 const HELP = `workflow-verify <command> [--flags]
 
-  sample-config --sample notes-api --output <dir>     write a sample project (real app + corpus)
+  sample-config --sample notes-api|notes-django --output <dir>
+                                                       write a sample project (real app + shared corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
@@ -69,13 +71,11 @@ async function main(argv: string[]): Promise<number> {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
 
     case 'sample-config': {
-      const sample = flag(args, 'sample') ?? 'notes-api';
+      const sample = args.flags.sample ?? 'notes-api';
       const output = resolve(args.flags['output']);
-      const source = join(samplesDir(), sample);
-      if (!existsSync(source)) throw new Blocked([{ code: 'unknown_sample', detail: sample, owner: 'operator', action: `choose one of ${readdirSync(samplesDir()).join(', ')}` }]);
-      mkdirSync(output, { recursive: true });
-      cpSync(source, output, { recursive: true });
-      out(args, { sample, output, config: join(output, 'verification', 'workflow.yaml') }, `wrote sample ${sample} to ${output}\nnext: workflow-verify doctor --config ${join(output, 'verification', 'workflow.yaml')}`);
+      const config = writeSample(samplesDir(), sample, output);
+      const next = sample === 'notes-django' ? `install the pinned Python dependencies as described in ${join(output, 'README.md')}, then run doctor` : `workflow-verify doctor --config ${config}`;
+      out(args, { sample, output, config }, `wrote sample ${sample} to ${output}\nnext: ${next}`);
       return 0;
     }
 

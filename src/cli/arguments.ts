@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
+import { SampleName } from './samples/catalog.ts';
 
 const Text = z.string().min(1).max(8192);
 const Bool = z.boolean().optional();
 const common = { json: Bool, help: Bool };
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
-  'sample-config': z.object({ ...common, sample: Text.optional(), output: Text }).strict(),
+  'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,

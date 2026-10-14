@@ -1,0 +1,4 @@
+# Pure-Python wheels downloaded from PyPI; installs require these exact hashes.
+asgiref==3.12.1 --hash=sha256:fe386d1c2bff7259ea95929266d12a8cf9a8b5a1c2598402967d8792e7a7c094
+Django==6.1.2 --hash=sha256:141efee6ec64d1db6db90683bf734c550102450f444fb099063b0be1bd27d991
+sqlparse==0.6.0 --hash=sha256:b861c0288ce2fa56209a9a6412d2e066ac664b3873b89c26c9d8415e8e32996f

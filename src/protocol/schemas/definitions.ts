@@ -422,6 +422,7 @@ export const LaunchRecipe = z.object({
   identitySourceFiles: z.array(z.string().max(LIMITS.shortText)).min(1).max(256),
   issuedCredentials: z.array(z.object({ name: IdString, subject: ShortText }).strict()).max(32),
 }).strict();
+export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 
 export const RunnerProfile = z.object({
   ...defined('workflow.runner-profile/v1'),

@@ -20,6 +20,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "vitest run",
     "test:conformance": "vitest run conformance/",
+    "test:django": "vitest run --config vitest.django.config.ts",
     "schema:export": "node --import tsx scripts/export-schemas.ts",
     "schema:check": "node --import tsx scripts/export-schemas.ts --check",
     "verify": "npm run typecheck && npm run schema:check && npm run test"
