@@ -19,6 +19,7 @@ import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
+import { observeApplicationRuntime } from '../hosts/runtime.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -120,7 +121,10 @@ async function main(argv: string[]): Promise<number> {
           const identity = sourceIdentityDigest(cwd, hostPlan.launch.identitySourceFiles);
           checks.push({ check: 'identity_sources', state: 'ok', detail: `${identity.entries.length} file(s), digest ${identity.hex.slice(0, 12)}` });
         } catch (error) { checks.push({ check: 'identity_sources', state: 'blocked', detail: String((error as Error).message) }); }
-        checks.push({ check: 'launch_command', state: hostPlan.launch.command === 'node' ? 'ok' : 'unknown', detail: `${hostPlan.launch.command} ${hostPlan.launch.args.join(' ')} (not executed by doctor)` });
+        try {
+          const runtime = await observeApplicationRuntime(hostPlan.launch.command, cwd, process.env.PATH ?? '');
+          checks.push({ check: 'application_runtime', state: 'ok', detail: `${runtime.runtime} (${runtime.version}); executable digest ${runtime.executableSha256.slice(0, 12)}` });
+        } catch (error) { checks.push({ check: 'application_runtime', state: 'blocked', detail: String((error as Error).message) }); }
       } else {
         checks.push({ check: 'host', state: 'ok', detail: `${hostPlan.adapter} binds a declared target; no launch` });
       }

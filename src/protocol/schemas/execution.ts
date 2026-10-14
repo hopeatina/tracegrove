@@ -185,6 +185,17 @@ export const HostLease = z.object({
 }).strict();
 export type HostLease = z.infer<typeof HostLease>;
 
+export const RuntimeObservation = z.object({
+  family: z.enum(['node', 'python']), version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  runtime: z.string().min(1).max(64), executable: z.string().min(1).max(4096),
+  executableSha256: z.string().regex(/^[0-9a-f]{64}$/),
+}).strict().superRefine((observation, ctx) => {
+  const [major, minor] = observation.version.split('.');
+  const expected = observation.family === 'node' ? `node${major}` : `python${major}.${minor}`;
+  if (observation.runtime !== expected) ctx.addIssue({ code: 'custom', path: ['runtime'], message: 'Runtime identity disagrees with observed version' });
+});
+export type RuntimeObservation = z.infer<typeof RuntimeObservation>;
+
 export const IdentityAttestation = z.object({
   ...record('workflow.identity-attestation/v1'),
   componentId: IdString,
@@ -192,9 +203,19 @@ export const IdentityAttestation = z.object({
   identity: ComponentIdentity,
   issuer: z.enum(['local_launcher', 'declared_binding']),
   trustPolicy: z.enum(['launcher_computed_source_digest', 'operator_declared_unverified']),
-  evidence: z.object({ files: z.array(z.object({ path: z.string().max(LIMITS.shortText), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict()).max(256), observedHealthBody: JsonValue.nullable() }).strict(),
+  evidence: z.object({ files: z.array(z.object({ path: z.string().max(LIMITS.shortText), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict()).max(256),
+    runtimeProbe: RuntimeObservation.optional(), observedHealthBody: JsonValue.nullable() }).strict(),
   observedAt: IsoDateTime,
-}).strict();
+}).strict().superRefine((attestation, ctx) => {
+  if (attestation.identity.kind !== 'source_digest') return;
+  const probe = attestation.evidence.runtimeProbe;
+  if (probe && attestation.identity.runtime !== probe.runtime) {
+    ctx.addIssue({ code: 'custom', path: ['identity', 'runtime'], message: 'Application identity disagrees with runtime probe' });
+  }
+  if (!probe && !/^node\d+$/.test(attestation.identity.runtime)) {
+    ctx.addIssue({ code: 'custom', path: ['evidence', 'runtimeProbe'], message: 'A non-Node runtime requires an executable observation' });
+  }
+});
 export type IdentityAttestation = z.infer<typeof IdentityAttestation>;
 
 export const EnvironmentBinding = z.object({
