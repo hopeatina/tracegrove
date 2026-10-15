@@ -16,19 +16,27 @@ export interface QualificationResultPorts {
    * This does not certify live qualification: mock/structural terminal results are retained too. */
   authenticateEvidence(admission: QualificationRoundAdmission, bundle: VerifiedBundleRecords): Promise<void>;
 }
+export type QualificationRoundInput = { admissionRef: Ref; scope: Scope; bundleDir: string };
+export type QualificationEvidence = { admission: QualificationRoundAdmission; round: QualificationRound; bundle: VerifiedBundleRecords };
 
 /** Reduce a complete terminal campaign. No activation, live-level claim or storage write occurs here. */
 export async function reduceQualificationRound(
-  ports: QualificationResultPorts, input: { admissionRef: Ref; scope: Scope; bundleDir: string },
+  ports: QualificationResultPorts, input: QualificationRoundInput,
 ): Promise<QualificationRound> {
+  return (await readQualificationEvidence(ports, input)).round;
+}
+
+/** Read once so assessment uses the same authenticated bytes as terminal reduction. */
+export async function readQualificationEvidence(ports: QualificationResultPorts, input: QualificationRoundInput): Promise<QualificationEvidence> {
   const admissionRef = RefSchema.parse(input.admissionRef);
   const scope = ScopeSchema.parse(input.scope);
+  const bundleDir = input.bundleDir;
   await ports.authorize(structuredClone(scope));
   const admission = QualificationRoundAdmission.parse(await ports.resolveAdmission(structuredClone(admissionRef), structuredClone(scope)));
   if (!verifySelfDigest(admission) || !sameRef(admission.ref, admissionRef) || !sameScope(admission.scope, scope)) {
     throw new Conflict('qualification admission identity or scope mismatch');
   }
-  const bundle = readVerifiedBundle(input.bundleDir);
+  const bundle = readVerifiedBundle(bundleDir);
   const { request, selection, campaign, receipts } = bundle;
   if (!sameScope(request.requestedScope, scope) || !request.qualificationRoundRef || !sameRef(request.qualificationRoundRef, admission.ref) ||
       request.purpose !== 'qualification' || request.campaignId !== admission.campaignId ||
@@ -60,9 +68,10 @@ export async function reduceQualificationRound(
   }
   // Separate copies prevent trusted callbacks from rewriting records used by this reduction.
   await ports.authenticateEvidence(structuredClone(admission), structuredClone(bundle));
-  return QualificationRound.parse(freeze({ schemaVersion: 'workflow.qualification-round/v1',
+  const round = QualificationRound.parse(freeze({ schemaVersion: 'workflow.qualification-round/v1',
     ref: { id: `qualification-result-${digestOfValue(admission.ref).hex}`, revision: '1' }, scope, admissionRef: admission.ref,
     campaignResultRef: campaign.ref,
     terminalReceiptRefs: selection.cells.map(cell => byCell.get(cell.selectionCellId)!.ref),
   }));
+  return { admission, round, bundle };
 }

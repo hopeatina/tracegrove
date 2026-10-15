@@ -25,7 +25,8 @@ export const qualificationStrataDigest = (selection: SelectionManifest) => diges
   excludedCells: [...selection.excludedCells].sort((a, b) => compareIds(a.cellKey, b.cellKey)), policyRef: selection.policyRef,
 });
 
-async function current(ports: ScenarioPorts, token: ScenarioRevisionToken): Promise<ScenarioSnapshot> {
+export type ScenarioReadPorts = Pick<ScenarioPorts, 'read' | 'resolveDefinition' | 'resolveSelection' | 'validateDefinition'>;
+export async function readScenarioSnapshot(ports: ScenarioReadPorts, token: ScenarioRevisionToken): Promise<ScenarioSnapshot> {
   const snapshot = Snapshot.parse(await ports.read(token.id, structuredClone(token.scope)));
   const p = snapshot.projection;
   if (p.id !== token.id || !sameScope(p.scope, token.scope) || p.aggregateVersion !== token.expectedAggregateVersion ||
@@ -33,7 +34,8 @@ async function current(ports: ScenarioPorts, token: ScenarioRevisionToken): Prom
       p.latestRoundSequence !== token.expectedLatestRoundSequence) throw new Conflict('stale scenario version, definition, epoch or latest round');
   const history = [...snapshot.admissions].sort((a, b) => a.roundSequence - b.roundSequence);
   if (history.length !== p.latestRoundSequence || history.some((a, index) => !verifySelfDigest(a) || !sameScope(a.scope, p.scope) ||
-      a.scenarioRef.id !== p.definitionRef.id || a.roundSequence !== index + 1 || a.invalidationEpoch > p.invalidationEpoch)) {
+      a.scenarioRef.id !== p.definitionRef.id || a.roundSequence !== index + 1 || a.invalidationEpoch > p.invalidationEpoch ||
+      (index > 0 && a.invalidationEpoch < history[index - 1]!.invalidationEpoch))) {
     throw new Conflict('scenario admission history is incomplete or substituted');
   }
   const unique = (values: string[]) => new Set(values).size === values.length;
@@ -42,14 +44,14 @@ async function current(ports: ScenarioPorts, token: ScenarioRevisionToken): Prom
       !unique(history.flatMap(a => a.stateLeaseRefs.map(ref => ref.id)))) throw new Conflict('scenario history reuses campaign, attempt or leased-state identities');
   return snapshot;
 }
-async function definition(ports: ScenarioPorts, ref: Ref, scope: Scope): Promise<ScenarioDefinition> {
+export async function resolveScenarioDefinition(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<ScenarioDefinition> {
   const value = ScenarioDefinition.parse(await ports.resolveDefinition(structuredClone(ref), structuredClone(scope)));
   if (!sameRef(value.ref, ref) || !sameScope(value.scope, scope) || !verifySelfDigest(value)) throw new Conflict('scenario definition digest or scope mismatch');
   if (refKeys(value.caseRefs).length !== value.caseRefs.length) throw new Conflict('duplicate scenario case reference');
   await ports.validateDefinition(structuredClone(value));
   return value;
 }
-async function selection(ports: ScenarioPorts, ref: Ref, scope: Scope): Promise<SelectionManifest> {
+export async function resolveQualificationSelection(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<SelectionManifest> {
   const value = SelectionManifest.parse(await ports.resolveSelection(structuredClone(ref), structuredClone(scope)));
   if (!sameRef(value.ref, ref) || !sameScope(value.scope, scope) || !verifySelfDigest(value)) throw new Conflict('qualification selection digest or scope mismatch');
   if (!value.cells.length || new Set(value.cells.map(c => c.selectionCellId)).size !== value.cells.length ||
@@ -58,21 +60,25 @@ async function selection(ports: ScenarioPorts, ref: Ref, scope: Scope): Promise<
   return value;
 }
 
+export function validateQualificationMatrix(scenario: ScenarioDefinition, matrix: SelectionManifest, selected: SelectionManifest): void {
+  if (!matrix.policyRef || !sameRef(matrix.policyRef, scenario.qualificationPolicyRef) ||
+      !sameDigest(qualificationStrataDigest(matrix), qualificationStrataDigest(selected)) ||
+      !sameDigest(digestOfValue(refKeys(matrix.cells.filter(c => c.required).map(c => c.caseRef))), digestOfValue(refKeys(scenario.caseRefs))) ||
+      matrix.cells.some(c => !scenario.caseRefs.some(ref => sameRef(ref, c.caseRef)))) throw new Conflict('qualification must retain the exact required case/persona/target matrix and policy');
+}
+
 /** Registers the complete pending round before execution; never activates coverage or admits effects. */
 export async function registerQualificationRound(ports: ScenarioPorts, input: ScenarioRevisionToken, requested: QualificationRoundIntent): Promise<QualificationRoundAdmission> {
   const token = ScenarioRevisionToken.parse(input);
   const intent = QualificationRoundIntent.parse(requested);
   await ports.authorize(structuredClone(token.scope), 'register_round');
-  const snapshot = await current(ports, token);
+  const snapshot = await readScenarioSnapshot(ports, token);
   const p = snapshot.projection;
   if (!['validating', 'active'].includes(p.state)) throw new Conflict('scenario must be structurally validated and not retired before round registration');
-  const scenario = await definition(ports, p.definitionRef, token.scope);
-  const matrix = await selection(ports, scenario.qualificationMatrixRef, token.scope);
-  const selected = await selection(ports, intent.selectionManifestRef, token.scope);
-  if (!matrix.policyRef || !sameRef(matrix.policyRef, scenario.qualificationPolicyRef) ||
-      !sameDigest(qualificationStrataDigest(matrix), qualificationStrataDigest(selected)) ||
-      !sameDigest(digestOfValue(refKeys(matrix.cells.filter(c => c.required).map(c => c.caseRef))), digestOfValue(refKeys(scenario.caseRefs))) ||
-      matrix.cells.some(c => !scenario.caseRefs.some(ref => sameRef(ref, c.caseRef)))) throw new Conflict('qualification must retain the exact required case/persona/target matrix and policy');
+  const scenario = await resolveScenarioDefinition(ports, p.definitionRef, token.scope);
+  const matrix = await resolveQualificationSelection(ports, scenario.qualificationMatrixRef, token.scope);
+  const selected = await resolveQualificationSelection(ports, intent.selectionManifestRef, token.scope);
+  validateQualificationMatrix(scenario, matrix, selected);
   const usedLeases = new Set(snapshot.admissions.flatMap(a => a.stateLeaseRefs.map(ref => ref.id)));
   if (new Set(intent.stateLeaseRefs.map(ref => ref.id)).size !== intent.stateLeaseRefs.length || intent.stateLeaseRefs.some(ref => usedLeases.has(ref.id))) {
     throw new Conflict('qualification round needs fresh, nonduplicated leased state');
@@ -96,10 +102,10 @@ export async function registerQualificationRound(ports: ScenarioPorts, input: Sc
 export async function invalidateScenario(ports: ScenarioPorts, input: ScenarioRevisionToken, nextRef: Ref): Promise<ScenarioProjection> {
   const token = ScenarioRevisionToken.parse(input); nextRef = RefSchema.parse(nextRef);
   await ports.authorize(structuredClone(token.scope), 'invalidate');
-  const { projection: p } = await current(ports, token);
+  const { projection: p } = await readScenarioSnapshot(ports, token);
   if (p.state === 'retired') throw new Conflict('retired coverage cannot be resurrected');
   if (nextRef.id !== p.definitionRef.id || nextRef.revision === p.definitionRef.revision) throw new Conflict('semantic replacement needs a new immutable revision of the same scenario');
-  await definition(ports, nextRef, token.scope);
+  await resolveScenarioDefinition(ports, nextRef, token.scope);
   const next = ScenarioProjection.parse({ ...p, definitionRef: nextRef, aggregateVersion: p.aggregateVersion + 1,
     invalidationEpoch: p.invalidationEpoch + 1, state: 'degraded', activationDecisionRef: null });
   if (!await ports.compareAndSwap(p.aggregateVersion, structuredClone(next), null)) throw new Conflict('scenario changed during invalidation');

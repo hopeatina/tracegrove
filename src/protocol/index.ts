@@ -7,7 +7,8 @@ import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
-import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
+import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
+  ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -34,6 +35,9 @@ export const SCHEMA_REGISTRY = {
   'workflow.scenario/v1': ScenarioDefinition,
   'workflow.qualification-admission/v1': QualificationRoundAdmission,
   'workflow.qualification-round/v1': QualificationRound,
+  'workflow.qualification-policy/v1': QualificationPolicy,
+  'workflow.replay-finding/v1': ReplayFinding,
+  'workflow.replay-assessment/v1': ReplayAssessment,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -80,6 +84,7 @@ export const NON_DOCUMENT_SCHEMAS = {
   'workflow.scenario-projection/v1': ScenarioProjection,
   'workflow.scenario-revision-token/v1': ScenarioRevisionToken,
   'workflow.qualification-intent/v1': QualificationRoundIntent,
+  'workflow.scenario-replay-assessment/v1': ScenarioReplayAssessment,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
   'workflow.runner-protocol/v1.host': HostFrame,
