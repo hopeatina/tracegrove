@@ -19,6 +19,10 @@ export const QualificationRoundAdmission = z.object({ schemaVersion: z.literal('
   stateLeaseRefs: refList().min(1),
 }).strict();
 export type QualificationRoundAdmission = z.infer<typeof QualificationRoundAdmission>;
+export const QualificationRound = z.object({ schemaVersion: z.literal('workflow.qualification-round/v1'), ref: RefSchema,
+  scope: ScopeSchema, admissionRef: RefSchema, campaignResultRef: RefSchema, terminalReceiptRefs: refList().min(1),
+}).strict();
+export type QualificationRound = z.infer<typeof QualificationRound>;
 export const ScenarioRevisionToken = z.object({ id: IdString, scope: ScopeSchema, expectedAggregateVersion: PositiveInt,
   expectedDefinitionRef: RefSchema, expectedInvalidationEpoch: NonNegInt, expectedLatestRoundSequence: NonNegInt }).strict();
 export type ScenarioRevisionToken = z.infer<typeof ScenarioRevisionToken>;

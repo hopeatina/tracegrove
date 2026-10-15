@@ -63,6 +63,9 @@ See [source-backed review](docs/source-review.md) for the immutable checks and a
 Scenario qualification now has a typed registration/invalidation API with exact-matrix
 and monotonic-history checks. It registers pending work and invalidates semantic edits;
 it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
+`reduceQualificationRound` binds an entire verified terminal campaign to the registered
+cell/attempt allocations, retaining failed and mock evidence without granting a live
+proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
 
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
 source selection resolver, complete review/qualification lifecycle, authoring inference, hosted

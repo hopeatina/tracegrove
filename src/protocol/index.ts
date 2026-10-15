@@ -7,7 +7,7 @@ import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
-import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
+import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -33,6 +33,7 @@ export const SCHEMA_REGISTRY = {
   'workflow.source-validation/v1': PlanSourceValidation,
   'workflow.scenario/v1': ScenarioDefinition,
   'workflow.qualification-admission/v1': QualificationRoundAdmission,
+  'workflow.qualification-round/v1': QualificationRound,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
