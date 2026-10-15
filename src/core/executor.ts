@@ -99,7 +99,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   if (digestOfValue(request.requestedScope).hex !== digestOfValue(scope).hex) {
     throw new Blocked([{ code: 'scope_mismatch', detail: 'request scope differs from the authenticated controller owner' }]);
   }
-  if (request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length) {
+  if (request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) {
     throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'reviewed source plans, qualification and activated regression admission require the unimplemented lifecycle authority' }]);
   }
   const docs = new DocStore(bundle.documents);

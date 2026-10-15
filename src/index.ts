@@ -10,6 +10,7 @@ export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
 export { createRerun } from './core/rerun.ts';
 export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, type ReviewSnapshot } from './core/review.ts';
+export { registerQualificationRound, invalidateScenario, qualificationStrataDigest, ScenarioRevisionToken, type ScenarioPorts, type ScenarioSnapshot } from './core/scenario.ts';
 export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
 export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } from './core/source-analysis.ts';
 export { verifyBundle, writeExecutionBundle } from './core/bundle.ts';

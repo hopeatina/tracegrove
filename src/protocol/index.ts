@@ -7,6 +7,7 @@ import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
+import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -18,6 +19,7 @@ export * from './schemas/corpus.ts';
 export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
 export * from './schemas/source.ts';
+export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
@@ -29,6 +31,8 @@ export const SCHEMA_REGISTRY = {
   'workflow.revisions/v1': RevisionMatrix,
   'workflow.change-model/v1': ChangeModel,
   'workflow.source-validation/v1': PlanSourceValidation,
+  'workflow.scenario/v1': ScenarioDefinition,
+  'workflow.qualification-admission/v1': QualificationRoundAdmission,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -72,6 +76,9 @@ export const NON_DOCUMENT_SCHEMAS = {
   'workflow.cleanup-followup/v1': CleanupFollowupSchema,
   'workflow.signed-cleanup-followup/v1': SignedCleanupFollowupSchema,
   'workflow.plan-edit-projection/v1': PlanEditProjection,
+  'workflow.scenario-projection/v1': ScenarioProjection,
+  'workflow.scenario-revision-token/v1': ScenarioRevisionToken,
+  'workflow.qualification-intent/v1': QualificationRoundIntent,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
   'workflow.runner-protocol/v1.host': HostFrame,

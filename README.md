@@ -58,6 +58,10 @@ are enforced through trusted source-analysis and policy ports before approval; h
 implementations remain separate work. These records alone are not authority for product execution.
 See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
 
+Scenario qualification now has a typed registration/invalidation API with exact-matrix
+and monotonic-history checks. It registers pending work and invalidates semantic edits;
+it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
+
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
 source selection resolver, complete review/qualification lifecycle, authoring inference, hosted
 coordinator, `seed --apply`, distributed crash recovery and required media capture.

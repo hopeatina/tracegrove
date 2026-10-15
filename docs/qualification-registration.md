@@ -1,0 +1,15 @@
+# Qualification registration and invalidation
+
+`registerQualificationRound` creates a sealed pending admission before execution. It requires an exact scenario revision token, a structurally validated definition, its complete frozen selection matrix and fresh leased-state refs. A new campaign and per-cell execution/attempt identities are allocated together with the next monotonic round sequence.
+
+The prototype uses `SelectionManifest` as the qualification matrix. Its policy, required case/persona/target strata and exclusions are frozen; the round selection must match them exactly. Every scenario case must retain a required matrix cell. Changed personas/targets, empty or duplicated cells, unexplained exclusions and dropped required cases are refused. The exported `qualificationStrataDigest` uses stable code-unit ordering across hosts.
+
+`ScenarioPorts` are trusted host ports, never candidate/plugin inputs. `validateDefinition` must resolve and validate the exact review, replay-contract, matrix, policy and target-profile closure. `compareAndSwap` must atomically verify/reserve the submitted state leases, enforce ownership/fencing/freshness, append the admission and update the projection, or publish none of them. This API does not provision physical state or grant per-cell effects. It does not install that storage adapter.
+
+Snapshots include all registered admissions, including rounds still pending or later failed; the admission itself carries no outcome claim. The projection's latest sequence must match complete, scoped, sealed history. Reused campaign/execution/attempt/lease identities and incomplete histories are conflicts. A lease cannot become fresh by changing its revision or digest. An exhausted 500-round prototype history blocks until an authoritative archival index is supplied; it never silently drops earlier registrations.
+
+Registration increments aggregate version and latest-round sequence without activating coverage. Any older activation snapshot must therefore conflict even before the newest round completes. Concurrent registration/invalidation uses the same aggregate-version CAS. Losing writers publish no admission and do not advance the epoch.
+
+`invalidateScenario` requires a new immutable definition revision of the same scenario, advances the invalidation epoch, clears activation authority and moves coverage to `degraded`. It retains historical round records. Retired coverage cannot be resurrected through this operation. An observed product regression does not itself call semantic invalidation or remove its detecting case.
+
+Promotion, structural-validation transitions, terminal round reduction, two-independent-live-round assessment, explicit activation, hosted persistence and execution wiring remain open. Qualification/regression requests, including a trial carrying a qualification admission ref, remain blocked by the executor until the full lifecycle authority exists. A registration record is neither a passing round nor release coverage.
