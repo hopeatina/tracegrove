@@ -78,7 +78,7 @@ export class LocalLedger {
     const lines = text.split('\n').filter((line) => line.trim().length > 0);
     for (const line of lines) {
       const entry = JournalRecord.parse(JSON.parse(line));
-      if (entry.seq !== this.seq + 1 || entry.version !== this.version(entry.aggregateId) + 1) {
+      if (entry.seq !== this.seq + 1 || entry.version !== (this.versions.get(entry.aggregateId) ?? 0) + 1) {
         throw new Conflict(`corrupt journal at sequence ${entry.seq}: non-contiguous sequence or aggregate version`);
       }
       this.entries.push(entry);
@@ -99,23 +99,22 @@ export class LocalLedger {
   }
 
   version(aggregateId: string): number {
+    this.ownedLock();
     return this.versions.get(aggregateId) ?? 0;
   }
 
   current(aggregateId: string): JournalEntry | null {
+    this.ownedLock();
     return structuredClone(this.latest.get(aggregateId) ?? null);
   }
 
   history(aggregateId: string): JournalEntry[] {
+    this.ownedLock();
     return structuredClone(this.entries.filter((entry) => entry.aggregateId === aggregateId));
   }
 
   /** Atomic transition: fails with Conflict unless the aggregate is at `expectedVersion`. */
   append(aggregateId: string, expectedVersion: number, type: string, data: Record<string, unknown>): JournalEntry {
-    if (this.closed) throw new Conflict('ledger closed');
-    if (this.writeFailed) throw new Conflict('ledger has an uncertain write; close and reconcile the persisted journal before continuing');
-    const lock = JSON.parse(readFileSync(this.lockPath, 'utf8')) as LockFile;
-    if (lock.writerId !== this.writerId) throw new Conflict('ledger ownership lost');
     const current = this.version(aggregateId);
     if (current !== expectedVersion) {
       throw new Conflict(`${aggregateId}: expected version ${expectedVersion}, current ${current}`);
@@ -139,9 +138,16 @@ export class LocalLedger {
   }
 
   publishController(endpoint: string, tokenDigest: string): void {
-    const lock = JSON.parse(readFileSync(this.lockPath, 'utf8')) as LockFile;
-    if (lock.writerId !== this.writerId || this.closed) throw new Conflict('ledger ownership lost');
+    const lock = this.ownedLock();
     writeFileSync(this.lockPath, JSON.stringify({ ...lock, endpoint, tokenDigest }), { mode: 0o600 });
+  }
+
+  private ownedLock(): LockFile {
+    if (this.closed) throw new Conflict('ledger closed');
+    if (this.writeFailed) throw new Conflict('ledger has an uncertain write; close and reconcile the persisted journal before continuing');
+    const lock = JSON.parse(readFileSync(this.lockPath, 'utf8')) as LockFile;
+    if (lock.writerId !== this.writerId) throw new Conflict('ledger ownership lost');
+    return lock;
   }
 
   close(): void {

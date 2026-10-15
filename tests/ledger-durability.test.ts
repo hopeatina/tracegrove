@@ -36,6 +36,9 @@ it('stops all further writes after an uncertain sync acknowledgement until the j
   expect(() => ledger.append('review', 0, 'draft', { value: 'written but unacknowledged' })).toThrow();
   fault.sync = false;
   expect(() => ledger.append('another-review', 0, 'draft', {})).toThrow('uncertain write');
+  expect(() => ledger.current('review')).toThrow('uncertain write');
+  expect(() => ledger.history('review')).toThrow('uncertain write');
+  expect(() => ledger.version('review')).toThrow('uncertain write');
   ledger.close();
   const reopened = open(dir).ledger;
   expect(reopened.current('review')?.version).toBe(1);
@@ -45,7 +48,12 @@ it('refuses writes after ownership is replaced and preserves the other writer lo
   const { dir, ledger } = open(); const path = join(dir, 'ledger/lock.json');
   const lock = JSON.parse(readFileSync(path, 'utf8')); writeFileSync(path, JSON.stringify({ ...lock, writerId: 'other-owner' }));
   expect(() => ledger.append('review', 0, 'draft', {})).toThrow('ownership lost');
+  expect(() => ledger.current('review')).toThrow('ownership lost');
   ledger.close(); expect(JSON.parse(readFileSync(path, 'utf8')).writerId).toBe('other-owner');
+});
+it('does not present a closed writer cache as current state', () => {
+  const { ledger } = open(); ledger.append('review', 0, 'draft', {}); ledger.close();
+  expect(() => ledger.current('review')).toThrow('closed'); expect(() => ledger.history('review')).toThrow('closed');
 });
 it('preserves an unterminated journal for reconciliation rather than concatenating another record onto it', () => {
   const { dir, ledger } = open(); ledger.append('review', 0, 'draft', { value: 'saved' }); ledger.close();
