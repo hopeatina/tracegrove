@@ -1,20 +1,11 @@
 import { afterEach, expect, it } from 'vitest';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanupTemps, sampleCopy, planSample, runSample } from '../conformance/helpers.ts';
+import { cleanupTemps, sampleCopy, planSample, runSample, resealBundle as reseal } from '../conformance/helpers.ts';
 import { verifyBundle } from '../src/core/bundle.ts';
-import { digestOfBytes, freeze } from '../src/protocol/index.ts';
+import { freeze } from '../src/protocol/index.ts';
 afterEach(cleanupTemps);
 
-function reseal(dir: string): void {
-  const path = join(dir, 'manifest.json');
-  const manifest = JSON.parse(readFileSync(path, 'utf8'));
-  for (const file of manifest.files) {
-    const bytes = readFileSync(join(dir, file.path));
-    file.sha256 = digestOfBytes(bytes).hex; file.bytes = bytes.length;
-  }
-  writeFileSync(path, JSON.stringify(manifest));
-}
 it('rejects claimed PASS after a producer removes probed capabilities and reseals the bundle', async () => {
   const copy = sampleCopy(); const result = await runSample(planSample(copy.configPath), copy.stateDir);
   const name = readdirSync(join(result.executionDir, 'cells'))[0]!;

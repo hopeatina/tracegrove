@@ -3,20 +3,20 @@
  * hashes, every self digest, re-derives assertions from the frozen case and step observations and
  * re-reduces the outcome. A bundle whose reduction disagrees with its receipt is not evidence.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, lstatSync } from 'node:fs';
-import { join, isAbsolute } from 'node:path';
-import { z } from 'zod';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { checkCellEvidence } from './bundleEvidence.ts';
+import { BundleSnapshot, BUNDLE_SCHEMA_VERSION } from './bundleSnapshot.ts';
+export { BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
 import {
   CampaignResult, CaseFixturePlan, CaseSpec, ExecutionReceipt, RunRequest, SeedRecipe, SelectionManifest, canonicalize, digestOfBytes, parseAs,
-  refKey, sameDigest, verifySelfDigest, type Ref,
+  refKey, sameDigest, sameRef, sameScope, digestOfValue, verifySelfDigest, type Ref, type Digest,
 } from '../protocol/index.ts';
 import type { FrozenBundle } from './planner.ts';
 import { REDUCER_REF, evaluateAssertions, reduceCampaign, reduceCell } from './reducer.ts';
 import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 
-export const BUNDLE_SCHEMA_VERSION = 'workflow.evidence-bundle/v1';
 
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -70,65 +70,53 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
 }
 
 export type BundleVerification = { ok: boolean; problems: string[]; outcome: CampaignResult['outcome'] | null; receipts: number };
+export type VerifiedBundleRecords = { verification: BundleVerification & { ok: true }; manifestDigest: Digest;
+  request: RunRequest; selection: SelectionManifest; campaign: CampaignResult; receipts: ExecutionReceipt[]; documents: Record<string, unknown> };
+type Inspection = { verification: BundleVerification; records: Omit<VerifiedBundleRecords, 'verification'> | null };
 
 export function verifyBundle(dir: string): BundleVerification {
-  try { return verifyBundleRecords(dir); }
+  try { return verifyBundleRecords(dir).verification; }
   catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 }; }
 }
 
-function verifyBundleRecords(dir: string): BundleVerification {
+export function readVerifiedBundle(dir: string): VerifiedBundleRecords {
+  const checked = verifyBundleRecords(dir);
+  if (!checked.verification.ok || !checked.records) throw new Error(`invalid bundle: ${checked.verification.problems.slice(0, 20).join('; ')}`);
+  return { ...checked.records, verification: { ...checked.verification, ok: true } };
+}
+
+function verifyBundleRecords(dir: string): Inspection {
   const problems: string[] = [];
-  const manifestPath = join(dir, 'manifest.json');
-  if (!existsSync(manifestPath)) return { ok: false, problems: ['manifest.json missing'], outcome: null, receipts: 0 };
-  const manifest = z.object({
-    schemaVersion: z.literal(BUNDLE_SCHEMA_VERSION), executionId: z.string().nullable(), campaignId: z.string(),
-    reducer: z.unknown(), runner: z.unknown(), createdAt: z.string(),
-    files: z.array(z.object({ path: z.string(), sha256: z.string().regex(/^[0-9a-f]{64}$/), bytes: z.number().int().nonnegative() }).strict()).min(1).max(10_000),
-  }).strict().parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
-  const listed = new Set<string>();
-  for (const file of manifest.files) {
-    if (isAbsolute(file.path) || file.path.includes('\\') || file.path.split('/').some((part) => !part || part === '.' || part === '..') || listed.has(file.path)) {
-      problems.push(`unsafe or duplicate manifest path ${file.path}`); continue;
-    }
-    listed.add(file.path);
-    const full = join(dir, file.path);
-    let segment = dir;
-    for (const part of file.path.split('/')) {
-      segment = join(segment, part);
-      if (existsSync(segment) && lstatSync(segment).isSymbolicLink()) throw new Error(`symlink in bundle ${file.path}`);
-    }
-    if (!existsSync(full)) { problems.push(`missing ${file.path}`); continue; }
-    const bytes = readFileSync(full);
-    if (bytes.length !== file.bytes || digestOfBytes(bytes).hex !== file.sha256) problems.push(`hash mismatch ${file.path}`);
-  }
-  const requireListed = (file: string) => { if (!listed.has(file)) problems.push(`unsealed required file ${file}`); };
+  const snapshot = new BundleSnapshot(dir);
+  const requireListed = (file: string) => { if (!snapshot.has(file)) problems.push(`unsealed required file ${file}`); };
   for (const file of ['request.json', 'selection.json', 'campaign.json', 'documents.json']) requireListed(file);
-  if (problems.length) return { ok: false, problems, outcome: null, receipts: 0 };
-  const request = parseAs(RunRequest, JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8')), 'request');
-  const selection = parseAs(SelectionManifest, JSON.parse(readFileSync(join(dir, 'selection.json'), 'utf8')), 'selection');
-  const campaign = parseAs(CampaignResult, JSON.parse(readFileSync(join(dir, 'campaign.json'), 'utf8')), 'campaign');
+  if (problems.length) return { verification: { ok: false, problems, outcome: null, receipts: 0 }, records: null };
+  const request = parseAs(RunRequest, snapshot.json('request.json'), 'request');
+  const selection = parseAs(SelectionManifest, snapshot.json('selection.json'), 'selection');
+  const campaign = parseAs(CampaignResult, snapshot.json('campaign.json'), 'campaign');
   for (const [label, doc] of [['request', request], ['selection', selection], ['campaign', campaign]] as Array<[string, { ref: Ref }]>) {
     if (!verifySelfDigest(doc)) problems.push(`${label} self digest mismatch`);
   }
-  const documents = existsSync(join(dir, 'documents.json')) ? (JSON.parse(readFileSync(join(dir, 'documents.json'), 'utf8')) as Record<string, unknown>) : {};
+  const documents = snapshot.json('documents.json') as Record<string, unknown>;
   for (const [key, doc] of Object.entries(documents)) {
     const record = doc as { ref: Ref };
     if (!record?.ref || !verifySelfDigest(record) || refKey(record.ref) !== key) problems.push(`document digest mismatch ${key}`);
   }
-  if (!sameDigest(request.selectionManifestRef.digest, selection.ref.digest) || !sameDigest(campaign.selectionManifestRef.digest, selection.ref.digest) || !sameDigest(campaign.requestRef.digest, request.ref.digest)) problems.push('request/selection/campaign binding mismatch');
+  if (!sameRef(request.selectionManifestRef, selection.ref) || !sameRef(campaign.selectionManifestRef, selection.ref) || !sameRef(campaign.requestRef, request.ref) ||
+      request.campaignId !== campaign.campaignId || !sameScope(request.requestedScope, selection.scope) || !sameScope(request.requestedScope, campaign.scope)) problems.push('request/selection/campaign binding or scope mismatch');
+  const selectedCases = [...new Set(selection.cells.map(cell => refKey(cell.caseRef)))].sort();
+  if (new Set(request.caseRefs.map(refKey)).size !== request.caseRefs.length || digestOfValue([...request.caseRefs.map(refKey)].sort()).hex !== digestOfValue(selectedCases).hex) problems.push('request cases differ from the complete selection');
   const receipts: ExecutionReceipt[] = [];
-  const cellsDir = join(dir, 'cells');
-  for (const name of existsSync(cellsDir) ? readdirSync(cellsDir) : []) {
+  const cellNames = [...new Set(snapshot.paths().filter(path => path.startsWith('cells/')).map(path => path.split('/')[1]!))].sort();
+  for (const name of cellNames) {
     for (const file of ['receipt.json', 'events.jsonl', 'environment.json', 'fixtures.json', 'boundaries.json', 'host.json', 'accounting.json', 'assertions.json', 'cleanup.json', 'finalization.json']) requireListed(`cells/${name}/${file}`);
-    const receiptPath = join(cellsDir, name, 'receipt.json');
-    if (!existsSync(receiptPath)) { problems.push(`cell ${name} has no receipt`); continue; }
-    const receipt = parseAs(ExecutionReceipt, JSON.parse(readFileSync(receiptPath, 'utf8')), 'receipt');
-    checkCellEvidence({ dir, name, receipt, request, selection, documents, problems });
+    const receipt = parseAs(ExecutionReceipt, snapshot.json(`cells/${name}/receipt.json`), 'receipt');
+    checkCellEvidence({ readBytes: path => snapshot.read(path), readJson: path => snapshot.json(path), name, receipt, request, selection, documents, problems });
     if (!verifySelfDigest(receipt)) problems.push(`receipt ${name} self digest mismatch`);
-    const events = readFileSync(join(cellsDir, name, 'events.jsonl'));
+    const events = snapshot.read(`cells/${name}/events.jsonl`);
     if (!sameDigest(digestOfBytes(events), receipt.eventsDigest)) problems.push(`events digest mismatch for ${name}`);
-    const spec = parseAs(CaseSpec, JSON.parse(readFileSync(join(dir, 'cases', `${receipt.caseRef.id}.json`), 'utf8')), 'case');
-    if (!sameDigest(spec.ref.digest, receipt.caseRef.digest)) problems.push(`case digest mismatch for ${name}`);
+    const spec = parseAs(CaseSpec, snapshot.json(`cases/${receipt.caseRef.id}.json`), 'case');
+    if (!verifySelfDigest(spec) || !sameRef(spec.ref, receipt.caseRef)) problems.push(`case digest mismatch for ${name}`);
     let recipe: SeedRecipe | null = null;
     if (spec.fixturePlanRef) {
       const planDoc = documents[refKey(spec.fixturePlanRef)];
@@ -165,6 +153,10 @@ function verifyBundleRecords(dir: string): BundleVerification {
   }
   const rereduced = reduceCampaign({ scope: campaign.scope, campaignId: campaign.campaignId, requestRef: request.ref, selection, receipts });
   if (rereduced.outcome !== campaign.outcome) problems.push(`campaign outcome ${campaign.outcome} but re-reduction gives ${rereduced.outcome}`);
+  if (digestOfValue(rereduced.cellReceiptRefs).hex !== digestOfValue(campaign.cellReceiptRefs).hex) problems.push('campaign receipt bindings differ from the complete selection');
+  if (digestOfValue(rereduced.coverage).hex !== digestOfValue(campaign.coverage).hex || digestOfValue(rereduced.missingCellIds).hex !== digestOfValue(campaign.missingCellIds).hex) problems.push('campaign coverage differs from evidence');
+  if (rereduced.proofEligible !== campaign.proofEligible) problems.push('campaign proof eligibility differs from evidence');
   void canonicalize;
-  return { ok: problems.length === 0, problems, outcome: campaign.outcome, receipts: receipts.length };
+  return { verification: { ok: problems.length === 0, problems, outcome: problems.length ? null : campaign.outcome, receipts: receipts.length },
+    records: problems.length ? null : { manifestDigest: snapshot.manifestDigest, request, selection, campaign, receipts, documents } };
 }

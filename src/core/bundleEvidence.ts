@@ -1,6 +1,4 @@
 /** Reconstruct verdict inputs from evidence records, never from outcome labels. */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   BoundaryObservation, FidelityPlan, FixtureManifest, HostCapabilityObservation, HostLease,
   HostPlan, IdentityAttestation, CaseFixturePlan, SeedRecipe, CaseSpec, digestOfValue,
@@ -12,19 +10,23 @@ import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 
 export function checkCellEvidence(input: {
-  dir: string; name: string; receipt: ExecutionReceipt; request: RunRequest;
+  readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
   selection: SelectionManifest; documents: Record<string, unknown>; problems: string[];
 }): void {
-  const { dir, name, receipt: r, request, selection, documents, problems } = input;
+  const { name, receipt: r, request, selection, documents, problems } = input;
   const problem = (message: string) => problems.push(`cell ${name}: ${message}`);
-  const read = (file: string): unknown => JSON.parse(readFileSync(join(dir, 'cells', name, file), 'utf8'));
+  const read = (file: string): unknown => input.readJson(`cells/${name}/${file}`);
   const exact = (a: Ref, b: Ref) => refKey(a) === refKey(b);
+  const nullableExact = (a: Ref | null, b: Ref | null) => a === null ? b === null : b !== null && exact(a, b);
   const record = (doc: { ref: Ref }, ref: Ref, label: string) => {
     if (!verifySelfDigest(doc) || !exact(doc.ref, ref)) problem(`${label} digest or reference mismatch`);
   };
   const cell = selection.cells.find((c) => c.selectionCellId === r.selectionCellId);
   if (!cell) { problem('unknown selection cell'); return; }
+  if (!exact(r.caseRef, cell.caseRef) || !exact(r.personaRef, cell.personaRef) || !exact(r.surfaceBindingRef, cell.surfaceBindingRef) ||
+      !nullableExact(r.variantRef, cell.variantRef)) problem('case/persona/binding/variant differs from selected cell');
   if (!exact(r.requestRef, request.ref) || r.campaignId !== request.campaignId) problem('foreign request or campaign');
+  if (!nullableExact(r.qualificationRoundRef, request.qualificationRoundRef)) problem('qualification admission binding mismatch');
   if (digestOfValue(r.scope).hex !== digestOfValue(request.requestedScope).hex) problem('scope mismatch');
   if (!exact(r.environment.planRef, cell.environmentRef) || !exact(r.executionHostRef, cell.executionHostRef)) problem('foreign environment or host');
   const spec = parseAs(CaseSpec, documents[refKey(cell.caseRef)], 'case');
@@ -38,7 +40,8 @@ export function checkCellEvidence(input: {
   record(r.environment, r.environment.ref, 'environment');
   if (digestOfValue(read('environment.json')).hex !== digestOfValue(r.environment).hex) problem('environment records disagree');
   if (digestOfValue(r.environment.expected).hex !== digestOfValue(cell.expectedTarget).hex) problem('expected identity differs from selection');
-  if (r.environment.executionId !== r.executionId || r.environment.attemptId !== r.attemptId) problem('foreign environment attempt');
+  if (r.environment.executionId !== r.executionId || r.environment.attemptId !== r.attemptId || r.environment.campaignId !== r.campaignId ||
+      digestOfValue(r.environment.scope).hex !== digestOfValue(r.scope).hex) problem('foreign environment attempt or scope');
 
   const host = read('host.json') as { lease: unknown; observation: unknown; attestations: unknown[] };
   let capabilitiesObserved = false;
@@ -96,7 +99,7 @@ export function checkCellEvidence(input: {
   const compiled = compileCase(spec, { ...HTTP_RUNNER_CAPABILITIES, maxStepsPerCase: 10_000 }, recipe);
   const rederived = evaluateAssertions(spec, r.environment.class, r.steps, REDUCER_REF, r.startedAt ?? r.finalizedAt, r.finalizedAt);
   if (digestOfValue(rederived).hex !== digestOfValue(r.assertions).hex) problem('assertions disagree with independent reduction');
-  const events = readFileSync(join(dir, 'cells', name, 'events.jsonl'));
+  const events = input.readBytes(`cells/${name}/events.jsonl`);
   const artifactsVerified = r.artifacts.length > 0 && r.artifacts.every((a) => a.mediaType === 'application/x-ndjson' && sameDigest(a.ref.digest, r.eventsDigest) && a.byteCount === events.length);
   const reduction = reduceCell({
     spec, expectedStepIds: compiled.orderedStepIds, steps: r.steps, assertions: rederived,

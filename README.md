@@ -39,6 +39,8 @@ Bundle verification checks sealed required files, host capability records, targe
 fixture completeness and boundary observations. It rejects empty/traversal manifests and
 producer resealing that removes required observations. This verifies portable integrity and
 record consistency; the importer still needs its own issuer trust and access policy.
+The [verified snapshot reader](docs/verified-bundles.md) supplies complete checked
+records from the same bounded bytes used by the reducer, without rereading payloads.
 
 `verifySourceCitation` checks exact repository/commit/path identity, document and
 file digests, and inclusive line excerpt bytes through authorized trusted host ports.

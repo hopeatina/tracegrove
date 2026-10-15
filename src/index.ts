@@ -13,7 +13,7 @@ export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, typ
 export { registerQualificationRound, invalidateScenario, qualificationStrataDigest, ScenarioRevisionToken, type ScenarioPorts, type ScenarioSnapshot } from './core/scenario.ts';
 export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
 export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } from './core/source-analysis.ts';
-export { verifyBundle, writeExecutionBundle } from './core/bundle.ts';
+export { verifyBundle, readVerifiedBundle, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';
 export { materializeLogicalPayload } from './core/generators.ts';
