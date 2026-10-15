@@ -3,6 +3,7 @@ export { loadProject, localScope, CorpusStore, ProjectLoader } from './core/corp
 export { plan, runnerCapabilitiesFor, type FrozenBundle, type Blocker } from './core/planner.ts';
 export { executeBundle, EXIT_CODES, type RunSummary, type RunOptions } from './core/executor.ts';
 export { LocalLedger } from './core/ledger.ts';
+export { LocalReviewStore, type LocalReviewAuthority } from './core/localReviewStore.ts';
 export { deriveCleanupExpectation } from './core/ownership.ts';
 export { signCleanupFollowup, verifyCleanupFollowup, cleanupExpectationDigest, type CleanupObserver } from './core/cleanupAttestation.ts';
 export { CoordinationSnapshotSchema, CoordinationCommandSchema, transitionCoordination, commitCoordination, type CoordinationSnapshot, type CoordinationCommand, type CoordinationFence, type CoordinationStore } from './core/coordination.ts';

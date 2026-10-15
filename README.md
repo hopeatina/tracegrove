@@ -59,6 +59,9 @@ scenario activation. Resolving and validating source citations and coverage poli
 are enforced through trusted source-analysis and policy ports before approval; hosted
 implementations remain separate work. These records alone are not authority for product execution.
 See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
+`LocalReviewStore` connects that API to the existing single-writer journal and preserves
+reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
+requires trusted host admission and source checking; it does not supply distributed authority.
 
 Scenario qualification now has a typed registration/invalidation API with exact-matrix
 and monotonic-history checks. It registers pending work and invalidates semantic edits;
