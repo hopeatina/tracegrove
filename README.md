@@ -68,7 +68,10 @@ cell/attempt allocations, retaining failed and mock evidence without granting a 
 proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
 `assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
 and failed history, requires at least two independent live campaigns and checks the latest
-admitted round. [Replay assessment](docs/replay-assessment.md) is read-only; activation and hosted authority remain open.
+admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
+`activateScenario` rechecks that evidence and publishes an authenticated activation through
+an atomic host port, with exact round selection and idempotent receipt recovery. See
+[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
 
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
 source selection resolver, complete review/qualification lifecycle, authoring inference, hosted

@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { cleanupTemps } from '../conformance/helpers.ts';
-import { qualificationFixture } from './fixtures/qualification.ts';
+import { qualificationFixture, defineQualificationScenario } from './fixtures/qualification.ts';
 import { localScope } from '../src/core/corpus.ts';
 import { reduceQualificationRound } from '../src/core/qualification.ts';
 import { assessScenarioReplay, type ReplayAssessmentPorts } from '../src/core/replayAssessment.ts';
-import { QualificationPolicy, ScenarioDefinition, freeze, refKey, digestOfBytes, type Ref, type SelectionManifest, type QualificationRoundAdmission,
+import { QualificationPolicy, ScenarioDefinition, freeze, refKey, digestOfBytes, type Ref,
   type ScenarioRevisionToken, type ScenarioReplayAssessment } from '../src/protocol/index.ts';
 import type { ScenarioSnapshot } from '../src/core/scenario.ts';
 import { LocalProcessHost } from '../src/hosts/local.ts';
@@ -24,20 +24,13 @@ let inconclusive: Fixture;
 const definitions = new Map<string, ScenarioDefinition>();
 const locations = new Map<string, { roundRef: Ref; bundleDir: string }>();
 
-function define(selection: SelectionManifest, admission: QualificationRoundAdmission, ownPolicy = policy): ScenarioDefinition {
-  return ScenarioDefinition.parse(freeze({ schemaVersion: 'workflow.scenario/v1',
-    ref: { id: 'scenario', revision: '1' }, scope: selection.scope, sourcePlanRef: null, reviewRef: ref('review'),
-    caseRefs: [...new Map(selection.cells.map(c => [refKey(c.caseRef), c.caseRef])).values()],
-    replayContractRef: admission.replayContractRef, qualificationPolicyRef: ownPolicy.ref, qualificationMatrixRef: selection.ref,
-    qualificationTargetProfileRef: admission.targetProfileRef }));
-}
 
 beforeAll(async () => {
   // Authentic local application observations with simulated registration/issuer ports.
   // These exercise reduction, not a hosted qualification/activation authority.
   for (let index = 0; index < 2; index++) {
     const fixture = await qualificationFixture(false, (admission, selection) => {
-      if (!scenario) scenario = define(selection, admission);
+      if (!scenario) scenario = defineQualificationScenario(selection, admission);
       admission.ref.id = `admission-${index + 1}`;
       admission.roundSequence = index + 1; admission.scenarioRef = scenario.ref;
       admission.qualificationMatrixRef = scenario.qualificationMatrixRef;
@@ -51,7 +44,7 @@ beforeAll(async () => {
   ] as const) {
     let definition: ScenarioDefinition;
     const saved = await qualificationFixture(fail, (admission, selection) => {
-      definition = define(selection, admission, ownPolicy);
+      definition = defineQualificationScenario(selection, admission);
       if (id === 'source') definition = ScenarioDefinition.parse(freeze({ ...definition, sourcePlanRef: ref('reviewed-source-plan') }));
       admission.ref.id = `${id}-admission`; admission.scenarioRef = definition.ref;
     }, profile, ownPolicy.ref);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DigestSchema, IdString, NonNegInt, PositiveInt, RefSchema, ScopeSchema, refList } from '../primitives.ts';
+import { DigestSchema, IdString, IsoDateTime, NonNegInt, PositiveInt, RefSchema, ScopeSchema, refList } from '../primitives.ts';
 
 export const ScenarioDefinition = z.object({ schemaVersion: z.literal('workflow.scenario/v1'), ref: RefSchema, scope: ScopeSchema,
   sourcePlanRef: RefSchema.nullable(), reviewRef: RefSchema, caseRefs: refList().min(1), replayContractRef: RefSchema,
@@ -50,3 +50,13 @@ export const ScenarioReplayAssessment = z.object({ snapshot: ScenarioRevisionTok
   reasonCodes: z.array(z.enum(['scenario_not_validating', 'insufficient_independent_rounds', 'no_current_epoch_rounds', 'latest_round_pending', 'latest_round_not_qualified'])).max(4),
 }).strict();
 export type ScenarioReplayAssessment = z.infer<typeof ScenarioReplayAssessment>;
+export const ScenarioActivationIntent = z.object({ snapshot: ScenarioRevisionToken, replayContractRef: RefSchema,
+  qualificationPolicyRef: RefSchema, qualificationMatrixRef: RefSchema, targetProfileRef: RefSchema,
+  roundRefs: refList().min(2), idempotencyKey: IdString,
+}).strict();
+export type ScenarioActivationIntent = z.infer<typeof ScenarioActivationIntent>;
+export const ScenarioActivation = z.object({ schemaVersion: z.literal('workflow.scenario-activation/v1'), ref: RefSchema,
+  scope: ScopeSchema, intent: ScenarioActivationIntent, intentDigest: DigestSchema, actorId: IdString,
+  authorizationPolicyRef: RefSchema, assessmentRefs: refList().min(2), activatedAt: IsoDateTime,
+}).strict();
+export type ScenarioActivation = z.infer<typeof ScenarioActivation>;

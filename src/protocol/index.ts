@@ -8,7 +8,8 @@ import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupS
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
-  ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent } from './schemas/scenario.ts';
+  ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
+  ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -38,6 +39,7 @@ export const SCHEMA_REGISTRY = {
   'workflow.qualification-policy/v1': QualificationPolicy,
   'workflow.replay-finding/v1': ReplayFinding,
   'workflow.replay-assessment/v1': ReplayAssessment,
+  'workflow.scenario-activation/v1': ScenarioActivation,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -85,6 +87,7 @@ export const NON_DOCUMENT_SCHEMAS = {
   'workflow.scenario-revision-token/v1': ScenarioRevisionToken,
   'workflow.qualification-intent/v1': QualificationRoundIntent,
   'workflow.scenario-replay-assessment/v1': ScenarioReplayAssessment,
+  'workflow.scenario-activation-intent/v1': ScenarioActivationIntent,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
   'workflow.runner-protocol/v1.host': HostFrame,

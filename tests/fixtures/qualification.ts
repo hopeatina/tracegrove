@@ -7,13 +7,20 @@ import { vi } from 'vitest';
 import { planSample, resealBundle, runSample, sampleCopy } from '../../conformance/helpers.ts';
 import { readVerifiedBundle } from '../../src/core/bundle.ts';
 import { qualificationStrataDigest } from '../../src/core/scenario.ts';
-import { QualificationRoundAdmission, RunRequest, SelectionManifest, ExecutionReceipt, CampaignResult,
-  digestOfBytes, freeze, type Ref } from '../../src/protocol/index.ts';
+import { QualificationRoundAdmission, RunRequest, SelectionManifest, ExecutionReceipt, CampaignResult, ScenarioDefinition,
+  digestOfBytes, freeze, refKey, type Ref } from '../../src/protocol/index.ts';
 import type { QualificationResultPorts } from '../../src/core/qualification.ts';
 import type { RunOptions } from '../../src/core/executor.ts';
 
 const ref = (id: string): Ref => ({ id, revision: '1', digest: digestOfBytes(id) });
 const write = (path: string, value: unknown) => writeFileSync(path, JSON.stringify(value));
+export function defineQualificationScenario(selection: SelectionManifest, admission: QualificationRoundAdmission): ScenarioDefinition {
+  return ScenarioDefinition.parse(freeze({ schemaVersion: 'workflow.scenario/v1', ref: { id: 'scenario', revision: '1' },
+    scope: selection.scope, sourcePlanRef: null, reviewRef: ref('review'),
+    caseRefs: [...new Map(selection.cells.map(c => [refKey(c.caseRef), c.caseRef])).values()], replayContractRef: admission.replayContractRef,
+    qualificationPolicyRef: admission.qualificationPolicyRef, qualificationMatrixRef: selection.ref,
+    qualificationTargetProfileRef: admission.targetProfileRef }));
+}
 export async function qualificationFixture(failed = false, alterAdmission?: (admission: QualificationRoundAdmission, selection: SelectionManifest) => void,
   profile = 'offline-contract', policy: Ref = ref('qualification-policy'), runOptions: Partial<RunOptions> = {}) {
   const copy = sampleCopy(root => {

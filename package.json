@@ -14,7 +14,7 @@
     "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" },
     "./coordination": { "types": "./dist/core/coordination.d.ts", "default": "./dist/core/coordination.js" }
   },
-  "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/verified-bundles.md", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
+  "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/scenario-activation.md", "docs/verified-bundles.md", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
