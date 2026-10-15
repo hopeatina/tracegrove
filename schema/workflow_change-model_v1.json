@@ -1,0 +1,614 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "elements": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "behavior": {
+            "maxLength": 400,
+            "minLength": 1,
+            "type": "string"
+          },
+          "boundary": {
+            "maxLength": 400,
+            "minLength": 1,
+            "type": "string"
+          },
+          "citationRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "derivation": {
+            "enum": [
+              "ast",
+              "declared",
+              "probe",
+              "pattern",
+              "agent"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "verification": {
+            "enum": [
+              "confirmed",
+              "contradicted",
+              "unverified"
+            ],
+            "type": "string"
+          },
+          "verificationEvidenceRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "verifierRef": {
+            "additionalProperties": false,
+            "properties": {
+              "digest": {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "revision": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "digest"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "boundary",
+          "behavior",
+          "citationRefs",
+          "derivation",
+          "confidence",
+          "verification",
+          "verifierRef",
+          "verificationEvidenceRefs"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "extractorReports": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnosticRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "extractorRef": {
+            "additionalProperties": false,
+            "properties": {
+              "digest": {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "revision": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "sourceRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial",
+              "failed",
+              "unsupported"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "extractorRef",
+          "sourceRefs",
+          "status",
+          "diagnosticRefs"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "generationRef": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ref": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "revisionMatrixRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "workflow.change-model/v1",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "tenantId": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "owner_private",
+            "tenant_private"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "tenantId",
+        "visibility"
+      ],
+      "type": "object"
+    },
+    "unresolvedQuestions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 400,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sourceRefs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "sourceRefs",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    }
+  },
+  "required": [
+    "ref",
+    "scope",
+    "schemaVersion",
+    "revisionMatrixRef",
+    "elements",
+    "extractorReports",
+    "unresolvedQuestions",
+    "generationRef"
+  ],
+  "type": "object"
+}

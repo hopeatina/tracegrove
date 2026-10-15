@@ -44,16 +44,19 @@ record consistency; the importer still needs its own issuer trust and access pol
 file digests, and inclusive line excerpt bytes through authorized trusted host ports.
 It preserves UTF-8 and CRLF bytes, rejects traversal, unsupported files and unavailable
 objects, and never falls back to the current checkout. These checks establish cited
-source bytes; connecting citations to change elements and review policy remains open.
+source bytes. The source-analysis API connects them to runnable change elements and
+the authenticated review policy; it does not establish passing product behavior.
 
-The initial Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
+The Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
 digests and scopes. Every specification edit clears its review. Concurrent edits and
 reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
 review nor projection. Reviewer identity and policy come from authenticated host
 admission. Tests exercise stale tokens, concurrent writers, resolver tampering and
 denied authority. This API has no hosted store, execution-admission integration or
 scenario activation. Resolving and validating source citations and coverage policy
-remain separate work; these records alone are not authority for product execution.
+are enforced through trusted source-analysis and policy ports before approval; hosted
+implementations remain separate work. These records alone are not authority for product execution.
+See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
 
 Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
 source selection resolver, complete review/qualification lifecycle, authoring inference, hosted

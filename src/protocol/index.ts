@@ -6,6 +6,7 @@ import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
+import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -16,6 +17,7 @@ export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
 export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
+export * from './schemas/source.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
@@ -24,6 +26,9 @@ export const SCHEMA_REGISTRY = {
   'workflow.corpus/v1': CorpusManifest,
   'workflow.source-plan/v1': SourcePlan,
   'workflow.plan-review/v1': PlanReview,
+  'workflow.revisions/v1': RevisionMatrix,
+  'workflow.change-model/v1': ChangeModel,
+  'workflow.source-validation/v1': PlanSourceValidation,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
