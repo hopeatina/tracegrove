@@ -67,7 +67,8 @@ export async function assessScenarioReplay(ports: ReplayAssessmentPorts, input: 
   if (!['validating', 'active'].includes(projection.state)) reasonCodes.push('scenario_not_validating');
   if (qualifyingRoundRefs.length < policy.minimumIndependentRounds) reasonCodes.push('insufficient_independent_rounds');
   const latestResult = latest ? rounds.find(r => sameRef(r.admissionRef, latest.ref)) : undefined;
-  if (!latestResult?.assessment) reasonCodes.push('latest_round_pending');
+  if (!latest) reasonCodes.push('no_current_epoch_rounds');
+  else if (!latestResult?.assessment) reasonCodes.push('latest_round_pending');
   else if (!latestResult.assessment.qualifies) reasonCodes.push('latest_round_not_qualified');
   // A registration/edit that arrives while reading evidence invalidates this report too.
   await readScenarioSnapshot(ports, token);

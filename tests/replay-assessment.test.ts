@@ -140,6 +140,7 @@ it('does not count pre-invalidation rounds and never resurrects degraded or reti
   const f = fixture(); f.snapshot().projection.invalidationEpoch = 1;
   const result = await assessScenarioReplay(f.ports, f.token());
   expect(result.qualifies).toBe(false); expect(result.rounds).toEqual([]);
+  expect(result.reasonCodes).toContain('no_current_epoch_rounds'); expect(result.reasonCodes).not.toContain('latest_round_pending');
   for (const state of ['degraded', 'retired'] as const) {
     const g = fixture(); g.snapshot().projection.state = state;
     const report = await assessScenarioReplay(g.ports, g.token());

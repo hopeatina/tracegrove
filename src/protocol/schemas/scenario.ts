@@ -47,6 +47,6 @@ export const ScenarioReplayAssessment = z.object({ snapshot: ScenarioRevisionTok
   requiredRounds: z.number().int().min(2).max(20), latestAdmissionRef: RefSchema.nullable(),
   rounds: z.array(z.object({ admissionRef: RefSchema, assessment: ReplayAssessment.nullable() }).strict()).max(500),
   qualifyingRoundRefs: refList(), qualifies: z.boolean(), findings: z.array(ReplayFinding).max(2000),
-  reasonCodes: z.array(z.enum(['scenario_not_validating', 'insufficient_independent_rounds', 'latest_round_pending', 'latest_round_not_qualified'])).max(4),
+  reasonCodes: z.array(z.enum(['scenario_not_validating', 'insufficient_independent_rounds', 'no_current_epoch_rounds', 'latest_round_pending', 'latest_round_not_qualified'])).max(4),
 }).strict();
 export type ScenarioReplayAssessment = z.infer<typeof ScenarioReplayAssessment>;

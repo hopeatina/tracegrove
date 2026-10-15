@@ -294,6 +294,7 @@
         "enum": [
           "scenario_not_validating",
           "insufficient_independent_rounds",
+          "no_current_epoch_rounds",
           "latest_round_pending",
           "latest_round_not_qualified"
         ],
