@@ -1,20 +1,17 @@
 import { z } from 'zod';
 import {
-  DigestSchema, PositiveInt, RefSchema, ScopeSchema, ShortText,
+  DigestSchema, PositiveInt, RefSchema, ScopeSchema, ShortText, GitObjectId, RepositoryPath,
   digestOfBytes, sameDigest, sameRef, verifySelfDigest, type Ref, type Scope,
 } from '../protocol/index.ts';
 import { Conflict } from './errors.ts';
 
-const RepositoryPath = z.string().min(1).max(2048).refine(path =>
-  !path.includes('\\') && !path.includes(':') && !/[\x00-\x1f\x7f]/.test(path)
-  && path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
-  'expected a repository-relative file path');
+export { RepositoryPath } from '../protocol/index.ts';
 
 /** Source facts only: this does not attest deployed behavior or execution admission. */
 export const SourceCitation = z.object({
   ref: RefSchema,
   repositoryRef: RefSchema,
-  resolvedCommit: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/, 'expected a full immutable Git object ID'),
+  resolvedCommit: GitObjectId,
   path: RepositoryPath,
   fileDigest: DigestSchema,
   lineStart: PositiveInt,

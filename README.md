@@ -59,6 +59,9 @@ scenario activation. Resolving and validating source citations and coverage poli
 are enforced through trusted source-analysis and policy ports before approval; hosted
 implementations remain separate work. These records alone are not authority for product execution.
 See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
+`source-resolve` and `GitSourceReader` [freeze local Git commit pairs and full diffs](docs/git-source-resolution.md)
+and read cited immutable objects after checkout changes. They supply source facts;
+independent review policy, full source transport and runtime identity remain separate gates.
 `LocalReviewStore` connects that API to the existing single-writer journal and preserves
 reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
 requires trusted host admission and source checking; it does not supply distributed authority.

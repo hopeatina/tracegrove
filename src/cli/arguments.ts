@@ -24,6 +24,7 @@ export const COMMAND_SCHEMAS = {
   export: z.object({ ...common, execution: Text, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   'verify-cleanup': z.object({ ...common, proof: Text, expectation: Text, trust: Text }).strict(),
+  'source-resolve': z.object({ ...common, input: Text, output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
 } as const;
 export type Args = {

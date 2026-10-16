@@ -12,7 +12,8 @@ it('retains the workspace when its supervisor dies before readiness without ackn
   const pidPath = join(copy.root, 'child.pid');
   const plan = freeze({ ...base, launch: { ...base.launch!, command: process.execPath,
     args: ['-e', "require('node:fs').writeFileSync(process.argv[1], String(process.pid)); process.kill(process.ppid, 'SIGKILL'); setInterval(() => {}, 1000)", pidPath],
-    readiness: { path: '/health', timeoutMs: 500 },
+    // Exercise supervisor death even when parallel Git fixtures delay child startup.
+    readiness: { path: '/health', timeoutMs: 5000 },
   } });
   const workspaceDir = join(copy.stateDir, 'host');
   try {

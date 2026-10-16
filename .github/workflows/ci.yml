@@ -16,6 +16,10 @@ jobs:
       - run: npm run verify
       - run: npm run test:conformance
       - run: npm run build
+      - name: Verify immutable source resolution through the built CLI
+        env:
+          WORKFLOW_VERIFY_TEST_CLI: compiled
+        run: npm test -- tests/cliGitSources.test.ts --maxWorkers=2
       - name: Qualify clean native and mocked Docker lanes
         run: |
           npm run test:container -- native-real

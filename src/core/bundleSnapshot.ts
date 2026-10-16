@@ -1,7 +1,8 @@
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
+import { lstatSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import { digestOfBytes, type Digest } from '../protocol/index.ts';
+import { readBoundedFile as readBounded } from './boundedFile.ts';
 
 export const BUNDLE_SCHEMA_VERSION = 'workflow.evidence-bundle/v1';
 export const BUNDLE_LIMITS = { manifestBytes: 1024 * 1024, fileBytes: 16 * 1024 * 1024, totalBytes: 64 * 1024 * 1024, files: 10000 } as const;
@@ -14,25 +15,6 @@ const Manifest = z.object({ schemaVersion: z.literal(BUNDLE_SCHEMA_VERSION), exe
 function json(bytes: Uint8Array, path: string): unknown {
   try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
   catch { throw new Error(`invalid JSON or UTF-8 in sealed file ${path}`); }
-}
-
-function readBounded(path: string, maxBytes: number, expectedBytes?: number): Buffer {
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const stat = fstatSync(descriptor);
-    if (!stat.isFile() || stat.size > maxBytes) throw new Error('bundle input is not a bounded regular file');
-    const size = expectedBytes ?? stat.size;
-    if (stat.size !== size) throw new Error(`hash mismatch ${path}: byte count changed`);
-    const bytes = Buffer.alloc(size + 1);
-    let count = 0;
-    while (count < bytes.length) {
-      const read = readSync(descriptor, bytes, count, bytes.length - count, null);
-      if (!read) break;
-      count += read;
-    }
-    if (count !== size) throw new Error(`hash mismatch ${path}: byte count changed`);
-    return bytes.subarray(0, count);
-  } finally { closeSync(descriptor); }
 }
 
 /** Sealed bytes, not issuer authority. Caller owns/authorizes the quiescent artifact directory. */

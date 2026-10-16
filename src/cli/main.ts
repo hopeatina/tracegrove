@@ -21,6 +21,7 @@ import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload,
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { writeSample } from './samples/write.ts';
+import { resolveSourceFiles } from './source.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -62,6 +63,8 @@ const HELP = `workflow-verify <command> [--flags]
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
                                                        check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
+  source-resolve --input <repositories.json> --output <source.json>
+                                                       freeze local Git commit pairs and complete diffs (no fetch or review)
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
 
@@ -69,6 +72,11 @@ async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
+    case 'source-resolve': {
+      const result = await resolveSourceFiles(args.flags.input, args.flags.output);
+      out(args, result.summary, result.text);
+      return 0;
+    }
 
     case 'sample-config': {
       const sample = args.flags.sample ?? 'notes-api';
