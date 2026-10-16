@@ -1,0 +1,4 @@
+schemaVersion: workflow.suite/v1
+id: notes.browser.suite
+cases:
+  - { caseRef: ./notes.browser.yaml, required: true, profiles: [native-real] }

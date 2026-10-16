@@ -4,6 +4,7 @@
  * host plan. Each carries `schemaVersion`, `ref` and `scope`; `ref.digest` is the self digest.
  */
 import { z } from 'zod';
+import { BrowserAction, BrowserLocator } from './browser.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
   RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList,
@@ -109,18 +110,21 @@ export const ObserveStep = z.object({
 /** Declared but unimplemented in the HTTP runner; capability checks must block these. */
 export const UnsupportedStep = z.object({
   ...stepCommon,
-  kind: z.enum(['ui.navigate', 'ui.action', 'job.submit', 'integration.action', 'mcp.call', 'widget.action', 'native.action', 'computer.action']),
+  kind: z.enum(['job.submit', 'integration.action', 'mcp.call', 'widget.action', 'native.action', 'computer.action']),
   parameters: z.record(z.string().max(LIMITS.id), JsonValue),
 }).strict();
 
-export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, UnsupportedStep]);
+export const BrowserNavigateStep = z.object({ ...stepCommon, kind: z.literal('ui.navigate'), path: HttpTemplatePath }).strict();
+export const BrowserActionStep = z.object({ ...stepCommon, kind: z.literal('ui.action'), command: BrowserAction }).strict();
+export const BrowserObserveStep = z.object({ ...stepCommon, kind: z.literal('ui.observe'), target: BrowserLocator, predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();
+export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, UnsupportedStep]);
 export type Step = z.infer<typeof Step>;
 
 export const Assertion = z.object({
   id: IdString,
   required: z.boolean(),
   environmentClasses: z.array(EnvironmentClass).min(1).max(4),
-  oracle: z.object({ name: z.enum(['http.observation', 'step.result']), version: z.literal('1') }).strict(),
+  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'step.result']), version: z.literal('1') }).strict(),
   stepId: IdString,
   predicate: Predicate,
   coverageTags: idList(32),
@@ -431,7 +435,7 @@ export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 
 export const RunnerProfile = z.object({
   ...defined('workflow.runner-profile/v1'),
-  adapter: z.enum(['http']),
+  adapter: z.enum(['http', 'browser']),
   maxStepsPerCase: PositiveInt,
   cancellation: z.enum(['confirmed', 'best_effort']),
 }).strict();

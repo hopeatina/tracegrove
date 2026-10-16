@@ -2,12 +2,12 @@
 import {
   BoundaryObservation, FidelityPlan, FixtureManifest, HostCapabilityObservation, HostLease,
   HostPlan, IdentityAttestation, CaseFixturePlan, SeedRecipe, CaseSpec, digestOfValue,
-  refKey, sameDigest, verifySelfDigest, parseAs,
+  refKey, sameDigest, verifySelfDigest, parseAs, digestOfBytes,
   type ExecutionReceipt, type RunRequest, type SelectionManifest, type Ref,
 } from '../protocol/index.ts';
 import { compareTargets, evaluateAssertions, REDUCER_REF, reduceCell } from './reducer.ts';
 import { compileCase } from './compiler.ts';
-import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
+import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -96,11 +96,23 @@ export function checkCellEvidence(input: {
       if (fixtureState === 'verified' && (manifest.missingEntityKeys.length || recipe.entities.some((entity) => !manifest.entities.some((e) => e.entityKey === entity.entityKey && (!entity.readback || e.readbackEvidenceRefs.length > 0))))) problem('fixture manifest omits required starting state');
     }
   }
-  const compiled = compileCase(spec, { ...HTTP_RUNNER_CAPABILITIES, maxStepsPerCase: 10_000 }, recipe);
+  const compiled = compileCase(spec, frozenRunnerCapabilities(documents, cell.expectedTarget.runner), recipe);
   const rederived = evaluateAssertions(spec, r.environment.class, r.steps, REDUCER_REF, r.startedAt ?? r.finalizedAt, r.finalizedAt);
   if (digestOfValue(rederived).hex !== digestOfValue(r.assertions).hex) problem('assertions disagree with independent reduction');
   const events = input.readBytes(`cells/${name}/events.jsonl`);
-  const artifactsVerified = r.artifacts.length > 0 && r.artifacts.every((a) => a.mediaType === 'application/x-ndjson' && sameDigest(a.ref.digest, r.eventsDigest) && a.byteCount === events.length);
+  const eventArtifacts = r.artifacts.filter(a => a.mediaType === 'application/x-ndjson');
+  const videos = r.artifacts.filter(a => a.mediaType === 'video/webm');
+  const artifactsVerified = eventArtifacts.length === 1
+    && (spec.capture.video !== 'required' || videos.length === 1)
+    && r.artifacts.reduce((sum, a) => sum + a.byteCount, 0) <= spec.limits.maxArtifactBytes
+    && r.artifacts.every(a => {
+      if (a.mediaType === 'application/x-ndjson') return sameDigest(a.ref.digest, r.eventsDigest) && a.byteCount === events.length;
+      if (a.mediaType !== 'video/webm' || !exact(a.producerRef, cell.expectedTarget.runner)) return false;
+      const bytes = input.readBytes(`cells/${name}/media/${a.ref.digest.hex}.webm`);
+      return a.byteCount === bytes.length && sameDigest(a.ref.digest, digestOfBytes(bytes))
+        && bytes.subarray(0, 4).toString('hex') === '1a45dfa3'
+        && a.stepIds.every(id => compiled.stepsById.get(id)?.kind.startsWith('ui.'));
+    });
   const reduction = reduceCell({
     spec, expectedStepIds: compiled.orderedStepIds, steps: r.steps, assertions: rederived,
     cancelled: r.steps.some((s) => s.result === 'cancelled'), fixtureState,
@@ -111,7 +123,7 @@ export function checkCellEvidence(input: {
     // A host that never started leaves every step not_run; its sealed host.failed event is the
     // evidence. It can only move a cell away from passed, never towards it.
     infrastructureFailure: r.steps.some((s) => ['transport_failure', 'deadline_exceeded'].includes(s.reasonCode ?? ''))
-      || (artifactsVerified && events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"'))),
+      || events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"') || line.includes('"kind":"browser.failed"')),
     blockedReasons: r.outcome === 'blocked' ? r.reasonCodes : [],
   });
   if (reduction.outcome !== r.outcome || reduction.proofEligible !== r.proofEligible) problem(`recorded outcome ${r.outcome} differs from evidence reduction ${reduction.outcome}`);

@@ -1,10 +1,10 @@
-import { chromium, type Browser, type BrowserContext, type Locator, type Page } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Deadline } from '../../core/deadline.ts';
 import { readBoundedFile } from '../../core/boundedFile.ts';
-import { BrowserCommand, BrowserObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
+import { BrowserCommand, BrowserObservation, BrowserNetworkObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
 
 export class BrowserStepError extends Error {
   constructor(readonly code: string) { super(code); this.name = 'BrowserStepError'; }
@@ -20,9 +20,15 @@ export class BrowserDriver {
     private readonly context: BrowserContext,
     private readonly page: Page,
     private readonly mediaDir: string,
+    private readonly inputMode: 'pointer' | 'keyboard' | 'touch',
   ) {}
 
-  static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal }): Promise<BrowserDriver> {
+  static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
+    allowedMethods?: readonly string[]; allowedResourcePrefixes?: readonly string[];
+    bearer?: string; viewport?: { width: number; height: number }; locale?: string; timezoneId?: string; reducedMotion?: boolean;
+    inputMode?: 'pointer' | 'keyboard' | 'touch';
+    onNetwork?: (observation: BrowserNetworkObservation) => void;
+  }): Promise<BrowserDriver> {
     const origin = new URL(input.origin);
     if (!['http:', 'https:'].includes(origin.protocol) || origin.href !== `${origin.origin}/` || origin.username || origin.password) {
       throw new BrowserStepError('invalid_origin');
@@ -38,18 +44,41 @@ export class BrowserDriver {
       signal.throwIfAborted();
       const context = await browser.newContext({
         serviceWorkers: 'block', acceptDownloads: false,
-        viewport: { width: 1280, height: 720 },
+        viewport: input.viewport ?? { width: 1280, height: 720 },
+        hasTouch: input.inputMode === 'touch',
+        ...(input.locale ? { locale: input.locale } : {}),
+        ...(input.timezoneId ? { timezoneId: input.timezoneId } : {}),
+        reducedMotion: input.reducedMotion ? 'reduce' : 'no-preference',
         recordVideo: { dir: mediaDir, size: { width: 1280, height: 720 } },
       });
       await context.routeWebSocket('**/*', socket => socket.close());
       const page = await context.newPage();
+      const requests = new WeakMap<Request, number>();
+      let nextRequest = 0;
+      const observeNetwork = (kind: BrowserNetworkObservation['kind'], request: Request, status: number | null) => {
+        if (!input.onNetwork) return;
+        try {
+          let requestId = requests.get(request);
+          if (requestId === undefined) { requestId = ++nextRequest; requests.set(request, requestId); }
+          const url = new URL(request.url());
+          input.onNetwork(BrowserNetworkObservation.parse({ kind, requestId, method: request.method(), url: `${url.origin}${url.pathname}`.slice(0, 4096), status }));
+        } catch { void context.close().catch(() => {}); }
+      };
+      page.on('request', request => observeNetwork('request', request, null));
+      page.on('response', response => observeNetwork('response', response.request(), response.status()));
+      page.on('requestfailed', request => observeNetwork('failed', request, null));
       // CDP pauses every redirect hop. Continue the native response stream rather
       // than buffering/proxying it through route.fetch (which breaks chat/SSE).
       const network = await context.newCDPSession(page);
       network.on('Fetch.requestPaused', event => {
-        const allowed = new URL(event.request.url).origin === origin.origin;
+        const url = new URL(event.request.url);
+        const allowed = url.origin === origin.origin
+          && (!input.allowedMethods || input.allowedMethods.includes(event.request.method))
+          && (!input.allowedResourcePrefixes || input.allowedResourcePrefixes.some(prefix => url.pathname.startsWith(prefix)));
         const operation = allowed
-          ? network.send('Fetch.continueRequest', { requestId: event.requestId })
+          ? network.send('Fetch.continueRequest', { requestId: event.requestId,
+            ...(input.bearer ? { headers: [...Object.entries(event.request.headers).filter(([name]) => name.toLowerCase() !== 'authorization').map(([name, value]) => ({ name, value: String(value) })), { name: 'Authorization', value: `Bearer ${input.bearer}` }] } : {}),
+          })
           : network.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' });
         void operation.catch(() => context.close().catch(() => {}));
       });
@@ -57,7 +86,7 @@ export class BrowserDriver {
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
-      return new BrowserDriver(origin.origin, browser, context, page, mediaDir);
+      return new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
     } catch (error) {
       await browser?.close();
       await rm(mediaDir, { recursive: true, force: true });
@@ -95,8 +124,15 @@ export class BrowserDriver {
         status = (await this.page.goto(url.href, { timeout, waitUntil: 'domcontentloaded' }))?.status() ?? null;
       } else {
         const locator = this.locator(command.target);
-        if (command.kind === 'click') await locator.click({ timeout });
-        if (command.kind === 'fill') await locator.fill(command.value, { timeout });
+        if (command.kind === 'click') {
+          if (this.inputMode === 'touch') await locator.tap({ timeout });
+          else if (this.inputMode === 'keyboard') { await locator.focus({ timeout }); await locator.press('Enter', { timeout }); }
+          else await locator.click({ timeout });
+        }
+        if (command.kind === 'fill') {
+          if (this.inputMode === 'keyboard') { await locator.fill('', { timeout }); await locator.pressSequentially(command.value, { timeout }); }
+          else await locator.fill(command.value, { timeout });
+        }
         if (command.kind === 'read') {
           await locator.waitFor({ state: 'visible', timeout });
           // Bound the text before transporting it out of the page.
@@ -133,11 +169,11 @@ export class BrowserDriver {
   }
 
   /** Closing flushes the real recording; the caller must seal it in its evidence store. */
-  async collectVideo(): Promise<Buffer> {
+  async collectVideo(maxBytes = 32 * 1024 * 1024): Promise<Buffer> {
     await this.close();
     const path = await this.page.video()?.path();
     if (!path) throw new BrowserStepError('video_missing');
-    const bytes = readBoundedFile(path, 32 * 1024 * 1024);
+    const bytes = readBoundedFile(path, maxBytes);
     if (!bytes.length) throw new BrowserStepError('video_empty');
     return bytes;
   }

@@ -9,12 +9,14 @@ import { join } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
-  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, RunnerProfile, SeedRecipe,
+  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource,
+  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
+import { BrowserStepError } from '../adapters/browser/driver.ts';
+import { CaseBrowserSession } from '../adapters/browser/session.ts';
 import { LocalProcessHost } from '../hosts/local.ts';
 import { MockLoopbackHost } from '../hosts/mock.ts';
 import type { ExecutorHost, HostSession } from '../hosts/types.ts';
@@ -28,7 +30,7 @@ import { Blocked, Conflict, InfrastructureFailure } from './errors.ts';
 import { EventLog } from './events.ts';
 import type { LocalLedger } from './ledger.ts';
 import type { FrozenBundle } from './planner.ts';
-import { runnerCapabilitiesFor } from './planner.ts';
+import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
 
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
@@ -64,13 +66,7 @@ class DocStore {
     if (!result.success || result.data === undefined) throw new Blocked([{ code: 'schema_violation', detail: `${label}: ${refKey(ref)}` }]);
     return result.data;
   }
-  findRunnerProfile(expected: Ref): RunnerProfile {
-    for (const doc of this.docs.values()) {
-      const parsed = RunnerProfile.safeParse(doc);
-      if (parsed.success && sameDigest(runnerCapabilitiesFor(parsed.data).ref.digest, expected.digest)) return parsed.data;
-    }
-    throw new Blocked([{ code: 'runner_profile_missing', detail: `no runner profile reproduces capabilities ${expected.id}@${expected.revision}`, owner: 'operator', action: 'plan again with the runner profile in the corpus' }]);
-  }
+  runnerCapabilities(expected: Ref): RunnerCapabilities { return frozenRunnerCapabilities(Object.fromEntries(this.docs), expected); }
 }
 
 type PreparedCell = {
@@ -124,8 +120,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     const binding = docs.get<SurfaceBinding>(SurfaceBinding, cell.surfaceBindingRef, 'surface binding');
     const environmentPlan = docs.get<EnvironmentPlan>(EnvironmentPlan, cell.environmentRef, 'environment plan');
     const hostPlan = docs.get<HostPlan>(HostPlan, cell.executionHostRef, 'host plan');
-    const runnerProfile = docs.findRunnerProfile(cell.expectedTarget.runner);
-    const capabilities = runnerCapabilitiesFor(runnerProfile);
+    const capabilities = docs.runnerCapabilities(cell.expectedTarget.runner);
     const fidelityCell = fidelityPlan.cells.find((f) => f.selectionCellId === cell.selectionCellId);
     if (!fidelityCell) throw new Blocked([{ code: 'fidelity_cell_missing', detail: cell.selectionCellId }]);
     for (const required of spec.requiredBoundaries) {
@@ -284,6 +279,9 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   const driver = session ? new HttpDriver({ persona: authRecipe.credentialName ? session.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session.credentials) }, new Set([session.origin])) : null;
   const origin = session?.origin ?? '';
+  const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: authRecipe.credentialName ? session?.credentials.get(authRecipe.credentialName) ?? null : null,
+    onNetwork: observation => { log.emit('browser.network', null, observation); },
+  });
   const runtimeVariables: Record<string, unknown> = { execution_nonce: attemptId, lease_namespace: cell.selectionCellId, target_origin: origin };
 
   // ---- preparing: fixtures through registered actions with independent readback ----
@@ -384,10 +382,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       continue;
     }
     const stepStart = nowIso();
+    const stepStartedMs = monotonicMs();
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation;
+      let observation: HttpObservation | BrowserObservation;
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
@@ -400,16 +399,20 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'observe') {
         observation = await driver!.observe({ origin, method: step.readback.method, path: step.readback.path, auth: step.readback.auth, variables, deadline, signal }, step.predicate, step.pollIntervalMs);
         captured[stepId] = captureValues(observation, step.captures);
+      } else if (step.kind === 'ui.navigate' || step.kind === 'ui.action' || step.kind === 'ui.observe') {
+        if (authRecipe.credentialName && !session?.credentials.get(authRecipe.credentialName)) throw new HttpStepError('missing_persona_credential', 'browser persona credential was not issued');
+        observation = await browser.execute(step, variables, deadline, signal);
       } else {
         throw new HttpStepError('unsupported_operation', `${step.kind} is not implemented by the HTTP runner`);
       }
-      const output = redactObservation(observation);
-      const finished = log.emit('step.finished', stepId, { result: 'completed', observation: output }, { requestId: observation.requestId });
-      stepObservations.push({ stepId, result: 'completed', reasonCode: null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: observation.durationMs } });
+      const output = 'requestId' in observation ? redactObservation(observation) : observation;
+      const finished = log.emit('step.finished', stepId, { result: 'completed', observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
+      stepObservations.push({ stepId, result: 'completed', reasonCode: null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
     } catch (error) {
-      const code = error instanceof HttpStepError ? error.code : 'transport_failure';
+      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError ? error.code : 'transport_failure';
+      const code = rawCode === 'browser_cancelled' ? 'cancelled' : rawCode;
       const finished = log.emit('step.finished', stepId, { result: code === 'cancelled' ? 'cancelled' : 'failed', reason: code, message: String((error as Error).message) });
-      if (code === 'cancelled') cancelled = true;
+      if (code === 'cancelled' || code === 'browser_cancelled') cancelled = true;
       else if (code === 'transport_failure' || code === 'deadline_exceeded') infrastructureFailure = true;
       stepObservations.push({ stepId, result: code === 'cancelled' ? 'cancelled' : 'failed', reasonCode: code, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: null, output: null, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: 0 } });
       halted = true;
@@ -436,6 +439,21 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const fidelityMatched = boundaryObservations.filter((b) => fidelityCell.claimBoundaryIds.includes(b.boundaryId)).every((b) => b.mismatchReasons.length === 0);
   log.emit('boundaries.observed', null, { observations: boundaryObservations.map((b) => ({ boundaryId: b.boundaryId, expected: b.expectedMode, observed: b.observedMode, mismatches: b.mismatchReasons })) });
 
+  // Flush browser evidence before host cleanup; an unavailable recording cannot satisfy required capture.
+  const media: Array<{ digest: string; bytes: Buffer }> = [];
+  const mediaArtifacts: ExecutionReceipt['artifacts'] = [];
+  try {
+    const bytes = await browser.collectVideo();
+    if (bytes) {
+      const artifact = ctx.artifacts.put({ id: `${executionId}.${cell.selectionCellId}.video`, bytes, mediaType: 'video/webm', producerRef: cell.expectedTarget.runner,
+        stepIds: compiled.orderedStepIds.filter(id => compiled.stepsById.get(id)!.kind.startsWith('ui.')), from: startedAt, to: nowIso() });
+      media.push({ digest: artifact.ref.digest.hex, bytes }); mediaArtifacts.push({ ...artifact, retentionPolicyRef: spec.capture.retentionPolicyRef });
+      log.emit('browser.video.collected', null, { ref: artifact.ref, byteCount: artifact.byteCount });
+    }
+  } catch {
+    infrastructureFailure = true; log.emit('browser.failed', null, { code: 'browser_evidence_collection_failed' });
+  }
+
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
   const cleanupDeadline = Deadline.in(hostPlan.cleanupReserveMs);
   const { cleanup, criticalCleanupConfirmed } = await collectCleanup({ allocated,
@@ -447,7 +465,10 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const finishedAt = nowIso();
   const sealedEvents = log.toJsonl();
   const eventsArtifact = ctx.artifacts.put({ id: `${executionId}.${cell.selectionCellId}.events`, bytes: Buffer.from(sealedEvents, 'utf8'), mediaType: 'application/x-ndjson', producerRef: REDUCER_REF, stepIds: compiled.orderedStepIds, from: startedAt, to: finishedAt });
-  const artifactsVerified = ctx.artifacts.verify(eventsArtifact.ref.digest);
+  const allArtifacts = [eventsArtifact, ...mediaArtifacts];
+  const artifactsVerified = allArtifacts.every(artifact => ctx.artifacts.verify(artifact.ref.digest))
+    && (spec.capture.video !== 'required' || mediaArtifacts.length > 0)
+    && allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0) <= spec.limits.maxArtifactBytes;
   const assertions = evaluateAssertions(spec, environmentPlan.class, stepObservations, REDUCER_REF, startedAt, finishedAt);
   const reduction = reduceCell({ spec, expectedStepIds: compiled.orderedStepIds, steps: stepObservations, assertions, cancelled, fixtureState, identityMatched, fidelityMatched, requiredCapabilitiesObserved, artifactsVerified, unknownMutations: cleanup.remainingUnknownMutations, criticalCleanupConfirmed, infrastructureFailure, blockedReasons });
   const routing = parseAs(RoutingDecision, freeze({
@@ -464,9 +485,9 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   }), 'cost observation'));
   const accounting: Accounting = {
     reservations: [{ reservationId: ctx.reservation.ref.id, kind: 'action', cents: ctx.reservation.actionCents }],
-    runnerSeconds: Number(hostSeconds.toFixed(3)), browserSeconds: 0, inferenceCalls: 0, inferenceTokens: 0, requestedModel: null, observedModel: null,
+    runnerSeconds: Number(hostSeconds.toFixed(3)), browserSeconds: Number(browser.seconds.toFixed(3)), inferenceCalls: 0, inferenceTokens: 0, requestedModel: null, observedModel: null,
     providerRequestIds: stepObservations.flatMap((s) => (s.output && typeof s.output === 'object' && (s.output as { requestId?: string | null }).requestId ? [String((s.output as { requestId?: string | null }).requestId)] : [])),
-    integrationOperations: 0, artifactBytes: eventsArtifact.byteCount, estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
+    integrationOperations: 0, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
     routingDecisionRefs: [routing.ref], costObservationRefs: costs.map((c) => c.ref),
   };
   const receipt = parseAs(ExecutionReceipt, freeze({
@@ -476,14 +497,14 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     executionHostRef: hostPlan.ref, hostLeaseRef: session?.lease.ref ?? { id: `${executionId}.host-lease.unissued`, revision: '0', digest: digestOfValue('unissued') }, hostObservationRefs: session ? [session.observation.ref] : [],
     environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: null,
     fixtureManifestRef: fixtureManifest?.ref ?? null, boundaryObservationRefs: boundaryObservations.map((b) => b.ref), proofClaim: spec.proofClaim,
-    coverage: reduction.coverage, eventsDigest: eventsArtifact.ref.digest, assertions, steps: stepObservations, artifacts: [eventsArtifact], accounting,
-    performance: stepObservations.filter((s) => s.timing).map((s) => ({ metric: `step.${s.stepId}.duration`, boundary: 'http', clock: 'monotonic' as const, cellId: cell.selectionCellId, valueMs: s.timing!.durationMs, censored: false, warm: false, strata: { host: hostPlan.adapter } })),
+    coverage: reduction.coverage, eventsDigest: eventsArtifact.ref.digest, assertions, steps: stepObservations, artifacts: allArtifacts, accounting,
+    performance: stepObservations.filter((s) => s.timing).map((s) => ({ metric: `step.${s.stepId}.duration`, boundary: compiled.stepsById.get(s.stepId)!.kind.startsWith('ui.') ? 'browser' : 'http', clock: 'monotonic' as const, cellId: cell.selectionCellId, valueMs: s.timing!.durationMs, censored: false, warm: false, strata: { host: hostPlan.adapter } })),
     cleanup, outcome: reduction.outcome, reasonCodes: reduction.reasonCodes, proofEligible: reduction.proofEligible, startedAt, finalizedAt: finishedAt,
   }), 'execution receipt');
   const finalization = log.emit('cell.finalized', null, { outcome: receipt.outcome, reasonCodes: receipt.reasonCodes, receiptRef: receipt.ref });
   // Persist cell-level records beside the receipt for the bundle writer. The events file carries the
   // sealed bytes the receipt hashes; the finalization event is recorded separately.
-  writeExecutionBundle({ dir: ctx.executionDir, cell: { id: cell.selectionCellId, receipt, environment, fixtureManifest, boundaryObservations, hostLease: session?.lease ?? null, hostObservation: session?.observation ?? null, attestations: session?.attestations ?? [], credentialLease, routing, costs, eventsJsonl: sealedEvents, finalization } });
+  writeExecutionBundle({ dir: ctx.executionDir, cell: { id: cell.selectionCellId, receipt, environment, fixtureManifest, boundaryObservations, hostLease: session?.lease ?? null, hostObservation: session?.observation ?? null, attestations: session?.attestations ?? [], credentialLease, routing, costs, eventsJsonl: sealedEvents, finalization, media } });
   return receipt;
 }
 

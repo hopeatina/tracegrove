@@ -1,0 +1,63 @@
+schemaVersion: workflow.case/v1
+ref: { id: example.notes.browser, revision: "1" }
+purpose: Read a seeded note through the authenticated browser and confirm its state through an independent API readback.
+workflowId: notes.browser
+requirementRefs: []
+sourceRefs: []
+sourceAnalysisRef: null
+risk: standard
+surface: hybrid
+surfaceBindingRef: { $file: ../surfaces/http-api.binding.yaml }
+proofClaim: The locally launched application displays a seeded note through its authenticated UI, agrees with an independent API readback, and records the browser interaction. This establishes local application behavior only.
+environmentClasses: [isolated_candidate]
+requiredCapabilities: [ui.navigate, ui.action, ui.observe, observe, fixture.http]
+requiredBoundaries:
+  - { boundaryId: application, mode: real }
+  - { boundaryId: storage, mode: real }
+dependencyCases: []
+personaRef: { $file: ../personas/owner.yaml }
+datasetRef: null
+fixturePlanRef: { $file: ../fixtures/existing-note.plan.yaml }
+navigationRef: null
+preconditions: []
+steps:
+  - { id: navigate, kind: ui.navigate, path: /ui, timeoutMs: 5000, inputs: {}, retry: { attempts: 1 } }
+  - id: refresh
+    kind: ui.action
+    timeoutMs: 5000
+    inputs: {}
+    retry: { attempts: 1 }
+    command: { kind: click, target: { by: role, role: button, name: Refresh } }
+  - id: read_dom
+    kind: ui.observe
+    timeoutMs: 5000
+    inputs: {}
+    retry: { attempts: 1 }
+    target: { by: testId, name: notes }
+    predicate: { kind: json_path_equals, path: browser.text, value: Existing note }
+    pollIntervalMs: 50
+  - id: read_api
+    kind: observe
+    timeoutMs: 5000
+    inputs: { existingId: { kind: fixture, entityKey: existing_note, outputName: noteId } }
+    retry: { attempts: 1 }
+    readback: { kind: http, method: GET, path: "/notes/{existingId}", auth: { kind: persona } }
+    predicate: { kind: json_path_equals, path: body.note.title, value: Existing note }
+    pollIntervalMs: 50
+    captures: []
+assertions:
+  - { id: a.browser, stepId: read_dom, required: true, environmentClasses: [isolated_candidate], oracle: { name: browser.observation, version: "1" }, predicate: { kind: json_path_equals, path: browser.text, value: Existing note }, coverageTags: [notes.ui] }
+  - { id: a.readback, stepId: read_api, required: true, environmentClasses: [isolated_candidate], oracle: { name: http.observation, version: "1" }, predicate: { kind: all, predicates: [ { kind: status_equals, value: 200 }, { kind: json_path_equals, path: body.note.title, value: Existing note } ] }, coverageTags: [notes.read] }
+effects:
+  mode: read_only
+  allowedHosts: ["launch://notes-api"]
+  allowedMethods: [GET, HEAD]
+  allowedResourcePrefixes: [/ui, /notes]
+  maxCreates: 1
+  maxMessages: 0
+  maxJobs: 0
+  cleanupRecipeRef: null
+limits: { deadlineMs: 30000, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: 50, maxArtifactBytes: 2097152, diagnosticRetries: 0, concurrencyGroup: notes }
+capture: { stepEvents: true, networkMetadata: true, trace: optional, video: required, redactionPolicyRef: null, retentionPolicyRef: null }
+baselineRef: null
+generation: null

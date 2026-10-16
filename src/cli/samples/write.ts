@@ -30,12 +30,17 @@ export function writeSample(samplesRoot: string, name: SampleName, output: strin
     detail: output, action: 'choose an empty output directory; existing files are never overwritten' }]);
   mkdirSync(output, { recursive: true });
   cpSync(join(samplesRoot, 'notes-api'), output, { recursive: true });
+  if (name === 'notes-browser') cpSync(join(samplesRoot, name), output, { recursive: true });
   if (name === 'notes-django') {
     cpSync(join(samplesRoot, name), output, { recursive: true });
     rmSync(join(output, 'app/app.mjs'));
     const host = HostTemplate.parse(parse(readFileSync(join(output, 'verification/hosts/local-process.yaml'), 'utf8')));
     bindSampleApplication(output, { ...host.launch, command: '.venv/bin/python', args: ['app/django_app.py'],
       identitySourceFiles: ['app/django_app.py', 'app/requirements.lock'] }, 'python3.13');
+  }
+  if (name !== 'notes-django') {
+    const host = HostTemplate.parse(parse(readFileSync(join(output, 'verification/hosts/local-process.yaml'), 'utf8')));
+    bindSampleApplication(output, host.launch, 'node22');
   }
   return join(output, 'verification/workflow.yaml');
 }

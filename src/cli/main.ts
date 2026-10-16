@@ -6,6 +6,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
@@ -71,7 +72,7 @@ Agent-friendly commands (every one takes --json and never starts the app):
   (every command also takes --config <tracegrove.config.yaml>)
 
 Low-level corpus commands (the strict workflow.*/v1 files):
-  sample-config --sample notes-api|notes-django --output <dir>     write a sample project (real app + corpus)
+  sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>

@@ -8,10 +8,13 @@ export const BrowserLocator = z.discriminatedUnion('by', [
 ]);
 export type BrowserLocator = z.infer<typeof BrowserLocator>;
 
-export const BrowserCommand = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('navigate'), path: z.string().min(1).max(4096).startsWith('/') }).strict(),
+export const BrowserAction = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('click'), target: BrowserLocator }).strict(),
   z.object({ kind: z.literal('fill'), target: BrowserLocator, value: z.string().max(8192) }).strict(),
+]);
+export const BrowserCommand = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('navigate'), path: z.string().min(1).max(4096).startsWith('/') }).strict(),
+  ...BrowserAction.options,
   z.object({ kind: z.literal('read'), target: BrowserLocator }).strict(),
 ]);
 export type BrowserCommand = z.infer<typeof BrowserCommand>;
@@ -24,3 +27,10 @@ export const BrowserObservation = z.object({
   textTruncated: z.boolean(),
 }).strict();
 export type BrowserObservation = z.infer<typeof BrowserObservation>;
+
+export const BrowserNetworkObservation = z.object({
+  kind: z.enum(['request', 'response', 'failed']), requestId: z.number().int().positive(),
+  method: z.string().min(1).max(32), url: z.string().max(4096),
+  status: z.number().int().min(0).max(599).nullable(),
+}).strict();
+export type BrowserNetworkObservation = z.infer<typeof BrowserNetworkObservation>;

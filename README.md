@@ -210,7 +210,7 @@ What the adapters cover now and what's next:
 | Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
 | Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
 | Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
-| Browser | None | Playwright surface reusing personas, fixtures and run folders |
+| Browser | Typed Chromium steps in the low-level corpus, authenticated local personas, DOM/API assertions, sealed video | Short-flow authoring, Grove playback, staging qualification and controller-death cleanup |
 
 The full gap analysis by layer, with priorities, is in [docs/architecture.md](docs/architecture.md).
 
@@ -294,8 +294,10 @@ admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
 an atomic host port, with exact round selection and idempotent receipt recovery. See
 [activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
 
-Still open: browser/Playwright runner, full runtime source selection, hosted review and
-qualification, coordination acceptance, `seed --apply`, distributed crash recovery and required media.
+The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
+fixtures and independent readback, and verifies recordings in the portable bundle.
+Still open: browser short-flow authoring and Grove playback, full runtime source selection,
+hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
 Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 
 ## Zero-OrgX quickstart (low-level corpus)

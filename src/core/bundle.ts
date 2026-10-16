@@ -16,6 +16,7 @@ import type { FrozenBundle } from './planner.ts';
 import { REDUCER_REF, evaluateAssertions, reduceCampaign, reduceCell } from './reducer.ts';
 import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
+import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 
 
 function writeJson(path: string, value: unknown): void {
@@ -25,6 +26,7 @@ function writeJson(path: string, value: unknown): void {
 export type CellRecords = {
   id: string; receipt: ExecutionReceipt; environment: unknown; fixtureManifest: unknown; boundaryObservations: unknown[];
   hostLease: unknown; hostObservation: unknown; attestations: unknown[]; credentialLease: unknown; routing: unknown; costs: unknown[]; eventsJsonl: string; finalization: unknown;
+  media?: Array<{ digest: string; bytes: Buffer }>;
 };
 
 export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; bundle?: FrozenBundle; request?: RunRequest; selection?: SelectionManifest; receipts?: ExecutionReceipt[]; campaign?: CampaignResult }): void {
@@ -42,6 +44,11 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
     writeJson(join(cellDir, 'cleanup.json'), input.cell.receipt.cleanup);
     writeFileSync(join(cellDir, 'events.jsonl'), input.cell.eventsJsonl);
     writeJson(join(cellDir, 'finalization.json'), input.cell.finalization);
+    for (const artifact of input.cell.media ?? []) {
+      if (!/^[a-f0-9]{64}$/.test(artifact.digest) || digestOfBytes(artifact.bytes).hex !== artifact.digest) throw new Error('invalid media digest');
+      mkdirSync(join(cellDir, 'media'), { recursive: true });
+      writeFileSync(join(cellDir, 'media', `${artifact.digest}.webm`), artifact.bytes, { mode: 0o600 });
+    }
     return;
   }
   if (!input.bundle || !input.request || !input.selection || !input.receipts || !input.campaign) throw new Error('incomplete bundle input');
@@ -65,7 +72,7 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
     }
   };
   walk(input.dir, '');
-  const manifest = { schemaVersion: BUNDLE_SCHEMA_VERSION, executionId: input.receipts[0]?.executionId ?? null, campaignId: input.campaign.campaignId, reducer: REDUCER_REF, runner: HTTP_RUNNER_CAPABILITIES.ref, files, createdAt: new Date().toISOString() };
+  const manifest = { schemaVersion: BUNDLE_SCHEMA_VERSION, executionId: input.receipts[0]?.executionId ?? null, campaignId: input.campaign.campaignId, reducer: REDUCER_REF, runner: input.selection.cells[0]?.expectedTarget.runner ?? HTTP_RUNNER_CAPABILITIES.ref, files, createdAt: new Date().toISOString() };
   writeJson(join(input.dir, 'manifest.json'), manifest);
 }
 
@@ -126,7 +133,7 @@ function verifyBundleRecords(dir: string): Inspection {
       if (!parsedRecipe?.success) problems.push(`fixture recipe for ${receipt.caseRef.id} missing from bundle documents`);
       else recipe = parsedRecipe.data;
     }
-    const compiled = compileCase(spec, { ...HTTP_RUNNER_CAPABILITIES, maxStepsPerCase: 10_000 }, recipe);
+    const compiled = compileCase(spec, frozenRunnerCapabilities(documents, receipt.environment.expected.runner), recipe);
     const rederived = evaluateAssertions(spec, receipt.environment.class, receipt.steps, REDUCER_REF, receipt.startedAt ?? receipt.finalizedAt, receipt.finalizedAt);
     for (const assertion of rederived) {
       const recorded = receipt.assertions.find((a) => a.assertionId === assertion.assertionId);

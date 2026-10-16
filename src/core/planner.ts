@@ -8,9 +8,10 @@ import {
   ActionRegistry, AuthRecipe, CampaignFixturePlan, CaseFixturePlan, CaseSpec, ComponentProfile, EffectiveConfig,
   EnvironmentPlan, FidelityPlan, FidelityProfile, HostPlan, IntelligencePolicy, LogicalPayload, Persona,
   RunRequest, RunnerProfile, SeedRecipe, SelectionManifest, SurfaceBinding, SurfacePack, digestOfValue, freeze,
-  parseAs, refKey, sameDigest, type Ref, type Scope, type TargetTuple, type RunnerCapabilities,
+  parseAs, refKey, sameDigest, type Ref, type Scope, type TargetTuple,
 } from '../protocol/index.ts';
-import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
+import { runnerCapabilitiesFor } from './runnerCapabilities.ts';
+export { runnerCapabilitiesFor } from './runnerCapabilities.ts';
 import { compileCase } from './compiler.ts';
 import { cleanupActionError } from './cleanupActions.ts';
 import { Blocked } from './errors.ts';
@@ -39,13 +40,6 @@ export type PlanInput = { project: LoadedProject; profileName: string; scope: Sc
 
 function cellId(caseId: string, personaId: string): string {
   return `${caseId}__${personaId}`.replace(/[^A-Za-z0-9._:/-]/g, '_');
-}
-
-export function runnerCapabilitiesFor(profile: RunnerProfile): RunnerCapabilities {
-  if (profile.adapter !== 'http') throw new Blocked([{ code: 'unknown_runner_adapter', detail: profile.adapter }]);
-  const caps = { ...HTTP_RUNNER_CAPABILITIES, maxStepsPerCase: profile.maxStepsPerCase, cancellation: profile.cancellation };
-  const base = { ...caps, ref: { id: caps.ref.id, revision: caps.ref.revision } };
-  return { ...caps, ref: { ...base.ref, digest: digestOfValue(base) } };
 }
 
 export function plan(input: PlanInput): FrozenBundle {

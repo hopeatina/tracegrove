@@ -19,7 +19,7 @@ export class LocalArtifactStore {
     const target = this.objectPath(digest.hex);
     if (!existsSync(target)) {
       const tmp = `${target}.tmp-${process.pid}`;
-      writeFileSync(tmp, input.bytes);
+      writeFileSync(tmp, input.bytes, { mode: 0o600 });
       renameSync(tmp, target);
     }
     const readBack = digestOfBytes(readFileSync(target));

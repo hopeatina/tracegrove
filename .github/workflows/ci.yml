@@ -63,6 +63,20 @@ jobs:
         run: |
           node dist/cli/main.js sample-config --sample notes-api --output "$RUNNER_TEMP/notes-flows"
           cd "$RUNNER_TEMP/notes-flows" && node "$GITHUB_WORKSPACE/dist/cli/main.js" test
+      - name: Authenticated browser sample from the built distribution
+        run: |
+          node dist/cli/main.js sample-config --sample notes-browser --output "$RUNNER_TEMP/browser-sample"
+          node dist/cli/main.js plan --config "$RUNNER_TEMP/browser-sample/verification/workflow.yaml" --output "$RUNNER_TEMP/browser-request.json"
+          node dist/cli/main.js run --request "$RUNNER_TEMP/browser-request.json" --json > "$RUNNER_TEMP/browser-run.json"
+          browser_execution=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/browser-run.json")
+          node dist/cli/main.js export --execution "$browser_execution" --state-dir "$RUNNER_TEMP/browser-sample/verification/.workflow-verify" --output "$RUNNER_TEMP/browser-bundle"
+          node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/browser-bundle"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-bundle
+          path: ${{ runner.temp }}/browser-bundle
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

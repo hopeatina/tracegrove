@@ -4,7 +4,8 @@
   "properties": {
     "adapter": {
       "enum": [
-        "http"
+        "http",
+        "browser"
       ],
       "type": "string"
     },

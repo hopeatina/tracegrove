@@ -1,0 +1,11 @@
+schemaVersion: workflow.surface-binding/v1
+ref: { id: example.surface.notes-browser, revision: "1" }
+kind: web
+packRef: { $file: ./http-api.pack.yaml }
+driverProfileRef: null
+componentProfileRef: { $file: ../components/notes-api.profile.yaml }
+interaction: hybrid
+configurationSchemaRef: null
+configurationRef: null
+variantPolicyRef: null
+requiredCapabilities: [http.request, observe, ui.navigate, ui.action, ui.observe]

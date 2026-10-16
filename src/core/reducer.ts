@@ -4,7 +4,7 @@
  * Producer flags are redundant checks, never authority.
  */
 import {
-  AssertionObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
+  AssertionObservation, BrowserObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
   type Assertion, type CaseSpec, type EnvironmentBinding, type ExecutionReceipt, type Outcome,
   type PredicateT, type Ref, type SelectionManifest, type StepObservation, type TargetTuple, type Scope,
 } from '../protocol/index.ts';
@@ -37,7 +37,7 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   return digestOfValue(a).hex === digestOfValue(b).hex;
 }
 
-export type ObservationView = { status?: number | undefined; body?: unknown; stepResult?: StepObservation['result'] | undefined };
+export type ObservationView = { status?: number | undefined; body?: unknown; browser?: BrowserObservation; stepResult?: StepObservation['result'] | undefined };
 
 export function evaluatePredicate(predicate: PredicateT, view: ObservationView): { pass: boolean; actual: unknown; reason: string | null } {
   switch (predicate.kind) {
@@ -80,6 +80,13 @@ export function evaluateAssertions(spec: CaseSpec, environmentClass: Environment
     } else if (assertion.oracle.name === 'step.result') {
       const evaluation = evaluatePredicate(assertion.predicate, { stepResult: step.result });
       result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason;
+    } else if (assertion.oracle.name === 'browser.observation') {
+      const browser = BrowserObservation.safeParse(step.output);
+      if (!browser.success || browser.data.textTruncated) { result = 'not_observed'; reasonCode = 'invalid_or_truncated_browser_observation'; }
+      else {
+        const evaluation = evaluatePredicate(assertion.predicate, { browser: browser.data });
+        result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason;
+      }
     } else {
       const output = (step.output ?? null) as { status?: number; body?: unknown } | null;
       if (!output) { result = 'not_observed'; reasonCode = 'no_observation_recorded'; }

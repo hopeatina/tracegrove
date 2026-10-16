@@ -22,7 +22,7 @@ Status as of 2026-10-16, for this repository. "Intended" means what the protocol
  tracegrove ui ─► reads config, flows, runs, git; runs `test`; scans routes for discovery
 ```
 
-Supporting modules that exist but aren't wired into the everyday flow yet: shared coordination (budget and persona leases with fencing), signed cleanup follow-ups (Ed25519, independent collector), source citations (exact repo/commit/path/line bytes), and the plan review API (edit/review with CAS). They are the building blocks for the hosted and agent-driven modes.
+The low-level corpus also supports the [Chromium browser runner](browser-driver.md), with typed UI steps, DOM assertions, authenticated local personas, and sealed recordings. Short-flow authoring and Grove playback still need that integration. Supporting modules that exist but aren't wired into the everyday flow yet include shared coordination, signed cleanup follow-ups, source citations, and the plan review API.
 
 ## 2. The current UX flow, end to end
 
@@ -40,7 +40,7 @@ Supporting modules that exist but aren't wired into the everyday flow yet: share
 
 | Layer | Supported now | Declared but not implemented |
 | --- | --- | --- |
-| Surfaces (step kinds) | `http.request`, `observe` (HTTP readback) | `ui.navigate`/`ui.action` (Playwright/CDP), `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
+| Surfaces (step kinds) | `http.request`, `observe`; low-level corpus also supports `ui.navigate`, `ui.action`, `ui.observe` through Chromium | Browser short-flow authoring, `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
 | Hosts | `local_process` (POSIX), `mock_loopback` | container, managed sandbox, cloud VM, customer CI, device service; Windows process trees |
 | Fidelity lanes | `full_live_sandbox`, `mock_contract` | `recorded_replay`, `hybrid_live_product`, `full_live_canary` |
 | Boundaries | `application`, `storage` observed as real/stubbed | per-provider boundaries with interceptors and readback oracles |
@@ -121,6 +121,6 @@ individual HTTP checks passed.
 
 1. **P0 for full-stack repos:** `app.setup` commands, `services:` (Postgres, Redis), `components:` (workers), `db: sqlite|postgres` that injects `DATABASE_URL`, SQL and command seeding, and the outbound interceptor for third parties.
 2. **P1 for coverage:** job observe, DB-state oracle, mock lane in the authoring layer, record/replay, email/webhook capture, data-pipeline job surface with table oracles.
-3. **Then the browser surface (Playwright)**, which reuses personas, fixtures and run folders unchanged.
+3. **Complete browser authoring and playback**, building on the core Chromium runner, personas, fixtures, and sealed recordings.
 
 Each adapter keeps the kernel's rules: launched or reserved per run, identity attested, effects inside the declared envelope, cleanup confirmed by an independent read, and evidence sealed in the bundle.
