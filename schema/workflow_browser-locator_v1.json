@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "role",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "button",
+            "link",
+            "textbox",
+            "checkbox",
+            "heading",
+            "status"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "role",
+        "name"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "label",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "name"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "testId",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "name"
+      ],
+      "type": "object"
+    }
+  ]
+}

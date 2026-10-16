@@ -8,6 +8,7 @@ import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupS
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
 import { GitSourceRequest, GitSourceResolution } from './schemas/gitSources.ts';
+import { BrowserCommand, BrowserLocator, BrowserObservation } from './schemas/browser.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
   ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
@@ -23,6 +24,7 @@ export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
 export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
+export * from './schemas/browser.ts';
 export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
@@ -81,6 +83,9 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.browser-command/v1': BrowserCommand,
+  'workflow.browser-locator/v1': BrowserLocator,
+  'workflow.browser-observation/v1': BrowserObservation,
   'workflow.ownership/v1': WorkflowOwnershipSchema,
   'workflow.cleanup-expectation/v1': CleanupExpectationSchema,
   'workflow.cleanup-followup/v1': CleanupFollowupSchema,

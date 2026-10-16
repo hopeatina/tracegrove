@@ -21,6 +21,8 @@ jobs:
           "$RUNNER_TEMP/venv/bin/pip" install -q -r src/samples/fastapi-notes/requirements.txt -r src/samples/django-notes/requirements.txt
           echo "TRACEGROVE_PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
       - run: npm ci
+      - name: Install pinned Chromium and system dependencies for real UI tests
+        run: npx --no-install playwright install --with-deps chromium
       - run: npm run verify
       - run: npm run test:conformance
       - run: npm run build
