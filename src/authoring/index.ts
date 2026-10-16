@@ -2,3 +2,5 @@ export { compileProject, findConfig, caseIdFor, CONFIG_FILE, STATE_DIR, type Com
 export { runTests, resolveRun, renderJunit, renderMarkdown, renderText, type TestRunReport, type CaseReport } from './run.ts';
 export { initProject, detect, AUTH_SNIPPETS } from './init.ts';
 export { AuthoringConfig, Flow, Fixture, exportAuthoringSchemas } from './schema.ts';
+export { discover, draftFlow, gitInfo, scanSource, type Discovery, type Route } from './discover.ts';
+export { startUi, type UiServer } from './ui.ts';

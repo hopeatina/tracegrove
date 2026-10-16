@@ -22,6 +22,7 @@ import { sourceIdentityDigest } from '../hosts/local.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
+import { startUi } from '../authoring/ui.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -53,6 +54,7 @@ Everyday commands (read tracegrove.config.yaml, found by walking up from the cur
   list [--json]                                        list flows with their ids, tags and steps
   show [--run latest|<name>] [--json]                  print a run's summary
   compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
+  ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, and route discovery at a git branch
   (every command also takes --config <tracegrove.config.yaml>)
 
 Low-level corpus commands (the strict workflow.*/v1 files):
@@ -121,6 +123,15 @@ async function main(argv: string[]): Promise<number> {
       if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
       const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
       out(args, report, renderText(report, root));
+      return 0;
+    }
+
+    case 'ui': {
+      const port = flag(args, 'port');
+      if (port !== null && !/^\d{1,5}$/.test(port)) throw new Blocked([{ code: 'invalid_port', detail: port, owner: 'operator', action: 'pass --port <number>, or leave it out for a free port' }]);
+      const server = await startUi({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch') ?? null, ...(port ? { port: Number(port) } : {}) });
+      process.stdout.write(`tracegrove ui on ${server.url}\n(loopback only; Ctrl+C to stop)\n`);
+      await new Promise<void>((done) => { const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); void server.close().then(done); }; process.on('SIGINT', stop); process.on('SIGTERM', stop); });
       return 0;
     }
 

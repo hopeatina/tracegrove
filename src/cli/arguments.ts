@@ -12,6 +12,7 @@ export const COMMAND_SCHEMAS = {
   list: z.object({ ...common, config: Text.optional() }).strict(),
   compile: z.object({ ...common, config: Text.optional() }).strict(),
   show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),
+  ui: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), port: Text.optional() }).strict(),
   'sample-config': z.object({ ...common, sample: Text.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
