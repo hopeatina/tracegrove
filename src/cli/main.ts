@@ -23,6 +23,9 @@ import { compileProject, findConfig } from '../authoring/compile.ts';
 import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
+import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
+import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
+import { loadAuthoringConfig } from '../authoring/compile.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -54,7 +57,14 @@ Everyday commands (read tracegrove.config.yaml, found by walking up from the cur
   list [--json]                                        list flows with their ids, tags and steps
   show [--run latest|<name>] [--json]                  print a run's summary
   compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
-  ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, and route discovery at a git branch
+  ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
+
+Agent-friendly commands (every one takes --json and never starts the app):
+  discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
+  check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
+  draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
+        [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
+  settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
   (every command also takes --config <tracegrove.config.yaml>)
 
 Low-level corpus commands (the strict workflow.*/v1 files):
@@ -133,6 +143,45 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(`tracegrove ui on ${server.url}\n(loopback only; Ctrl+C to stop)\n`);
       await new Promise<void>((done) => { const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); void server.close().then(done); }; process.on('SIGINT', stop); process.on('SIGTERM', stop); });
       return 0;
+    }
+
+    case 'discover': {
+      const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
+      out(args, result, `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered${result.changedFiles.length ? `, ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}\n${result.routes.map((r) => `  ${r.coveredBy.length ? 'covered  ' : 'UNCOVERED'} ${r.method.padEnd(6)} ${r.path}  ${r.file}:${r.line}${r.changed ? '  (changed)' : ''}`).join('\n')}`);
+      return 0;
+    }
+
+    case 'check': {
+      const result = checkProject(flag(args, 'dir') ?? '.');
+      out(args, result, result.ok ? `ok: ${result.flows.length} flow(s) compile` : `${result.issues.length} issue(s):\n${result.issues.map((i) => `  ${i.detail}\n    → ${i.action}`).join('\n')}`);
+      return result.ok ? 0 : 2;
+    }
+
+    case 'settings': {
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const provider = flag(args, 'agent'); const model = flag(args, 'model');
+      if (provider !== null || model !== null) {
+        const current = readLocalSettings(dir);
+        writeLocalSettings(dir, { ...current, agent: { ...current.agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
+      }
+      let config = null; try { config = loadAuthoringConfig(findConfig(dir)); } catch { config = null; }
+      const settings = resolveAgentSettings(dir, config);
+      const detected = detectAgents();
+      out(args, { settings, detected }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}`);
+      return 0;
+    }
+
+    case 'draft': {
+      const controller = new AbortController();
+      const onSignal = () => controller.abort(new Error('user_cancelled'));
+      process.on('SIGINT', onSignal);
+      try {
+        const result = await draftWithAgent({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch'), intent: flag(args, 'intent'), overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
+          ...(args.flags.json ? {} : { onOutput: () => { process.stderr.write('.'); } }) });
+        const { agent, check } = result;
+        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written:\n${agent.files.map((f) => `  ${f}`).join('\n') || '  (none)'}\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\nnext: tracegrove test --grep discovered`);
+        return agent.exitCode === 0 && check.ok ? 0 : 2;
+      } finally { process.off('SIGINT', onSignal); }
     }
 
     case 'sample-config': {

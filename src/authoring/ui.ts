@@ -1,18 +1,22 @@
 /**
  * `tracegrove ui`: a loopback-only web UI over one folder. It shows the config, flows and run
- * history, runs `tracegrove test`, and starts discovery at the working tree or a git branch.
+ * history, runs `tracegrove test`, starts discovery at the working tree or a git branch, and
+ * hands drafting to Claude Code or Codex using the settings saved in .tracegrove/settings.json.
  * Writes need the per-session token in a custom header (blocks cross-site form posts) and
  * every request must carry the loopback Host header (blocks DNS rebinding).
  */
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, STATE_DIR, compileProject, loadAuthoringConfig, type CompileResult } from './compile.ts';
 import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
-import { discover, draftFlow, gitInfo } from './discover.ts';
+import { draftFlow, gitInfo } from './discover.ts';
+import { discoverProject, draftWithAgent } from './workspace.ts';
+import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 
 export type UiServer = { url: string; port: number; close: () => Promise<void> };
@@ -32,6 +36,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const dir = resolve(options.dir);
   const token = randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
+  let drafting = false;
 
   const configPath = () => join(dir, CONFIG_FILE);
   const compiled = (): { result: CompileResult | null; error: ReturnType<typeof errorBody> | null } => {
@@ -42,7 +47,41 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     const runsDir = join(dir, STATE_DIR, 'runs');
     if (!existsSync(runsDir)) return [];
     return readdirSync(runsDir).filter((name) => name !== 'latest' && existsSync(join(runsDir, name, 'summary.json'))).sort().reverse().slice(0, 50)
-      .map((name) => { const r = JSON.parse(readFileSync(join(runsDir, name, 'summary.json'), 'utf8')) as TestRunReport; return { name, outcome: r.outcome, startedAt: r.startedAt, totals: r.totals }; });
+      .map((name) => { const r = JSON.parse(readFileSync(join(runsDir, name, 'summary.json'), 'utf8')) as TestRunReport;
+        return { name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }; });
+  };
+  const testDir = () => {
+    try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
+  };
+  /** Pruned flows keep their file with a .pruned suffix, so the compiler skips them and grafting is a rename back. */
+  const pruned = () => {
+    const out: Array<{ file: string; title: string }> = [];
+    const walk = (d: string) => {
+      if (!existsSync(d)) return;
+      for (const name of readdirSync(d)) {
+        const path = join(d, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.flow\.ya?ml\.pruned$/.test(name)) {
+          let title = name;
+          try { const doc = parseYaml(readFileSync(path, 'utf8')) as { title?: unknown }; if (typeof doc?.title === 'string') title = doc.title; } catch { /* keep name */ }
+          out.push({ file: relative(dir, path).split(sep).join('/'), title });
+        }
+      }
+    };
+    walk(testDir());
+    return out.sort((a, b) => a.file.localeCompare(b.file));
+  };
+  const flowPath = (file: unknown, suffix: '' | '.pruned') => {
+    if (typeof file !== 'string' || !/^[A-Za-z0-9_./-]+\.flow\.ya?ml$/.test(file) || file.split('/').includes('..')) return null;
+    const abs = resolve(dir, file + suffix);
+    const root = testDir();
+    return abs.startsWith(root + sep) ? abs : null;
+  };
+
+  const agentInfo = () => {
+    let config = null;
+    if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
+    return { settings: resolveAgentSettings(dir, config), detected: detectAgents(), drafting };
   };
 
   const handle = async (req: IncomingMessage, res: ServerResponse, port: number) => {
@@ -59,13 +98,39 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const { result, error } = compiled();
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
-        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), git: gitInfo(dir), running: running !== null });
+        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo() });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/prune') {
+        const body = await readJson(req);
+        const graft = body.graft === true;
+        const live = flowPath(body.file, '');
+        const cut = flowPath(body.file, '.pruned');
+        if (!live || !cut) return send(400, { error: 'file must be a .flow.yaml under the test folder' });
+        const [from, to] = graft ? [cut, live] : [live, cut];
+        if (!existsSync(from)) return send(404, { error: `${body.file} is not ${graft ? 'pruned' : 'a live flow'}` });
+        if (existsSync(to)) return send(409, { error: `${relative(dir, to)} already exists` });
+        renameSync(from, to);
+        return send(200, { file: body.file, pruned: !graft });
+      }
+      if (req.method === 'GET' && url.pathname === '/api/settings') return send(200, agentInfo());
+      if (req.method === 'POST' && url.pathname === '/api/settings') {
+        const body = await readJson(req);
+        const agent = (body.agent ?? {}) as Record<string, unknown>;
+        const clean = Object.fromEntries(Object.entries(agent).filter(([, v]) => v !== '' && v !== null));
+        writeLocalSettings(dir, { ...readLocalSettings(dir), agent: clean });
+        return send(200, agentInfo());
+      }
+      if (req.method === 'POST' && url.pathname === '/api/agent-draft') {
+        if (drafting) return send(409, { error: 'an agent draft is already in progress' });
+        const body = await readJson(req);
+        drafting = true;
+        try {
+          const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null });
+          return send(200, result);
+        } finally { drafting = false; }
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
-        const result = compiled().result;
-        const flows = result?.flows.flatMap((f) => f.steps.map((s) => ({ caseId: f.caseId, method: s.method, path: s.path }))) ?? [];
-        if (result) flows.push({ caseId: '(readiness check)', method: 'GET', path: result.config.app.health });
-        return send(200, discover(dir, flows, url.searchParams.get('branch') || null));
+        return send(200, discoverProject(dir, url.searchParams.get('branch') || null));
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
