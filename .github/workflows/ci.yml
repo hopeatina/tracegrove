@@ -12,6 +12,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Python samples (FastAPI, Django)
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q -r src/samples/fastapi-notes/requirements.txt -r src/samples/django-notes/requirements.txt
+          echo "TRACEGROVE_PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm run verify
       - run: npm run test:conformance
@@ -49,6 +57,16 @@ jobs:
           exec_id=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/out/run.json")
           node dist/cli/main.js export --execution "$exec_id" --state-dir "$RUNNER_TEMP/notes/verification/.workflow-verify" --output "$RUNNER_TEMP/out/bundle"
           node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/out/bundle"
+      - name: tracegrove test from the built distribution
+        run: |
+          node dist/cli/main.js sample-config --sample notes-api --output "$RUNNER_TEMP/notes-flows"
+          cd "$RUNNER_TEMP/notes-flows" && node "$GITHUB_WORKSPACE/dist/cli/main.js" test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tracegrove-run
+          path: ${{ runner.temp }}/notes-flows/.tracegrove/runs/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

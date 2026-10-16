@@ -1,0 +1,15 @@
+project: notes
+app:
+  adapter: node
+  entry: app/app.mjs
+  health: /health
+  sources: [app/**]
+  env:
+    NOTES_BUILD: sample
+  inject:
+    port: PORT
+    dataDir: NOTES_DIR
+    tokens: NOTES_TOKENS
+personas:
+  owner: { subject: alice }
+  intruder: { subject: bob }

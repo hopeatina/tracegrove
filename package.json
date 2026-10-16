@@ -6,15 +6,16 @@
   "license": "Apache-2.0",
   "type": "module",
   "engines": { "node": ">=22.22.0 <23" },
-  "bin": { "workflow-verify": "./dist/cli/main.js" },
+  "bin": { "tracegrove": "./dist/cli/main.js", "workflow-verify": "./dist/cli/main.js" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./authoring": { "types": "./dist/authoring/index.d.ts", "default": "./dist/authoring/index.js" },
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" },
     "./coordination": { "types": "./dist/core/coordination.d.ts", "default": "./dist/core/coordination.js" }
   },
-  "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/git-source-resolution.md", "docs/local-review-store.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/scenario-activation.md", "docs/verified-bundles.md", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
+  "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/git-source-resolution.md", "docs/local-review-store.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/scenario-activation.md", "docs/verified-bundles.md", "docs/developer-ux.md", "docs/architecture.md", "conformance/coordination-vectors.json", "LICENSE", "README.md"],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",

@@ -4,6 +4,7 @@
  * anything the application says about itself; confirms termination on stop.
  */
 import { fork, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, relative, isAbsolute } from 'node:path';
@@ -59,6 +60,23 @@ export function buildLease(context: HostStartContext, pid: number | null): HostL
   }), 'host lease');
 }
 
+/** Reserve a free loopback port. The app binds it moments later; a race is reported as a startup failure. */
+export function freeLoopbackPort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(() => (port ? resolvePort(port) : reject(new InfrastructureFailure('could not reserve a loopback port'))));
+    });
+  });
+}
+
+function substitute(text: string, values: Record<string, string>): string {
+  return text.replace(/\{(port|dataDir)\}/g, (_m, name: string) => values[name]!);
+}
+
 async function waitReady(origin: string, path: string, deadline: Deadline, signal: AbortSignal): Promise<unknown> {
   while (!deadline.expired()) {
     try {
@@ -91,7 +109,12 @@ export class LocalProcessHost implements ExecutorHost {
     for (const name of context.credentialNames) {
       if (!credentials.has(name)) throw new Blocked([{ code: 'credential_not_issuable', detail: `host ${context.hostPlan.ref.id} cannot issue ${name}`, owner: 'operator', action: 'declare the credential in the launch recipe' }]);
     }
-    const env: Record<string, string> = { ...launch.env, PATH: process.env.PATH ?? '', [launch.portEnv]: '0', [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
+    const assigned = launch.portMode === 'assigned';
+    const assignedPort = assigned ? await freeLoopbackPort() : 0;
+    const values = { port: String(assignedPort), dataDir };
+    const launchEnv = assigned ? Object.fromEntries(Object.entries(launch.env).map(([k, v]) => [k, substitute(v, values)])) : launch.env;
+    const launchArgs = assigned ? launch.args.map((arg) => substitute(arg, values)) : launch.args;
+    const env: Record<string, string> = { ...launchEnv, PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
     const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js';
     const child: ChildProcess = fork(new URL(`./localSupervisor.${extension}`, import.meta.url), [], {
       cwd, env: { PATH: process.env.PATH ?? '' }, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -100,10 +123,25 @@ export class LocalProcessHost implements ExecutorHost {
     child.on('message', (message: unknown) => {
       if (message && typeof message === 'object' && 'kind' in message && message.kind === 'host.cleaned') ownedCleanupConfirmed = true;
     });
-    // Candidate output may contain credentials. Drain it without exporting it as proof.
-    child.stderr?.resume();
+    // Candidate output may contain credentials. Drain it without exporting it as proof; keep a
+    // short, secret-redacted tail only to explain a startup failure.
+    let stderrTail = '';
+    child.stderr?.on('data', (chunk: Buffer) => { stderrTail = (stderrTail + chunk.toString('utf8')).slice(-4096); });
+    const startupHint = () => {
+      let text = stderrTail;
+      for (const secret of credentials.values()) text = text.split(secret).join('<redacted>');
+      const lines = text.trim().split('\n').slice(-8).join('\n');
+      return lines ? `; last app output:\n${lines}` : '';
+    };
     try {
-    const port = await new Promise<number>((resolvePort, reject) => {
+    const port = assigned ? await new Promise<number>((resolvePort, reject) => {
+      // No stdout protocol: drain output and let readiness polling decide.
+      child.stdout?.resume();
+      child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`)));
+      child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)));
+      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir });
+      resolvePort(assignedPort);
+    }) : await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
       const timer = setTimeout(() => reject(new InfrastructureFailure(`application did not report a port within ${launch.readiness.timeoutMs} ms`)), launch.readiness.timeoutMs);
       child.stdout?.on('data', (chunk: Buffer) => {
@@ -116,7 +154,21 @@ export class LocalProcessHost implements ExecutorHost {
       child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir });
     });
     const origin = `http://127.0.0.1:${port}`;
-    const healthBody = await waitReady(origin, launch.readiness.path, Deadline.in(launch.readiness.timeoutMs), context.signal);
+    const stopPolling = new AbortController();
+    const exitedEarly = assigned ? new Promise<never>((_, reject) => {
+      // Give the last stderr bytes a moment to arrive, reject, then stop the readiness poll.
+      const onExit = () => { setTimeout(() => { reject(new InfrastructureFailure(`application exited before becoming ready${startupHint()}`)); stopPolling.abort(); }, 50); };
+      if (child.exitCode !== null) onExit(); else child.once('exit', onExit);
+    }) : null;
+    exitedEarly?.catch(() => undefined);
+    const ready = waitReady(origin, launch.readiness.path, Deadline.in(launch.readiness.timeoutMs), AbortSignal.any([context.signal, stopPolling.signal]));
+    ready.catch(() => undefined);
+    let healthBody: unknown;
+    try { healthBody = exitedEarly ? await Promise.race([ready, exitedEarly]) : await ready; }
+    catch (error) {
+      if (assigned && error instanceof InfrastructureFailure && !error.message.includes('last app output')) throw new InfrastructureFailure(`${error.message}${startupHint()}`);
+      throw error;
+    }
     const lease = buildLease(context, child.pid ?? null);
     const attestation = parseAs(IdentityAttestation, freeze({
       schemaVersion: 'workflow.identity-attestation/v1' as const,

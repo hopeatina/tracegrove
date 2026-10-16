@@ -1,0 +1,7 @@
+project: django-notes
+app:
+  adapter: django
+  sources: ["**/*.py"]
+personas:
+  owner: { subject: alice }
+  intruder: { subject: bob }

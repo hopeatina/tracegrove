@@ -108,7 +108,10 @@ export function checkCellEvidence(input: {
     fidelityMatched, requiredCapabilitiesObserved: capabilitiesObserved, artifactsVerified,
     unknownMutations: r.cleanup.remainingUnknownMutations,
     criticalCleanupConfirmed: r.cleanup.critical.every((k) => r.cleanup.confirmed.includes(k)),
-    infrastructureFailure: r.steps.some((s) => ['transport_failure', 'deadline_exceeded'].includes(s.reasonCode ?? '')),
+    // A host that never started leaves every step not_run; its sealed host.failed event is the
+    // evidence. It can only move a cell away from passed, never towards it.
+    infrastructureFailure: r.steps.some((s) => ['transport_failure', 'deadline_exceeded'].includes(s.reasonCode ?? ''))
+      || (artifactsVerified && events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"'))),
     blockedReasons: r.outcome === 'blocked' ? r.reasonCodes : [],
   });
   if (reduction.outcome !== r.outcome || reduction.proofEligible !== r.proofEligible) problem(`recorded outcome ${r.outcome} differs from evidence reduction ${reduction.outcome}`);

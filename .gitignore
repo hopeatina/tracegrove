@@ -8,3 +8,4 @@ verification-output/
 __pycache__/
 .venv/
 /artifacts/qa/
+.tracegrove/

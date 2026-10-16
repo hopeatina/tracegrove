@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "app": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "description": "Launch preset: node, fastapi, django or command.",
+          "enum": [
+            "node",
+            "fastapi",
+            "django",
+            "command"
+          ],
+          "type": "string"
+        },
+        "entry": {
+          "description": "node: script path; fastapi: module:app; django: folder containing manage.py.",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Extra env; {port} and {dataDir} are substituted.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "health": {
+          "default": "/health",
+          "description": "GET path that returns 2xx once the app is ready.",
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "inject": {
+          "additionalProperties": false,
+          "default": {
+            "dataDir": "TRACEGROVE_DATA_DIR",
+            "port": "PORT",
+            "tokens": "TRACEGROVE_TOKENS"
+          },
+          "properties": {
+            "dataDir": {
+              "default": "TRACEGROVE_DATA_DIR",
+              "type": "string"
+            },
+            "port": {
+              "default": "PORT",
+              "type": "string"
+            },
+            "tokens": {
+              "default": "TRACEGROVE_TOKENS",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "python": {
+          "description": "fastapi/django: interpreter (default .venv/bin/python when present, else python3).",
+          "type": "string"
+        },
+        "readyTimeoutMs": {
+          "default": 20000,
+          "exclusiveMinimum": 0,
+          "maximum": 300000,
+          "type": "integer"
+        },
+        "root": {
+          "default": ".",
+          "description": "App directory relative to this file; the launch cwd.",
+          "type": "string"
+        },
+        "run": {
+          "description": "command adapter: shell command that starts the app on $PORT.",
+          "type": "string"
+        },
+        "sources": {
+          "description": "Globs (relative to root) whose bytes are attested as the tested source.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "adapter"
+      ],
+      "type": "object"
+    },
+    "defaults": {
+      "additionalProperties": false,
+      "default": {
+        "caseTimeoutMs": 30000,
+        "stepTimeoutMs": 5000
+      },
+      "properties": {
+        "caseTimeoutMs": {
+          "default": 30000,
+          "exclusiveMinimum": 0,
+          "maximum": 600000,
+          "type": "integer"
+        },
+        "stepTimeoutMs": {
+          "default": 5000,
+          "exclusiveMinimum": 0,
+          "maximum": 120000,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "personas": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "subject": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject"
+        ],
+        "type": "object"
+      },
+      "description": "Callers. The first one is the default `as:` for every step.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "project": {
+      "description": "Short project name; prefixes every derived case id.",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+      "type": "string"
+    },
+    "testDir": {
+      "default": "tracegrove",
+      "description": "Folder holding *.flow.yaml and fixtures/, relative to this file.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "app",
+    "personas"
+  ],
+  "type": "object"
+}

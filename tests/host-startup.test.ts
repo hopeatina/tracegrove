@@ -35,7 +35,8 @@ it('stops a child and removes its workspace when it never announces readiness', 
   const pidPath = join(copy.root, 'child.pid');
   const plan = freeze({ ...base, launch: { ...base.launch!, command: process.execPath,
     args: ['-e', "require('node:fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(() => {}, 1000)", pidPath],
-    readiness: { path: '/health', timeoutMs: 500 },
+    // Allow the child to start before exercising the deliberate readiness timeout.
+    readiness: { path: '/health', timeoutMs: 5000 },
   } });
   const workspaceDir = join(copy.stateDir, 'host');
   await expect(new LocalProcessHost().start({ hostPlan: plan, projectRoot: project.root, workspaceDir,

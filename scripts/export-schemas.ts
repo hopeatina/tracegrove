@@ -1,11 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { canonicalize, exportJsonSchemas } from '../src/protocol/index.ts';
+import { exportAuthoringSchemas } from '../src/authoring/schema.ts';
 
 const check = process.argv.includes('--check');
 const dir = join(import.meta.dirname, '..', 'schema');
 mkdirSync(dir, { recursive: true });
-const schemas = exportJsonSchemas();
+const schemas = { ...exportJsonSchemas(), ...exportAuthoringSchemas() };
 let drift = 0;
 for (const [name, schema] of Object.entries(schemas)) {
   const file = join(dir, `${name.replace(/[\/.]/g, '_')}.json`);

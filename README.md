@@ -19,7 +19,7 @@ What exists and is exercised by tests:
   reverse-order cleanup, boundary observations, sealed receipts, trusted reducer.
 - Evidence bundle writer and `verify-bundle`, which rehashes every file, rechecks every self
   digest, re-derives assertions from the frozen case and re-reduces the verdict.
-- `workflow-verify` CLI: `sample-config`, `validate`, `doctor`, `plan`, `cases`, `rerun`, `controller`, `seed --preview`,
+- `tracegrove` CLI (also installed as `workflow-verify`): `init`, `test`, `list`, `show`, `compile`, `ui`, `sample-config`, `validate`, `doctor`, `plan`, `cases`, `rerun`, `controller`, `seed --preview`,
   `run`, `inspect`, `export`, `verify-bundle`, `schema`. Exit codes 0/1/2/3/4.
 - A real file-backed notes API sample with its corpus, plus an offline contract lane.
 
@@ -83,7 +83,133 @@ Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright ru
 source selection resolver, complete review/qualification lifecycle, authoring inference, hosted
 coordinator, `seed --apply`, distributed crash recovery and required media capture.
 
-## Zero-OrgX quickstart
+## Quickstart: test your own app
+
+Tracegrove drops into an existing FastAPI, Django or Node repo with one config file and one
+YAML file per test. Those short files compile into the strict corpus described below, so every
+run still gets attested source identity, independent readback, owned cleanup and a sealed,
+re-verifiable evidence bundle.
+
+```text
+npx tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
+npx tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
+```
+
+```yaml
+# tracegrove.config.yaml
+project: notes
+app:
+  adapter: fastapi            # node | fastapi | django | command
+  entry: app.main:app
+  sources: [app/**/*.py]      # bytes attested as "what was tested"
+personas:
+  owner: { subject: alice }   # the first persona is the default caller
+  intruder: { subject: bob }
+```
+
+```yaml
+# tracegrove/notes/crud.flow.yaml  ->  case id notes.crud
+title: Create, read, deny a stranger and delete a note
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Fresh note, body: hello }
+    expect: 201
+    save: { noteId: note.id }
+  - name: read back
+    GET: /notes/{noteId}
+    observe: true             # independent readback, polled until expect holds
+    expect: { status: 200, json: { note.title: Fresh note } }
+  - name: intruder is denied
+    GET: /notes/{noteId}
+    as: intruder
+    expect: { status: 403, absent: [note] }
+```
+
+Tracegrove picks a free port, passes it (and a fresh data directory and one random bearer token
+per persona) to the app through `PORT`, `TRACEGROVE_DATA_DIR` and `TRACEGROVE_TOKENS`
+(`{token: subject}` JSON), and waits on `app.health`. The app accepts those tokens in test mode;
+`tracegrove init` prints the five-line snippet for the detected framework.
+
+| `adapter` | launches |
+| --- | --- |
+| `node` | `node <entry>` |
+| `fastapi` | `<python> -m uvicorn <entry> --host 127.0.0.1 --port {port}` (python: `.venv/bin/python`, else `python3`) |
+| `django` | `manage.py migrate --noinput && manage.py runserver 127.0.0.1:{port} --noreload` in the `entry` folder |
+| `command` | Reserved; BLOCKED until the application runtime can be independently observed |
+
+Conventions:
+
+- Flows live in `tracegrove/<area>/<behavior>.flow.yaml`; the case id is `<area>.<behavior>`.
+- Fixtures live in `tracegrove/fixtures/<name>.fixture.yaml` and are used with `given: { alias: name }`;
+  their saved values are `{alias.output}` in later steps. They are created through the API, read
+  back independently and deleted with a confirmed 404/410 absence.
+- `save: { name: dot.path }` makes `{name}` available to later steps; `expect.json` keys are dot
+  paths into the response body. Prefer block style for anything containing `{` or `[` (or quote it).
+- The effect envelope (methods, path prefixes, create budget) is derived from the steps.
+- Each run writes `.tracegrove/runs/<UTC time>_<outcome>_<id>/` with `summary.md`, `summary.json`,
+  `junit.xml`, the frozen `request.json` and the verified `bundle/`; `runs/latest` points at the
+  newest. Add `.tracegrove/` to `.gitignore` (init does).
+- Editor validation: point `yaml.schemas` at `schema/tracegrove_config_v1.json` and
+  `schema/tracegrove_flow_v1.json`.
+
+Runnable samples: `src/samples/notes-api` (Node), `src/samples/fastapi-notes`,
+`src/samples/django-notes`. `tracegrove compile` writes the derived v1 corpus to
+`.tracegrove/compiled/` if you want to inspect it or drop to the low-level commands.
+
+## Discover what to test: `tracegrove ui`
+
+```text
+npx tracegrove ui                          # current folder, working tree
+npx tracegrove ui --dir ../api --branch feature/billing
+```
+
+It opens a local page (bound to 127.0.0.1, with a per-session token for anything that writes)
+with four tabs:
+
+- **Overview**: config, personas, injected env, attested source digest, last run, a Run tests button.
+- **Discovery**: scans FastAPI decorators, Django `path()` and Express/Fastify-style routers in the
+  folder or at any git branch (read with `git show`, nothing is checked out). Routes in files the
+  branch changed against the default branch come first, and each route shows the flows that
+  cover it. Uncovered routes get a **Draft flow** button that writes a skeleton to
+  `tracegrove/discovered/<area>/<behavior>.flow.yaml` with the TODOs marked.
+- **Flows**: every flow with its case id, tags, fixtures and steps.
+- **Runs**: run history from `.tracegrove/runs/`, with per-step results and failures.
+
+Discovery is a static heuristic that proposes tests; it is never evidence. Only `tracegrove test`
+produces a verdict.
+
+## How it fits together
+
+```text
+ tracegrove.config.yaml + tracegrove/**/*.flow.yaml + fixtures
+        │  authoring compiler (src/authoring)
+        ▼
+ .tracegrove/compiled/  (strict workflow.*/v1 corpus, $file refs frozen to sha256)
+        │  planner → admission + local ledger → executor
+        │     hosts: local_process | mock_loopback   surface: http   fixtures: API create/readback/cleanup
+        ▼
+ trusted reducer → bundle writer → verify-bundle → .tracegrove/runs/<run>/
+```
+
+The everyday flow today is `init` → `ui` (discover and draft) → edit flows → `test` → read the run
+folder or `show` → hand the bundle to anyone who runs `verify-bundle`.
+
+What the adapters cover now and what's next:
+
+| Area | Supported now | Next |
+| --- | --- | --- |
+| App launch | node, fastapi, django, any command; free port, data dir, per-persona tokens | `app.setup` commands (alembic, prisma, knex) |
+| Seeding | Fixtures created through the app's API, read back, deleted with confirmed absence | SQL seeding, repo seed commands (factory_boy, Prisma seed), snapshots |
+| Databases | SQLite via `TRACEGROVE_DATA_DIR` | `db: postgres` per-run database with `DATABASE_URL`, DB-state oracles, Redis/Mongo services |
+| Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
+| Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
+| Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
+| Browser | None | Playwright surface reusing personas, fixtures and run folders |
+
+The full gap analysis by layer, with priorities, is in [docs/architecture.md](docs/architecture.md).
+
+## Zero-OrgX quickstart (low-level corpus)
 
 ```text
 npm install && npm run build

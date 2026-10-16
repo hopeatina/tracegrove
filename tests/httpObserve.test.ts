@@ -22,7 +22,8 @@ const spec = (origin: string) => ({ origin, path: '/read', method: 'GET', auth: 
 it('retains a completed product observation when a later poll reaches its deadline', async () => {
   await withProvider(async (origin, calls) => {
     const driver = new HttpDriver({ persona: null, named: {} }, new Set([origin]));
-    const result = await driver.observe({ ...spec(origin), deadline: Deadline.in(200) }, predicate, 1);
+    // The first response and second request must occur before the intentional stall expires.
+    const result = await driver.observe({ ...spec(origin), deadline: Deadline.in(2000) }, predicate, 1);
     expect(calls()).toBeGreaterThanOrEqual(2);
     expect(result.status).toBe(501);
     expect(result.attempts).toBe(2);

@@ -1,5 +1,5 @@
 /** Observe the executable used for launch; controller Node is not application identity. */
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { delimiter, isAbsolute, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -25,17 +25,29 @@ function resolveExecutable(command: string, cwd: string, path: string): string {
   throw new Blocked([{ code: 'launch_executable_missing', detail: command, action: 'install the interpreter or provide its executable path' }]);
 }
 
+const probeOptions = (cwd: string, path: string) => ({ cwd, env: { PATH: path }, timeout: 2000, maxBuffer: 4096, encoding: 'utf8' as const });
+const observation = (stdout: string, executable: string): RuntimeObservation => RuntimeObservation.parse({
+  ...parseRuntimeVersion(stdout), executable, executableSha256: sha256Hex(readFileSync(executable)),
+});
+
+/** Synchronous compiler companion; uses the same bounded interpreter probe as launch. */
+export function observeApplicationRuntimeSync(command: string, cwd: string, path: string): RuntimeObservation {
+  const executable = resolveExecutable(command, cwd, path);
+  let stdout: string;
+  try { stdout = execFileSync(executable, ['--version'], probeOptions(cwd, path)); }
+  catch { throw new InfrastructureFailure('application runtime version probe failed or exceeded its limit'); }
+  return observation(stdout, executable);
+}
+
 export async function observeApplicationRuntime(command: string, cwd: string, path: string, signal?: AbortSignal): Promise<RuntimeObservation> {
   const executable = resolveExecutable(command, cwd, path);
   let stdout: string;
   try {
     // No issued credentials, inherited NODE_OPTIONS or PYTHON* settings enter this probe.
-    ({ stdout } = await execute(executable, ['--version'], { cwd, env: { PATH: path },
-      timeout: 2000, maxBuffer: 4096, encoding: 'utf8', ...(signal ? { signal } : {}) }));
+    ({ stdout } = await execute(executable, ['--version'], { ...probeOptions(cwd, path), ...(signal ? { signal } : {}) }));
   } catch {
     // Candidate output/error messages may contain private values; never echo them.
     throw new InfrastructureFailure('application runtime version probe failed or exceeded its limit');
   }
-  return RuntimeObservation.parse({ ...parseRuntimeVersion(stdout), executable,
-    executableSha256: sha256Hex(readFileSync(executable)) });
+  return observation(stdout, executable);
 }
