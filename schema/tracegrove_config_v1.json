@@ -5,6 +5,35 @@
     "$schema": {
       "type": "string"
     },
+    "agent": {
+      "additionalProperties": false,
+      "description": "Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.",
+      "properties": {
+        "maxBudgetUsd": {
+          "description": "Spend cap per draft run, passed to Claude Code as --max-budget-usd.",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": "number"
+        },
+        "model": {
+          "description": "Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "provider": {
+          "default": "claude",
+          "description": "Coding agent that drafts and repairs flows: claude (Claude Code CLI), codex (Codex CLI) or none.",
+          "enum": [
+            "claude",
+            "codex",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "app": {
       "additionalProperties": false,
       "properties": {
@@ -139,7 +168,7 @@
       "type": "object"
     },
     "project": {
-      "description": "Short project name; prefixes every derived case id.",
+      "description": "Short project name, shown in reports and run summaries.",
       "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
       "type": "string"
     },

@@ -1,87 +1,39 @@
-# Tracegrove (`workflow-verify`)
+# tracegrove
 
-Portable workflow verification: prepared state, independently observed actions, sealed
-evidence. This is the Phase 1a implementation of the plan in
-`orgx/docs/architecture/workflow-verification-platform.md`. Working name; private prototype;
-nothing here is a shipped runner or a production claim.
+**Behaviour tests your app has to actually pass, written by you or by a coding agent, with evidence anyone can re-verify.**
 
-What exists and is exercised by tests:
+tracegrove starts your real FastAPI, Django or Node app, walks it through scenarios written as
+short YAML files, checks every effect with an independent read, cleans up what it created, and
+seals the whole run into a bundle that `verify-bundle` can re-derive byte for byte. Claude Code
+or Codex can draft the scenarios from your routes and your intent, with explicit low-cost defaults,
+and tracegrove re-checks everything they write before you see it.
 
-- Canonical JSON codec with shared vectors and SHA-256 self digests (`ref.digest` excluded).
-- Strict versioned schemas (Zod 4) exported as JSON Schema under `schema/`, checked in sync.
-- Project corpus loader: YAML/JSON beside the product source, `{ $file: ./path }` references
-  frozen into exact refs, a frozen corpus manifest, digest-verified lookup.
-- Compiler, planner (`plan` is side-effect free and returns blockers with owner and action),
-  admission with idempotent redelivery, local single-writer ledger with stale-lock recovery.
-- Executor: local process host with launcher-computed identity attestation and issued
-  credentials, mock loopback host for the `mock_contract` lane, real HTTP driver with
-  per-operation deadlines, registered fixture actions with independent readback and
-  reverse-order cleanup, boundary observations, sealed receipts, trusted reducer.
-- Evidence bundle writer and `verify-bundle`, which rehashes every file, rechecks every self
-  digest, re-derives assertions from the frozen case and re-reduces the verdict.
-- `tracegrove` CLI (also installed as `workflow-verify`): `init`, `test`, `list`, `show`, `compile`, `ui`, `sample-config`, `validate`, `doctor`, `plan`, `cases`, `rerun`, `controller`, `seed --preview`,
-  `run`, `inspect`, `export`, `verify-bundle`, `schema`. Exit codes 0/1/2/3/4.
-- A real file-backed notes API sample with its corpus, plus an offline contract lane.
+![tracegrove ui: a run shown as a tree of scenarios, each step with its request, timing and status](docs/images/ui-run.png)
 
-The local controller owns an exclusive ledger and accepts authenticated loopback commands
-for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
-execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
-campaign while preserving case digests and original request lineage.
+## The 60-second tour
 
-The POSIX local host uses a trusted supervisor with an IPC ownership channel. If
-the controller is killed, the supervisor terminates the application process group
-and removes its owned workspace. A process-kill test checks both effects. This
-does not establish recovery after the supervisor itself is killed, distributed
-fencing, or cleanup of external provider resources. Windows local launches are
-blocked until a process-tree ownership implementation exists.
+```text
+npx --no-install tracegrove init                     # detect FastAPI / Django / Node, write a config and one example flow
+npx --no-install tracegrove ui                       # the grove: run, discover, draft, history, settings
+npx --no-install tracegrove draft --intent "a stranger can't read or delete someone else's note"
+npx --no-install tracegrove test                     # run, verify, seal: .tracegrove/runs/latest/
+```
 
-Bundle verification checks sealed required files, host capability records, target attestations,
-fixture completeness and boundary observations. It rejects empty/traversal manifests and
-producer resealing that removes required observations. This verifies portable integrity and
-record consistency; the importer still needs its own issuer trust and access policy.
-The [verified snapshot reader](docs/verified-bundles.md) supplies complete checked
-records from the same bounded bytes used by the reducer, without rereading payloads.
+The package remains private. Install a local packed archive before using the CLI examples;
+use `npx --no-install tracegrove` to avoid resolving an unrelated registry package.
 
-`verifySourceCitation` checks exact repository/commit/path identity, document and
-file digests, and inclusive line excerpt bytes through authorized trusted host ports.
-It preserves UTF-8 and CRLF bytes, rejects traversal, unsupported files and unavailable
-objects, and never falls back to the current checkout. These checks establish cited
-source bytes. The source-analysis API connects them to runnable change elements and
-the authenticated review policy; it does not establish passing product behavior.
+What makes it different:
 
-The Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
-digests and scopes. Every specification edit clears its review. Concurrent edits and
-reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
-review nor projection. Reviewer identity and policy come from authenticated host
-admission. Tests exercise stale tokens, concurrent writers, resolver tampering and
-denied authority. This API has no hosted store, execution-admission integration or
-scenario activation. Resolving and validating source citations and coverage policy
-are enforced through trusted source-analysis and policy ports before approval; hosted
-implementations remain separate work. These records alone are not authority for product execution.
-See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
-`source-resolve` and `GitSourceReader` [freeze local Git commit pairs and full diffs](docs/git-source-resolution.md)
-and read cited immutable objects after checkout changes. They supply source facts;
-independent review policy, full source transport and runtime identity remain separate gates.
-`LocalReviewStore` connects that API to the existing single-writer journal and preserves
-reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
-requires trusted host admission and source checking; it does not supply distributed authority.
-
-Scenario qualification now has a typed registration/invalidation API with exact-matrix
-and monotonic-history checks. It registers pending work and invalidates semantic edits;
-it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
-`reduceQualificationRound` binds an entire verified terminal campaign to the registered
-cell/attempt allocations, retaining failed and mock evidence without granting a live
-proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
-`assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
-and failed history, requires at least two independent live campaigns and checks the latest
-admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
-`activateScenario` rechecks that evidence and publishes an authenticated activation through
-an atomic host port, with exact round selection and idempotent receipt recovery. See
-[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
-
-Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
-source selection resolver, complete review/qualification lifecycle, authoring inference, hosted
-coordinator, `seed --apply`, distributed crash recovery and required media capture.
+- **Real app, real requests.** No mocks of your own code. Every step is an HTTP call to the app
+  tracegrove launched for this run, on a free port with its own data dir and per-persona tokens.
+- **Independent readback.** `observe: true` re-reads state through a separate request and polls
+  until the expectation holds, so "the endpoint said 204" is never mistaken for "it's deleted".
+- **Owned cleanup.** Fixtures are created through your API, read back, and deleted with a confirmed
+  404/410, in reverse order, even when a scenario fails.
+- **Evidence, not logs.** Each run is a sealed bundle with source digests, receipts and the frozen
+  request. `verify-bundle` rehashes it and re-reduces the verdict on another machine.
+- **Agents under the hood, never trusted blindly.** Claude Code or Codex writes drafts; tracegrove
+  compiles them itself and only a real run produces a verdict.
 
 ## Quickstart: test your own app
 
@@ -91,8 +43,8 @@ run still gets attested source identity, independent readback, owned cleanup and
 re-verifiable evidence bundle.
 
 ```text
-npx tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
-npx tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
+npx --no-install tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
+npx --no-install tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
 ```
 
 ```yaml
@@ -157,27 +109,80 @@ Runnable samples: `src/samples/notes-api` (Node), `src/samples/fastapi-notes`,
 `src/samples/django-notes`. `tracegrove compile` writes the derived v1 corpus to
 `.tracegrove/compiled/` if you want to inspect it or drop to the low-level commands.
 
-## Discover what to test: `tracegrove ui`
+## The grove: `tracegrove ui`
 
 ```text
-npx tracegrove ui                          # current folder, working tree
-npx tracegrove ui --dir ../api --branch feature/billing
+npx --no-install tracegrove ui                          # current folder, working tree
+npx --no-install tracegrove ui --dir ../api --branch feature/billing
 ```
 
-It opens a local page (bound to 127.0.0.1, with a per-session token for anything that writes)
-with four tabs:
+A local page (bound to 127.0.0.1, with a per-session token on anything that writes), light and
+dark, down to phone width:
 
-- **Overview**: config, personas, injected env, attested source digest, last run, a Run tests button.
-- **Discovery**: scans FastAPI decorators, Django `path()` and Express/Fastify-style routers in the
-  folder or at any git branch (read with `git show`, nothing is checked out). Routes in files the
-  branch changed against the default branch come first, and each route shows the flows that
-  cover it. Uncovered routes get a **Draft flow** button that writes a skeleton to
-  `tracegrove/discovered/<area>/<behavior>.flow.yaml` with the TODOs marked.
-- **Flows**: every flow with its case id, tags, fixtures and steps.
-- **Runs**: run history from `.tracegrove/runs/`, with per-step results and failures.
+- **Run.** Your scenarios as a bonsai: the trunk is the run, each branch a scenario, each twig a
+  step with its request, its slice of the run clock and the observed status. Failures collect in
+  **Needs a fix**; pick a step to see expected against observed and the evidence line. Run all,
+  run one scenario, or switch to any earlier run.
+- **Discover.** Pick the working tree or any git branch (read with `git show`, nothing is checked
+  out). Routes from FastAPI decorators, Django `path()` and Express-style routers are listed with
+  the flows that reach them, changed-on-this-branch first. Draft a skeleton for one route, or write
+  what should be true in **Intent** and press **Draft with Claude**: the agent's work shows as named
+  phases, and its flows arrive already checked, with **Run the new scenarios** one click away.
+- **History.** A grid with one column per run and one row per scenario, so a single case's record
+  and the whole set read at a glance. Any cell opens that run at that scenario.
+- **Settings.** Choose Claude Code, Codex or none, and the model. Installed CLIs are detected.
+
+**Pruning is a rename.** Prune a scenario and its file becomes `*.flow.yaml.pruned`: the compiler
+skips it, the tree shows it as a dashed branch, and **Graft back** restores it. Nothing is deleted.
 
 Discovery is a static heuristic that proposes tests; it is never evidence. Only `tracegrove test`
 produces a verdict.
+
+## Agents under the hood
+
+tracegrove does not ship a model. It drives the coding agent you already use, headless:
+
+| Provider | Command it runs | Default model |
+| --- | --- | --- |
+| `claude` (default) | `claude -p … --model claude-haiku-4.5 --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-4.5` |
+| `codex` | `codex exec --sandbox workspace-write --model gpt-6-luna` | `gpt-6-luna` |
+| `none` | nothing; discovery and templates only | |
+
+The agent gets the discovery report, your intent, the naming conventions, an existing flow as an
+example, the persona names and the JSON Schemas. Its instructions request drafts under
+`tracegrove/discovered/` and read-only checks; its CLI permissions remain the execution boundary.
+After it exits, tracegrove lists changed flow files and compiles the project. Compilation is
+not independent confirmation of the developer's intent. A configured `maxBudgetUsd` is
+supported by the Claude adapter; Codex blocks that setting until enforced accounting exists.
+
+Where the choice comes from, highest first:
+
+1. `--agent` / `--model` on `tracegrove draft`
+2. `.tracegrove/settings.json`, your own choice, written by **Settings** in the UI or `tracegrove settings --agent codex`
+3. `agent:` in `tracegrove.config.yaml`, the team default:
+
+   ```yaml
+   agent:
+     provider: claude      # claude | codex | none
+     model: claude-haiku-4.5  # optional
+     maxBudgetUsd: 0.50    # optional spend cap per draft (Claude Code)
+   ```
+4. The explicit low-cost defaults above. No inherited CLI model or silent provider fallback.
+
+### Commands built for agents
+
+Every one takes `--json`, and none starts your app:
+
+```text
+tracegrove discover [--branch <b>]   # routes vs. flows that reach them; changed files first
+tracegrove check                     # compile only; exit 0 when clean, 2 with file:path-located issues
+tracegrove list                      # flows with ids, tags and steps
+tracegrove draft --intent "<what should be true>" [--agent claude|codex] [--model <m>]
+tracegrove settings [--agent …] [--model …]
+```
+
+So any agent, including one you run yourself, can loop: `discover` → write flows → `check` →
+`test` → read `.tracegrove/runs/latest/summary.json`.
 
 ## How it fits together
 
@@ -192,8 +197,8 @@ produces a verdict.
  trusted reducer → bundle writer → verify-bundle → .tracegrove/runs/<run>/
 ```
 
-The everyday flow today is `init` → `ui` (discover and draft) → edit flows → `test` → read the run
-folder or `show` → hand the bundle to anyone who runs `verify-bundle`.
+The everyday flow is `init` → `ui` or `draft` (discover, write with an agent, prune) → `test` → read the
+run in the grove or with `show` → hand the bundle to anyone who runs `verify-bundle`.
 
 What the adapters cover now and what's next:
 
@@ -208,6 +213,90 @@ What the adapters cover now and what's next:
 | Browser | None | Playwright surface reusing personas, fixtures and run folders |
 
 The full gap analysis by layer, with priorities, is in [docs/architecture.md](docs/architecture.md).
+
+## The verification core
+
+This is the Phase 1a implementation of the plan in
+`orgx/docs/architecture/workflow-verification-platform.md`. It is a prototype; nothing below is a
+production claim.
+
+What exists and is exercised by tests:
+
+- Canonical JSON codec with shared vectors and SHA-256 self digests (`ref.digest` excluded).
+- Strict versioned schemas (Zod 4) exported as JSON Schema under `schema/`, checked in sync.
+- Project corpus loader: YAML/JSON beside the product source, `{ $file: ./path }` references
+  frozen into exact refs, a frozen corpus manifest, digest-verified lookup.
+- Compiler, planner (`plan` is side-effect free and returns blockers with owner and action),
+  admission with idempotent redelivery, local single-writer ledger with stale-lock recovery.
+- Executor: local process host with launcher-computed identity attestation and issued
+  credentials, mock loopback host for the `mock_contract` lane, real HTTP driver with
+  per-operation deadlines, registered fixture actions with independent readback and
+  reverse-order cleanup, boundary observations, sealed receipts, trusted reducer.
+- Evidence bundle writer and `verify-bundle`, which rehashes every file, rechecks every self
+  digest, re-derives assertions from the frozen case and re-reduces the verdict.
+- `tracegrove` CLI (also installed as `workflow-verify`): `init`, `test`, `list`, `show`, `compile`, `ui`, `discover`, `check`, `draft`, `settings`, `sample-config`, `validate`, `doctor`, `plan`, `cases`, `rerun`, `controller`, `seed --preview`,
+  `run`, `inspect`, `export`, `verify-bundle`, `schema`. Exit codes 0/1/2/3/4.
+- A real file-backed notes API sample with its corpus, plus an offline contract lane.
+
+The local controller owns an exclusive ledger and accepts authenticated loopback commands
+for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
+execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
+campaign while preserving case digests and original request lineage.
+
+The POSIX local host uses a trusted supervisor with an IPC ownership channel. If
+the controller is killed, the supervisor terminates the application process group
+and removes its owned workspace. A process-kill test checks both effects. This
+does not establish recovery after the supervisor itself is killed, distributed
+fencing, or cleanup of external provider resources. Windows local launches are
+blocked until a process-tree ownership implementation exists.
+
+Bundle verification checks sealed required files, host capability records, target attestations,
+fixture completeness and boundary observations. It rejects empty/traversal manifests and
+producer resealing that removes required observations. This verifies portable integrity and
+record consistency; the importer still needs its own issuer trust and access policy.
+The [verified snapshot reader](docs/verified-bundles.md) supplies complete checked
+records from the same bounded bytes used by the reducer, without rereading payloads.
+
+`verifySourceCitation` checks exact repository/commit/path identity, document and
+file digests, and inclusive line excerpt bytes through authorized trusted host ports.
+It preserves UTF-8 and CRLF bytes, rejects traversal, unsupported files and unavailable
+objects, and never falls back to the current checkout. These checks establish cited
+source bytes. The source-analysis API connects them to runnable change elements and
+the authenticated review policy; it does not establish passing product behavior.
+
+The Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
+digests and scopes. Every specification edit clears its review. Concurrent edits and
+reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
+review nor projection. Reviewer identity and policy come from authenticated host
+admission. Tests exercise stale tokens, concurrent writers, resolver tampering and
+denied authority. This API has no hosted store, execution-admission integration or
+scenario activation. Resolving and validating source citations and coverage policy
+are enforced through trusted source-analysis and policy ports before approval; hosted
+implementations remain separate work. These records alone are not authority for product execution.
+See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
+`source-resolve` and `GitSourceReader` [freeze local Git commit pairs and full diffs](docs/git-source-resolution.md)
+and read cited immutable objects after checkout changes. They supply source facts;
+independent review policy, full source transport and runtime identity remain separate gates.
+`LocalReviewStore` connects that API to the existing single-writer journal and preserves
+reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
+requires trusted host admission and source checking; it does not supply distributed authority.
+
+Scenario qualification now has a typed registration/invalidation API with exact-matrix
+and monotonic-history checks. It registers pending work and invalidates semantic edits;
+it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
+`reduceQualificationRound` binds an entire verified terminal campaign to the registered
+cell/attempt allocations, retaining failed and mock evidence without granting a live
+proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
+`assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
+and failed history, requires at least two independent live campaigns and checks the latest
+admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
+`activateScenario` rechecks that evidence and publishes an authenticated activation through
+an atomic host port, with exact round selection and idempotent receipt recovery. See
+[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
+
+Still open: browser/Playwright runner, full runtime source selection, hosted review and
+qualification, coordination acceptance, `seed --apply`, distributed crash recovery and required media.
+Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 
 ## Zero-OrgX quickstart (low-level corpus)
 
@@ -239,6 +328,6 @@ This private repository was extracted with `git subtree split` from
 `6da4205e0cef9fbd75b0e8e04cdfc6d5de669910`. The extracted bootstrap commit is
 `92f163c49812e373bdb04550ea3771b278eab0cd`.
 
-`codex/bootstrap` is the initial default branch. Changes remain reviewable in a PR;
-no release has been published. The standalone sample installs a pinned package archive,
+`codex/bootstrap` is the default branch. Releases are tagged on GitHub; v0.2.0 is the first,
+with the authoring layer, the grove UI and agent drafting. The standalone sample installs a pinned package archive,
 so its CI needs no cross-repository credential.

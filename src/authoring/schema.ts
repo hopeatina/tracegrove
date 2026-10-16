@@ -15,10 +15,12 @@ const Status = z.number().int().min(100).max(599);
 const Json: z.ZodType<unknown> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(Json), z.record(z.string(), Json)]));
 
 export const ADAPTERS = ['node', 'fastapi', 'django', 'command'] as const;
+export const AGENT_PROVIDERS = ['claude', 'codex', 'none'] as const;
+export type AgentProvider = typeof AGENT_PROVIDERS[number];
 
 export const AuthoringConfig = z.object({
   $schema: z.string().optional(),
-  project: Name.describe('Short project name; prefixes every derived case id.'),
+  project: Name.describe('Short project name, shown in reports and run summaries.'),
   testDir: z.string().default('tracegrove').describe('Folder holding *.flow.yaml and fixtures/, relative to this file.'),
   app: z.object({
     adapter: z.enum(ADAPTERS).describe('Launch preset: node, fastapi, django or command.'),
@@ -39,6 +41,11 @@ export const AuthoringConfig = z.object({
   personas: z.record(Name, z.object({ subject: z.string().min(1) }).strict())
     .refine((value) => Object.keys(value).length > 0, 'declare at least one persona')
     .describe('Callers. The first one is the default `as:` for every step.'),
+  agent: z.object({
+    provider: z.enum(AGENT_PROVIDERS).default('claude').describe('Coding agent that drafts and repairs flows: claude (Claude Code CLI), codex (Codex CLI) or none.'),
+    model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.'),
+    maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
+  }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
   defaults: z.object({
     stepTimeoutMs: z.number().int().positive().max(120_000).default(5000),
     caseTimeoutMs: z.number().int().positive().max(600_000).default(30_000),
