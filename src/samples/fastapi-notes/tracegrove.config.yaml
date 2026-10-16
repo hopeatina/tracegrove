@@ -1,0 +1,8 @@
+project: fastapi-notes
+app:
+  adapter: fastapi
+  entry: app.main:app
+  sources: [app/**/*.py]
+personas:
+  owner: { subject: alice }
+  intruder: { subject: bob }

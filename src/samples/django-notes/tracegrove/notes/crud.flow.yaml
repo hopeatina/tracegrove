@@ -1,0 +1,27 @@
+title: Create, read, deny a stranger and delete a note
+tags: [notes]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Fresh note, body: from Django }
+    expect: 201
+    save: { noteId: note.id }
+
+  - name: read back
+    GET: /notes/{noteId}
+    observe: true
+    expect: { status: 200, json: { note.title: Fresh note } }
+
+  - name: intruder is denied
+    GET: /notes/{noteId}
+    as: intruder
+    expect: { status: 403, absent: [note] }
+
+  - name: delete
+    DELETE: /notes/{noteId}
+    expect: 204
+
+  - name: gone
+    GET: /notes/{noteId}
+    observe: true
+    expect: 404

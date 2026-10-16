@@ -1,15 +1,16 @@
 {
   "name": "workflow-verify",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Tracegrove portable workflow verification core and workflow-verify CLI. Working name; not a shipped runner.",
+  "description": "tracegrove: behaviour tests against your real app, drafted by Claude Code or Codex, sealed as re-verifiable evidence.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": { "node": ">=22.22.0 <23" },
-  "bin": { "workflow-verify": "./dist/cli/main.js" },
+  "bin": { "tracegrove": "./dist/cli/main.js", "workflow-verify": "./dist/cli/main.js" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./authoring": { "types": "./dist/authoring/index.d.ts", "default": "./dist/authoring/index.js" },
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" },
     "./coordination": { "types": "./dist/core/coordination.d.ts", "default": "./dist/core/coordination.js" }

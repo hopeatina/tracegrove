@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * workflow-verify CLI. Every command goes through the same resolver, admission and reducer as
+ * tracegrove CLI (also installed as workflow-verify). Every command goes through the same resolver, admission and reducer as
  * the library API. Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive,
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
@@ -19,6 +19,13 @@ import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
+import { compileProject, findConfig } from '../authoring/compile.ts';
+import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
+import { initProject } from '../authoring/init.ts';
+import { startUi } from '../authoring/ui.ts';
+import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
+import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
+import { loadAuthoringConfig } from '../authoring/compile.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -42,8 +49,25 @@ function samplesDir(): string {
   return found;
 }
 
-const HELP = `workflow-verify <command> [--flags]
+const HELP = `tracegrove <command> [--flags]
 
+Everyday commands (read tracegrove.config.yaml, found by walking up from the current folder):
+  init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
+  test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+  list [--json]                                        list flows with their ids, tags and steps
+  show [--run latest|<name>] [--json]                  print a run's summary
+  compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
+  ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
+
+Agent-friendly commands (every one takes --json and never starts the app):
+  discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
+  check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
+  draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
+        [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
+  settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
+  (every command also takes --config <tracegrove.config.yaml>)
+
+Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample notes-api --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
@@ -66,6 +90,99 @@ async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
+
+    case 'init': {
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const result = initProject(dir, { force: args.flags.force === true });
+      out(args, result, `${result.detection.reason}: adapter ${result.detection.adapter}\nwrote:\n${result.files.map((f) => `  ${f}`).join('\n')}\n\nAdd this to your app's test-mode auth so personas work:\n\n${result.snippet}\n\nnext: tracegrove test`);
+      return 0;
+    }
+
+    case 'compile': {
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
+      return 0;
+    }
+
+    case 'list': {
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      out(args, compiled.flows, compiled.flows.map((f) => `${f.caseId}  [${f.tags.join(', ')}]  ${f.file}\n  ${f.title}\n${f.steps.map((s) => `    - ${s.name}: ${s.method} ${s.path}${s.as !== Object.keys(compiled.config.personas)[0] ? ` (as ${s.as})` : ''}`).join('\n')}`).join('\n'));
+      return 0;
+    }
+
+    case 'test': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const controller = new AbortController();
+      const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
+      process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
+      try {
+        const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, signal: controller.signal,
+          ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) });
+        out(args, report, renderText(report, compiled.root));
+        return report.exitCode;
+      } finally {
+        process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
+      }
+    }
+
+    case 'show': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const root = dirname(configPath);
+      const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
+      if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
+      const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
+      out(args, report, renderText(report, root));
+      return 0;
+    }
+
+    case 'ui': {
+      const port = flag(args, 'port');
+      if (port !== null && !/^\d{1,5}$/.test(port)) throw new Blocked([{ code: 'invalid_port', detail: port, owner: 'operator', action: 'pass --port <number>, or leave it out for a free port' }]);
+      const server = await startUi({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch') ?? null, ...(port ? { port: Number(port) } : {}) });
+      process.stdout.write(`tracegrove ui on ${server.url}\n(loopback only; Ctrl+C to stop)\n`);
+      await new Promise<void>((done) => { const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); void server.close().then(done); }; process.on('SIGINT', stop); process.on('SIGTERM', stop); });
+      return 0;
+    }
+
+    case 'discover': {
+      const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
+      out(args, result, `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered${result.changedFiles.length ? `, ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}\n${result.routes.map((r) => `  ${r.coveredBy.length ? 'covered  ' : 'UNCOVERED'} ${r.method.padEnd(6)} ${r.path}  ${r.file}:${r.line}${r.changed ? '  (changed)' : ''}`).join('\n')}`);
+      return 0;
+    }
+
+    case 'check': {
+      const result = checkProject(flag(args, 'dir') ?? '.');
+      out(args, result, result.ok ? `ok: ${result.flows.length} flow(s) compile` : `${result.issues.length} issue(s):\n${result.issues.map((i) => `  ${i.detail}\n    → ${i.action}`).join('\n')}`);
+      return result.ok ? 0 : 2;
+    }
+
+    case 'settings': {
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const provider = flag(args, 'agent'); const model = flag(args, 'model');
+      if (provider !== null || model !== null) {
+        const current = readLocalSettings(dir);
+        writeLocalSettings(dir, { ...current, agent: { ...current.agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
+      }
+      let config = null; try { config = loadAuthoringConfig(findConfig(dir)); } catch { config = null; }
+      const settings = resolveAgentSettings(dir, config);
+      const detected = detectAgents();
+      out(args, { settings, detected }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}`);
+      return 0;
+    }
+
+    case 'draft': {
+      const controller = new AbortController();
+      const onSignal = () => controller.abort(new Error('user_cancelled'));
+      process.on('SIGINT', onSignal);
+      try {
+        const result = await draftWithAgent({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch'), intent: flag(args, 'intent'), overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
+          ...(args.flags.json ? {} : { onOutput: () => { process.stderr.write('.'); } }) });
+        const { agent, check } = result;
+        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written:\n${agent.files.map((f) => `  ${f}`).join('\n') || '  (none)'}\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\nnext: tracegrove test --grep discovered`);
+        return agent.exitCode === 0 && check.ok ? 0 : 2;
+      } finally { process.off('SIGINT', onSignal); }
+    }
 
     case 'sample-config': {
       const sample = flag(args, 'sample') ?? 'notes-api';

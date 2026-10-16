@@ -41,7 +41,7 @@ process.once('message', (message: Launch) => {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   app.stdout?.pipe(process.stdout);
-  app.stderr?.resume();
+  app.stderr?.pipe(process.stderr);
   app.once('error', () => { void stop(); });
   app.once('exit', () => { void stop(); });
 });

@@ -3,4 +3,7 @@ dist/
 .workflow-verify/
 verification-output/
 *.tgz
-samples/
+/samples/
+.tracegrove/
+__pycache__/
+.venv/

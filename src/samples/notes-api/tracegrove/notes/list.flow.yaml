@@ -1,0 +1,25 @@
+title: A new note shows up in the owner's list and nowhere else
+tags: [notes, smoke]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Listed note, body: visible to its owner }
+    expect: 201
+    save: { noteId: note.id }
+
+  - name: owner sees it
+    GET: /notes
+    expect:
+      status: 200
+      count: { notes: 1 }
+      json: { "notes[0].title": Listed note }
+
+  - name: stranger sees an empty list
+    GET: /notes
+    as: intruder
+    expect: { status: 200, count: { notes: 0 } }
+
+  - name: anonymous is rejected
+    GET: /notes
+    as: none
+    expect: 401
