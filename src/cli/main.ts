@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * workflow-verify CLI. Every command goes through the same resolver, admission and reducer as
+ * tracegrove CLI (also installed as workflow-verify). Every command goes through the same resolver, admission and reducer as
  * the library API. Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive,
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
@@ -19,6 +19,9 @@ import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
+import { compileProject, findConfig } from '../authoring/compile.ts';
+import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
+import { initProject } from '../authoring/init.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -42,8 +45,17 @@ function samplesDir(): string {
   return found;
 }
 
-const HELP = `workflow-verify <command> [--flags]
+const HELP = `tracegrove <command> [--flags]
 
+Everyday commands (read tracegrove.config.yaml, found by walking up from the current folder):
+  init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
+  test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+  list [--json]                                        list flows with their ids, tags and steps
+  show [--run latest|<name>] [--json]                  print a run's summary
+  compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
+  (every command also takes --config <tracegrove.config.yaml>)
+
+Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample notes-api --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
@@ -66,6 +78,51 @@ async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
+
+    case 'init': {
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const result = initProject(dir, { force: args.flags.force === true });
+      out(args, result, `${result.detection.reason}: adapter ${result.detection.adapter}\nwrote:\n${result.files.map((f) => `  ${f}`).join('\n')}\n\nAdd this to your app's test-mode auth so personas work:\n\n${result.snippet}\n\nnext: tracegrove test`);
+      return 0;
+    }
+
+    case 'compile': {
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
+      return 0;
+    }
+
+    case 'list': {
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      out(args, compiled.flows, compiled.flows.map((f) => `${f.caseId}  [${f.tags.join(', ')}]  ${f.file}\n  ${f.title}\n${f.steps.map((s) => `    - ${s.name}: ${s.method} ${s.path}${s.as !== Object.keys(compiled.config.personas)[0] ? ` (as ${s.as})` : ''}`).join('\n')}`).join('\n'));
+      return 0;
+    }
+
+    case 'test': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const controller = new AbortController();
+      const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
+      process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
+      try {
+        const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, signal: controller.signal,
+          ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) });
+        out(args, report, renderText(report, compiled.root));
+        return report.exitCode;
+      } finally {
+        process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
+      }
+    }
+
+    case 'show': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const root = dirname(configPath);
+      const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
+      if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
+      const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
+      out(args, report, renderText(report, root));
+      return 0;
+    }
 
     case 'sample-config': {
       const sample = flag(args, 'sample') ?? 'notes-api';

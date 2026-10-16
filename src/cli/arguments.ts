@@ -7,6 +7,11 @@ const Bool = z.boolean().optional();
 const common = { json: Bool, help: Bool };
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
+  init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
+  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool }).strict(),
+  list: z.object({ ...common, config: Text.optional() }).strict(),
+  compile: z.object({ ...common, config: Text.optional() }).strict(),
+  show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),
   'sample-config': z.object({ ...common, sample: Text.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
@@ -29,7 +34,7 @@ export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];
 const deny = (code: string, detail: string, command: string): never => {
-  throw new Blocked([{ code, detail, owner: 'operator', action: `workflow-verify ${command} --help` }]);
+  throw new Blocked([{ code, detail, owner: 'operator', action: `tracegrove ${command} --help` }]);
 };
 
 /** Validate every option before file access, admission or execution. No ignored arguments. */
@@ -68,7 +73,7 @@ export function parseArgs(argv: string[]): Args {
   const parsed = schema.safeParse(flags);
   if (!parsed.success) throw new Blocked(parsed.error.issues.map(issue => ({
     code: Object.hasOwn(flags, String(issue.path[0])) ? 'invalid_argument' : 'missing_argument',
-    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `workflow-verify ${command} --help`,
+    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `tracegrove ${command} --help`,
   })));
   return { command: name, flags: parsed.data } as Args;
 }

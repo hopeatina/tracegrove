@@ -1,0 +1,297 @@
+{
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "as": {
+      "type": "string"
+    },
+    "cleanup": {
+      "additionalProperties": false,
+      "properties": {
+        "DELETE": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "expect": {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        "gone": {
+          "additionalProperties": false,
+          "properties": {
+            "GET": {
+              "pattern": "^\\/",
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": 404,
+                  "type": "number"
+                },
+                {
+                  "const": 410,
+                  "type": "number"
+                }
+              ]
+            }
+          },
+          "required": [
+            "GET",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "DELETE",
+        "gone"
+      ],
+      "type": "object"
+    },
+    "create": {
+      "additionalProperties": false,
+      "properties": {
+        "DELETE": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "GET": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "HEAD": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "PATCH": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "POST": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "PUT": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "expect": {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        "json": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/__schema0"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "words": {
+                    "maximum": 64,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "words"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "slug": {
+                    "const": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "slug"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "uuid": {
+                    "const": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "uuid"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "int": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "max": {
+                        "maximum": 9007199254740991,
+                        "minimum": -9007199254740991,
+                        "type": "integer"
+                      },
+                      "min": {
+                        "maximum": 9007199254740991,
+                        "minimum": -9007199254740991,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "int"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "readback": {
+      "additionalProperties": false,
+      "properties": {
+        "GET": {
+          "pattern": "^\\/",
+          "type": "string"
+        },
+        "expect": {
+          "anyOf": [
+            {
+              "maximum": 599,
+              "minimum": 100,
+              "type": "integer"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "absent": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "count": {
+                  "additionalProperties": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "json": {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "description": "Dot paths into the response body and their exact values.",
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "present": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "maximum": 599,
+                  "minimum": 100,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "GET",
+        "expect"
+      ],
+      "type": "object"
+    },
+    "save": {
+      "additionalProperties": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "create",
+    "save",
+    "readback",
+    "cleanup"
+  ],
+  "type": "object"
+}

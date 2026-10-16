@@ -421,6 +421,11 @@ export const LaunchRecipe = z.object({
   readiness: z.object({ path: HttpTemplatePath, timeoutMs: PositiveMillis }).strict(),
   identitySourceFiles: z.array(z.string().max(LIMITS.shortText)).min(1).max(256),
   issuedCredentials: z.array(z.object({ name: IdString, subject: ShortText }).strict()).max(32),
+  // reported (absent): the app prints `listening <port>` after binding PORT=0.
+  // assigned: the launcher reserves a free loopback port, substitutes {port}/{dataDir}
+  // in args and env values, and waits on the readiness path alone.
+  portMode: z.enum(['reported', 'assigned']).optional(),
+  runtime: ShortText.optional(), // attested runtime label; defaults to node<major>
 }).strict();
 
 export const RunnerProfile = z.object({

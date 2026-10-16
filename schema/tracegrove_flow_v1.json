@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "as": {
+      "description": "Default persona for this flow.",
+      "type": "string"
+    },
+    "given": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "description": "alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "risk": {
+      "default": "standard",
+      "enum": [
+        "critical",
+        "standard",
+        "exploratory"
+      ],
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "DELETE": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "GET": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "HEAD": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "PATCH": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "POST": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "PUT": {
+            "pattern": "^\\/",
+            "type": "string"
+          },
+          "as": {
+            "description": "Persona name, or none for an unauthenticated call.",
+            "type": "string"
+          },
+          "expect": {
+            "anyOf": [
+              {
+                "maximum": 599,
+                "minimum": 100,
+                "type": "integer"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "absent": {
+                    "items": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "count": {
+                    "additionalProperties": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "json": {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "description": "Dot paths into the response body and their exact values.",
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "present": {
+                    "items": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "status": {
+                    "maximum": 599,
+                    "minimum": 100,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "json": {
+            "$ref": "#/$defs/__schema0",
+            "description": "Request body; {name} placeholders use saved values."
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "observe": {
+            "description": "Independent readback (GET/HEAD) polled until expect holds.",
+            "type": "boolean"
+          },
+          "save": {
+            "additionalProperties": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "description": "name: dot.path into the response body.",
+            "propertyNames": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "timeoutMs": {
+            "exclusiveMinimum": 0,
+            "maximum": 120000,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "maxItems": 50,
+      "minItems": 1,
+      "type": "array"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 400,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "steps"
+  ],
+  "type": "object"
+}
