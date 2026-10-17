@@ -32,6 +32,7 @@ import type { LocalLedger } from './ledger.ts';
 import type { FrozenBundle } from './planner.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
+import { targetFromComponentAttestations } from './targetObservation.ts';
 
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
 
@@ -246,13 +247,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   let observedTarget: TargetTuple | null = null;
   let identityMatched: boolean | null = null;
   if (session) {
-    observedTarget = {
-      ...cell.expectedTarget,
-      components: cell.expectedTarget.components.map((component) => {
-        const attestation = session!.attestations.find((a) => a.componentId === component.componentId);
-        return { componentId: component.componentId, kind: component.kind, identity: attestation ? attestation.identity : null };
-      }),
-    };
+    observedTarget = targetFromComponentAttestations(cell.expectedTarget, session.attestations);
     const comparison = compareTargets(cell.expectedTarget, observedTarget);
     identityMatched = comparison.matched;
     log.emit('identity.compared', null, { matched: comparison.matched, mismatches: comparison.mismatches });

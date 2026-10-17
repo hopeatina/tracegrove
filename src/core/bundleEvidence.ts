@@ -9,6 +9,7 @@ import { compareTargets, evaluateAssertions, REDUCER_REF, reduceCell } from './r
 import { compileCase } from './compiler.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { videoBundlePath } from './bundlePaths.ts';
+import { targetFromComponentAttestations } from './targetObservation.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -62,6 +63,9 @@ export function checkCellEvidence(input: {
   const attestations = host.attestations.map((a) => parseAs(IdentityAttestation, a, 'attestation'));
   for (const a of attestations) record(a, a.ref, 'attestation');
   const observed = r.environment.observed;
+  if (observed && digestOfValue(observed).hex !== digestOfValue(targetFromComponentAttestations(cell.expectedTarget, attestations)).hex) {
+    problem('target differs from host observations');
+  }
   if (observed && r.environment.provenance.runtime === 'live') {
     for (const id of cell.expectedTarget.requiredComponents) {
       const attestation = attestations.find((a) => a.componentId === id);

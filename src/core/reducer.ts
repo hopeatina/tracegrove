@@ -266,11 +266,15 @@ export function reduceCampaign(input: { scope: Scope; campaignId: string; reques
 export function compareTargets(expected: TargetTuple, observed: TargetTuple | null): { matched: boolean | null; mismatches: string[] } {
   if (!observed) return { matched: null, mismatches: ['no observed target'] };
   const mismatches: string[] = [];
+  for (const field of Object.keys(expected) as Array<keyof TargetTuple>) {
+    if (field !== 'components' && !jsonEqual(expected[field], observed[field])) mismatches.push(`${field}: identity differs`);
+  }
   for (const componentId of expected.requiredComponents) {
     const exp = expected.components.find((c) => c.componentId === componentId);
     const obs = observed.components.find((c) => c.componentId === componentId);
     if (!exp || !exp.identity) { mismatches.push(`${componentId}: expected identity missing`); continue; }
     if (!obs || !obs.identity) { mismatches.push(`${componentId}: not observed`); continue; }
+    if (exp.kind !== obs.kind) mismatches.push(`${componentId}: component kind differs`);
     if (digestOfValue(exp.identity).hex !== digestOfValue(obs.identity).hex) mismatches.push(`${componentId}: identity differs`);
   }
   if (mismatches.some((m) => m.endsWith('not observed'))) return { matched: null, mismatches };

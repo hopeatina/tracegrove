@@ -8,4 +8,14 @@ The reader refuses traversal, duplicate paths, symlinks and nonregular files. Re
 
 Campaign verification rechecks complete receipt bindings, missing cells, coverage and proof eligibility, as well as full request/selection/campaign scope and reference identity. Per-cell checks bind exact case/persona/surface/variant and qualification-admission refs. The outcome label alone cannot cover inconsistent campaign metadata.
 
+Target comparison checks every target metadata field and each required component's
+kind and identity. Current hosts supply component attestations only: repository,
+release, schema, flag, browser, container and model metadata remain unobserved.
+Requesting those fields cannot fill their observations; a required mismatch blocks
+the run before fixtures or steps. The saved-bundle reader reconstructs the observed
+tuple from the captured host attestations too, so inventing matching expected and
+observed metadata and recomputing all file/document hashes cannot create passing
+source or deployment evidence. Unsupported target observations need a real host
+contract before they can qualify. Honest blocked attempts retain their evidence.
+
 This is integrity and record-consistency verification. A passing mocked bundle retains its mocked proof boundary. It is not live qualification, trusted issuer identity, tenant authorization or production acceptance. The host must authorize a quiescent artifact directory and apply its own issuer/admission policy. The snapshot API is not a remote filesystem ACL or a defense against a hostile process replacing parent directories during capture.
