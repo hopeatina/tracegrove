@@ -18,4 +18,56 @@ Files and directory entries are synced before acknowledgement, including newly c
 
 Cooperating exporters share an exclusive sibling publication lock. A writer crash can leave its private staging directory and lock; the destination is absent or contains the complete verified bundle. Locks are never automatically broken. The operator must establish that the writer is gone and inspect the owned staging/output state before a separately authorized cleanup/retry; do not blindly remove a lock belonging to another writer. If final parent sync fails after rename, the command reports that publication durability is unconfirmed: the complete output may exist, so verify it before retrying and do not overwrite it.
 
-Tests include concurrent independent publishers, actual writer SIGKILL during a payload write, source mutation after snapshot capture, corrupt objects, symlink/no-effect refusal and injected write/sync failures. This establishes local process-crash behavior and fsync ordering, not physical power-loss qualification, arbitrary hostile-parent confinement, distributed fencing, automatic recovery, provider attestation or durability of the original in-progress execution directory.
+Tests include concurrent independent publishers, actual writer SIGKILL during a payload write, source mutation after snapshot capture, corrupt objects, symlink/no-effect refusal and injected write/sync failures. This establishes local process-crash behavior and fsync ordering, not physical power-loss qualification, arbitrary hostile-parent confinement, distributed fencing, automatic recovery or provider attestation.
+
+## Durable original execution seal
+
+`writeExecutionBundle` now persists the original execution records before acknowledging the
+source seal, rather than relying on a later exported copy. Cell and final payload files are created
+exclusively and fsynced. Existing cell payloads are re-read through the bounded no-follow reader,
+synced as regular files, and their directories are synced before final publication. Existing
+payloads or manifests are never overwritten, including corrupt bytes left by an interrupted write.
+
+The writer builds the existing v1 manifest in a unique private `.bundle-pending-*` directory.
+An internal candidate snapshot checks its bounded payload hashes and performs the same complete
+frozen-record, assertion and campaign reduction as the public verifier. The verified receipt set
+must also match the final records supplied by the executor. Only then does an exclusive hard link
+publish `manifest.json`, followed by directory fsync. The executor's ledger finalization follows
+the returned source seal. The bundle format and public reader contract are unchanged: a candidate
+without a published manifest is never a valid public bundle.
+
+The caller must own a quiescent local execution tree and retain its existing ledger writer.
+An exclusive `.bundle-write.lock` serializes cooperating source writers. A write/sync/candidate
+failure or process death retains its incomplete records, lock and any manifest staging for explicit
+reconciliation; no stale lock is automatically removed and no assertion is retried. A manifest
+that became visible before a later directory sync failure is reported as published with durability
+unconfirmed, rather than removed or overwritten. Verify that existing bundle before any retry.
+
+Tests cover actual SIGKILL before the manifest link and after its first directory fsync, injected
+payload write/fsync failures, corruption during manifest staging, a hash-consistent candidate
+whose campaign disagrees with reduction, existing corrupt payload preservation, linked-parent
+refusal and post-publication sync uncertainty. A process crash can leave an invalid incomplete
+source or a complete verifiable source with reconciliation remnants. These bounded local tests
+do not simulate physical power loss, establish hostile-writer confinement, distributed fencing,
+provider/host qualification, or transactional recovery across the separate ledger and bundle seal.
+
+## Local commit-window readback
+
+If a controller dies after the original manifest commits but before ledger finalization, local
+redelivery first requires the existing durable ownership inventory to show acknowledged removal
+of every resource. It then verifies and reduces the entire committed bundle and binds its exact
+request/selection, scope, execution/attempt/generation, attempt number, idempotency key and
+per-cell receipt references to the trusted ledger. Only a matching commit can reconstruct the
+original summary, sync the manifest's directory and append the missing `finalized` transition.
+A failed recovery directory sync leaves finalization blocked with durability unconfirmed.
+It returns checked receipts and
+starts no second host or fixture. A manifest's mere presence or a producer PASS label is insufficient.
+
+Finalized redelivery also reads this bound committed evidence instead of trusting the cached
+summary containing an empty receipt list. Missing, corrupt or foreign finalized evidence fails
+closed without acquisition. Interrupted attempts without a committed manifest retain the existing
+retry policy and ownership gate; this readback does not repair incomplete files or invent cleanup.
+Actual controller SIGKILL immediately before the ledger finalization write, zero-launch readback,
+unknown ownership, corrupt/foreign/missing evidence and false cached summary are regression-tested.
+This is local reconciliation under one ledger writer, not a distributed transaction or a claim that
+physical power loss was simulated.
