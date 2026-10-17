@@ -14,7 +14,7 @@ Status as of 2026-10-16, for this repository. "Intended" means what the protocol
                                                                                  ─► executor
                                                                                       host adapter:  local_process │ mock_loopback
                                                                                       fixtures:      registered API actions, readback, cleanup
-                                                                                      surface driver: http (only)
+                                                                                      surface driver: http │ Chromium browser
                                                                                  ─► trusted reducer (outcome from observations)
                                                                                  ─► bundle writer ─► verify-bundle ───────► .tracegrove/runs/<run>/
                                                                                                                               summary.md/json, junit.xml,
@@ -22,11 +22,11 @@ Status as of 2026-10-16, for this repository. "Intended" means what the protocol
  tracegrove ui ─► reads config, flows, runs, git; runs `test`; scans routes for discovery
 ```
 
-The low-level corpus also supports the [Chromium browser runner](browser-driver.md), with typed UI steps, DOM assertions, authenticated local personas, and sealed recordings. Short-flow authoring and Grove playback still need that integration. Supporting modules that exist but aren't wired into the everyday flow yet include shared coordination, signed cleanup follow-ups, source citations, and the plan review API.
+The [Chromium browser runner](browser-driver.md) supports short flows and the low-level corpus, with typed UI steps, DOM assertions, authenticated local personas, and sealed recordings in Grove. Supporting modules that exist but aren't wired into the everyday flow yet include shared coordination, signed cleanup follow-ups, source citations, and the plan review API.
 
 ## 2. The current UX flow, end to end
 
-| Step | Today (with PR #14) | Intended |
+| Step | Today (this branch) | Intended |
 | --- | --- | --- |
 | Install | Private package; install a packed archive | `npm i -D tracegrove`, `pipx`/`uvx` shim for Python repos |
 | Set up | `tracegrove init` detects FastAPI, Django or Node and writes config + example flow | Same, plus discovery proposes the first flows |
@@ -40,7 +40,7 @@ The low-level corpus also supports the [Chromium browser runner](browser-driver.
 
 | Layer | Supported now | Declared but not implemented |
 | --- | --- | --- |
-| Surfaces (step kinds) | `http.request`, `observe`; low-level corpus also supports `ui.navigate`, `ui.action`, `ui.observe` through Chromium | Browser short-flow authoring, `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
+| Surfaces (step kinds) | `http.request`, `observe`, `ui.navigate`, `ui.action`, `ui.observe`; browser short flows compile into the same core | `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
 | Hosts | `local_process` (POSIX), `mock_loopback` | container, managed sandbox, cloud VM, customer CI, device service; Windows process trees |
 | Fidelity lanes | `full_live_sandbox`, `mock_contract` | `recorded_replay`, `hybrid_live_product`, `full_live_canary` |
 | Boundaries | `application`, `storage` observed as real/stubbed | per-provider boundaries with interceptors and readback oracles |
@@ -121,6 +121,6 @@ individual HTTP checks passed.
 
 1. **P0 for full-stack repos:** `app.setup` commands, `services:` (Postgres, Redis), `components:` (workers), `db: sqlite|postgres` that injects `DATABASE_URL`, SQL and command seeding, and the outbound interceptor for third parties.
 2. **P1 for coverage:** job observe, DB-state oracle, mock lane in the authoring layer, record/replay, email/webhook capture, data-pipeline job surface with table oracles.
-3. **Complete browser authoring and playback**, building on the core Chromium runner, personas, fixtures, and sealed recordings.
+3. **Qualify browser execution beyond local runs**, including staging personas, controller-death cleanup, trace/redaction collectors, and host network confinement.
 
 Each adapter keeps the kernel's rules: launched or reserved per run, identity attested, effects inside the declared envelope, cleanup confirmed by an independent read, and evidence sealed in the bundle.

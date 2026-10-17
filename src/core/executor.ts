@@ -440,10 +440,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   log.emit('boundaries.observed', null, { observations: boundaryObservations.map((b) => ({ boundaryId: b.boundaryId, expected: b.expectedMode, observed: b.observedMode, mismatches: b.mismatchReasons })) });
 
   // Flush browser evidence before host cleanup; an unavailable recording cannot satisfy required capture.
+  const cleanupDeadline = Deadline.in(hostPlan.cleanupReserveMs);
   const media: Array<{ digest: string; bytes: Buffer }> = [];
   const mediaArtifacts: ExecutionReceipt['artifacts'] = [];
   try {
-    const bytes = await browser.collectVideo();
+    const bytes = await browser.collectVideo(cleanupDeadline);
     if (bytes) {
       const artifact = ctx.artifacts.put({ id: `${executionId}.${cell.selectionCellId}.video`, bytes, mediaType: 'video/webm', producerRef: cell.expectedTarget.runner,
         stepIds: compiled.orderedStepIds.filter(id => compiled.stepsById.get(id)!.kind.startsWith('ui.')), from: startedAt, to: nowIso() });
@@ -455,7 +456,6 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   }
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
-  const cleanupDeadline = Deadline.in(hostPlan.cleanupReserveMs);
   const { cleanup, criticalCleanupConfirmed } = await collectCleanup({ allocated,
     uncertainAllocations: uncertainAllocations.size, registry: item.fixture?.registry ?? null,
     driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });

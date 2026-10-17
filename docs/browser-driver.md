@@ -66,13 +66,16 @@ HTTP steps and fixtures can run in the same case for independent readback.
 Each poll counts against `maxBrowserActions`. Case method and resource-prefix
 rules filter page requests; read-only cases allow only GET and HEAD. Persona
 viewport, locale, timezone, and reduced motion are passed to the browser. Pointer
-activation uses clicks, keyboard activation uses focus and Enter, and touch
+activation uses clicks, keyboard activation uses focus with Enter or Space for toggles, and touch
 activation uses taps. Host-issued bearer credentials are added only to admitted
 page requests, never expanded into filled values or recorded commands.
 Network events record methods, paths, and response statuses without request
 headers or query strings. Recording more than 512 network events invalidates
 collection. Required traces and declared redaction policies remain blocked.
 
+Before closing a successful session, collection crosses a paint boundary and
+captures the compositor so a completed DOM observation is present in the final
+video frame. This uses the cleanup deadline, not an arbitrary recording delay.
 The controller seals the recording bytes into the portable bundle and records
 browser duration and artifact bytes. Verification reproduces the frozen runner
 capabilities, independently reduces browser assertions, and checks video hashes
@@ -81,6 +84,51 @@ and byte counts. A required recording cannot be satisfied by an event log alone.
 The integrated native tests cover pointer, keyboard, and 375px simulated touch,
 combining an authenticated UI, DOM observation,
 independent API assertions, fixture cleanup, video capture, and portable bundle
-verification. This proves local behavior. Hosted admission, staging personas,
-controller-death browser cleanup, short-flow authoring, and Grove media playback
-remain separate integration work; no production qualification is claimed.
+verification. A decoded-frame test checks the recorded terminal visual state.
+This proves local behavior. Hosted admission, staging personas, and
+controller-death browser cleanup remain open; no production qualification is claimed.
+
+## Short flows and Grove
+
+The packaged sample also includes a short browser flow. From the repository root:
+
+```sh
+node dist/cli/main.js test --config /tmp/notes-browser/tracegrove.config.yaml --grep notes.browser
+node dist/cli/main.js ui --dir /tmp/notes-browser
+```
+
+Open the printed loopback address and select the browser scenario. Its step
+panel shows expected and observed text plus native recording controls. The
+player supports keyboard playback and byte-range seeking, and preserves its
+position when changing steps. Each media request verifies one immutable bundle
+snapshot and binds the digest to that run and scenario. Corrupt, unbound, or
+symlinked recordings are refused.
+
+Browser commands reuse the core command and locator schemas:
+
+```yaml
+title: Show the seeded note
+given: { existing: existing-note }
+browser:
+  allowPaths: [/ui, /notes]
+  allowMethods: [GET, HEAD]
+steps:
+  - browser: { kind: navigate, path: /ui }
+    expect: { status: 200 }
+  - browser: { kind: click, target: { by: role, role: button, name: Refresh } }
+  - browser: { kind: read, target: { by: testId, name: notes } }
+    expect: { text: Existing note }
+```
+
+`fill` accepts a semantic `target` and string `value`. Browser reads require
+`expect.text` and poll until it holds. Click/fill steps assert completion; add a
+DOM read or independent API readback to establish the effect. Browser steps use
+the default persona, and browser flows require a recording. Set `maxActions`
+and `maxArtifactBytes` inside the flow's `browser` block to tune their budgets.
+Its allowed paths and methods combine with those derived from HTTP steps and
+fixtures into the flow's effect envelope.
+
+Persona configuration accepts optional `viewport`, `inputMode`, `locale`,
+`timezone`, and `reducedMotion` fields alongside `subject`. Simulated touch
+does not qualify a physical mobile device. Required traces, executable
+redaction policies, and non-browser native surfaces remain unsupported.

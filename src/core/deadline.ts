@@ -19,7 +19,10 @@ export class Deadline {
     return Deadline.in(ms, this);
   }
   signal(parent?: AbortSignal): AbortSignal {
-    const timeout = AbortSignal.timeout(Math.max(1, this.remainingMs()));
+    const remaining = this.remainingMs();
+    const timeout = remaining === 0
+      ? AbortSignal.abort(new DOMException('deadline exceeded', 'TimeoutError'))
+      : AbortSignal.timeout(remaining);
     return parent ? AbortSignal.any([parent, timeout]) : timeout;
   }
 }

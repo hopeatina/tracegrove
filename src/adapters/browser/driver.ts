@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Request } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type CDPSession, type Locator, type Page, type Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,6 +21,7 @@ export class BrowserDriver {
     private readonly page: Page,
     private readonly mediaDir: string,
     private readonly inputMode: 'pointer' | 'keyboard' | 'touch',
+    private readonly compositor: CDPSession,
   ) {}
 
   static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
@@ -86,7 +87,7 @@ export class BrowserDriver {
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
-      return new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
+      return new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', network);
     } catch (error) {
       await browser?.close();
       await rm(mediaDir, { recursive: true, force: true });
@@ -126,7 +127,15 @@ export class BrowserDriver {
         const locator = this.locator(command.target);
         if (command.kind === 'click') {
           if (this.inputMode === 'touch') await locator.tap({ timeout });
-          else if (this.inputMode === 'keyboard') { await locator.focus({ timeout }); await locator.press('Enter', { timeout }); }
+          else if (this.inputMode === 'keyboard') {
+            await locator.focus({ timeout });
+            const key = await locator.evaluate(element => {
+              if (element.matches('input[type=checkbox],input[type=radio],[role=checkbox],[role=radio],[role=switch]')) return 'Space';
+              if (element.matches('button,a,input[type=button],input[type=submit],input[type=reset],[role=button],[role=link]')) return 'Enter';
+              return null; // A keyboard click on a text input means focus, not form submission.
+            });
+            if (key) await locator.press(key, { timeout });
+          }
           else await locator.click({ timeout });
         }
         if (command.kind === 'fill') {
@@ -169,7 +178,22 @@ export class BrowserDriver {
   }
 
   /** Closing flushes the real recording; the caller must seal it in its evidence store. */
-  async collectVideo(maxBytes = 32 * 1024 * 1024): Promise<Buffer> {
+  async collectVideo(maxBytes = 32 * 1024 * 1024, deadline = Deadline.in(5000)): Promise<Buffer> {
+    if (!this.closing) {
+      const signal = deadline.signal();
+      const abort = () => { void this.close().catch(() => {}); };
+      signal.addEventListener('abort', abort, { once: true });
+      try {
+        signal.throwIfAborted();
+        // A DOM read can finish before its pixels reach the recording. Capture
+        // the compositor directly: background/headless animation clocks may pause.
+        await this.compositor.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+        signal.throwIfAborted();
+      } catch {
+        await this.close();
+        throw new BrowserStepError('video_final_frame_unavailable');
+      } finally { signal.removeEventListener('abort', abort); }
+    }
     await this.close();
     const path = await this.page.video()?.path();
     if (!path) throw new BrowserStepError('video_missing');

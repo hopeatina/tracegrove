@@ -210,7 +210,7 @@ What the adapters cover now and what's next:
 | Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
 | Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
 | Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
-| Browser | Typed Chromium steps in the low-level corpus, authenticated local personas, DOM/API assertions, sealed video | Short-flow authoring, Grove playback, staging qualification and controller-death cleanup |
+| Browser | Typed short flows and low-level corpus, authenticated local personas, DOM/API assertions, sealed video and Grove playback | Staging qualification, trace/redaction collectors and controller-death cleanup |
 
 The full gap analysis by layer, with priorities, is in [docs/architecture.md](docs/architecture.md).
 
@@ -296,7 +296,9 @@ an atomic host port, with exact round selection and idempotent receipt recovery.
 
 The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
 fixtures and independent readback, and verifies recordings in the portable bundle.
-Still open: browser short-flow authoring and Grove playback, full runtime source selection,
+Browser short flows run through `tracegrove test`; Grove plays receipt-bound recordings
+after rechecking the bundle. See the browser sample and guide for the exact syntax.
+Still open: full runtime source selection,
 hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
 Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 

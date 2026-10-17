@@ -11,13 +11,16 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { Conflict } from '../core/errors.ts';
-import type { ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { runVideos } from './media.ts';
+import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 
-export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null };
+export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
   caseId: string; file: string; title: string; outcome: string; durationMs: number;
   steps: StepReport[]; failure: { step: string; message: string; observed: string | null } | null;
+  videos?: RunVideo[];
 };
 export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
@@ -51,7 +54,9 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
   const steps: StepReport[] = receipt.steps.map((s) => {
     const info = stepInfo.get(s.stepId);
     const output = s.output as { status?: number } | null;
-    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode };
+    const browser = BrowserObservation.safeParse(s.output);
+    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
+      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
@@ -71,7 +76,7 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     failure = { step: '(case)', message: receipt.reasonCodes.join(', ') || receipt.outcome, observed: null };
   }
   const durationMs = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
-  return { caseId: receipt.caseRef.id, file: flow?.file ?? '', title: flow?.title ?? receipt.caseRef.id, outcome: receipt.outcome, durationMs, steps, failure };
+  return { caseId: receipt.caseRef.id, file: flow?.file ?? '', title: flow?.title ?? receipt.caseRef.id, outcome: receipt.outcome, durationMs, steps, failure, videos: runVideos(receipt) };
 }
 
 function xml(text: string): string {

@@ -225,7 +225,7 @@ tracegrove · notes · app sha 3e8d13bc9bd1
 | 2 | `lanes:` with an offline mock lane compiled from recorded responses; `--update-snapshots` to record them | No |
 | 3 | `tracegrove.config.ts` with `defineConfig` and a typed `flow()` builder for editor autocompletion; JSON Schema for the YAML files so VS Code validates them today | Schema export only |
 | 4 | Login-recipe personas (POST /login, cookie or token capture) for apps whose auth can't be patched; external `url:` targets with declared, unverified identity | No |
-| 5 | Browser surface (Playwright) using the same flow file shape with `visit:` / `click:` steps | No |
+| 5 | Browser surface using shared typed `browser:` commands, independent DOM/API checks, and verified Grove recording playback | Implemented locally; staging qualification remains open |
 
 ## Found along the way
 

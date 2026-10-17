@@ -150,9 +150,50 @@
       "additionalProperties": {
         "additionalProperties": false,
         "properties": {
+          "inputMode": {
+            "enum": [
+              "pointer",
+              "touch",
+              "keyboard"
+            ],
+            "type": "string"
+          },
+          "locale": {
+            "maxLength": 16,
+            "minLength": 2,
+            "type": "string"
+          },
+          "reducedMotion": {
+            "type": "boolean"
+          },
           "subject": {
             "minLength": 1,
             "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "viewport": {
+            "additionalProperties": false,
+            "properties": {
+              "height": {
+                "maximum": 2147483647,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "width": {
+                "maximum": 2147483647,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "type": "object"
           }
         },
         "required": [

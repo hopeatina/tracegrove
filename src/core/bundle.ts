@@ -17,6 +17,7 @@ import { REDUCER_REF, evaluateAssertions, reduceCampaign, reduceCell } from './r
 import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
+import { cellBundleName, videoBundlePath } from './bundlePaths.ts';
 
 
 function writeJson(path: string, value: unknown): void {
@@ -32,7 +33,7 @@ export type CellRecords = {
 export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; bundle?: FrozenBundle; request?: RunRequest; selection?: SelectionManifest; receipts?: ExecutionReceipt[]; campaign?: CampaignResult }): void {
   mkdirSync(join(input.dir, 'cells'), { recursive: true });
   if (input.cell) {
-    const cellDir = join(input.dir, 'cells', input.cell.id.replace(/[^A-Za-z0-9._-]/g, '_'));
+    const cellDir = join(input.dir, 'cells', cellBundleName(input.cell.id));
     mkdirSync(cellDir, { recursive: true });
     writeJson(join(cellDir, 'receipt.json'), input.cell.receipt);
     writeJson(join(cellDir, 'environment.json'), input.cell.environment);
@@ -47,7 +48,7 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
     for (const artifact of input.cell.media ?? []) {
       if (!/^[a-f0-9]{64}$/.test(artifact.digest) || digestOfBytes(artifact.bytes).hex !== artifact.digest) throw new Error('invalid media digest');
       mkdirSync(join(cellDir, 'media'), { recursive: true });
-      writeFileSync(join(cellDir, 'media', `${artifact.digest}.webm`), artifact.bytes, { mode: 0o600 });
+      writeFileSync(join(input.dir, videoBundlePath(input.cell.id, artifact.digest)), artifact.bytes, { mode: 0o600 });
     }
     return;
   }
@@ -92,9 +93,20 @@ export function readVerifiedBundle(dir: string): VerifiedBundleRecords {
   return { ...checked.records, verification: { ...checked.verification, ok: true } };
 }
 
-function verifyBundleRecords(dir: string): Inspection {
-  const problems: string[] = [];
+/** Read recording bytes from the same immutable snapshot that passed complete bundle verification. */
+export function readVerifiedVideo(dir: string, digest: string, caseId?: string): Buffer {
   const snapshot = new BundleSnapshot(dir);
+  const checked = verifySnapshot(snapshot);
+  if (!checked.verification.ok || !checked.records) throw new Error('recording bundle failed verification');
+  const receipt = checked.records.receipts.find(r => (caseId === undefined || r.caseRef.id === caseId) && r.artifacts.some(a => a.mediaType === 'video/webm' && a.ref.digest.hex === digest));
+  if (!receipt) throw new Error('recording is not bound to a verified receipt');
+  return snapshot.read(videoBundlePath(receipt.selectionCellId, digest));
+}
+
+function verifyBundleRecords(dir: string): Inspection { return verifySnapshot(new BundleSnapshot(dir)); }
+
+function verifySnapshot(snapshot: BundleSnapshot): Inspection {
+  const problems: string[] = [];
   const requireListed = (file: string) => { if (!snapshot.has(file)) problems.push(`unsealed required file ${file}`); };
   for (const file of ['request.json', 'selection.json', 'campaign.json', 'documents.json']) requireListed(file);
   if (problems.length) return { verification: { ok: false, problems, outcome: null, receipts: 0 }, records: null };

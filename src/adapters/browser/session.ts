@@ -45,11 +45,11 @@ export class CaseBrowserSession {
 
   get seconds(): number { return this.started === undefined ? 0 : this.elapsed || (monotonicMs() - this.started) / 1000; }
 
-  async collectVideo(): Promise<Buffer | null> {
+  async collectVideo(deadline: Deadline): Promise<Buffer | null> {
     if (!this.browser) return null;
     try {
       if (this.networkEvents > 512) throw new BrowserStepError('browser_network_metadata_limit');
-      return await this.browser.collectVideo(Math.min(this.input.spec.limits.maxArtifactBytes, 16 * 1024 * 1024));
+      return await this.browser.collectVideo(Math.min(this.input.spec.limits.maxArtifactBytes, 16 * 1024 * 1024), deadline.child(5000));
     }
     finally {
       try { await this.browser.dispose(); }

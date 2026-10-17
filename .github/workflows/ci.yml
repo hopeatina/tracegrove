@@ -71,11 +71,14 @@ jobs:
           browser_execution=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/browser-run.json")
           node dist/cli/main.js export --execution "$browser_execution" --state-dir "$RUNNER_TEMP/browser-sample/verification/.workflow-verify" --output "$RUNNER_TEMP/browser-bundle"
           node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/browser-bundle"
+          node dist/cli/main.js test --config "$RUNNER_TEMP/browser-sample/tracegrove.config.yaml" --grep notes.browser
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-evidence-bundle
-          path: ${{ runner.temp }}/browser-bundle
+          path: |
+            ${{ runner.temp }}/browser-bundle
+            ${{ runner.temp }}/browser-sample/.tracegrove/runs/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()

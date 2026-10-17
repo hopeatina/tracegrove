@@ -14,6 +14,9 @@ import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntimeSync } from '../hosts/runtime.ts';
 import { SeedRecipe, parseAs } from '../protocol/index.ts';
 import { AuthoringConfig, Fixture, Flow, HTTP_VERBS, type Expect, type FlowStep, type HttpVerb } from './schema.ts';
+import { compileBrowserStep } from './browser.ts';
+import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
+import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 
 export const CONFIG_FILE = 'tracegrove.config.yaml';
@@ -22,7 +25,7 @@ const APP_ID = 'app';
 const ORIGIN = `launch://${APP_ID}`;
 const PROFILE = 'real';
 
-export type CompiledStepInfo = { id: string; name: string; method: string; path: string; as: string; expectStatus: number | null };
+export type CompiledStepInfo = { id: string; name: string; method: string; path: string; as: string; expectStatus: number | null; expectation?: string };
 export type CompiledFlowInfo = { caseId: string; file: string; title: string; tags: string[]; risk: string; steps: CompiledStepInfo[]; fixtures: string[] };
 export type CompileResult = {
   root: string;
@@ -225,6 +228,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
   if (selected.length === 0) fail('no_flows_selected', `no flow matches${options.grep ? ` --grep ${options.grep}` : ''}${options.tags?.length ? ` --tag ${options.tags.join(',')}` : ''}`, 'run tracegrove list to see flow ids and tags');
+  const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
+  const runner = hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
   // ---- attested source identity ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
@@ -247,7 +252,10 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   for (const name of personas) write(compiledDir, `auth/${name}.yaml`, { schemaVersion: 'workflow.auth-recipe/v1', ref: ref(`auth.${name}`), kind: 'host_issued', credentialName: `${name}_token`, header: 'authorization', scheme: 'Bearer' });
   write(compiledDir, `personas/${defaultPersona}.yaml`, {
     schemaVersion: 'workflow.persona/v1', ref: ref(`persona.${defaultPersona}`), traits: [], accountBindingRef: null, roleScopes: [], stateRecipeRef: null, dataVolumeRecipeRef: null, entitlementRef: null, connectorStateRef: null,
-    authRecipeRef: { $file: `.${defaultAuth}` }, locale: 'en-US', timezone: 'UTC', viewport: { width: 1280, height: 800 }, inputMode: 'keyboard', reducedMotion: true, cleanupPolicyRef: null,
+    authRecipeRef: { $file: `.${defaultAuth}` },
+    locale: config.personas[defaultPersona]!.locale ?? 'en-US', timezone: config.personas[defaultPersona]!.timezone ?? 'UTC',
+    viewport: config.personas[defaultPersona]!.viewport ?? { width: 1280, height: 800 }, inputMode: config.personas[defaultPersona]!.inputMode ?? 'keyboard',
+    reducedMotion: config.personas[defaultPersona]!.reducedMotion ?? true, cleanupPolicyRef: null,
   });
   write(compiledDir, 'components.yaml', {
     schemaVersion: 'workflow.component-profile/v1', ref: ref('components'),
@@ -273,9 +281,9 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000, cleanupReserveMs: 10_000,
   });
-  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: 'tracegrove.runner.http', revision: '1' }, adapter: 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
-  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: 'tracegrove.pack.http-api', revision: '1' }, kind: 'http_api', protocol: 'http', stepKinds: ['http.request', 'observe'], oracles: ['http.observation/1', 'step.result/1'], captureFormats: ['application/json'] });
-  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
+  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: hasBrowser ? 'browser' : 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
+  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: hasBrowser ? 'web' : 'http_api', protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
+  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: hasBrowser ? 'web' : 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
   const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass: 'local', readbackOracleRef: null, interceptorRef: null });
   write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: [boundary('application'), boundary('storage')] });
   const stage = { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 };
@@ -310,22 +318,34 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const assertions: Json[] = [];
     const info: CompiledStepInfo[] = [];
     const ids = new Set<string>();
-    const methods = new Set<string>();
-    const prefixes = new Set<string>();
+    const browserFlow = flow.steps.some(step => 'browser' in step);
+    const methods = new Set<string>(browserFlow ? flow.browser!.allowMethods : []);
+    const prefixes = new Set<string>(browserFlow ? flow.browser!.allowPaths : []);
     let creates = 0;
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const { method, path } = verbOf(step);
-      let id = step.name ? snake(step.name) : `${method.toLowerCase()}_${index + 1}`;
+      const label = 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
       const where = `${rel} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
       const inputs: Record<string, Json> = {};
+      const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
+      if ('browser' in step) {
+        const browser = compileBrowserStep({ step, id, timeoutMs, inputs, bind: value => bindTemplates(value, scope, inputs, where) });
+        steps.push(browser.step);
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: ['isolated_candidate'], stepId: id,
+          oracle: { name: browser.predicate ? 'browser.observation' : 'step.result', version: '1' },
+          predicate: browser.predicate ?? { kind: 'step_result', value: 'completed' }, coverageTags: flow.tags });
+        info.push({ id, name: step.name ?? id, method: 'UI', path: `${browser.label.toLowerCase()} ${browser.path}`, as: defaultPersona, expectStatus: step.expect?.status ?? null,
+          expectation: step.expect?.text !== undefined ? JSON.stringify(step.expect.text) : step.expect?.status !== undefined ? `Status ${step.expect.status}` : 'Step completes' });
+        return;
+      }
+      const { method, path } = verbOf(step);
       const boundPath = bindTemplates(path, scope, inputs, where) as string;
       const auth = authFor(step.as, personas, defaultPersona, inputs, where);
       const predicate = predicateFor(step.expect);
-      const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
       methods.add(method); prefixes.add(firstSegment(path));
       if (method === 'POST') creates++;
       const captures = Object.entries(step.save ?? {}).map(([name, p]) => ({ name, from: 'json', path: p }));
@@ -345,7 +365,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
         stepId: id, predicate: predicate ?? { kind: 'step_result', value: 'completed' }, coverageTags: flow.tags,
       });
       for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
-      info.push({ id, name: step.name ?? id, method, path, as: step.as ?? defaultPersona, expectStatus: statusOf(step.expect) });
+      info.push({ id, name: step.name ?? id, method, path, as: step.as ?? defaultPersona, expectStatus: statusOf(step.expect), expectation: statusOf(step.expect) !== null ? `Status ${statusOf(step.expect)}` : predicate ? 'Configured response checks' : 'Step completes' });
     });
     let fixturePlanRef: Json = null;
     if (given.size) {
@@ -391,15 +411,15 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     }
     write(compiledDir, `cases/${caseId}.yaml`, {
       schemaVersion: 'workflow.case/v1', ref: { id: caseId, revision: '1' }, purpose: flow.title, workflowId: caseId,
-      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
-      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its HTTP API. Local application behavior, not deployment.`,
-      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(given.size ? ['fixture.http'] : [])],
+      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
+      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
+      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(browserFlow ? ['ui.navigate', 'ui.action', 'ui.observe'] : []), ...(given.size ? ['fixture.http'] : [])],
       requiredBoundaries: [{ boundaryId: 'application', mode: 'real' }, { boundaryId: 'storage', mode: 'real' }],
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
       effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: 0, cleanupRecipeRef: null },
-      limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: 0, maxArtifactBytes: 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
-      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
+      limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
+      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
       baselineRef: null, generation: null,
     });
     suiteCases.push({ caseRef: `./${caseId}.yaml`, required: true, profiles: null });

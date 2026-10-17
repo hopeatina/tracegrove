@@ -19,6 +19,7 @@ import { discoverProject, draftWithAgent } from './workspace.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
+import { readRunVideo, videoRange } from './media.ts';
 
 export type UiServer = { url: string; port: number; close: () => Promise<void> };
 
@@ -137,6 +138,19 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
         return send(200, discoverProject(dir, url.searchParams.get('branch') || null));
+      }
+      const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
+      if ((req.method === 'GET' || req.method === 'HEAD') && video) {
+        try {
+          const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
+          const range = videoRange(req.headers.range, bytes.length);
+          const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
+            'cross-origin-resource-policy': 'same-origin', 'x-content-type-options': 'nosniff' };
+          if (!range) { res.writeHead(416, { ...headers, 'content-range': `bytes */${bytes.length}` }); res.end(); return; }
+          res.writeHead(req.headers.range ? 206 : 200, { ...headers, 'content-length': range.end - range.start + 1,
+            ...(req.headers.range ? { 'content-range': `bytes ${range.start}-${range.end}/${bytes.length}` } : {}) });
+          res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
+        } catch { return send(409, { error: 'Recording is unavailable or its evidence failed verification.' }); }
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));

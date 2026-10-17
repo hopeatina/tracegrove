@@ -8,6 +8,7 @@ import {
 import { compareTargets, evaluateAssertions, REDUCER_REF, reduceCell } from './reducer.ts';
 import { compileCase } from './compiler.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
+import { videoBundlePath } from './bundlePaths.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -108,7 +109,7 @@ export function checkCellEvidence(input: {
     && r.artifacts.every(a => {
       if (a.mediaType === 'application/x-ndjson') return sameDigest(a.ref.digest, r.eventsDigest) && a.byteCount === events.length;
       if (a.mediaType !== 'video/webm' || !exact(a.producerRef, cell.expectedTarget.runner)) return false;
-      const bytes = input.readBytes(`cells/${name}/media/${a.ref.digest.hex}.webm`);
+      const bytes = input.readBytes(videoBundlePath(r.selectionCellId, a.ref.digest.hex));
       return a.byteCount === bytes.length && sameDigest(a.ref.digest, digestOfBytes(bytes))
         && bytes.subarray(0, 4).toString('hex') === '1a45dfa3'
         && a.stepIds.every(id => compiled.stepsById.get(id)?.kind.startsWith('ui.'));
