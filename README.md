@@ -19,7 +19,7 @@ npx --no-install tracegrove draft --intent "a stranger can't read or delete some
 npx --no-install tracegrove test                     # run, verify, seal: .tracegrove/runs/latest/
 ```
 
-The package remains private. Install a local packed archive before using the CLI examples;
+This release candidate has not been published. Install a local packed archive before using the CLI examples;
 use `npx --no-install tracegrove` to avoid resolving an unrelated registry package.
 
 What makes it different:

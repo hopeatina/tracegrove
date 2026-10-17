@@ -34,7 +34,7 @@ read visible text. Locators use exact roles, labels, or test IDs. Arbitrary
 scripts and selectors are not accepted. Observations contain browser facts;
 the driver does not decide whether a scenario passes.
 
-Each operation has a deadline. Cancellation or a failed operation closes the
+Each operation has a deadline. Cancellation or a failed mutating operation closes the
 context and browser before returning. Calls on one driver are serialized by
 rejecting concurrent operations. Closing is idempotent. A closure acknowledgement
 does not prove cleanup of an operating-system process tree after controller death.
@@ -77,7 +77,14 @@ Before closing a successful session, collection requests a compositor capture
 and waits for a fresh presented frame through Playwright’s public screencast
 callback, then stops and flushes the encoder. A screenshot acknowledgement
 alone does not establish recording delivery. This uses the cleanup deadline,
-not an arbitrary recording delay.
+not an arbitrary recording delay. The public screenshot API waits for an available
+surface during navigation. Read-only observation timeouts preserve the browser
+for final evidence collection; cancellation and failed mutating operations still
+close it to revoke late actions.
+
+Browser polling retains its last completed observation at the deadline, so a
+mismatching observed value remains an assertion failure. Cancellation and actual
+browser errors still propagate.
 The controller seals the recording bytes into the portable bundle and records
 browser duration and artifact bytes. Verification reproduces the frozen runner
 capabilities, independently reduces browser assertions, and checks video hashes

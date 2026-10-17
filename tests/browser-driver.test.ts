@@ -86,8 +86,8 @@ describe('real isolated browser driver', () => {
     await expect(execute({ kind: 'navigate', path: '/' })).rejects.toMatchObject({ code: 'browser_closed' });
   });
 
-  it('records an unchanged final page without relying on another user action', async () => {
-    await start();
+  it.each(['pointer', 'keyboard', 'touch'] as const)('records an unchanged final page for %s without another user action', async inputMode => {
+    await start(inputMode);
     await execute({ kind: 'navigate', path: '/' });
     const pixel = await finalVideoPixel(await driver!.collectVideo());
     expect(pixel[0]).toBeGreaterThan(200);
@@ -127,6 +127,25 @@ describe('real isolated browser driver', () => {
     cancellation.abort();
     await expect(pending).rejects.toMatchObject({ code: 'browser_cancelled' });
     expect(saved).toEqual([]);
+    await expect(execute({ kind: 'navigate', path: '/' })).rejects.toMatchObject({ code: 'browser_closed' });
+  });
+
+  it('preserves the browser and recording after a read-only timeout', async () => {
+    await start(); await execute({ kind: 'navigate', path: '/' });
+    await expect(driver!.execute({ kind: 'read', target: { by: 'testId', name: 'missing' } }, Deadline.in(100)))
+      .rejects.toMatchObject({ code: 'browser_timeout' });
+    expect((await execute({ kind: 'read', target: { by: 'testId', name: 'result' } })).text).toBe('Ready');
+    const pixel = await finalVideoPixel(await driver!.collectVideo());
+    expect(pixel[0]).toBeGreaterThan(200);
+    expect(pixel[1]).toBeLessThan(30);
+  });
+
+  it('still closes the browser when a read-only observation is cancelled', async () => {
+    await start(); await execute({ kind: 'navigate', path: '/' });
+    const cancellation = new AbortController();
+    const pending = driver!.execute({ kind: 'read', target: { by: 'testId', name: 'missing' } }, Deadline.in(5000), cancellation.signal);
+    cancellation.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'browser_cancelled' });
     await expect(execute({ kind: 'navigate', path: '/' })).rejects.toMatchObject({ code: 'browser_closed' });
   });
 

@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type CDPSession, type Locator, type Page, type Request } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,7 +23,6 @@ export class BrowserDriver {
     private readonly page: Page,
     private readonly mediaDir: string,
     private readonly inputMode: 'pointer' | 'keyboard' | 'touch',
-    private readonly compositor: CDPSession,
   ) {}
 
   static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
@@ -88,7 +87,7 @@ export class BrowserDriver {
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
-      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', network);
+      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
       await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: { width: 1280, height: 720 },
         onFrame: frame => { driver.latestFrameAt = frame.timestamp; driver.onFrame?.(frame.timestamp); },
       });
@@ -116,8 +115,11 @@ export class BrowserDriver {
     const signal = deadline.signal(parent);
     signal.throwIfAborted();
     this.busy = true;
-    // Closing the context interrupts Playwright's pending action and prevents late clicks.
-    const abort = () => { void this.close().catch(() => {}); };
+    // A read timeout has no late mutation to revoke. Keep its recording alive;
+    // user cancellation and mutating operations still close the context.
+    const abort = () => {
+      if (command.kind !== 'read' || parent?.aborted) void this.close().catch(() => {});
+    };
     signal.addEventListener('abort', abort, { once: true });
     try {
       signal.throwIfAborted();
@@ -164,8 +166,8 @@ export class BrowserDriver {
     } catch (error) {
       const cancelled = parent?.aborted === true;
       const timedOut = deadline.expired() || (error instanceof Error && error.name === 'TimeoutError');
-      // A timeout poisons the session; do not leave an action running after reporting failure.
-      await this.close();
+      // Revoke failed mutating actions; a bounded read timeout can retain its video.
+      if (cancelled || !timedOut || command.kind !== 'read') await this.close();
       if (cancelled) throw new BrowserStepError('browser_cancelled');
       if (timedOut) throw new BrowserStepError('browser_timeout');
       if (error instanceof BrowserStepError) throw error;
@@ -189,7 +191,10 @@ export class BrowserDriver {
       const signal = deadline.signal();
       try {
         signal.throwIfAborted();
-        // A DOM read or screenshot acknowledgement can precede recording delivery.
+        // The public screenshot API waits for an available rendering surface and retries
+        // transient capture failures during navigation. Raw CDP capture can race
+        // that surface, even after DOMContentLoaded on an unchanged page.
+        // Screenshot acknowledgement can still precede recording delivery.
         // Browser presentation timestamps exclude frames already in flight.
         const since = Date.now() + 1;
         await new Promise<void>((resolve, reject) => {
@@ -206,7 +211,7 @@ export class BrowserDriver {
             if (captured && presented) finish();
           };
           signal.addEventListener('abort', abort, { once: true });
-          void this.compositor.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false })
+          void this.page.screenshot({ type: 'png', caret: 'initial', animations: 'allow', timeout: Math.max(1, deadline.remainingMs()) })
             .then(() => {
               captured = true;
               presented ||= this.latestFrameAt >= since;

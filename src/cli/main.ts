@@ -69,7 +69,7 @@ Agent-friendly commands (every one takes --json and never starts the app):
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
-  (every command also takes --config <tracegrove.config.yaml>)
+  test, list, show and compile take --config <tracegrove.config.yaml>; the commands above use --dir.
 
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)

@@ -31,11 +31,12 @@ jobs:
           WORKFLOW_VERIFY_TEST_CLI: compiled
         run: npm test -- tests/cliGitSources.test.ts --maxWorkers=2
       - name: Qualify clean native and mocked Docker lanes
+        id: container-qualification
         run: |
           npm run test:container -- native-real
           npm run test:container -- offline-contract
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.container-qualification.outcome != 'skipped'
         with:
           name: container-qualification
           path: artifacts/qa/container-*

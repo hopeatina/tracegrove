@@ -61,3 +61,25 @@ it('blocks browser execution under the HTTP runner before launching a host', () 
   expect(bundle.request).toBeNull();
   expect(bundle.blockers.some(b => b.code === 'unsupported_operation' || b.code === 'required_video_unsupported')).toBe(true);
 });
+
+it('retains the completed DOM observation when its expectation never holds', async () => {
+  const { root, configPath } = browserProject();
+  const casePath = join(root, 'verification/cases/notes.browser.yaml');
+  writeFileSync(casePath, readFileSync(casePath, 'utf8')
+    .replaceAll('value: Existing note', 'value: Deliberately wrong expectation')
+    .replace('id: read_dom\n    kind: ui.observe\n    timeoutMs: 5000', 'id: read_dom\n    kind: ui.observe\n    timeoutMs: 300'));
+  const bundle = plan({ project: loadProject(configPath), profileName: 'native-real', scope: localScope() });
+  expect(bundle.blockers).toEqual([]);
+  const stateDir = join(root, '.state'); const ledger = LocalLedger.open(stateDir);
+  try {
+    const result = await executeBundle({ bundle, stateDir, ledger, scope: localScope() });
+    expect(result.outcome).toBe('assertion_failed');
+    const receipt = result.receipts[0]!;
+    expect(receipt.steps.find(step => step.stepId === 'read_dom')?.output).toMatchObject({ text: 'Existing note' });
+    expect(receipt.assertions.find(assertion => assertion.assertionId === 'a.browser')?.result).toBe('fail');
+    expect(receipt.cleanup.confirmed).toContain('existing_note');
+    expect(receipt.cleanup.confirmed).toContain('host.process');
+    expect(receipt.artifacts.some(artifact => artifact.mediaType === 'video/webm')).toBe(true);
+    expect(verifyBundle(result.executionDir)).toMatchObject({ ok: true, outcome: 'assertion_failed' });
+  } finally { ledger.close(); }
+});

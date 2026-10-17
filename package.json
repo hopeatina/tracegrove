@@ -1,7 +1,7 @@
 {
-  "name": "workflow-verify",
+  "name": "tracegrove",
   "version": "0.2.0",
-  "private": true,
+  "private": false,
   "description": "tracegrove: behaviour tests against your real app, drafted by Claude Code or Codex, sealed as re-verifiable evidence.",
   "license": "Apache-2.0",
   "type": "module",

@@ -34,12 +34,25 @@ export class CaseBrowserSession {
       : step.kind === 'ui.action' ? BrowserAction.parse(applyTemplateDeep(step.command, variables))
       : step.kind === 'ui.observe' ? { kind: 'read', target: BrowserLocator.parse(applyTemplateDeep(step.target, variables)) } : null;
     if (!command) throw new BrowserStepError('not_browser_step');
+    let last: BrowserObservation | null = null;
     for (;;) {
+      if (signal.aborted) throw new BrowserStepError('browser_cancelled');
+      if (last && deadline.expired()) return last;
       if (++this.actions > this.input.spec.limits.maxBrowserActions) throw new BrowserStepError('browser_action_limit');
-      const observation = await this.browser.execute(command, deadline, signal);
-      if (step.kind !== 'ui.observe' || evaluatePredicate(step.predicate, { browser: observation }).pass) return observation;
-      if (deadline.expired()) throw new BrowserStepError('browser_timeout');
-      await sleep(Math.min(step.pollIntervalMs, deadline.remainingMs()), deadline.signal(signal));
+      try {
+        last = await this.browser.execute(command, deadline, signal);
+        if (step.kind !== 'ui.observe' || evaluatePredicate(step.predicate, { browser: last }).pass) return last;
+        if (deadline.remainingMs() <= step.pollIntervalMs) return last;
+        await sleep(step.pollIntervalMs, deadline.signal(signal));
+      } catch (error) {
+        if (signal.aborted) throw new BrowserStepError('browser_cancelled');
+        const timeout = error instanceof BrowserStepError ? error.code === 'browser_timeout'
+          : error instanceof Error && error.name === 'TimeoutError';
+        // A later polling timeout cannot erase a completed product observation.
+        // Cancellation and actual browser failures still propagate.
+        if (last && timeout && deadline.expired()) return last;
+        throw error;
+      }
     }
   }
 
