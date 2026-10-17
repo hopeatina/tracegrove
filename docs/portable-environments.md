@@ -24,7 +24,7 @@ is not a supported capability.
 | Resource/time/spend | Existing request/action deadlines and budgets; native/Docker enforcement differs; draft provider caps differ | Explicit wall/cleanup reserve, CPU/memory/disk/request/browser/provider/agent/spend limits. Host must prove enforceability, including zero calls/spend. A number in YAML is not enforced accounting. |
 | Ownership / cleanup | Scoped process/data/fixture inventory, acknowledged stop, unresolved cleanup retained | Lease/cleanup policy refs and per-attempt bindings; acquired resources only. Durable acquisition CAS/fencing, atomic artifacts, expired-lease recovery and real-provider crash/interleaving remain integration gates. |
 | Replay | Verify/play existing evidence; `test` creates fresh actions; low-level rerun preserves lineage | Explicit fresh execution, evidence playback, fresh-fixture, recorded-I/O or history mode; host-supported replay plan required. Source fixture reuse is rejected by the existing lifecycle validator. No replay engine installed. |
-| Agent output / onboarding | check/doctor/test JSON and exit codes; top-level errors sometimes prose | SDK preflight returns typed checks, omissions, stable errors and recovery; ready is execution not started and verification not evaluated. It is not an admission token. CLI wiring must preserve these semantics. |
+| Agent output / onboarding | check/doctor/test JSON and exit codes; doctor discovers authoring projects and reports native compiled-plan provenance, dependencies and structured errors. Other top-level errors sometimes prose | SDK preflight returns typed checks, omissions, stable errors and recovery; ready is execution not started and verification not evaluated. It is not an admission token. Portable profile dispatch remains gated. |
 
 ## Reference-only profiles
 
@@ -89,8 +89,13 @@ Examples of actionable machine output:
 
 The report uses `status: ready|blocked`, `exitCode: 0|2`, `checks[]` with request/state/required/
 evidenceRefs/code/recovery, `errors[]`, `execution: not_started` and
-`verificationVerdict: not_evaluated`. Existing CLI `doctor` still uses its established low-level
-workflow config and JSON shape; no new portable CLI flag is advertised in this slice.
+`verificationVerdict: not_evaluated`. CLI `doctor --dir <project> --json` discovers an authoring
+config and reuses the existing compiler and planner; low-level `--config`/`--profile` remain
+supported. Its separate `tracegrove.doctor/v1` report includes selected host/corpus refs,
+source/runtime digests, dependency checks and recovery actions. Compilation writes derived
+files and interpreter version probes may run; the app never starts. Required Chromium executable
+presence is installation metadata, not a tested engine or environment qualification. No portable
+profile execution flag is advertised.
 
 ## Environment acceptance and rollout
 
@@ -98,9 +103,9 @@ workflow config and JSON shape; no new portable CLI flag is advertised in this s
    conformance and README first-use checks. Synthetic probe tests establish contract behavior,
    not host support. Independent review must challenge secret/actor separation, stale observations,
    ignored cancellation, scope, startup-versus-staging and security/spend enforcement claims.
-2. **Native selection/onboarding:** after review, compile one profile selection through existing
-   authoring/HostPlan instead of adding another executor. Add doctor capability discovery and
-   host-specific missing-ref recovery; no silent policy downgrade. Repeat the clean API/browser
+2. **Native selection/onboarding:** doctor now resolves the existing native authoring/HostPlan
+   selection and reports source/runtime/dependency inspection. General portable profile dispatch
+   and host-specific missing-ref recovery remain gated; no silent policy downgrade. Repeat the clean API/browser
    first run independently on each actual machine. Mac remains unqualified while offline.
 3. **External staging:** install a reviewed read-only external-host adapter and existing secret
    broker integration. Prove deployment/endpoint identity and authorized test-persona access;

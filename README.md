@@ -93,8 +93,16 @@ current-versus-needed matrix, generated SDK templates and credential-reference c
 templates are experimental SDK records, **not** additional `tracegrove.config.yaml` fields.
 
 If a check fails, use its code and recovery action. `check --dir` validates authoring;
+`doctor --dir <project> --json` finds the authoring config, writes its derived corpus and checks
+the selected native plan. From a project subdirectory, `doctor --json` finds the config above it.
 `doctor --config <low-level workflow.yaml> --profile <name> --json` checks the existing host plan.
-Neither proves a running app. Current top-level argument/prerequisite errors can still be prose
+Doctor returns `tracegrove.doctor/v1` JSON with the selected host/corpus refs, source/runtime
+digests, checks, errors and recovery actions; exit 2 means blocked. It never starts the app,
+but can invoke the configured interpreter with `--version`. Browser executable presence is
+installation metadata; engine launch, system libraries and video capture remain untested.
+Its result always says `execution: not_started` and `verificationVerdict: not_evaluated`.
+Portable SDK profiles and external staging are not executable doctor configurations.
+Neither command proves a running app. Other top-level argument/prerequisite errors can still be prose
 on stderr even with `--json`; preserve stderr and the exit status. Completed `test --json` reports
 are structured. Exit 1 means assertion failure, 2 blocked/inconclusive, 3 infrastructure failure,
 4 cancellation. Do not retry assertions into a clean result or discard the first attempt.
