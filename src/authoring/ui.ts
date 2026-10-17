@@ -128,8 +128,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         return send(200, agentInfo());
       }
       if (req.method === 'POST' && url.pathname === '/api/agent-draft') {
-        if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         const body = await readJson(req);
+        // Body reads yield: admit against the current state only after parsing.
+        if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         drafting = true;
         try {
           const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null });
@@ -159,8 +160,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         return existsSync(file) ? send(200, JSON.parse(readFileSync(file, 'utf8'))) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
-        if (running) return send(409, { error: 'a run is already in progress' });
         const body = await readJson(req);
+        if (running) return send(409, { error: 'a run is already in progress' });
         activity = { status: 'running', event: null, stepId: null, label: 'Planning verification', observedAt: new Date().toISOString() };
         const job = runTests({ configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
           onEvent: event => { activity = runActivity(event); } });
