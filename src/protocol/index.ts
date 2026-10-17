@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
+import * as P from './schemas/portableEnvironment.ts';
 import * as D from './schemas/definitions.ts';
 import * as E from './schemas/execution.ts';
 import { Suite, WorkflowConfig } from './schemas/config.ts';
@@ -17,6 +18,7 @@ import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, Qu
 
 export * from './schemas/capability.ts';
 export * from './schemas/capabilityLifecycle.ts';
+export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
 export * from './primitives.ts';
 export * from './schemas/definitions.ts';
@@ -87,6 +89,9 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.portable-environment-profile/v1': P.PortableEnvironmentProfile,
+  'workflow.portable-environment-intent/v1': P.PortableEnvironmentIntent,
+  'workflow.portable-preflight/v1': P.PortablePreflightReport,
   'workflow.capability-replay-plan/v1': L.CapabilityReplayPlan,
   'workflow.capability-retry-policy/v1': L.CapabilityRetryPolicy,
   'workflow.capability-retry-state/v1': L.CapabilityRetryState,

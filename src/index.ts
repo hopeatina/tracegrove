@@ -31,3 +31,4 @@ export type { ExecutorHost, HostSession, HostStartContext } from './hosts/types.
 
 export * from './core/capabilityBoundary.ts';
 export * from './core/capabilityLifecycle.ts';
+export * from './core/environmentPreflight.ts';
