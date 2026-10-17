@@ -20,7 +20,7 @@ export const COMMAND_SCHEMAS = {
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
-  doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
+  doctor: z.object({ ...common, config: Text.optional(), dir: Text.optional(), profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,
     purpose: RunRequest.shape.purpose.optional() }).strict(),
   seed: z.object({ ...common, request: Text, preview: Bool }).strict(),
@@ -77,6 +77,7 @@ export function parseArgs(argv: string[]): Args {
   }
   if (flags.help === true) return { command: 'help', flags: {} };
   if (flags.json === true && flags.jsonl === true) deny('conflicting_flags', '--json and --jsonl cannot be combined', command);
+  if (name === 'doctor' && flags.config !== undefined && flags.dir !== undefined) deny('conflicting_flags', '--config and --dir cannot be combined', command);
   const parsed = schema.safeParse(flags);
   if (!parsed.success) throw new Blocked(parsed.error.issues.map(issue => ({
     code: Object.hasOwn(flags, String(issue.path[0])) ? 'invalid_argument' : 'missing_argument',
