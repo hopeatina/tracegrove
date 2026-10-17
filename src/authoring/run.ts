@@ -2,14 +2,15 @@
  * `tracegrove test`: compile, plan, run, then write a human-named run folder with
  * summary.md, summary.json, junit.xml, the frozen request and the verified evidence bundle.
  */
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { executeBundle, type RunSummary } from '../core/executor.ts';
 import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
-import { verifyBundle } from '../core/bundle.ts';
+import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
+import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
@@ -163,13 +164,13 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
   let outcome = summary?.outcome ?? 'blocked';
   const runPath = (result: string) => join(runsDir, `${stamp(startedAt)}_${OUTCOME_LABEL[result] ?? result}_${(summary?.executionId ?? 'plan').replace(/[^A-Za-z0-9]/g, '').slice(-6)}`);
   let runDir = runPath(outcome);
-  mkdirSync(runDir, { recursive: true });
+  createDurableDirectory(runDir);
   writeFileSync(join(runDir, 'request.json'), `${JSON.stringify(bundle, null, 2)}\n`);
   let bundleVerified: boolean | null = null;
   if (summary) {
     const target = join(runDir, 'bundle');
-    cpSync(summary.executionDir, target, { recursive: true, filter: (src) => !relative(summary!.executionDir, src).startsWith('host') });
-    const verification = verifyBundle(target);
+    const publication = exportVerifiedBundle(summary.executionDir, target);
+    const verification = publication.ok ? verifyBundle(target) : publication;
     bundleVerified = verification.ok;
     if (!verification.ok) writeFileSync(join(runDir, 'bundle-problems.txt'), `${verification.problems.join('\n')}\n`);
   }
