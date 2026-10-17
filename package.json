@@ -25,7 +25,7 @@
     "test:container": "node scripts/container-conformance.mjs",
     "schema:export": "node --import tsx scripts/export-schemas.ts",
     "schema:check": "node --import tsx scripts/export-schemas.ts --check && node --import tsx scripts/export-environment-examples.ts --check",
-    "test:onboarding": "node scripts/readme-onboarding.mjs",
+    "test:onboarding": "node scripts/readme-onboarding.mjs && node scripts/readme-onboarding-negative.mjs",
     "verify": "npm run typecheck && npm run schema:check && npm run test"
   },
   "dependencies": {
