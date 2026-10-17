@@ -4,14 +4,14 @@
  * boundary/host/identity observations and artifacts, cleans owned resources and seals a receipt.
  * The reducer derives every verdict; drivers and hosts only supply observations.
  */
-import { mkdirSync } from 'node:fs';
+import { lstatSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
-  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
-  type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
+  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, sameRef, sameScope, selfDigest, verifySelfDigest,
+  type Accounting, type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
   type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
@@ -22,7 +22,8 @@ import { MockLoopbackHost } from '../hosts/mock.ts';
 import type { ExecutorHost, HostSession } from '../hosts/types.ts';
 import { LocalArtifactStore } from './artifacts.ts';
 import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
-import { writeExecutionBundle } from './bundle.ts';
+import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
+import { requireRealDirectory, syncDirectory } from './atomicFiles.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { compileCase, type CompiledCase } from './compiler.ts';
 import { Deadline } from './deadline.ts';
@@ -85,6 +86,35 @@ type PreparedCell = {
 
 function ownerFor(scope: Scope): string {
   return scope.ownerId;
+}
+
+/** Readback reconciles a local commit; it never acquires resources or trusts cached PASS/summary. */
+function committedRunSummary(input: { stateDir: string; ledger: LocalLedger; request: RunRequest; selection: SelectionManifest; scope: Scope;
+  executionId: string; attemptId: string; generation: number; attemptNumber: number }): RunSummary {
+  const { executionId, attemptId, generation, attemptNumber, request, selection, scope, ledger } = input;
+  if (!/^[A-Za-z0-9_-]+$/.test(executionId) || !Number.isInteger(generation) || generation < 1 || !Number.isInteger(attemptNumber) || attemptNumber < 1)
+    throw new Conflict('committed_execution_binding_invalid');
+  const executionDir = join(input.stateDir, 'executions', executionId);
+  let checked: ReturnType<typeof readVerifiedBundle>;
+  try { requireRealDirectory(executionDir); checked = readVerifiedBundle(executionDir); }
+  catch { throw new Conflict('committed_execution_evidence_invalid; preserve the existing execution and reconcile its missing or corrupt evidence'); }
+  const finalized = ledger.current(`execution:${executionId}`);
+  const finalizedRefs = ledger.history(`execution:${executionId}`).filter(row => row.type === 'cell.finalized').map(row => row.data.receiptRef);
+  if (!sameRef(checked.request.ref, request.ref) || !sameRef(checked.selection.ref, selection.ref) || !sameScope(checked.campaign.scope, scope) ||
+      checked.campaign.campaignId !== request.campaignId || !checked.receipts.length ||
+      checked.receipts.some(receipt => receipt.executionId !== executionId || receipt.attemptId !== attemptId || receipt.attemptNumber !== attemptNumber ||
+        receipt.environment.generation !== generation || !sameScope(receipt.scope, scope) || receipt.idempotencyKey !== request.idempotencyKey) ||
+      digestOfValue(finalizedRefs.map(ref => digestOfValue(ref).hex).sort()).hex !== digestOfValue(checked.receipts.map(receipt => digestOfValue(receipt.ref).hex).sort()).hex ||
+      finalized?.type === 'finalized' && (digestOfValue(finalized.data.campaignResultRef).hex !== digestOfValue(checked.campaign.ref).hex || finalized.data.outcome !== checked.campaign.outcome))
+    throw new Conflict('committed_execution_binding_mismatch; no acquisition was replayed');
+  return { executionId, attemptId, generation, campaignId: request.campaignId, outcome: checked.campaign.outcome,
+    exitCode: EXIT_CODES[checked.campaign.outcome], reasonCodes: [...new Set(checked.receipts.flatMap(receipt => receipt.reasonCodes))],
+    receipts: checked.receipts, campaign: checked.campaign, executionDir, redelivered: true };
+}
+
+function hasCommittedManifest(executionDir: string): boolean {
+  try { lstatSync(join(executionDir, 'manifest.json')); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw new Conflict('committed_execution_evidence_unreadable'); }
 }
 
 export async function executeBundle(options: RunOptions): Promise<RunSummary> {
@@ -152,11 +182,24 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     const admitted = ledger.history(`execution:${executionId}`).find((entry) => entry.type === 'admitted');
     if (admitted?.data.requestDigest !== request.ref.digest.hex) throw new Conflict('idempotency key is already bound to a different frozen request');
     const state = ledger.current(`execution:${executionId}`);
+    const binding = { executionId, attemptId: String(admitted?.data.attemptId), generation: Number(admitted?.data.generation),
+      campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope };
+    const checkedSummary = () => committedRunSummary({ stateDir, ledger, request, selection, scope, executionId,
+      attemptId: binding.attemptId, generation: binding.generation, attemptNumber: Number(admitted?.data.attemptNumber) });
     if (state && state.type === 'finalized') {
-      return { ...(state.data.summary as RunSummary), redelivered: true };
+      return checkedSummary();
     }
-    if (state && state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state.type}); redelivery reconciles, it does not start another attempt`);
-    assertInterruptedOwnershipResolved(ledger, { executionId, attemptId: String(admitted?.data.attemptId), generation: Number(admitted?.data.generation), campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope });
+    if (!state || state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state?.type ?? 'missing execution state'}); redelivery reconciles, it does not start another attempt`);
+    assertInterruptedOwnershipResolved(ledger, binding);
+    if (hasCommittedManifest(join(stateDir, 'executions', executionId))) {
+      const recovered = checkedSummary();
+      // A crashed publisher may have linked the valid manifest before syncing its directory.
+      try { syncDirectory(recovered.executionDir); }
+      catch { throw new Conflict('committed_execution_durability_unconfirmed; preserve the committed bytes; no acquisition was replayed'); }
+      ledger.append(`execution:${executionId}`, state.version, 'finalized', { outcome: recovered.outcome, campaignResultRef: recovered.campaign.ref,
+        receiptRef: recovered.receipts[0]?.ref ?? null, recoveredFromCommittedBundle: true, summary: { ...recovered, receipts: [], redelivered: false } });
+      return recovered;
+    }
     predecessor = (state?.data.receiptRef as Ref | undefined) ?? null;
     attemptNumber = Number(existing.data.attemptNumber ?? 1) + 1;
   }
