@@ -125,3 +125,27 @@ settings heading, #3614 a method boundary, and #3645 failed receipt lookup with 
 workspace/store. None proves full OrgX workflow/client acceptance. Local Docker registry HTTPS
 was refused; hosted CI's Docker success is separate evidence. Claude coding cloud, Hope's Mac,
 OrgX-triggered runtime and authenticated external staging remain unqualified.
+
+## Recorded clean-room onboarding
+
+An independent AI reviewer followed only the README at source
+`3894ed6e43b32c0177be03397e22df757405ed6c` in a fresh Linux x86_64 checkout, with a new toolchain,
+dependency tree, cache and sample. Default Node 24.19.0/npm 11.9.0 required the documented optional
+bootstrap to Node 22.23.3/npm 10.9.9. The reviewer preserved PATH/cache across stateless shell
+calls; the README now explicitly recommends one shell session. No source/flow repair or
+undocumented install was needed. Observed setup through bundle verification took 39 seconds,
+including README inspection and orchestration; it is not a benchmark or measured infrastructure cost.
+
+Doctor/check, both real notes scenarios, independent API readbacks, stranger 403/empty-list,
+anonymous 401 and deletion 404 assertions passed. Original and copied evidence bundles verified
+with two receipts and no problems. Fixture/process/workspace cleanup was confirmed, with independent
+readback finding both owned process entries and workspaces absent. The private receipt and run are
+retained in the saved cloud environment under `/workspace/tracegrove-readme-review-3894ed6/`;
+they are not shipped in npm. One stale “any command” table claim was corrected after review.
+The canonical executed quickstart is unchanged by that documentation correction.
+
+The automated README journey separately passed using the existing build/dependencies. Its first
+harness run misread the receipt's `critical` IDs as errors; the corrected harness requires all
+attempted and critical IDs to be confirmed. That initial harness failure receipt is preserved.
+Neither run exercises portable-profile dispatch, a browser, another cloud, Mac, authenticated
+staging or an npm registry installation. Those environment acceptance gates remain open.

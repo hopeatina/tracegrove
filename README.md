@@ -19,6 +19,8 @@ writable workspace/temp storage and loopback sockets. Linux is exercised in CI; 
 implemented through the POSIX host but remains unqualified on Hope's offline Mac. Windows
 process-tree execution is blocked. This API sample needs no Docker, Python, browser, model,
 cloud account or application credentials. Dependency installation needs authorized npm access.
+Use one shell session for these blocks. Agents with stateless shell calls should execute the
+bootstrap, build and quickstart blocks together so the selected PATH and writable npm cache persist.
 
 Check `node --version`. If Node 22 is absent and this environment permits dependency installation,
 this optional bootstrap installs a pinned toolchain into an owned temporary folder:
@@ -284,7 +286,7 @@ What the adapters cover now and what's next:
 
 | Area | Supported now | Next |
 | --- | --- | --- |
-| App launch | node, fastapi, django, any command; free port, data dir, per-persona tokens | `app.setup` commands (alembic, prisma, knex) |
+| App launch | node, fastapi, django; free port, data dir, per-persona tokens. Command wrappers remain blocked | `app.setup` commands (alembic, prisma, knex) |
 | Seeding | Fixtures created through the app's API, read back, deleted with confirmed absence | SQL seeding, repo seed commands (factory_boy, Prisma seed), snapshots |
 | Databases | SQLite via `TRACEGROVE_DATA_DIR` | `db: postgres` per-run database with `DATABASE_URL`, DB-state oracles, Redis/Mongo services |
 | Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
