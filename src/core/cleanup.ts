@@ -16,7 +16,7 @@ export async function collectCleanup(input: {
   allocated: readonly AllocatedFixture[]; uncertainAllocations: number;
   registry: ActionRegistry | null; driver: Pick<HttpDriver, 'request'> | null; origin: string;
   deadline: Deadline; session: HostSession | null; reason: string; log: Pick<EventLog, 'emit'>;
-}): Promise<{ cleanup: CleanupObservation; criticalCleanupConfirmed: boolean }> {
+}): Promise<{ cleanup: CleanupObservation; criticalCleanupConfirmed: boolean; confirmedFixtureKeys: string[]; hostCleanupConfirmed: boolean }> {
   const { allocated, driver, registry, origin, deadline, session, log } = input;
   const attempted: string[] = []; const confirmed: string[] = [];
   for (const entry of [...allocated].reverse()) {
@@ -71,5 +71,8 @@ export async function collectCleanup(input: {
       ...(input.uncertainAllocations ? ['fixture_allocation_uncertain'] : []),
       ...(session && !hostStopConfirmed ? ['host_stop_unconfirmed'] : [])],
   });
-  return { cleanup, criticalCleanupConfirmed: unknown === 0 && (!session || hostStopConfirmed) };
+  // Typed acknowledgement provenance is separate from the legacy public display-key arrays.
+  // A fixture key may equal a host key; neither can acknowledge the other resource kind.
+  return { cleanup, criticalCleanupConfirmed: unknown === 0 && (!session || hostStopConfirmed),
+    confirmedFixtureKeys: [...confirmed], hostCleanupConfirmed: hostStopConfirmed };
 }
