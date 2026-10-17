@@ -1,4 +1,4 @@
-export { compileProject, findConfig, caseIdFor, CONFIG_FILE, STATE_DIR, type CompileResult, type CompiledFlowInfo } from './compile.ts';
+export { compileProject, findConfig, configInDirectory, caseIdFor, CONFIG_FILE, CONFIG_FILES, STATE_DIR, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 export { runTests, resolveRun, renderJunit, renderMarkdown, renderText, type TestRunReport, type CaseReport } from './run.ts';
 export { initProject, detect, AUTH_SNIPPETS } from './init.ts';
 export { AuthoringConfig, Flow, FlowStep, HttpFlowStep, BrowserFlowStep, Fixture, RunVideo, exportAuthoringSchemas } from './schema.ts';
@@ -7,3 +7,4 @@ export { startUi, type UiServer } from './ui.ts';
 export { buildAgentCommand, buildDraftPrompt, detectAgents, readLocalSettings, resolveAgentSettings, runAgent, writeLocalSettings, DEFAULT_MODELS, type AgentSettings, type AgentRunResult } from './agent.ts';
 export { checkProject, discoverProject, draftWithAgent, type CheckResult, type DraftResult } from './workspace.ts';
 export { RunActivity, runActivity } from './activity.ts';
+export { defineConfig, flow, fixture } from './typed.ts';

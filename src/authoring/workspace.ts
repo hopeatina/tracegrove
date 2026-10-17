@@ -1,12 +1,11 @@
 /**
  * The project-level operations shared by the CLI and `tracegrove ui`: discover routes against
- * the compiled flows, check authoring files without running anything, and draft flows with a
+ * the compiled flows, check authoring files without launching the application, and draft flows with a
  * coding agent followed by tracegrove's own check.
  */
-import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Blocked } from '../core/errors.ts';
-import { CONFIG_FILE, compileProject, loadAuthoringConfig, type CompiledFlowInfo } from './compile.ts';
+import { CONFIG_FILE, compileProject, configInDirectory, loadAuthoringConfig, type CompiledFlowInfo } from './compile.ts';
 import { discover, type Discovery } from './discover.ts';
 import { buildDraftPrompt, resolveAgentSettings, runAgent, type AgentOverrides, type AgentRunResult } from './agent.ts';
 import type { AuthoringConfig } from './schema.ts';
@@ -15,9 +14,9 @@ export type CheckIssue = { code: string; detail: string; action: string };
 export type CheckResult = { ok: boolean; flows: Array<Pick<CompiledFlowInfo, 'caseId' | 'file' | 'title'>>; issues: CheckIssue[] };
 
 export function checkProject(dir: string): CheckResult {
-  const configPath = join(resolve(dir), CONFIG_FILE);
-  if (!existsSync(configPath)) return { ok: false, flows: [], issues: [{ code: 'config_not_found', detail: configPath, action: 'run tracegrove init' }] };
   try {
+    const configPath = configInDirectory(resolve(dir));
+    if (!configPath) return { ok: false, flows: [], issues: [{ code: 'config_not_found', detail: join(resolve(dir), CONFIG_FILE), action: 'run tracegrove init' }] };
     const compiled = compileProject(configPath);
     return { ok: true, flows: compiled.flows.map((f) => ({ caseId: f.caseId, file: f.file, title: f.title })), issues: [] };
   } catch (error) {
@@ -28,22 +27,20 @@ export function checkProject(dir: string): CheckResult {
 
 export function discoverProject(dir: string, branch: string | null): Discovery {
   const root = resolve(dir);
-  const configPath = join(root, CONFIG_FILE);
   let flows: Array<{ caseId: string; method: string; path: string }> = [];
-  if (existsSync(configPath)) {
-    try {
+  try {
+    const configPath = configInDirectory(root);
+    if (configPath) {
       const compiled = compileProject(configPath);
       flows = compiled.flows.flatMap((f) => f.steps.map((s) => ({ caseId: f.caseId, method: s.method, path: s.path })));
       flows.push({ caseId: '(readiness check)', method: 'GET', path: compiled.config.app.health });
-    } catch { /* uncompilable flows cover nothing; check reports why */ }
-  }
+    }
+  } catch { /* uncompilable flows cover nothing; check reports why */ }
   return discover(root, flows, branch);
 }
 
 function configOrNull(root: string): AuthoringConfig | null {
-  const configPath = join(root, CONFIG_FILE);
-  if (!existsSync(configPath)) return null;
-  try { return loadAuthoringConfig(configPath); } catch { return null; }
+  try { const path = configInDirectory(root); return path ? loadAuthoringConfig(path) : null; } catch { return null; }
 }
 
 export type DraftResult = { agent: AgentRunResult; check: CheckResult; discovery: { source: string; routes: number; uncovered: number } };

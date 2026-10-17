@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
-import { CONFIG_FILE, STATE_DIR, compileProject, loadAuthoringConfig, type CompileResult } from './compile.ts';
+import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompileResult } from './compile.ts';
 import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
 import { draftFlow, gitInfo } from './discover.ts';
@@ -41,10 +41,12 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   let drafting = false;
   let activity: RunActivity = { status: 'idle', event: null, stepId: null, label: 'No run in progress', observedAt: new Date().toISOString() };
 
-  const configPath = () => join(dir, CONFIG_FILE);
+  const configPath = () => configInDirectory(dir) ?? join(dir, CONFIG_FILE);
   const compiled = (): { result: CompileResult | null; error: ReturnType<typeof errorBody> | null } => {
-    if (!existsSync(configPath())) return { result: null, error: null };
-    try { return { result: compileProject(configPath()), error: null }; } catch (error) { return { result: null, error: errorBody(error) }; }
+    try {
+      const path = configPath();
+      return { result: existsSync(path) ? compileProject(path) : null, error: null };
+    } catch (error) { return { result: null, error: errorBody(error) }; }
   };
   const runs = () => {
     const runsDir = join(dir, STATE_DIR, 'runs');
@@ -64,7 +66,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       for (const name of readdirSync(d)) {
         const path = join(d, name);
         if (statSync(path).isDirectory()) walk(path);
-        else if (/\.flow\.ya?ml\.pruned$/.test(name)) {
+        else if (/\.flow\.(?:ya?ml|ts)\.pruned$/.test(name)) {
           let title = name;
           try { const doc = parseYaml(readFileSync(path, 'utf8')) as { title?: unknown }; if (typeof doc?.title === 'string') title = doc.title; } catch { /* keep name */ }
           out.push({ file: relative(dir, path).split(sep).join('/'), title });
@@ -75,7 +77,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     return out.sort((a, b) => a.file.localeCompare(b.file));
   };
   const flowPath = (file: unknown, suffix: '' | '.pruned') => {
-    if (typeof file !== 'string' || !/^[A-Za-z0-9_./-]+\.flow\.ya?ml$/.test(file) || file.split('/').includes('..')) return null;
+    if (typeof file !== 'string' || !/^[A-Za-z0-9_./-]+\.flow\.(?:ya?ml|ts)$/.test(file) || file.split('/').includes('..')) return null;
     const abs = resolve(dir, file + suffix);
     const root = testDir();
     return abs.startsWith(root + sep) ? abs : null;
@@ -111,7 +113,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const graft = body.graft === true;
         const live = flowPath(body.file, '');
         const cut = flowPath(body.file, '.pruned');
-        if (!live || !cut) return send(400, { error: 'file must be a .flow.yaml under the test folder' });
+        if (!live || !cut) return send(400, { error: 'file must be a .flow.yaml, .flow.yml, or .flow.ts under the test folder' });
         const [from, to] = graft ? [cut, live] : [live, cut];
         if (!existsSync(from)) return send(404, { error: `${body.file} is not ${graft ? 'pruned' : 'a live flow'}` });
         if (existsSync(to)) return send(409, { error: `${relative(dir, to)} already exists` });

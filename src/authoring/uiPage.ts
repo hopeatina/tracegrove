@@ -110,7 +110,7 @@ function page(...nodes){document.getElementById('main').replaceChildren(...nodes
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
   return{id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,steps}});
- const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.ya?ml\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
+ const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
 function runTab(){
  if(!state.hasConfig)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'No tracegrove.config.yaml in this folder yet.'),
@@ -174,7 +174,7 @@ let runWatch=null;
 function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
 function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const a=await api('/api/activity');if(ui.running&&a.status==='running'){ui.running=a.label;const el=document.getElementById('run-activity');if(el)el.textContent=a.label}else if(ui.running&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},500)}
 async function runNow(grep){ui.running='Planning and running; awaiting verified evidence';render();watchRun();
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.outcome)}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
+ ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=r.cases.some(c=>c.caseId===ui.sel)?ui.sel:(r.cases[0]?.caseId||null);toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.outcome)}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned. Graft it back any time.');ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */

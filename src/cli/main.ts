@@ -55,7 +55,7 @@ function samplesDir(): string {
 
 const HELP = `tracegrove <command> [--flags]
 
-Everyday commands (read tracegrove.config.yaml, found by walking up from the current folder):
+Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found from the current folder):
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
   list [--json]                                        list flows with their ids, tags and steps
@@ -69,7 +69,7 @@ Agent-friendly commands (every one takes --json and never starts the app):
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
-  (every command also takes --config <tracegrove.config.yaml>)
+  (test/list/compile take --config <tracegrove.config.yaml|tracegrove.config.ts>)
 
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)

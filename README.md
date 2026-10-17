@@ -186,6 +186,12 @@ So any agent, including one you run yourself, can loop: `discover` → write flo
 
 ## How it fits together
 
+Prefer TypeScript? Use `tracegrove.config.ts` with `defineConfig`, `.flow.ts`
+with `flow`, and `.fixture.ts` with `fixture`, all exported by
+`workflow-verify/authoring`. These reuse the YAML validation and execution path.
+See [typed authoring](docs/developer-ux.md#typescript-authoring) for examples,
+module evaluation bounds, and supported TypeScript syntax.
+
 ```text
  tracegrove.config.yaml + tracegrove/**/*.flow.yaml + fixtures
         │  authoring compiler (src/authoring)
