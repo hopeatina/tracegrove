@@ -16,8 +16,10 @@ import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
 import { draftFlow, gitInfo } from './discover.ts';
 import { discoverProject, draftWithAgent } from './workspace.ts';
-import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
+import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
+import { RunActivity, runActivity } from './activity.ts';
+import { readRunVideo, videoRange } from './media.ts';
 
 export type UiServer = { url: string; port: number; close: () => Promise<void> };
 
@@ -37,6 +39,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const token = randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
   let drafting = false;
+  let activity: RunActivity = { status: 'idle', event: null, stepId: null, label: 'No run in progress', observedAt: new Date().toISOString() };
 
   const configPath = () => join(dir, CONFIG_FILE);
   const compiled = (): { result: CompileResult | null; error: ReturnType<typeof errorBody> | null } => {
@@ -93,7 +96,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
     if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token) return send(403, { error: 'missing session token' });
     try {
-      if (req.method === 'GET' && url.pathname === '/') return send(200, UI_HTML.replace('__TOKEN__', token).replace('__BRANCH__', JSON.stringify(options.branch ?? null)), 'text/html; charset=utf-8');
+      if (req.method === 'GET' && url.pathname === '/') {
+        const scriptJson = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c');
+        return send(200, UI_HTML.replace('__TOKEN__', token).replace('__BRANCH__', scriptJson(options.branch ?? null)).replace('__DEFAULT_MODELS__', scriptJson(DEFAULT_MODELS)), 'text/html; charset=utf-8');
+      }
       if (req.method === 'GET' && url.pathname === '/api/overview') {
         const { result, error } = compiled();
         let config: unknown = null;
@@ -113,6 +119,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         return send(200, { file: body.file, pruned: !graft });
       }
       if (req.method === 'GET' && url.pathname === '/api/settings') return send(200, agentInfo());
+      if (req.method === 'GET' && url.pathname === '/api/activity') return send(200, RunActivity.parse(activity));
       if (req.method === 'POST' && url.pathname === '/api/settings') {
         const body = await readJson(req);
         const agent = (body.agent ?? {}) as Record<string, unknown>;
@@ -121,8 +128,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         return send(200, agentInfo());
       }
       if (req.method === 'POST' && url.pathname === '/api/agent-draft') {
-        if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         const body = await readJson(req);
+        // Body reads yield: admit against the current state only after parsing.
+        if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         drafting = true;
         try {
           const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null });
@@ -132,6 +140,19 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/discover') {
         return send(200, discoverProject(dir, url.searchParams.get('branch') || null));
       }
+      const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
+      if ((req.method === 'GET' || req.method === 'HEAD') && video) {
+        try {
+          const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
+          const range = videoRange(req.headers.range, bytes.length);
+          const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
+            'cross-origin-resource-policy': 'same-origin', 'x-content-type-options': 'nosniff' };
+          if (!range) { res.writeHead(416, { ...headers, 'content-range': `bytes */${bytes.length}` }); res.end(); return; }
+          res.writeHead(req.headers.range ? 206 : 200, { ...headers, 'content-length': range.end - range.start + 1,
+            ...(req.headers.range ? { 'content-range': `bytes ${range.start}-${range.end}/${bytes.length}` } : {}) });
+          res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
+        } catch { return send(409, { error: 'Recording is unavailable or its evidence failed verification.' }); }
+      }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!/^[A-Za-z0-9_.:-]+$/.test(name)) return send(400, { error: 'bad run name' });
@@ -139,11 +160,20 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         return existsSync(file) ? send(200, JSON.parse(readFileSync(file, 'utf8'))) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
-        if (running) return send(409, { error: 'a run is already in progress' });
         const body = await readJson(req);
-        const job = runTests({ configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}) });
+        if (running) return send(409, { error: 'a run is already in progress' });
+        activity = { status: 'running', event: null, stepId: null, label: 'Planning verification', observedAt: new Date().toISOString() };
+        const job = runTests({ configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
+          onEvent: event => { activity = runActivity(event); } });
         running = job;
-        try { const { report } = await job; return send(200, report); } finally { running = null; }
+        try {
+          const { report } = await job;
+          activity = { status: 'finished', event: null, stepId: null, label: `Run finished: ${report.outcome}`, observedAt: report.finishedAt };
+          return send(200, report);
+        } catch (error) {
+          activity = { status: 'failed', event: null, stepId: null, label: 'Run could not be completed', observedAt: new Date().toISOString() };
+          throw error;
+        } finally { running = null; }
       }
       if (req.method === 'POST' && url.pathname === '/api/init') {
         return send(200, initProject(dir));

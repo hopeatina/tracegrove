@@ -1,8 +1,9 @@
 /**
  * Claude Code or Codex "under the hood": tracegrove hands a coding agent the discovery report,
  * the developer's intent and the authoring conventions, and lets it write draft flows. The agent
- * may only edit files and run tracegrove's own read-only commands; tracegrove re-checks every
- * draft itself afterwards, so an agent's claim of success is never taken on trust.
+ * is prompted to edit draft flows and run tracegrove's read-only checks. The agent CLI's
+ * own permissions remain the execution boundary; this prompt is not a filesystem ACL.
+ * tracegrove compiles drafts afterwards; that check does not establish their intended behavior.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -14,8 +15,8 @@ import { AGENT_PROVIDERS, type AgentProvider, type AuthoringConfig } from './sch
 import type { Discovery } from './discover.ts';
 
 export const SETTINGS_FILE = 'settings.json';
-/** Cheapest current frontier model per provider. Codex: the CLI's own default unless set. */
-export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'haiku', codex: null, none: null };
+/** Explicit low-cost defaults from workspace policy; never inherit the CLI's production model. */
+export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-4.5', codex: 'gpt-6-luna', none: null };
 
 export const LocalSettings = z.object({
   agent: z.object({
@@ -61,8 +62,11 @@ export function resolveAgentSettings(root: string, config: AuthoringConfig | nul
   const provider = pick(overrides.provider as AgentProvider | null | undefined, local.provider, shared?.provider, 'claude' as AgentProvider);
   // A model chosen for another provider must not leak across a provider switch.
   const providerChanged = provider.from === 'flag' && overrides.model == null;
+  const sharedProvider = shared?.provider ?? 'claude';
+  const localProvider = local.provider ?? sharedProvider;
   const model = providerChanged ? { value: DEFAULT_MODELS[provider.value], from: 'default' as const }
-    : pick<string | null>(overrides.model, local.model, shared?.model, DEFAULT_MODELS[provider.value]);
+    : pick<string | null>(overrides.model, localProvider === provider.value ? local.model : undefined,
+      sharedProvider === provider.value ? shared?.model : undefined, DEFAULT_MODELS[provider.value]);
   return { provider: provider.value, model: model.value, maxBudgetUsd: local.maxBudgetUsd ?? shared?.maxBudgetUsd ?? null, source: { provider: provider.from, model: model.from } };
 }
 
@@ -103,7 +107,10 @@ export function buildAgentCommand(settings: AgentSettings, prompt: string, trace
       '--allowedTools', allowed.join(','), '--add-dir', schemaDir(), '--no-session-persistence', ...(settings.maxBudgetUsd ? ['--max-budget-usd', String(settings.maxBudgetUsd)] : [])] };
   }
   if (settings.provider === 'codex') {
-    return { bin: 'codex', args: ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', ...(settings.model ? ['--model', settings.model] : []), prompt] };
+    if (settings.maxBudgetUsd !== null) throw new Blocked([{ code: 'agent_budget_unsupported',
+      detail: 'The Codex CLI adapter cannot enforce maxBudgetUsd; the requested limit cannot be silently ignored.',
+      owner: 'operator', action: 'use the Claude adapter for this draft cap, or configure a host with enforced Codex accounting' }]);
+    return { bin: 'codex', args: ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', '--model', settings.model ?? DEFAULT_MODELS.codex!, prompt] };
   }
   throw new Blocked([{ code: 'agent_disabled', detail: 'agent provider is none', owner: 'operator', action: 'set agent.provider to claude or codex in tracegrove ui → Settings, or pass --agent claude' }]);
 }
@@ -130,7 +137,7 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
   const example = exampleFlow(input.testDir);
   const personas = input.config ? Object.keys(input.config.personas) : [];
   return [
-    'You are drafting behaviour tests for tracegrove, a workflow verifier that drives a real running app over HTTP.',
+    'You are drafting behaviour tests for tracegrove, a workflow verifier that drives a real running app through HTTP and Chromium.',
     input.intent ? `What the developer wants verified: ${input.intent}` : 'No intent was given: cover the most important uncovered or changed routes.',
     `Discovery (${input.discovery.source}${input.discovery.base ? `, base ${input.discovery.base}` : ''}): ${input.discovery.routes.length} routes, ${input.discovery.uncovered} uncovered.`,
     input.discovery.changedFiles.length ? `Files changed on this branch: ${input.discovery.changedFiles.slice(0, 30).join(', ')}` : '',
@@ -139,7 +146,8 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
     'Rules:',
     `1. Write new flows only under ${outDir}/ as <area>/<behavior>.flow.yaml (kebab-case, one behaviour per file). Never edit application code or existing flows outside ${outDir}/.`,
     '2. Read the route handlers to learn real request bodies, status codes and ownership rules before writing a step.',
-    '3. A flow has title, tags, steps. A step is `- name: ...` plus one verb key (GET/POST/PUT/PATCH/DELETE: /path/{var}), optional json, as: <persona>, expect: <status | { status, json: {dot.path: value}, present: [paths], absent: [paths], count: {path: n} }>, save: { var: dot.path }. Only HTTP steps exist; do not invent other step kinds.',
+    '3. A flow has title, tags, steps. An HTTP step is `- name: ...` plus one verb key (GET/POST/PUT/PATCH/DELETE: /path/{var}), optional json, as: <persona>, expect: <status | { status, json: {dot.path: value}, present: [paths], absent: [paths], count: {path: n} }>, save: { var: dot.path }.',
+    '3b. Browser flows must declare browser: { allowPaths: [/page, /assets, /api], allowMethods: [GET, HEAD] }. Browser steps use browser: { kind: navigate, path: /page }, browser: { kind: click, target: { by: role, role: button, name: Submit } }, browser: { kind: fill, target: { by: label, name: Note }, value: text }, or browser: { kind: read, target: { by: testId, name: result } } with expect: { text: exact text }. Navigation may expect: { status: 200 }. Read polls until its text holds. Browser steps use the default persona and require a recording. Do not invent scripts, selectors, other browser commands, or job/MCP/native steps. Keep independent API readback where possible.',
     personas.length ? `4. Personas available: ${personas.join(', ')}, plus "none" for an unauthenticated caller.` : '4. Use as: none for unauthenticated calls.',
     `5. JSON Schemas: ${join(schemaDir(), 'tracegrove_flow_v1.json')} (flows) and ${join(schemaDir(), 'tracegrove_config_v1.json')} (config).`,
     `6. After writing, run \`${tg} check --json\` and fix every reported issue until it reports ok. Do not run tests against the app.`,

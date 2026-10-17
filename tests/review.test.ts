@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, type ReviewSnapshot } from '../src/core/review.ts';
-import { SourcePlan, freeze, type PlanReview, type Ref, type Scope } from '../src/protocol/index.ts';
+import { SourcePlan, PlanSourceValidation, freeze, type PlanReview, type Ref, type Scope } from '../src/protocol/index.ts';
 
 const scope: Scope = { ownerId: 'owner', tenantId: 'tenant', visibility: 'tenant_private' };
 const ref = (id: string): Ref => ({ id, revision: '1', digest: { algorithm: 'sha256', hex: 'a'.repeat(64) } });
@@ -19,22 +19,60 @@ function fixture() {
   const after = plan('2');
   let snapshot: ReviewSnapshot = { storageVersion: 1, projection: { id: 'editable-plan', scope, editRevision: 1, sourcePlanRef: before.ref, currentReviewRef: null } };
   const reviews: PlanReview[] = [];
+  const validations: PlanSourceValidation[] = [];
   const ports: PlanReviewPorts = {
     authorize: async () => ({ actorId: 'authenticated-human', policyRef: ref('review-policy') }),
     resolvePlan: async (r) => r.revision === '1' ? before : after,
+    validateSources: async (p, policyRef) => PlanSourceValidation.parse(freeze({ schemaVersion: 'workflow.source-validation/v1',
+      ref: { id: 'source-check', revision: '1' }, scope, sourcePlanRef: p.ref, changeModelRef: p.changeModelRef,
+      revisionMatrixRef: p.revisionMatrixRef, policyRef, verifiedCitationRefs: [], runnableElementIds: [], retainedDiagnosticRefs: p.gapRefs })),
     read: async () => structuredClone(snapshot),
-    compareAndSwap: async (version, projection, review) => {
+    compareAndSwap: async (version, projection, review, validation) => {
       if (snapshot.storageVersion !== version) return false;
       snapshot = { storageVersion: version + 1, projection: structuredClone(projection) };
       if (review) reviews.push(structuredClone(review));
+      if (validation) validations.push(structuredClone(validation));
       return true;
     },
   };
   const token = (): PlanRevisionToken => ({ id: snapshot.projection.id, scope, expectedEditRevision: snapshot.projection.editRevision, expectedSourcePlanRef: snapshot.projection.sourcePlanRef });
-  return { before, after, ports, token, reviews, snapshot: () => structuredClone(snapshot) };
+  return { before, after, ports, token, reviews, validations, snapshot: () => structuredClone(snapshot) };
 }
 
 describe('exact-plan review and edit arbitration', () => {
+  it('publishes source validation with the review in the same atomic write', async () => {
+    const f = fixture();
+    const original = f.ports.compareAndSwap;
+    let observed: PlanSourceValidation | null = null;
+    f.ports.compareAndSwap = async (version, projection, review, validation) => {
+      observed = validation;
+      return original(version, projection, review, validation);
+    };
+    const review = await reviewPlan(f.ports, f.token(), 'approved', []);
+    expect(observed).not.toBeNull();
+    expect(review.reasonRefs).toEqual([observed!.ref]);
+    expect(f.validations).toEqual([observed]);
+  });
+  it('does not publish approval when source checks fail or bind another plan', async () => {
+    const f = fixture();
+    f.ports.validateSources = async () => { throw new Error('independent source confirmation failed'); };
+    await expect(reviewPlan(f.ports, f.token(), 'approved', [])).rejects.toThrow('source confirmation');
+    expect(f.reviews).toEqual([]);
+    expect(f.snapshot().storageVersion).toBe(1);
+    const other = fixture();
+    const check = other.ports.validateSources;
+    other.ports.validateSources = async (p, policy) => freeze({ ...await check(p, policy), sourcePlanRef: ref('another-plan') });
+    await expect(reviewPlan(other.ports, other.token(), 'approved', [])).rejects.toThrow('does not bind');
+    expect(other.reviews).toEqual([]);
+    expect(other.validations).toEqual([]);
+  });
+  it('reports a missing registered checker as blocked without writing approval', async () => {
+    const f = fixture();
+    Reflect.deleteProperty(f.ports, 'validateSources');
+    await expect(reviewPlan(f.ports, f.token(), 'approved', [])).rejects.toThrow('source_validation_unavailable');
+    expect(f.reviews).toEqual([]);
+    expect(f.validations).toEqual([]);
+  });
   it('binds authenticated reviewer identity and invalidates approval on edit', async () => {
     const f = fixture();
     const review = await reviewPlan(f.ports, f.token(), 'approved', []);
@@ -69,6 +107,7 @@ describe('exact-plan review and edit arbitration', () => {
     expect(results.filter(r => r.status === 'rejected')).toHaveLength(1);
     expect(f.snapshot().storageVersion).toBe(2);
     expect(f.reviews.length).toBe(f.snapshot().projection.currentReviewRef ? 1 : 0);
+    expect(f.validations.length).toBe(f.reviews.length);
   });
 
   it.each(['scope', 'digest'] as const)('rejects a resolver %s mismatch', async (kind) => {

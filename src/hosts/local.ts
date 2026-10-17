@@ -13,6 +13,7 @@ import { Deadline, sleep } from '../core/deadline.ts';
 import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
 import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
+import { observeApplicationRuntime } from './runtime.ts';
 
 export function sourceIdentityDigest(root: string, files: string[]): { hex: string; entries: Array<{ path: string; sha256: string }> } {
   const entries = [...files].sort().map((rel) => {
@@ -94,6 +95,7 @@ export class LocalProcessHost implements ExecutorHost {
     if (!launch) throw new Blocked([{ code: 'host_launch_missing', detail: context.hostPlan.ref.id }]);
     const cwd = resolve(context.projectRoot, launch.cwd);
     const identity = sourceIdentityDigest(cwd, launch.identitySourceFiles);
+    const runtime = await observeApplicationRuntime(launch.command, cwd, process.env.PATH ?? '', context.signal);
     const dataDir = join(context.workspaceDir, 'data');
     mkdirSync(dataDir, { recursive: true });
     const credentials = new Map<string, string>();
@@ -137,7 +139,7 @@ export class LocalProcessHost implements ExecutorHost {
       child.stdout?.resume();
       child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`)));
       child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)));
-      child.send({ command: launch.command, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir });
+      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir });
       resolvePort(assignedPort);
     }) : await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
@@ -149,7 +151,7 @@ export class LocalProcessHost implements ExecutorHost {
       });
       child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`)); });
       child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)); });
-      child.send({ command: launch.command, args: launch.args, cwd, env, workspaceDir: context.workspaceDir });
+      child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir });
     });
     const origin = `http://127.0.0.1:${port}`;
     const stopPolling = new AbortController();
@@ -174,10 +176,10 @@ export class LocalProcessHost implements ExecutorHost {
       scope: context.scope,
       componentId: launch.componentId,
       kind: 'application' as const,
-      identity: { kind: 'source_digest' as const, sourceDigest: { algorithm: 'sha256' as const, hex: identity.hex }, runtime: launch.runtime ?? `node${process.versions.node.split('.')[0]}` },
+      identity: { kind: 'source_digest' as const, sourceDigest: { algorithm: 'sha256' as const, hex: identity.hex }, runtime: runtime.runtime },
       issuer: 'local_launcher' as const,
       trustPolicy: 'launcher_computed_source_digest' as const,
-      evidence: { files: identity.entries, observedHealthBody: (healthBody ?? null) as never },
+      evidence: { files: identity.entries, runtimeProbe: runtime, observedHealthBody: (healthBody ?? null) as never },
       observedAt: nowIso(),
     }), 'identity attestation');
     const observation = buildCapabilityObservation({
@@ -226,7 +228,11 @@ export class LocalProcessHost implements ExecutorHost {
         });
       }
       credentials.clear();
-      if (child.exitCode !== null || child.signalCode !== null) rmSync(context.workspaceDir, { recursive: true, force: true });
+      // Supervisor exit alone says nothing about its owned process group. Keep
+      // the inventory/workspace unless the trusted owner acknowledged cleanup.
+      if (ownedCleanupConfirmed && (child.exitCode !== null || child.signalCode !== null)) {
+        rmSync(context.workspaceDir, { recursive: true, force: true });
+      }
       throw error;
     }
   }

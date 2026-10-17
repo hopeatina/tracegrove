@@ -1,0 +1,19 @@
+title: A seeded note appears in the authenticated browser
+tags: [browser, smoke]
+given: { existing: existing-note }
+browser:
+  allowPaths: [/ui, /notes]
+  allowMethods: [GET, HEAD]
+steps:
+  - name: open notes
+    browser: { kind: navigate, path: /ui }
+    expect: { status: 200 }
+  - name: refresh notes
+    browser: { kind: click, target: { by: role, role: button, name: Refresh } }
+  - name: note is visible
+    browser: { kind: read, target: { by: testId, name: notes } }
+    expect: { text: Existing note }
+  - name: independent API readback
+    GET: /notes/{existing.noteId}
+    observe: true
+    expect: { status: 200, json: { note.title: Existing note } }

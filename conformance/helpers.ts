@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadProject, localScope, ProjectLoader, AUTHORING_SCOPE } from '../src/core/corpus.ts';
 import { materializeLogicalPayload } from '../src/core/generators.ts';
-import { SeedRecipe, parseAs } from '../src/protocol/index.ts';
+import { SeedRecipe, parseAs, digestOfBytes } from '../src/protocol/index.ts';
 import { stringify } from 'yaml';
 import { plan, type FrozenBundle } from '../src/core/planner.ts';
 import { executeBundle, type RunOptions, type RunSummary } from '../src/core/executor.ts';
@@ -11,6 +11,17 @@ import { LocalLedger } from '../src/core/ledger.ts';
 
 export const SAMPLE_ROOT = join(import.meta.dirname, '..', 'src', 'samples', 'notes-api');
 const temps: string[] = [];
+
+/** Test-only producer reseal for adversarial evidence checks. */
+export function resealBundle(dir: string): void {
+  const path = join(dir, 'manifest.json');
+  const manifest = JSON.parse(readFileSync(path, 'utf8'));
+  for (const file of manifest.files) {
+    const bytes = readFileSync(join(dir, file.path));
+    file.sha256 = digestOfBytes(bytes).hex; file.bytes = bytes.length;
+  }
+  writeFileSync(path, JSON.stringify(manifest));
+}
 
 export function cleanupTemps(): void {
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });

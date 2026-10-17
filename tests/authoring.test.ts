@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,10 +9,13 @@ import { expandSources, globToRegExp } from '../src/authoring/sources.ts';
 import { loadProject, localScope } from '../src/core/corpus.ts';
 import { plan } from '../src/core/planner.ts';
 import { Blocked } from '../src/core/errors.ts';
+import { HostPlan } from '../src/protocol/index.ts';
+import { observeApplicationRuntimeSync } from '../src/hosts/runtime.ts';
+import * as bundleVerification from '../src/core/bundle.ts';
 
 const SAMPLES = join(import.meta.dirname, '..', 'src', 'samples');
 const temps: string[] = [];
-afterEach(() => { for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => { vi.restoreAllMocks(); for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
 function copy(sample: string): string {
   const root = mkdtempSync(join(tmpdir(), 'tracegrove-authoring-'));
@@ -41,6 +44,8 @@ describe('authoring compiler', () => {
     const bundle = plan({ project: loadProject(compiled.workflowConfigPath), profileName: 'real', scope: localScope() });
     expect(bundle.blockers).toEqual([]);
     expect(bundle.request?.caseRefs).toHaveLength(2);
+    const host = loadProject(compiled.workflowConfigPath).corpus.findById('notes.host')[0]!.value;
+    expect(HostPlan.parse(host).launch?.command).toBe(process.execPath);
   });
 
   it('derives the effect envelope and assertions from the steps', () => {
@@ -84,9 +89,31 @@ describe('authoring compiler', () => {
     const root = copy('notes-api');
     expect(findConfig(join(root, 'tracegrove', 'notes'))).toBe(join(root, 'tracegrove.config.yaml'));
   });
+
+  it('blocks generic shell launches until their application runtime can be independently observed', () => {
+    const root = copy('notes-api');
+    const config = join(root, 'tracegrove.config.yaml');
+    writeFileSync(config, readFileSync(config, 'utf8').replace('adapter: node', 'adapter: command').replace('entry: app/app.mjs', 'run: node app/app.mjs'));
+    expect(blockedCodes(() => compileProject(config))[0]).toMatch(/^command_adapter_unqualified/);
+  });
 });
 
 describe('tracegrove test', () => {
+  it('never publishes a passed report or green JUnit when its exported evidence bundle is corrupt', async () => {
+    const root = copy('notes-api');
+    const verify = bundleVerification.verifyBundle;
+    vi.spyOn(bundleVerification, 'verifyBundle').mockImplementation(path => {
+      writeFileSync(join(path, 'campaign.json'), '{}\n');
+      return verify(path);
+    });
+    const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml'), grep: 'list' });
+    expect(report.bundleVerified).toBe(false);
+    expect(report.outcome).toBe('inconclusive');
+    expect(report.exitCode).toBe(2);
+    expect(readFileSync(join(report.runDir, 'junit.xml'), 'utf8')).toContain('name="evidence-integrity"');
+    expect(readFileSync(join(report.runDir, 'junit.xml'), 'utf8')).toContain('errors="1"');
+    expect(report.runDir).toContain('_inconclusive_');
+  });
   it('runs the notes flows and writes a findable, verified run folder', async () => {
     const root = copy('notes-api');
     const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });
@@ -128,7 +155,9 @@ describe('tracegrove test', () => {
   it.skipIf(!python)('runs the FastAPI sample through the fastapi preset', async () => {
     const root = copy('fastapi-notes');
     writeFileSync(join(root, 'tracegrove.config.yaml'), readFileSync(join(root, 'tracegrove.config.yaml'), 'utf8').replace('app:\n', `app:\n  python: ${python}\n`));
-    const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });
+    const { report, compiled } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });
+    const host = HostPlan.parse(loadProject(compiled.workflowConfigPath).corpus.findById(`${compiled.config.project}.host`)[0]!.value);
+    expect(host.launch?.runtime).toBe(observeApplicationRuntimeSync(python!, root, process.env.PATH ?? '').runtime);
     expect(report.cases.map((c) => c.failure)).toEqual([null]);
     expect(report.outcome).toBe('passed');
   }, 60_000);
@@ -136,7 +165,11 @@ describe('tracegrove test', () => {
   it.skipIf(!python)('runs the Django sample through the django preset with a fresh database', async () => {
     const root = copy('django-notes');
     writeFileSync(join(root, 'tracegrove.config.yaml'), readFileSync(join(root, 'tracegrove.config.yaml'), 'utf8').replace('app:\n', `app:\n  python: ${python}\n`));
-    const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });
+    const { report, compiled } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });
+    const host = HostPlan.parse(loadProject(compiled.workflowConfigPath).corpus.findById(`${compiled.config.project}.host`)[0]!.value);
+    expect(host.launch?.command).toBe(python);
+    expect(host.launch?.args[0]).toBe('-c');
+    expect(host.launch?.runtime).toBe(observeApplicationRuntimeSync(python!, root, process.env.PATH ?? '').runtime);
     expect(report.cases.map((c) => c.failure)).toEqual([null]);
     expect(report.outcome).toBe('passed');
   }, 60_000);

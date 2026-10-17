@@ -1,0 +1,5 @@
+schemaVersion: workflow.runner-profile/v1
+ref: { id: tracegrove.runner.browser, revision: "1" }
+adapter: browser
+maxStepsPerCase: 50
+cancellation: confirmed

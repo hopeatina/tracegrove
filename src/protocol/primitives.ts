@@ -17,6 +17,11 @@ export const HexSha256 = z.string().regex(/^[0-9a-f]{64}$/, 'sha256 hex digest')
 export const DigestSchema = z.object({ algorithm: z.literal('sha256'), hex: HexSha256 }).strict();
 export const IdString = z.string().min(1).max(LIMITS.id).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/);
 export const RevisionString = z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
+export const GitObjectId = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
+export const GitRevision = z.string().min(1).max(400).regex(/^[^-\x00-\x1f\x7f][^\x00-\x1f\x7f]*$/, 'expected a non-option revision expression');
+export const RepositoryPath = z.string().min(1).max(2048).regex(
+  /^(?!\.{1,2}(?:\/|$))[^\\:\x00-\x1f\x7f/]+(?:\/(?!\.{1,2}(?:\/|$))[^\\:\x00-\x1f\x7f/]+)*$/,
+  'expected a repository-relative file path');
 export const RefSchema = z.object({ id: IdString, revision: RevisionString, digest: DigestSchema }).strict();
 export const ShortText = z.string().min(1).max(LIMITS.shortText);
 export const Text = z.string().max(LIMITS.text);

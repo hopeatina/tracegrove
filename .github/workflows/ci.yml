@@ -21,9 +21,37 @@ jobs:
           "$RUNNER_TEMP/venv/bin/pip" install -q -r src/samples/fastapi-notes/requirements.txt -r src/samples/django-notes/requirements.txt
           echo "TRACEGROVE_PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
       - run: npm ci
+      - name: Install pinned Chromium and system dependencies for real UI tests
+        run: npx --no-install playwright install --with-deps chromium
       - run: npm run verify
       - run: npm run test:conformance
       - run: npm run build
+      - name: Verify immutable source resolution through the built CLI
+        env:
+          WORKFLOW_VERIFY_TEST_CLI: compiled
+        run: npm test -- tests/cliGitSources.test.ts --maxWorkers=2
+      - name: Qualify clean native and mocked Docker lanes
+        id: container-qualification
+        run: |
+          npm run test:container -- native-real
+          npm run test:container -- offline-contract
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.container-qualification.outcome != 'skipped'
+        with:
+          name: container-qualification
+          path: artifacts/qa/container-*
+          if-no-files-found: error
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install hash-locked Django customer environment
+        run: |
+          python -m venv "$RUNNER_TEMP/django"
+          "$RUNNER_TEMP/django/bin/python" -m pip install --require-hashes -r src/samples/notes-django/app/requirements.lock
+      - name: Replay shared corpus against Django without a database
+        env:
+          TRACEGROVE_DJANGO_PYTHON: ${{ runner.temp }}/django/bin/python
+        run: npm run test:django
       - name: Zero-OrgX sample from the built distribution
         run: |
           node dist/cli/main.js sample-config --sample notes-api --output "$RUNNER_TEMP/notes"
@@ -36,6 +64,23 @@ jobs:
         run: |
           node dist/cli/main.js sample-config --sample notes-api --output "$RUNNER_TEMP/notes-flows"
           cd "$RUNNER_TEMP/notes-flows" && node "$GITHUB_WORKSPACE/dist/cli/main.js" test
+      - name: Authenticated browser sample from the built distribution
+        run: |
+          node dist/cli/main.js sample-config --sample notes-browser --output "$RUNNER_TEMP/browser-sample"
+          node dist/cli/main.js plan --config "$RUNNER_TEMP/browser-sample/verification/workflow.yaml" --output "$RUNNER_TEMP/browser-request.json"
+          node dist/cli/main.js run --request "$RUNNER_TEMP/browser-request.json" --json > "$RUNNER_TEMP/browser-run.json"
+          browser_execution=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/browser-run.json")
+          node dist/cli/main.js export --execution "$browser_execution" --state-dir "$RUNNER_TEMP/browser-sample/verification/.workflow-verify" --output "$RUNNER_TEMP/browser-bundle"
+          node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/browser-bundle"
+          node dist/cli/main.js test --config "$RUNNER_TEMP/browser-sample/tracegrove.config.yaml" --grep notes.browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-bundle
+          path: |
+            ${{ runner.temp }}/browser-bundle
+            ${{ runner.temp }}/browser-sample/.tracegrove/runs/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

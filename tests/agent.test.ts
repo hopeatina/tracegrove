@@ -35,9 +35,17 @@ function call(port: number, method: string, path: string, opts: { token?: string
 }
 
 describe('agent settings', () => {
-  it('defaults to Claude Code on haiku, its cheapest model', () => {
+  it('pins the low-cost drafting model for both providers', () => {
     const s = resolveAgentSettings(temp(), null);
-    expect(s).toMatchObject({ provider: 'claude', model: 'haiku', source: { provider: 'default', model: 'default' } });
+    expect(s).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', source: { provider: 'default', model: 'default' } });
+    expect(resolveAgentSettings(temp(), null, { provider: 'codex' }).model).toBe('gpt-6-luna');
+  });
+
+  it('does not inherit a shared model when local settings switch the provider', () => {
+    const root = temp();
+    const config = AuthoringConfig.parse({ project: 'p', app: { adapter: 'node', entry: 'server.js' }, personas: { alice: { subject: 'alice' } }, agent: { provider: 'codex', model: 'codex-team-model' } });
+    writeLocalSettings(root, { agent: { provider: 'claude' } });
+    expect(resolveAgentSettings(root, config)).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', source: { model: 'default' } });
   });
 
   it('resolves flag over settings.json over config', () => {
@@ -47,7 +55,7 @@ describe('agent settings', () => {
     writeLocalSettings(root, { agent: { provider: 'claude', model: 'sonnet' } });
     expect(resolveAgentSettings(root, config)).toMatchObject({ provider: 'claude', model: 'sonnet', source: { provider: 'settings', model: 'settings' } });
     // switching provider by flag drops a model chosen for the other provider
-    expect(resolveAgentSettings(root, config, { provider: 'codex' })).toMatchObject({ provider: 'codex', model: null, source: { provider: 'flag' } });
+    expect(resolveAgentSettings(root, config, { provider: 'codex' })).toMatchObject({ provider: 'codex', model: 'gpt-6-luna', source: { provider: 'flag' } });
     expect(resolveAgentSettings(root, config, { provider: 'claude', model: 'opus' })).toMatchObject({ model: 'opus', source: { model: 'flag' } });
     expect(() => resolveAgentSettings(root, config, { provider: 'gpt' })).toThrow(/invalid_agent/);
     expect(() => writeLocalSettings(root, { agent: { provider: 'nope' } })).toThrow();
@@ -62,7 +70,8 @@ describe('agent settings', () => {
     expect(allowed).toContain('Bash(node /x/main.js check:*)');
     expect(allowed).not.toMatch(/Bash\(\*|Bash,|Bash$/);
     const codex = buildAgentCommand({ provider: 'codex', model: null, maxBudgetUsd: null, source: { provider: 'flag', model: 'default' } }, 'PROMPT', tg);
-    expect(codex).toEqual({ bin: 'codex', args: ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', 'PROMPT'] });
+    expect(codex).toEqual({ bin: 'codex', args: ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', '--model', 'gpt-6-luna', 'PROMPT'] });
+    expect(() => buildAgentCommand({ provider: 'codex', model: null, maxBudgetUsd: 0.5, source: { provider: 'flag', model: 'default' } }, 'P', tg)).toThrow(/cannot enforce maxBudgetUsd/);
     expect(() => buildAgentCommand({ provider: 'none', model: null, maxBudgetUsd: null, source: { provider: 'flag', model: 'default' } }, 'P', tg)).toThrow(/none/);
   });
 
@@ -104,9 +113,10 @@ describe('agent-friendly CLI', () => {
 
   it('settings saves the per-developer choice', () => {
     const root = temp();
+    writeLocalSettings(root, { agent: { provider: 'claude', model: 'claude-custom-model' } });
     const result = cli('settings', '--dir', root, '--agent', 'codex', '--json');
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout).settings).toMatchObject({ provider: 'codex', source: { provider: 'settings' } });
+    expect(JSON.parse(result.stdout).settings).toMatchObject({ provider: 'codex', model: 'gpt-6-luna', source: { provider: 'settings', model: 'default' } });
     expect(JSON.parse(readFileSync(join(root, '.tracegrove', 'settings.json'), 'utf8'))).toEqual({ agent: { provider: 'codex' } });
   });
 });
@@ -137,7 +147,7 @@ echo '{"result":"tracegrove/discovered/notes/owner-only.flow.yaml: owner-only re
     process.env.PATH = `${fakeClaude()}${delimiter}${PATH}`;
     expect(detectAgents().claude).toBeTruthy();
     const result = await draftWithAgent({ dir: root, branch: null, intent: 'only the owner can read a note' });
-    expect(result.agent).toMatchObject({ provider: 'claude', model: 'haiku', exitCode: 0, files: ['tracegrove/discovered/notes/owner-only.flow.yaml'] });
+    expect(result.agent).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', exitCode: 0, files: ['tracegrove/discovered/notes/owner-only.flow.yaml'] });
     expect(result.agent.output).toContain('owner-only read');
     expect(result.agent.command).toContain('<prompt>');
     expect(result.check.ok).toBe(true);
@@ -155,11 +165,11 @@ echo '{"result":"tracegrove/discovered/notes/owner-only.flow.yaml: owner-only re
     const server = await startUi({ dir: root }); servers.push(server);
     const page = await call(server.port, 'GET', '/');
     const token = /const TOKEN='([^']+)'/.exec(page.body)![1]!;
-    expect((await call(server.port, 'GET', '/api/settings')).body.settings).toMatchObject({ provider: 'claude', model: 'haiku' });
+    expect((await call(server.port, 'GET', '/api/settings')).body.settings).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5' });
     expect((await call(server.port, 'POST', '/api/settings', { body: { agent: { provider: 'codex' } } })).status).toBe(403);
     const saved = await call(server.port, 'POST', '/api/settings', { token, body: { agent: { provider: 'codex', model: '' } } });
     expect(saved.status).toBe(200);
-    expect(saved.body.settings).toMatchObject({ provider: 'codex', model: null });
+    expect(saved.body.settings).toMatchObject({ provider: 'codex', model: 'gpt-6-luna' });
     expect((await call(server.port, 'POST', '/api/settings', { token, body: { agent: { provider: 'gpt' } } })).status).toBe(422);
     expect(existsSync(join(root, '.tracegrove', 'settings.json'))).toBe(true);
     void mkdirSync;

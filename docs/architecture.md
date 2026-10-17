@@ -14,7 +14,7 @@ Status as of 2026-10-16, for this repository. "Intended" means what the protocol
                                                                                  ─► executor
                                                                                       host adapter:  local_process │ mock_loopback
                                                                                       fixtures:      registered API actions, readback, cleanup
-                                                                                      surface driver: http (only)
+                                                                                      surface driver: http │ Chromium browser
                                                                                  ─► trusted reducer (outcome from observations)
                                                                                  ─► bundle writer ─► verify-bundle ───────► .tracegrove/runs/<run>/
                                                                                                                               summary.md/json, junit.xml,
@@ -22,11 +22,11 @@ Status as of 2026-10-16, for this repository. "Intended" means what the protocol
  tracegrove ui ─► reads config, flows, runs, git; runs `test`; scans routes for discovery
 ```
 
-Supporting modules that exist but aren't wired into the everyday flow yet: shared coordination (budget and persona leases with fencing), signed cleanup follow-ups (Ed25519, independent collector), source citations (exact repo/commit/path/line bytes), and the plan review API (edit/review with CAS). They are the building blocks for the hosted and agent-driven modes.
+The [Chromium browser runner](browser-driver.md) supports short flows and the low-level corpus, with typed UI steps, DOM assertions, authenticated local personas, and sealed recordings in Grove. Supporting modules that exist but aren't wired into the everyday flow yet include shared coordination, signed cleanup follow-ups, source citations, and the plan review API.
 
 ## 2. The current UX flow, end to end
 
-| Step | Today (with PR #14) | Intended |
+| Step | Today (this branch) | Intended |
 | --- | --- | --- |
 | Install | Private package; install a packed archive | `npm i -D tracegrove`, `pipx`/`uvx` shim for Python repos |
 | Set up | `tracegrove init` detects FastAPI, Django or Node and writes config + example flow | Same, plus discovery proposes the first flows |
@@ -40,7 +40,7 @@ Supporting modules that exist but aren't wired into the everyday flow yet: share
 
 | Layer | Supported now | Declared but not implemented |
 | --- | --- | --- |
-| Surfaces (step kinds) | `http.request`, `observe` (HTTP readback) | `ui.navigate`/`ui.action` (Playwright/CDP), `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
+| Surfaces (step kinds) | `http.request`, `observe`, `ui.navigate`, `ui.action`, `ui.observe`; browser short flows compile into the same core | `job.submit`, `integration.action`, `mcp.call`, `widget.action`, native and computer-use |
 | Hosts | `local_process` (POSIX), `mock_loopback` | container, managed sandbox, cloud VM, customer CI, device service; Windows process trees |
 | Fidelity lanes | `full_live_sandbox`, `mock_contract` | `recorded_replay`, `hybrid_live_product`, `full_live_canary` |
 | Boundaries | `application`, `storage` observed as real/stubbed | per-provider boundaries with interceptors and readback oracles |
@@ -50,6 +50,20 @@ Supporting modules that exist but aren't wired into the everyday flow yet: share
 | Environments | `isolated_candidate` | deployed preview, canary, production observation |
 | Discovery | Route scan in `tracegrove ui` (heuristic) | source selection resolver, intelligence-policy-gated drafting |
 | Media | step events, network metadata | trace and video capture (`required` currently unsatisfiable) |
+
+### Integration with the verified core
+
+The integration branch also includes the immutable Git pair resolver, source citation
+validation, durable local plan review, qualification reduction and activation contracts.
+Those APIs do not make heuristic route discovery independent source confirmation or
+hosted qualification. The workbench remains a local authoring and replay interface.
+
+Node and Python presets use the same bounded interpreter observation during compilation
+and launch. Django runs migrations and starts its server through that Python executable.
+Generic shell wrappers remain blocked until a qualified host can observe their actual
+application runtime. A corrupt exported evidence bundle marks the overall run inconclusive,
+uses an inconclusive run directory and adds an evidence-integrity JUnit error, even when
+individual HTTP checks passed.
 
 ## 4. Adapter gap analysis for full-stack and data-engineering work
 
@@ -107,6 +121,6 @@ Supporting modules that exist but aren't wired into the everyday flow yet: share
 
 1. **P0 for full-stack repos:** `app.setup` commands, `services:` (Postgres, Redis), `components:` (workers), `db: sqlite|postgres` that injects `DATABASE_URL`, SQL and command seeding, and the outbound interceptor for third parties.
 2. **P1 for coverage:** job observe, DB-state oracle, mock lane in the authoring layer, record/replay, email/webhook capture, data-pipeline job surface with table oracles.
-3. **Then the browser surface (Playwright)**, which reuses personas, fixtures and run folders unchanged.
+3. **Qualify browser execution beyond local runs**, including staging personas, controller-death cleanup, trace/redaction collectors, and host network confinement.
 
 Each adapter keeps the kernel's rules: launched or reserved per run, identity attested, effects inside the declared envelope, cleanup confirmed by an independent read, and evidence sealed in the bundle.

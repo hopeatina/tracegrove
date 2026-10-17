@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "enum": [
+        "request",
+        "response",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "method": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    },
+    "requestId": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "maximum": 599,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "url": {
+      "maxLength": 4096,
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "requestId",
+    "method",
+    "url",
+    "status"
+  ],
+  "type": "object"
+}

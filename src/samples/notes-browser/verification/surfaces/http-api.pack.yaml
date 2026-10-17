@@ -1,0 +1,7 @@
+schemaVersion: workflow.surface-pack/v1
+ref: { id: tracegrove.pack.browser, revision: "1" }
+kind: web
+protocol: playwright
+stepKinds: [http.request, observe, ui.navigate, ui.action, ui.observe]
+oracles: [http.observation/1, browser.observation/1, step.result/1]
+captureFormats: [application/json, video/webm]

@@ -4,6 +4,7 @@
  * evidence by itself and nothing bypasses the planner, executor or reducer.
  */
 import { z } from 'zod';
+import { BrowserCommand, Persona, HexSha256 } from '../protocol/index.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -38,12 +39,14 @@ export const AuthoringConfig = z.object({
       tokens: z.string().default('TRACEGROVE_TOKENS'),
     }).strict().default({ port: 'PORT', dataDir: 'TRACEGROVE_DATA_DIR', tokens: 'TRACEGROVE_TOKENS' }),
   }).strict(),
-  personas: z.record(Name, z.object({ subject: z.string().min(1) }).strict())
+  personas: z.record(Name, z.object({ subject: z.string().min(1),
+    ...Persona.pick({ locale: true, timezone: true, viewport: true, inputMode: true, reducedMotion: true }).partial().shape,
+  }).strict())
     .refine((value) => Object.keys(value).length > 0, 'declare at least one persona')
     .describe('Callers. The first one is the default `as:` for every step.'),
   agent: z.object({
     provider: z.enum(AGENT_PROVIDERS).default('claude').describe('Coding agent that drafts and repairs flows: claude (Claude Code CLI), codex (Codex CLI) or none.'),
-    model: z.string().min(1).max(120).optional().describe('Model passed to the agent CLI. Default: haiku for claude (cheapest current Claude); the CLI default for codex.'),
+    model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.'),
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
   defaults: z.object({
@@ -72,7 +75,7 @@ function exactlyOneVerb(value: { [K in HttpVerb]?: string | undefined }, ctx: z.
   if (verbs.length !== 1) ctx.addIssue({ code: 'custom', message: `give exactly one of ${HTTP_VERBS.join(', ')} (found ${verbs.length ? verbs.join(', ') : 'none'})` });
 }
 
-export const FlowStep = z.object({
+export const HttpFlowStep = z.object({
   name: z.string().min(1).max(120).optional(),
   ...verbFields,
   as: z.string().optional().describe('Persona name, or none for an unauthenticated call.'),
@@ -83,6 +86,14 @@ export const FlowStep = z.object({
   save: z.record(Name, DotPath).optional().describe('name: dot.path into the response body.'),
   timeoutMs: z.number().int().positive().max(120_000).optional(),
 }).strict().superRefine(exactlyOneVerb);
+export const BrowserFlowStep = z.object({
+  name: z.string().min(1).max(120).optional(),
+  browser: BrowserCommand,
+  expect: z.object({ text: z.string().max(8192).optional(), status: Status.optional() }).strict().optional(),
+  timeoutMs: z.number().int().positive().max(120_000).optional(),
+}).strict();
+export type BrowserFlowStep = z.infer<typeof BrowserFlowStep>;
+export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep]);
 export type FlowStep = z.infer<typeof FlowStep>;
 
 export const Flow = z.object({
@@ -92,8 +103,22 @@ export const Flow = z.object({
   tags: z.array(Name).default([]),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),
+  browser: z.object({
+    allowPaths: z.array(Path).min(1).max(64).describe('Path prefixes in this flow’s effect envelope, including browser assets and API calls.'),
+    allowMethods: z.array(z.enum(HTTP_VERBS)).min(1).max(6).default(['GET', 'HEAD']),
+    maxActions: z.number().int().positive().max(10_000).default(100),
+    maxArtifactBytes: z.number().int().positive().max(16 * 1024 * 1024).default(4 * 1024 * 1024),
+  }).strict().optional(),
   steps: z.array(FlowStep).min(1).max(50),
-}).strict();
+}).strict().superRefine((flow, ctx) => {
+  if (flow.steps.some(step => 'browser' in step) && !flow.browser) ctx.addIssue({ code: 'custom', path: ['browser'], message: 'browser steps require browser.allowPaths to declare the permitted page, asset, and API paths' });
+  flow.steps.forEach((step, index) => {
+    if (!('browser' in step)) return;
+    if (step.browser.kind === 'read' && step.expect?.text === undefined) ctx.addIssue({ code: 'custom', path: ['steps', index, 'expect'], message: 'browser read requires expect.text; it polls until that text is observed' });
+    if (step.expect?.text !== undefined && step.browser.kind !== 'read') ctx.addIssue({ code: 'custom', path: ['steps', index, 'expect', 'text'], message: 'text expectations need a browser read command' });
+    if (step.expect?.status !== undefined && step.browser.kind !== 'navigate') ctx.addIssue({ code: 'custom', path: ['steps', index, 'expect', 'status'], message: 'status expectations need a browser navigate command' });
+  });
+});
 export type Flow = z.infer<typeof Flow>;
 
 const FixtureValue = z.union([
@@ -116,11 +141,15 @@ export const Fixture = z.object({
 }).strict();
 export type Fixture = z.infer<typeof Fixture>;
 
+export const RunVideo = z.object({ digest: HexSha256, byteCount: z.number().int().positive().max(16 * 1024 * 1024), mediaType: z.literal('video/webm') }).strict();
+export type RunVideo = z.infer<typeof RunVideo>;
+
 export function exportAuthoringSchemas(): Record<string, unknown> {
   const opts = { target: 'draft-2020-12' as const, io: 'input' as const, unrepresentable: 'any' as const };
   return {
     'tracegrove.config/v1': z.toJSONSchema(AuthoringConfig, opts),
     'tracegrove.flow/v1': z.toJSONSchema(Flow, opts),
     'tracegrove.fixture/v1': z.toJSONSchema(Fixture, opts),
+    'tracegrove.run-video/v1': z.toJSONSchema(RunVideo, opts),
   };
 }

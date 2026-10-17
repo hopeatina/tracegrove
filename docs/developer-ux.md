@@ -81,7 +81,7 @@ Defaults when omitted: `testDir: tracegrove`, `inject` = `PORT`, `TRACEGROVE_DAT
 | `node` | `node <entry>` with `PORT` set | Any Express/Fastify/Hono/Nest app that reads `PORT`. |
 | `fastapi` | `<python> -m uvicorn <entry> --host 127.0.0.1 --port {port}` | `python:` defaults to `.venv/bin/python` if present, else `python3`. |
 | `django` | `<python> manage.py migrate --noinput && <python> manage.py runserver 127.0.0.1:{port} --noreload` | Point `DATABASES` at `TRACEGROVE_DATA_DIR` for a fresh database per run (the sample does). |
-| `command` | `run: "npm start"` (any shell command) | Escape hatch for anything else (Rails, Go, Docker compose wrappers). |
+| `command` | Reserved for a qualified application-runtime adapter | Currently BLOCKED: a shell wrapper cannot attest the application interpreter. |
 
 `{port}` and `{dataDir}` are substituted in `args` and `env` values. Tracegrove picks a free loopback port itself (the "assigned" port mode), so apps no longer need to print `listening <port>`.
 
@@ -221,11 +221,11 @@ tracegrove · notes · app sha 3e8d13bc9bd1
 
 | Phase | Scope | In the draft PR |
 | --- | --- | --- |
-| 1 | Config + flow + fixture compiler, node/fastapi/django/command presets, assigned port mode, app-output-on-startup-failure, `test`/`list`/`compile`/`show`/`init`, run folders with summary.md/json/junit, Node/FastAPI/Django samples | Yes |
+| 1 | Config + flow + fixture compiler, node/fastapi/django presets, assigned port mode, app-output-on-startup-failure, `test`/`list`/`compile`/`show`/`init`, run folders with summary.md/json/junit, Node/FastAPI/Django samples | Yes; generic command host remains unqualified |
 | 2 | `lanes:` with an offline mock lane compiled from recorded responses; `--update-snapshots` to record them | No |
 | 3 | `tracegrove.config.ts` with `defineConfig` and a typed `flow()` builder for editor autocompletion; JSON Schema for the YAML files so VS Code validates them today | Schema export only |
 | 4 | Login-recipe personas (POST /login, cookie or token capture) for apps whose auth can't be patched; external `url:` targets with declared, unverified identity | No |
-| 5 | Browser surface (Playwright) using the same flow file shape with `visit:` / `click:` steps | No |
+| 5 | Browser surface using shared typed `browser:` commands, independent DOM/API checks, and verified Grove recording playback | Implemented locally; staging qualification remains open |
 
 ## Found along the way
 

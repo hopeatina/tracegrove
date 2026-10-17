@@ -6,6 +6,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
@@ -19,6 +20,9 @@ import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
+import { observeApplicationRuntime } from '../hosts/runtime.ts';
+import { writeSample } from './samples/write.ts';
+import { resolveSourceFiles } from './source.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
@@ -65,10 +69,10 @@ Agent-friendly commands (every one takes --json and never starts the app):
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
-  (every command also takes --config <tracegrove.config.yaml>)
+  test, list, show and compile take --config <tracegrove.config.yaml>; the commands above use --dir.
 
 Low-level corpus commands (the strict workflow.*/v1 files):
-  sample-config --sample notes-api --output <dir>     write a sample project (real app + corpus)
+  sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
@@ -83,6 +87,8 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
                                                        check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
+  source-resolve --input <repositories.json> --output <source.json>
+                                                       freeze local Git commit pairs and complete diffs (no fetch or review)
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
 
@@ -90,6 +96,11 @@ async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
+    case 'source-resolve': {
+      const result = await resolveSourceFiles(args.flags.input, args.flags.output);
+      out(args, result.summary, result.text);
+      return 0;
+    }
 
     case 'init': {
       const dir = resolve(flag(args, 'dir') ?? '.');
@@ -162,7 +173,9 @@ async function main(argv: string[]): Promise<number> {
       const provider = flag(args, 'agent'); const model = flag(args, 'model');
       if (provider !== null || model !== null) {
         const current = readLocalSettings(dir);
-        writeLocalSettings(dir, { ...current, agent: { ...current.agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
+        const agent = { ...current.agent };
+        if (provider !== null && provider !== agent.provider && model === null) delete agent.model;
+        writeLocalSettings(dir, { ...current, agent: { ...agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
       }
       let config = null; try { config = loadAuthoringConfig(findConfig(dir)); } catch { config = null; }
       const settings = resolveAgentSettings(dir, config);
@@ -185,13 +198,11 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'sample-config': {
-      const sample = flag(args, 'sample') ?? 'notes-api';
+      const sample = args.flags.sample ?? 'notes-api';
       const output = resolve(args.flags['output']);
-      const source = join(samplesDir(), sample);
-      if (!existsSync(source)) throw new Blocked([{ code: 'unknown_sample', detail: sample, owner: 'operator', action: `choose one of ${readdirSync(samplesDir()).join(', ')}` }]);
-      mkdirSync(output, { recursive: true });
-      cpSync(source, output, { recursive: true });
-      out(args, { sample, output, config: join(output, 'verification', 'workflow.yaml') }, `wrote sample ${sample} to ${output}\nnext: workflow-verify doctor --config ${join(output, 'verification', 'workflow.yaml')}`);
+      const config = writeSample(samplesDir(), sample, output);
+      const next = sample === 'notes-django' ? `install the pinned Python dependencies as described in ${join(output, 'README.md')}, then run doctor` : `workflow-verify doctor --config ${config}`;
+      out(args, { sample, output, config }, `wrote sample ${sample} to ${output}\nnext: ${next}`);
       return 0;
     }
 
@@ -237,7 +248,10 @@ async function main(argv: string[]): Promise<number> {
           const identity = sourceIdentityDigest(cwd, hostPlan.launch.identitySourceFiles);
           checks.push({ check: 'identity_sources', state: 'ok', detail: `${identity.entries.length} file(s), digest ${identity.hex.slice(0, 12)}` });
         } catch (error) { checks.push({ check: 'identity_sources', state: 'blocked', detail: String((error as Error).message) }); }
-        checks.push({ check: 'launch_command', state: hostPlan.launch.command === 'node' ? 'ok' : 'unknown', detail: `${hostPlan.launch.command} ${hostPlan.launch.args.join(' ')} (not executed by doctor)` });
+        try {
+          const runtime = await observeApplicationRuntime(hostPlan.launch.command, cwd, process.env.PATH ?? '');
+          checks.push({ check: 'application_runtime', state: 'ok', detail: `${runtime.runtime} (${runtime.version}); executable digest ${runtime.executableSha256.slice(0, 12)}` });
+        } catch (error) { checks.push({ check: 'application_runtime', state: 'blocked', detail: String((error as Error).message) }); }
       } else {
         checks.push({ check: 'host', state: 'ok', detail: `${hostPlan.adapter} binds a declared target; no launch` });
       }

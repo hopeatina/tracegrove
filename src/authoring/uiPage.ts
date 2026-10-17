@@ -30,6 +30,7 @@ nav button[aria-current=page]{background:var(--sel);color:var(--ink);font-weight
 .label{font:500 11px/16px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .rulehead{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}.rulehead .rule{flex:1;height:1px;background:var(--line);min-width:40px}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px}
+.recording{margin-top:20px}.recording video{display:block;width:100%;max-height:360px;aspect-ratio:16/9;object-fit:contain;margin:10px 0;background:var(--ink)}
 .cols{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}.grow{flex:999 1 560px;min-width:0}.side{flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:16px}
 h1{font-size:28px;line-height:34px;font-weight:500;letter-spacing:-.015em;margin:0;max-width:30ch}h2{font-size:17px;line-height:24px;font-weight:600;margin:0}
 .muted{color:var(--ink3)}.small{font-size:13px;line-height:18px}
@@ -85,10 +86,10 @@ table.kv{border-collapse:collapse;width:100%}table.kv th,table.kv td{text-align:
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span></header>
 <div class="page" id="main"></div>
 <script>
-const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;
+const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
 const TABS=['Run','Discover','History','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
-const ui={run:null,runName:null,sel:null,step:null,running:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1};
+const ui={run:null,runName:null,sel:null,step:null,running:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{}};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw j;return j}
 function toast(text){const t=h('div',{class:'toast fade',role:'status'},text);document.body.append(t);setTimeout(()=>t.remove(),2600)}
@@ -102,12 +103,12 @@ const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;return d<60?'j
 function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>{tab=t;render()}}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
+async function load(){state=await api('/api/overview');if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
 function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat())}
 
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
- const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,result:r?kind(r.result):'none',status:r?r.status:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
+ const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
   return{id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.ya?ml\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
@@ -116,19 +117,19 @@ function runTab(){
   h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
  if(state.compileError&&!state.flows.length)return[blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
- const allSteps=sc.flatMap(s=>s.steps);const stepsHeld=allSteps.filter(s=>s.result==='pass').length;
+ const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass').length;
  if(ui.sel===null){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
- const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
+ const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
  const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},state.runs.map(r=>h('option',{value:r.name,selected:r.name===ui.runName},ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
  const hero=h('section',{style:'margin-bottom:28px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
    h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),h('h1',{style:'margin-top:6px'},headline)),
-   h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),ui.running):
+   h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)):
     [ui.sel&&sc.length>1?h('button',{class:'btn ghost',on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',on:{click:()=>runNow('')}},'Run all')])),
   run?h('div',{class:'stats'},h('div',{},h('b',{},held+' / '+ran.length),h('span',{class:'muted'},'scenarios held')),h('div',{},h('b',{},stepsHeld+' / '+allSteps.length),h('span',{class:'muted'},'steps held')),
    h('div',{},h('b',{},secs(new Date(run.finishedAt)-new Date(run.startedAt))),h('span',{class:'muted'},'wall time')),
    h('div',{},h('b',{class:run.bundleVerified?'c-pass':'c-warn'},run.bundleVerified?'✓':'–'),h('span',{class:'muted'},run.bundleVerified?'evidence bundle re-verified':'bundle not verified'))):null,
   state.compileError?h('div',{style:'margin-top:16px'},blocked(state.compileError)):null,ui.error?h('div',{style:'margin-top:16px'},blocked(ui.error)):null);
- const tree=h('section',{class:'grow','aria-label':'Scenario tree'},h('div',{class:'rulehead'},h('span',{class:'label'},'Scenarios'),h('span',{class:'rule'}),h('span',{class:'small muted'},'step · request · time on the run clock · status')),
+ const tree=h('section',{class:'grow','aria-label':'Scenario tree'},h('div',{class:'rulehead'},h('span',{class:'label'},'Scenarios'),h('span',{class:'rule'}),h('span',{class:'small muted'},'step · interaction · time on the run clock · status')),
   h('div',{class:'tree'+(ui.running?' growing':'')},sc.map(s=>branch(s))));
  const side=h('div',{class:'side'},fixes(sc,run),detail(sc));
  return[hero,h('div',{class:'cols'},tree,side)]}
@@ -145,28 +146,39 @@ function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state=
     h('span',{class:'bar','aria-hidden':'true'},x.ms!=null?h('i',{class:x.result==='fail'?'fail':'',style:'left:'+left.toFixed(1)+'%;width:'+((x.ms||0)/total*100).toFixed(1)+'%'}):null),
     h('span',{class:'ms muted'},x.ms!=null?x.ms+' ms':''),h('span',{class:'res c-'+x.result},x.status!=null?x.status:x.result==='none'?'–':LABEL[x.result])))})):null)}
 function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.state==='warn')items.push({s,title:s.failure?s.failure.message:'Did not complete',where:s.failure?'step "'+s.failure.step+'"':s.file});
+ if(run&&run.bundleVerified===false)items.push({s:null,title:'Exported evidence failed verification',where:'Inspect bundle-problems.txt before relying on this run.'});
  for(const b of (run&&run.blockers)||[])items.push({s:null,title:b.code+': '+b.detail,where:b.action});
  return h('section',{'aria-label':'Needs a fix'},h('div',{class:'rulehead'},h('h2',{},'Needs a fix'),h('span',{class:'rule'}),h('span',{class:'small muted'},items.length?items.length+' open':'')),
   items.length?h('div',{style:'display:flex;flex-direction:column;gap:8px'},items.map(it=>h('button',{class:'fix','aria-pressed':it.s&&ui.sel===it.s.id?'true':'false',on:{click:()=>{if(!it.s)return;ui.sel=it.s.id;ui.step=Math.max(0,it.s.steps.findIndex(x=>x.result!=='pass'));render()}}},
    h('span',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(it.s&&it.s.state==='fail'?'p-fail':'p-warn')},it.s&&it.s.state==='fail'?'bug':'blocked'),h('span',{class:'mono small'},it.s?it.s.id:'run')),h('span',{},it.title),h('span',{class:'small muted'},it.where)))):
   h('p',{class:'muted'},run?'Nothing. Every scenario that ran held.':'Run the grove and failures land here, ordered as they occurred.'))}
+function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id);const v=c&&(c.videos||[]).find(v=>v.mediaType==='video/webm'&&/^[a-f0-9]{64}$/.test(v.digest));if(!v||!ui.runName)return null;
+ const status=h('p',{class:'small muted',role:'status'},'Checking the recording evidence…');
+ if(ui.run.bundleVerified===false)return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),h('p',{role:'alert'},'Recording unavailable: this run’s evidence failed verification.'));
+ const key=ui.runName+':'+v.digest;
+ const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id),
+  on:{loadedmetadata:()=>{const at=ui.videoTimes[key];if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,Number.isFinite(player.duration)?player.duration:at);status.textContent='Recording loaded from verified evidence.'},timeupdate:()=>{ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
+ return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
 function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
  return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},x.name),
   h('p',{class:'mono small muted',style:'margin:0'},x.method+' '+x.path+' · as '+x.as+(x.ms!=null?' · '+x.ms+' ms':'')),
-  h('div',{class:'obs'},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expect!=null?x.expect:'any 2xx')),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
-  bad&&s.failure?h('pre',{},s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Observed through an independent request after the action and matched.':'Run the scenario to observe this step.'),
+  h('div',{class:'obs'},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  bad&&s.failure?h('pre',{},s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed; its configured checks held.':'Run the scenario to observe this step.'),
+  recording(s),
   h('div',{class:'row',style:'margin-top:16px'},h('span',{class:'mono small muted',style:'flex:1;overflow-wrap:anywhere'},s.file),
    h('button',{class:'btn ghost sm',on:{click:()=>prune(s.file,false)}},'Prune'),h('button',{class:'btn sm',on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
-const RUN_PHASES=['Starting the app','Seeding fixtures','Walking the scenarios','Cleaning up','Sealing the evidence bundle'];
-async function runNow(grep){let i=0;ui.running=RUN_PHASES[0];render();const t=setInterval(()=>{i=Math.min(i+1,RUN_PHASES.length-1);ui.running=RUN_PHASES[i];if(tab==='Run')render()},1600);
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.outcome)}catch(e){ui.error=e}finally{clearInterval(t);ui.running=false}await load()}
+let runWatch=null;
+function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
+function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const a=await api('/api/activity');if(ui.running&&a.status==='running'){ui.running=a.label;const el=document.getElementById('run-activity');if(el)el.textContent=a.label}else if(ui.running&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},500)}
+async function runNow(grep){ui.running='Planning and running; awaiting verified evidence';render();watchRun();
+ ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.outcome)}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned. Graft it back any time.');ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
-const AGENT_PHASES=['Reading routes and their handlers','Writing flows into tracegrove/discovered/','Checking that every draft compiles'];
+const AGENT_PHASES=['Drafting and checking; awaiting the agent result'];
 function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;
  const sources=[{v:'',label:'working tree',note:'uncommitted files included'}].concat(g.branches.map(b=>({v:b,label:b,note:b===g.current?'checked out':b===g.base?'base':''})));
  const src=h('section',{class:'side',style:'flex:1 1 260px;max-width:340px'},h('div',{},h('span',{class:'label'},'Source'),h('div',{class:'src',style:'margin-top:10px'},
@@ -190,8 +202,8 @@ function draftCard(){const d=ui.draft;return h('div',{class:'card fade',style:'m
  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',on:{click:async()=>{try{const s=await api('/api/draft',{method:d.route.method,path:d.route.path,save:true});ui.draft=null;toast('Saved '+s.saved.split('/').slice(-3).join('/')+'. Fill the TODOs.');await load();scan()}catch(e){toast(e.error||'Could not save')}}}},'Plant it'),h('button',{class:'btn ghost',on:{click:()=>{ui.draft=null;render()}}},'Discard')))}
 async function draftOne(r){try{const d=await api('/api/draft',{method:r.method,path:r.path});ui.draft={...d,route:r};render()}catch(e){toast(e.error||'Could not draft')}}
 async function scan(){ui.scanning=true;ui.disc=null;ui.draft=null;render();try{ui.disc=await api('/api/discover?branch='+encodeURIComponent(ui.source||''))}catch(e){ui.scanning=false;page(blocked(e));return}ui.scanning=false;if(tab==='Discover')render()}
-async function agentDraft(){ui.intent=document.getElementById('intent').value;ui.agent=null;ui.agentPhase=0;render();const t=setInterval(()=>{if(ui.agentPhase<AGENT_PHASES.length-1){ui.agentPhase++;if(tab==='Discover')render()}},15000);
- try{ui.agent=await api('/api/agent-draft',{intent:ui.intent,branch:ui.source})}catch(e){ui.agent={error:e}}finally{clearInterval(t);ui.agentPhase=-1}await load();if(ui.disc)scan()}
+async function agentDraft(){ui.intent=document.getElementById('intent').value;ui.agent=null;ui.agentPhase=0;render();
+ try{ui.agent=await api('/api/agent-draft',{intent:ui.intent,branch:ui.source})}catch(e){ui.agent={error:e}}finally{ui.agentPhase=-1}await load();if(ui.disc)scan()}
 function agentResult(){const r=ui.agent;if(r.error)return h('div',{style:'margin-top:16px'},blocked(r.error));const c=r.check;const ok=c.ok&&r.agent.exitCode===0;
  return h('div',{class:'fade',style:'margin-top:16px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(ok?'p-pass':'p-fail')},ok?'checked':'needs fixes'),h('span',{class:'small muted'},r.agent.files.length+' flow file(s) from '+r.agent.provider+(r.agent.model?' · '+r.agent.model:''))),
   r.agent.files.length?h('div',{style:'margin-top:8px'},r.agent.files.map(f=>h('div',{class:'row',style:'justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)'},h('span',{class:'mono small',style:'overflow-wrap:anywhere'},f),h('button',{class:'btn ghost sm',on:{click:()=>prune(f,false)}},'Prune')))):null,
@@ -209,12 +221,12 @@ function historyTab(){const runs=state.runs.slice(0,24);if(!runs.length)return[h
 
 /* ---------- Settings ---------- */
 function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detected;let provider=s.provider;
- const model=h('input',{id:'model','aria-label':'Model',value:s.source.model==='default'?'':(s.model||''),placeholder:s.provider==='claude'?'haiku (cheapest)':'CLI default',style:'flex:1;min-width:200px'});
- const opt=(v,title,note,ok)=>h('button',{'aria-pressed':provider===v?'true':'false',on:{click:e=>{provider=v;model.value='';model.placeholder=v==='claude'?'haiku (cheapest)':'CLI default';for(const b of e.currentTarget.parentNode.children)b.setAttribute('aria-pressed',b===e.currentTarget?'true':'false')}}},h('b',{style:'font-weight:500'},title),h('span',{class:'small '+(ok?'c-pass':'muted')},note));
+ const model=h('input',{id:'model','aria-label':'Model',value:s.source.model==='default'?'':(s.model||''),placeholder:DEFAULT_MODELS[s.provider]||'No agent selected',style:'flex:1;min-width:200px'});
+ const opt=(v,title,note,ok)=>h('button',{'aria-pressed':provider===v?'true':'false',on:{click:e=>{provider=v;model.value='';model.placeholder=DEFAULT_MODELS[v]||'No agent selected';for(const b of e.currentTarget.parentNode.children)b.setAttribute('aria-pressed',b===e.currentTarget?'true':'false')}}},h('b',{style:'font-weight:500'},title),h('span',{class:'small '+(ok?'c-pass':'muted')},note));
  const cfg=state.config;
  return[h('div',{class:'cols'},h('section',{class:'grow card'},h('span',{class:'label'},'Agent under the hood'),h('h2',{style:'margin:6px 0 4px'},'Who drafts and repairs your flows'),
    h('p',{class:'small muted',style:'margin:0 0 16px'},'Saved to .tracegrove/settings.json for you alone. agent: in tracegrove.config.yaml sets the team default; --agent and --model on the CLI override both.'),
-   h('div',{class:'seg'},opt('claude','Claude Code',det.claude?'installed · default model haiku':'not installed',!!det.claude),opt('codex','Codex',det.codex?'installed · CLI default model':'not installed',!!det.codex),opt('none','None','discovery and templates only',false)),
+   h('div',{class:'seg'},opt('claude','Claude Code',det.claude?'installed · '+DEFAULT_MODELS.claude:'not installed',!!det.claude),opt('codex','Codex',det.codex?'installed · '+DEFAULT_MODELS.codex:'not installed',!!det.codex),opt('none','None','discovery and templates only',false)),
    h('div',{class:'row',style:'margin-top:16px'},model,h('button',{class:'btn',on:{click:async()=>{try{state.agent=await api('/api/settings',{agent:{provider,model:model.value}});toast('Saved');render()}catch(e){toast(e.reasons?e.reasons[0].detail:e.error)}}}},'Save')),
    h('p',{class:'small muted',style:'margin-top:12px'},'In effect: ',h('span',{class:'mono'},s.provider+' · '+(s.model||'CLI default')),' (provider from '+s.source.provider+', model from '+s.source.model+').'),
    (!det.claude||!det.codex)?h('p',{class:'small muted'},(!det.claude?'Claude Code: npm i -g @anthropic-ai/claude-code. ':'')+(!det.codex?'Codex: npm i -g @openai/codex.':'')):null),

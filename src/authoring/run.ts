@@ -2,7 +2,7 @@
  * `tracegrove test`: compile, plan, run, then write a human-named run folder with
  * summary.md, summary.json, junit.xml, the frozen request and the verified evidence bundle.
  */
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
@@ -11,13 +11,16 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { Conflict } from '../core/errors.ts';
-import type { ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { runVideos } from './media.ts';
+import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 
-export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null };
+export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
   caseId: string; file: string; title: string; outcome: string; durationMs: number;
   steps: StepReport[]; failure: { step: string; message: string; observed: string | null } | null;
+  videos?: RunVideo[];
 };
 export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
@@ -51,7 +54,9 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
   const steps: StepReport[] = receipt.steps.map((s) => {
     const info = stepInfo.get(s.stepId);
     const output = s.output as { status?: number } | null;
-    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode };
+    const browser = BrowserObservation.safeParse(s.output);
+    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
+      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
@@ -71,7 +76,7 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     failure = { step: '(case)', message: receipt.reasonCodes.join(', ') || receipt.outcome, observed: null };
   }
   const durationMs = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
-  return { caseId: receipt.caseRef.id, file: flow?.file ?? '', title: flow?.title ?? receipt.caseRef.id, outcome: receipt.outcome, durationMs, steps, failure };
+  return { caseId: receipt.caseRef.id, file: flow?.file ?? '', title: flow?.title ?? receipt.caseRef.id, outcome: receipt.outcome, durationMs, steps, failure, videos: runVideos(receipt) };
 }
 
 function xml(text: string): string {
@@ -80,7 +85,7 @@ function xml(text: string): string {
 
 export function renderJunit(report: TestRunReport): string {
   const failures = report.cases.filter((c) => c.outcome === 'assertion_failed').length;
-  const errors = report.cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length + (report.cases.length === 0 && report.blockers.length ? 1 : 0);
+  const errors = report.cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length + (report.cases.length === 0 && report.blockers.length ? 1 : 0) + (report.bundleVerified === false ? 1 : 0);
   const body = report.cases.map((c) => {
     const time = (c.durationMs / 1000).toFixed(3);
     const head = `    <testcase classname="${xml(report.project)}" name="${xml(c.caseId)}" file="${xml(c.file)}" time="${time}">`;
@@ -92,6 +97,7 @@ export function renderJunit(report: TestRunReport): string {
   if (report.cases.length === 0 && report.blockers.length) {
     body.push(`    <testcase classname="${xml(report.project)}" name="plan"><error message="blocked" type="blocked">${xml(report.blockers.map((b) => `${b.code}: ${b.detail}`).join('\n'))}</error></testcase>`);
   }
+  if (report.bundleVerified === false) body.push(`    <testcase classname="${xml(report.project)}" name="evidence-integrity"><error message="Evidence bundle verification failed" type="inconclusive">See bundle-problems.txt in this run.</error></testcase>`);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="tracegrove" tests="${Math.max(report.cases.length, body.length)}" failures="${failures}" errors="${errors}">\n  <testsuite name="${xml(report.project)}" tests="${body.length}" failures="${failures}" errors="${errors}" timestamp="${report.startedAt}">\n${body.join('\n')}\n  </testsuite>\n</testsuites>\n`;
 }
 
@@ -154,8 +160,9 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
         : await delegateRun(stateDir, bundle, options.signal ?? new AbortController().signal);
     } finally { ledger?.close(); }
   }
-  const outcome = summary?.outcome ?? 'blocked';
-  const runDir = join(runsDir, `${stamp(startedAt)}_${OUTCOME_LABEL[outcome] ?? outcome}_${(summary?.executionId ?? 'plan').replace(/[^A-Za-z0-9]/g, '').slice(-6)}`);
+  let outcome = summary?.outcome ?? 'blocked';
+  const runPath = (result: string) => join(runsDir, `${stamp(startedAt)}_${OUTCOME_LABEL[result] ?? result}_${(summary?.executionId ?? 'plan').replace(/[^A-Za-z0-9]/g, '').slice(-6)}`);
+  let runDir = runPath(outcome);
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(runDir, 'request.json'), `${JSON.stringify(bundle, null, 2)}\n`);
   let bundleVerified: boolean | null = null;
@@ -165,6 +172,12 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     const verification = verifyBundle(target);
     bundleVerified = verification.ok;
     if (!verification.ok) writeFileSync(join(runDir, 'bundle-problems.txt'), `${verification.problems.join('\n')}\n`);
+  }
+  if (bundleVerified === false && outcome === 'passed') {
+    outcome = 'inconclusive';
+    const destination = runPath(outcome);
+    renameSync(runDir, destination);
+    runDir = destination;
   }
   const flowsById = new Map(compiled.flows.map((f) => [f.caseId, f]));
   const cases = (summary?.receipts ?? []).map((r) => {

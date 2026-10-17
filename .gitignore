@@ -1,9 +1,11 @@
 node_modules/
+/node_modules
 dist/
 .workflow-verify/
 verification-output/
 *.tgz
 /samples/
-.tracegrove/
 __pycache__/
 .venv/
+/artifacts/qa/
+.tracegrove/

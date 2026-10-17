@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
+import { SampleName } from './samples/catalog.ts';
 
 const Text = z.string().min(1).max(8192);
 const Bool = z.boolean().optional();
@@ -17,7 +18,7 @@ export const COMMAND_SCHEMAS = {
   check: z.object({ ...common, dir: Text.optional() }).strict(),
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
-  'sample-config': z.object({ ...common, sample: Text.optional(), output: Text }).strict(),
+  'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,
@@ -33,13 +34,14 @@ export const COMMAND_SCHEMAS = {
   export: z.object({ ...common, execution: Text, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   'verify-cleanup': z.object({ ...common, proof: Text, expectation: Text, trust: Text }).strict(),
+  'source-resolve': z.object({ ...common, input: Text, output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
 } as const;
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];
 const deny = (code: string, detail: string, command: string): never => {
-  throw new Blocked([{ code, detail, owner: 'operator', action: `tracegrove ${command} --help` }]);
+  throw new Blocked([{ code, detail, owner: 'operator', action: `workflow-verify ${command} --help` }]);
 };
 
 /** Validate every option before file access, admission or execution. No ignored arguments. */
@@ -78,7 +80,7 @@ export function parseArgs(argv: string[]): Args {
   const parsed = schema.safeParse(flags);
   if (!parsed.success) throw new Blocked(parsed.error.issues.map(issue => ({
     code: Object.hasOwn(flags, String(issue.path[0])) ? 'invalid_argument' : 'missing_argument',
-    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `tracegrove ${command} --help`,
+    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `workflow-verify ${command} --help`,
   })));
   return { command: name, flags: parsed.data } as Args;
 }

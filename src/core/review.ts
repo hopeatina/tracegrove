@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import {
   IdString, PlanEditProjection, PlanReview, PositiveInt, RefSchema, ScopeSchema,
-  SourcePlan, freeze, parseAs, refKey, refList, selfDigest, sameDigest,
+  SourcePlan, PlanSourceValidation, freeze, parseAs, refKey, refList, selfDigest, sameDigest, sameRef, sameScope, verifySelfDigest,
   type Ref, type Scope,
 } from '../protocol/index.ts';
-import { Conflict } from './errors.ts';
+import { Blocked, Conflict } from './errors.ts';
 import { newId } from './clock.ts';
 
 export interface ReviewSnapshot { storageVersion: number; projection: PlanEditProjection }
@@ -13,9 +13,10 @@ export interface ReviewSnapshot { storageVersion: number; projection: PlanEditPr
 export interface PlanReviewPorts {
   authorize(scope: Scope, action: 'edit' | 'review'): Promise<{ actorId: string; policyRef: Ref }>;
   resolvePlan(ref: Ref, scope: Scope): Promise<unknown>;
+  validateSources(plan: SourcePlan, policyRef: Ref): Promise<PlanSourceValidation>;
   read(id: string, scope: Scope): Promise<ReviewSnapshot>;
-  /** Atomically publish the review (if any) and projection; false leaves both unchanged. */
-  compareAndSwap(expectedStorageVersion: number, projection: PlanEditProjection, review: PlanReview | null): Promise<boolean>;
+  /** Atomically publish validation, review (if any), and projection; false leaves all unchanged. */
+  compareAndSwap(expectedStorageVersion: number, projection: PlanEditProjection, review: PlanReview | null, sourceValidation: PlanSourceValidation | null): Promise<boolean>;
 }
 
 export interface PlanRevisionToken {
@@ -25,16 +26,12 @@ export interface PlanRevisionToken {
   expectedSourcePlanRef: Ref;
 }
 
-function sameScope(a: Scope, b: Scope): boolean {
-  return a.ownerId === b.ownerId && a.tenantId === b.tenantId && a.visibility === b.visibility;
-}
-
 const RevisionToken = z.object({
   id: IdString, scope: ScopeSchema, expectedEditRevision: PositiveInt, expectedSourcePlanRef: RefSchema,
 }).strict();
 
 async function current(ports: PlanReviewPorts, token: PlanRevisionToken): Promise<ReviewSnapshot> {
-  const snapshot = await ports.read(token.id, token.scope);
+  const snapshot = await ports.read(token.id, structuredClone(token.scope));
   const projection = PlanEditProjection.parse(snapshot.projection);
   PositiveInt.parse(snapshot.storageVersion);
   if (projection.id !== token.id || !sameScope(projection.scope, token.scope)) throw new Conflict('plan scope mismatch');
@@ -45,7 +42,7 @@ async function current(ports: PlanReviewPorts, token: PlanRevisionToken): Promis
 }
 
 async function resolved(ports: PlanReviewPorts, ref: Ref, scope: Scope): Promise<SourcePlan> {
-  const plan = parseAs(SourcePlan, await ports.resolvePlan(ref, scope), 'source plan');
+  const plan = parseAs(SourcePlan, await ports.resolvePlan(structuredClone(ref), structuredClone(scope)), 'source plan');
   if (refKey(plan.ref) !== refKey(ref) || !sameDigest(selfDigest(plan), ref.digest) || !sameScope(plan.scope, scope)) {
     throw new Conflict('resolved plan digest or scope mismatch');
   }
@@ -63,7 +60,7 @@ export async function editPlan(ports: PlanReviewPorts, token: PlanRevisionToken,
   }
   await resolved(ports, nextRef, token.scope);
   const next = PlanEditProjection.parse({ ...snapshot.projection, editRevision: snapshot.projection.editRevision + 1, sourcePlanRef: nextRef, currentReviewRef: null });
-  if (!await ports.compareAndSwap(snapshot.storageVersion, next, null)) throw new Conflict('plan changed during edit; preserve the draft and reload');
+  if (!await ports.compareAndSwap(snapshot.storageVersion, structuredClone(next), null, null)) throw new Conflict('plan changed during edit; preserve the draft and reload');
   return next;
 }
 
@@ -76,14 +73,20 @@ export async function reviewPlan(
   reasonRefs = refList().parse(reasonRefs);
   const admission = z.object({ actorId: IdString, policyRef: RefSchema }).strict().parse(await ports.authorize(ScopeSchema.parse(token.scope), 'review'));
   const snapshot = await current(ports, token);
-  await resolved(ports, snapshot.projection.sourcePlanRef, token.scope);
+  const plan = await resolved(ports, snapshot.projection.sourcePlanRef, token.scope);
+  if (decision === 'approved' && typeof ports.validateSources !== 'function') throw new Blocked([{ code: 'source_validation_unavailable',
+    detail: 'Approval requires a registered source checker', owner: 'review host', action: 'wire validatePlanSources and atomic validation/review persistence' }]);
+  const validation = decision === 'approved' ? PlanSourceValidation.parse(await ports.validateSources(structuredClone(plan), structuredClone(admission.policyRef))) : null;
+  if (validation && (!verifySelfDigest(validation) || !sameScope(validation.scope, token.scope) || !sameRef(validation.sourcePlanRef, plan.ref)
+      || !sameRef(validation.changeModelRef, plan.changeModelRef) || !sameRef(validation.revisionMatrixRef, plan.revisionMatrixRef)
+      || !sameRef(validation.policyRef, admission.policyRef))) throw new Conflict('source validation does not bind this reviewed plan and policy');
   const review = PlanReview.parse(freeze({
     schemaVersion: 'workflow.plan-review/v1', ref: { id: newId('review'), revision: '1' },
     scope: snapshot.projection.scope, sourcePlanRef: snapshot.projection.sourcePlanRef,
     editRevision: snapshot.projection.editRevision, decision,
-    reviewerActorId: admission.actorId, policyRef: admission.policyRef, reasonRefs,
+    reviewerActorId: admission.actorId, policyRef: admission.policyRef, reasonRefs: validation ? [...reasonRefs, validation.ref] : reasonRefs,
   }));
   const next = { ...snapshot.projection, currentReviewRef: review.ref };
-  if (!await ports.compareAndSwap(snapshot.storageVersion, next, review)) throw new Conflict('plan changed during review; reload before reviewing');
+  if (!await ports.compareAndSwap(snapshot.storageVersion, structuredClone(next), structuredClone(review), validation ? structuredClone(validation) : null)) throw new Conflict('plan changed during review; reload before reviewing');
   return review;
 }

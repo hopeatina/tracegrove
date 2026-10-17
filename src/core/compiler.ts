@@ -35,6 +35,12 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
   const captureNames = new Map<string, Set<string>>();
   const fixtureInputs = new Map<string, Set<string>>();
   const credentialNames = new Set<string>();
+  if (spec.capture.video === 'required' && !capabilities.captureFormats.includes('video/webm')) reasons.push({ code: 'required_video_unsupported', detail: 'runner does not advertise video capture' });
+  const browserSteps = spec.steps.filter(step => step.kind.startsWith('ui.'));
+  if (browserSteps.some(step => step.retry.attempts !== 1)) reasons.push({ code: 'browser_retry_unsupported', detail: 'browser effects require a single attempt; replay requires a new admission' });
+  if (browserSteps.length > spec.limits.maxBrowserActions) reasons.push({ code: 'browser_action_limit', detail: 'browser steps exceed the case action budget' });
+  if (browserSteps.length && spec.capture.trace === 'required') reasons.push({ code: 'browser_trace_unavailable', detail: 'required browser traces are not implemented' });
+  if (browserSteps.length && spec.capture.redactionPolicyRef) reasons.push({ code: 'browser_redaction_unavailable', detail: 'the declared browser redaction policy has no executable adapter' });
 
   if (spec.steps.length > capabilities.maxStepsPerCase) {
     reasons.push({ code: 'step_limit_exceeded', detail: `${spec.steps.length} steps exceed runner ceiling ${capabilities.maxStepsPerCase}; no prefix execution` });
@@ -56,6 +62,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     const used = new Set<string>();
     if (step.kind === 'http.request') { templateNames(step.path, used); templateNames(step.body, used); templateNames(step.headers, used); }
     if (step.kind === 'observe') templateNames(step.readback.path, used);
+    if (step.kind === 'ui.navigate') templateNames(step.path, used);
+    if (step.kind === 'ui.action') templateNames(step.command, used);
+    if (step.kind === 'ui.observe') templateNames(step.target, used);
     for (const name of used) if (!declared.has(name)) reasons.push({ code: 'undeclared_variable', detail: `${step.id} uses {${name}} without declaring it in inputs` });
     for (const [name, source] of Object.entries(step.inputs) as Array<[string, VariableSource]>) {
       switch (source.kind) {
@@ -73,7 +82,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
           fixtureInputs.get(source.entityKey)!.add(source.outputName);
           break;
         }
-        case 'credential': credentialNames.add(source.name); break;
+        case 'credential':
+          if (step.kind.startsWith('ui.')) reasons.push({ code: 'browser_credential_expansion_unsupported', detail: `${step.id}: credentials cannot be filled into recorded browser steps` });
+          credentialNames.add(source.name); break;
         case 'literal':
         case 'runtime': break;
       }
@@ -88,6 +99,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     const oracleId = `${assertion.oracle.name}/${assertion.oracle.version}`;
     if (!oracles.has(oracleId)) reasons.push({ code: 'unsupported_oracle', detail: `${assertion.id}: ${oracleId}` });
     if (!stepsById.has(assertion.stepId)) reasons.push({ code: 'assertion_unknown_step', detail: `${assertion.id} -> ${assertion.stepId}` });
+    const assertedStep = stepsById.get(assertion.stepId);
+    if (assertion.oracle.name === 'browser.observation' && !assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: browser oracle needs a browser step` });
+    if (assertion.oracle.name === 'http.observation' && assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle cannot evaluate browser facts` });
   }
   if (spec.assertions.filter((a) => a.required).length === 0) reasons.push({ code: 'no_required_assertion', detail: 'a case needs at least one required assertion' });
   if (reasons.length > 0) throw new Blocked(reasons.map((r) => ({ ...r, owner: 'case author', action: 'fix the case definition and review it again' })));

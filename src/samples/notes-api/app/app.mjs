@@ -38,6 +38,13 @@ const server = createServer(async (req, res) => {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const userId = token ? tokens[token] : undefined;
   if (!userId) return send(res, 401, { error: 'unauthorized' });
+  if (req.method === 'GET' && url.pathname === '/ui') {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(`<!doctype html><html lang="en"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Notes</title>
+      <main><h1>Notes</h1><button onclick="fetch('/notes').then(r=>r.json()).then(data=>document.querySelector('[role=status]').textContent=data.notes.map(n=>n.title).join(', '))">Refresh</button>
+      <p role="status" data-testid="notes">Not loaded</p></main></html>`);
+    return;
+  }
   const match = url.pathname.match(/^\/notes(?:\/([^/]+))?$/);
   if (!match) return send(res, 404, { error: 'not_found' });
   const id = match[1];

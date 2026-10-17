@@ -6,6 +6,12 @@ import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
+import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
+import { GitSourceRequest, GitSourceResolution } from './schemas/gitSources.ts';
+import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
+import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
+  ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
+  ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -16,6 +22,10 @@ export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
 export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
+export * from './schemas/source.ts';
+export * from './schemas/gitSources.ts';
+export * from './schemas/browser.ts';
+export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
@@ -24,6 +34,17 @@ export const SCHEMA_REGISTRY = {
   'workflow.corpus/v1': CorpusManifest,
   'workflow.source-plan/v1': SourcePlan,
   'workflow.plan-review/v1': PlanReview,
+  'workflow.revisions/v1': RevisionMatrix,
+  'workflow.change-model/v1': ChangeModel,
+  'workflow.source-validation/v1': PlanSourceValidation,
+  'workflow.scenario/v1': ScenarioDefinition,
+  'workflow.qualification-admission/v1': QualificationRoundAdmission,
+  'workflow.qualification-round/v1': QualificationRound,
+  'workflow.qualification-policy/v1': QualificationPolicy,
+  'workflow.replay-finding/v1': ReplayFinding,
+  'workflow.replay-assessment/v1': ReplayAssessment,
+  'workflow.scenario-activation/v1': ScenarioActivation,
+  'workflow.git-source-resolution/v1': GitSourceResolution,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -62,11 +83,21 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.browser-command/v1': BrowserCommand,
+  'workflow.browser-locator/v1': BrowserLocator,
+  'workflow.browser-observation/v1': BrowserObservation,
+  'workflow.browser-network-observation/v1': BrowserNetworkObservation,
   'workflow.ownership/v1': WorkflowOwnershipSchema,
   'workflow.cleanup-expectation/v1': CleanupExpectationSchema,
   'workflow.cleanup-followup/v1': CleanupFollowupSchema,
   'workflow.signed-cleanup-followup/v1': SignedCleanupFollowupSchema,
   'workflow.plan-edit-projection/v1': PlanEditProjection,
+  'workflow.scenario-projection/v1': ScenarioProjection,
+  'workflow.scenario-revision-token/v1': ScenarioRevisionToken,
+  'workflow.qualification-intent/v1': QualificationRoundIntent,
+  'workflow.scenario-replay-assessment/v1': ScenarioReplayAssessment,
+  'workflow.scenario-activation-intent/v1': ScenarioActivationIntent,
+  'workflow.git-source-request/v1': GitSourceRequest,
   'workflow.runner-capabilities/v1': D.RunnerCapabilities,
   'workflow.step-event/v1': E.StepEvent,
   'workflow.runner-protocol/v1.host': HostFrame,

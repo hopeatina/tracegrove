@@ -5,7 +5,7 @@
 tracegrove starts your real FastAPI, Django or Node app, walks it through scenarios written as
 short YAML files, checks every effect with an independent read, cleans up what it created, and
 seals the whole run into a bundle that `verify-bundle` can re-derive byte for byte. Claude Code
-or Codex can draft the scenarios from your routes and your intent, on their cheapest models,
+or Codex can draft the scenarios from your routes and your intent, with explicit low-cost defaults,
 and tracegrove re-checks everything they write before you see it.
 
 ![tracegrove ui: a run shown as a tree of scenarios, each step with its request, timing and status](docs/images/ui-run.png)
@@ -13,15 +13,14 @@ and tracegrove re-checks everything they write before you see it.
 ## The 60-second tour
 
 ```text
-npx tracegrove init                     # detect FastAPI / Django / Node, write a config and one example flow
-npx tracegrove ui                       # the grove: run, discover, draft, history, settings
-npx tracegrove draft --intent "a stranger can't read or delete someone else's note"
-npx tracegrove test                     # run, verify, seal: .tracegrove/runs/latest/
+npx --no-install tracegrove init                     # detect FastAPI / Django / Node, write a config and one example flow
+npx --no-install tracegrove ui                       # the grove: run, discover, draft, history, settings
+npx --no-install tracegrove draft --intent "a stranger can't read or delete someone else's note"
+npx --no-install tracegrove test                     # run, verify, seal: .tracegrove/runs/latest/
 ```
 
-In one real session on the FastAPI sample, `draft` with Claude Code on haiku read the handlers,
-wrote two flows (stranger cannot read, stranger cannot delete), ran `tracegrove check` until they
-compiled, and both passed against the running app on the first `test`. It took 36 seconds.
+This release candidate has not been published. Install a local packed archive before using the CLI examples;
+use `npx --no-install tracegrove` to avoid resolving an unrelated registry package.
 
 What makes it different:
 
@@ -44,8 +43,8 @@ run still gets attested source identity, independent readback, owned cleanup and
 re-verifiable evidence bundle.
 
 ```text
-npx tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
-npx tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
+npx --no-install tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
+npx --no-install tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
 ```
 
 ```yaml
@@ -89,7 +88,7 @@ per persona) to the app through `PORT`, `TRACEGROVE_DATA_DIR` and `TRACEGROVE_TO
 | `node` | `node <entry>` |
 | `fastapi` | `<python> -m uvicorn <entry> --host 127.0.0.1 --port {port}` (python: `.venv/bin/python`, else `python3`) |
 | `django` | `manage.py migrate --noinput && manage.py runserver 127.0.0.1:{port} --noreload` in the `entry` folder |
-| `command` | `run:` as a shell command, e.g. `npm start` |
+| `command` | Reserved; BLOCKED until the application runtime can be independently observed |
 
 Conventions:
 
@@ -113,8 +112,8 @@ Runnable samples: `src/samples/notes-api` (Node), `src/samples/fastapi-notes`,
 ## The grove: `tracegrove ui`
 
 ```text
-npx tracegrove ui                          # current folder, working tree
-npx tracegrove ui --dir ../api --branch feature/billing
+npx --no-install tracegrove ui                          # current folder, working tree
+npx --no-install tracegrove ui --dir ../api --branch feature/billing
 ```
 
 A local page (bound to 127.0.0.1, with a per-session token on anything that writes), light and
@@ -145,14 +144,16 @@ tracegrove does not ship a model. It drives the coding agent you already use, he
 
 | Provider | Command it runs | Default model |
 | --- | --- | --- |
-| `claude` (default) | `claude -p … --model haiku --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `haiku`, the cheapest current Claude |
-| `codex` | `codex exec --sandbox workspace-write [--model …]` | the Codex CLI's own default |
+| `claude` (default) | `claude -p … --model claude-haiku-4.5 --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-4.5` |
+| `codex` | `codex exec --sandbox workspace-write --model gpt-6-luna` | `gpt-6-luna` |
 | `none` | nothing; discovery and templates only | |
 
 The agent gets the discovery report, your intent, the naming conventions, an existing flow as an
-example, the persona names and the JSON Schemas. It may only edit files and run tracegrove's
-read-only commands; it writes into `tracegrove/discovered/`, and it never runs your tests. After
-it exits, tracegrove lists the flow files it created or changed and compiles the project itself.
+example, the persona names and the JSON Schemas. Its instructions request drafts under
+`tracegrove/discovered/` and read-only checks; its CLI permissions remain the execution boundary.
+After it exits, tracegrove lists changed flow files and compiles the project. Compilation is
+not independent confirmation of the developer's intent. A configured `maxBudgetUsd` is
+supported by the Claude adapter; Codex blocks that setting until enforced accounting exists.
 
 Where the choice comes from, highest first:
 
@@ -163,10 +164,10 @@ Where the choice comes from, highest first:
    ```yaml
    agent:
      provider: claude      # claude | codex | none
-     model: haiku          # optional
+     model: claude-haiku-4.5  # optional
      maxBudgetUsd: 0.50    # optional spend cap per draft (Claude Code)
    ```
-4. Claude Code on haiku.
+4. The explicit low-cost defaults above. No inherited CLI model or silent provider fallback.
 
 ### Commands built for agents
 
@@ -209,7 +210,7 @@ What the adapters cover now and what's next:
 | Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
 | Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
 | Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
-| Browser | None | Playwright surface reusing personas, fixtures and run folders |
+| Browser | Typed short flows and low-level corpus, authenticated local personas, DOM/API assertions, sealed video and Grove playback | Staging qualification, trace/redaction collectors and controller-death cleanup |
 
 The full gap analysis by layer, with priorities, is in [docs/architecture.md](docs/architecture.md).
 
@@ -253,25 +254,53 @@ Bundle verification checks sealed required files, host capability records, targe
 fixture completeness and boundary observations. It rejects empty/traversal manifests and
 producer resealing that removes required observations. This verifies portable integrity and
 record consistency; the importer still needs its own issuer trust and access policy.
+The [verified snapshot reader](docs/verified-bundles.md) supplies complete checked
+records from the same bounded bytes used by the reducer, without rereading payloads.
 
 `verifySourceCitation` checks exact repository/commit/path identity, document and
 file digests, and inclusive line excerpt bytes through authorized trusted host ports.
 It preserves UTF-8 and CRLF bytes, rejects traversal, unsupported files and unavailable
 objects, and never falls back to the current checkout. These checks establish cited
-source bytes; connecting citations to change elements and review policy remains open.
+source bytes. The source-analysis API connects them to runnable change elements and
+the authenticated review policy; it does not establish passing product behavior.
 
-The initial Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
+The Phase 2 review API (`editPlan`, `reviewPlan`) binds exact source-plan
 digests and scopes. Every specification edit clears its review. Concurrent edits and
 reviews use a host-owned atomic compare-and-swap port; losing writes publish neither
 review nor projection. Reviewer identity and policy come from authenticated host
 admission. Tests exercise stale tokens, concurrent writers, resolver tampering and
 denied authority. This API has no hosted store, execution-admission integration or
 scenario activation. Resolving and validating source citations and coverage policy
-remain separate work; these records alone are not authority for product execution.
+are enforced through trusted source-analysis and policy ports before approval; hosted
+implementations remain separate work. These records alone are not authority for product execution.
+See [source-backed review](docs/source-review.md) for the immutable checks and atomic host contract.
+`source-resolve` and `GitSourceReader` [freeze local Git commit pairs and full diffs](docs/git-source-resolution.md)
+and read cited immutable objects after checkout changes. They supply source facts;
+independent review policy, full source transport and runtime identity remain separate gates.
+`LocalReviewStore` connects that API to the existing single-writer journal and preserves
+reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
+requires trusted host admission and source checking; it does not supply distributed authority.
 
-Not implemented yet (see `open-decisions.md` in the plan): browser/Playwright runner,
-source selection resolver, complete review/qualification lifecycle, authoring inference, hosted
-coordinator, `seed --apply`, distributed crash recovery and required media capture.
+Scenario qualification now has a typed registration/invalidation API with exact-matrix
+and monotonic-history checks. It registers pending work and invalidates semantic edits;
+it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
+`reduceQualificationRound` binds an entire verified terminal campaign to the registered
+cell/attempt allocations, retaining failed and mock evidence without granting a live
+proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
+`assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
+and failed history, requires at least two independent live campaigns and checks the latest
+admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
+`activateScenario` rechecks that evidence and publishes an authenticated activation through
+an atomic host port, with exact round selection and idempotent receipt recovery. See
+[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
+
+The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
+fixtures and independent readback, and verifies recordings in the portable bundle.
+Browser short flows run through `tracegrove test`; Grove plays receipt-bound recordings
+after rechecking the bundle. See the browser sample and guide for the exact syntax.
+Still open: full runtime source selection,
+hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
+Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 
 ## Zero-OrgX quickstart (low-level corpus)
 
@@ -288,6 +317,8 @@ No OrgX account, database, Docker, Python or model call is involved. The real sa
 proof claim is local application behavior at the attested source digest, not deployment.
 
 ## Checks
+
+For clean, credential-free Docker runs, see [container qualification](containers/README.md). Native real HTTP and offline contract lanes produce separate saved bundles.
 
 ```text
 npm run verify            # typecheck, schema sync, unit and end-to-end tests

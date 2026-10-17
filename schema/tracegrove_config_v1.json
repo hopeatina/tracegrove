@@ -16,7 +16,7 @@
           "type": "number"
         },
         "model": {
-          "description": "Model passed to the agent CLI. Default: haiku for claude (cheapest current Claude); the CLI default for codex.",
+          "description": "Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.",
           "maxLength": 120,
           "minLength": 1,
           "type": "string"
@@ -150,9 +150,50 @@
       "additionalProperties": {
         "additionalProperties": false,
         "properties": {
+          "inputMode": {
+            "enum": [
+              "pointer",
+              "touch",
+              "keyboard"
+            ],
+            "type": "string"
+          },
+          "locale": {
+            "maxLength": 16,
+            "minLength": 2,
+            "type": "string"
+          },
+          "reducedMotion": {
+            "type": "boolean"
+          },
           "subject": {
             "minLength": 1,
             "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "viewport": {
+            "additionalProperties": false,
+            "properties": {
+              "height": {
+                "maximum": 2147483647,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "width": {
+                "maximum": 2147483647,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "type": "object"
           }
         },
         "required": [

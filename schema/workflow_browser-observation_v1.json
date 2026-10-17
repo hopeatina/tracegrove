@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "enum": [
+        "navigate",
+        "click",
+        "fill",
+        "read"
+      ],
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "text": {
+      "anyOf": [
+        {
+          "maxLength": 8192,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "textTruncated": {
+      "type": "boolean"
+    },
+    "url": {
+      "maxLength": 4096,
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "url",
+    "status",
+    "text",
+    "textTruncated"
+  ],
+  "type": "object"
+}

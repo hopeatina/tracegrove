@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 export const CANONICAL_MAX_DEPTH = 64;
 export const CANONICAL_MAX_NODES = 250_000;
 
-import type { Digest, Ref } from './primitives.ts';
+import type { Digest, Ref, Scope } from './primitives.ts';
 
 export class CanonicalError extends Error {
   constructor(message: string) {
@@ -127,4 +127,8 @@ export function refKey(ref: Ref): string {
 
 export function sameRef(a: Ref, b: Ref): boolean {
   return a.id === b.id && a.revision === b.revision && sameDigest(a.digest, b.digest);
+}
+
+export function sameScope(a: Scope, b: Scope): boolean {
+  return a.ownerId === b.ownerId && a.tenantId === b.tenantId && a.visibility === b.visibility;
 }
