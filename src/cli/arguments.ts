@@ -20,7 +20,7 @@ export const COMMAND_SCHEMAS = {
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
-  doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),
+  doctor: z.object({ ...common, config: Text.optional(), dir: Text.optional(), profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,
     purpose: RunRequest.shape.purpose.optional() }).strict(),
   seed: z.object({ ...common, request: Text, preview: Bool }).strict(),
@@ -43,6 +43,17 @@ export type Args = {
 const deny = (code: string, detail: string, command: string): never => {
   throw new Blocked([{ code, detail, owner: 'operator', action: `workflow-verify ${command} --help` }]);
 };
+
+/** Best-effort output selection before parsing can fail. Duplicate flags still fail parsing. */
+export function jsonRequested(argv: string[]): boolean {
+  const options = argv.slice(1);
+  const index = options.findIndex(option => option === '--json' || option.startsWith('--json='));
+  if (index < 0) return false;
+  const value = options[index] === '--json'
+    ? (['false', 'true'].includes(options[index + 1] ?? '') ? options[index + 1] : 'true')
+    : options[index]?.slice('--json='.length);
+  return value === 'true';
+}
 
 /** Validate every option before file access, admission or execution. No ignored arguments. */
 export function parseArgs(argv: string[]): Args {
@@ -77,6 +88,7 @@ export function parseArgs(argv: string[]): Args {
   }
   if (flags.help === true) return { command: 'help', flags: {} };
   if (flags.json === true && flags.jsonl === true) deny('conflicting_flags', '--json and --jsonl cannot be combined', command);
+  if (name === 'doctor' && flags.config !== undefined && flags.dir !== undefined) deny('conflicting_flags', '--config and --dir cannot be combined', command);
   const parsed = schema.safeParse(flags);
   if (!parsed.success) throw new Blocked(parsed.error.issues.map(issue => ({
     code: Object.hasOwn(flags, String(issue.path[0])) ? 'invalid_argument' : 'missing_argument',

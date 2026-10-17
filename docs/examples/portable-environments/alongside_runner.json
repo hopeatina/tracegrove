@@ -1,0 +1,199 @@
+{
+  "schemaVersion": "workflow.portable-environment-profile/v1",
+  "ref": {
+    "id": "example.profile.alongside_runner",
+    "revision": "1",
+    "digest": {
+      "algorithm": "sha256",
+      "hex": "e4996a6cd34d28fdecc35d1b6fbef4b7e38301c7133137a43d833d1833e53e56"
+    }
+  },
+  "scope": {
+    "ownerId": "example.owner",
+    "tenantId": null,
+    "visibility": "owner_private"
+  },
+  "sourceSelectionRef": {
+    "id": "example.source-selection",
+    "revision": "1",
+    "digest": {
+      "algorithm": "sha256",
+      "hex": "ab392664423be621da6bb048313f6531356bd96333edb3938dce0b97cad0f277"
+    }
+  },
+  "buildRef": {
+    "id": "example.build",
+    "revision": "1",
+    "digest": {
+      "algorithm": "sha256",
+      "hex": "7e261d3ba9878d05db4c5c6baa3e4a2db1a584c3d2f5f0628b4a1c78f43f5e42"
+    }
+  },
+  "configurationRef": {
+    "id": "example.non-secret-config",
+    "revision": "1",
+    "digest": {
+      "algorithm": "sha256",
+      "hex": "74afc8ef6b145b02ec9bb478dfdefdadb225fc6f7c6a729760b525ca83476e55"
+    }
+  },
+  "target": {
+    "mode": "alongside_runner",
+    "workspaceRef": {
+      "id": "example.workspace",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "8e1f432465350d78268d8b77cee90f0715de9e46a650df4235f2a74894fa52b1"
+      }
+    },
+    "hostPlanRef": {
+      "id": "example.host-plan",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "bc6a1e45f33b36d86dbce570145d739f81e757d620e6a973f641905ad11aff21"
+      }
+    },
+    "launchRecipeRef": {
+      "id": "example.launch-recipe",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "ea08051425f1b814abb6bc69d036429beb70df5b2a142f94bd1dcfe3df7cabd4"
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "id": "app",
+      "resolverRef": {
+        "id": "example.app-endpoint",
+        "revision": "1",
+        "digest": {
+          "algorithm": "sha256",
+          "hex": "a6b3d24ad9a0af002a55a8ac10805e763bedd7b3e5fc0a714a3d59fecc129b81"
+        }
+      },
+      "source": "launch_reported"
+    }
+  ],
+  "readiness": {
+    "endpointId": "app",
+    "path": "/health",
+    "method": "GET",
+    "expectedStatus": 200,
+    "timeoutMs": 20000
+  },
+  "capabilities": [
+    {
+      "id": "surface.http",
+      "version": 1,
+      "required": true
+    }
+  ],
+  "dependencyPlanRefs": [],
+  "personaCredentials": [
+    {
+      "personaRef": {
+        "id": "example.persona.owner",
+        "revision": "1",
+        "digest": {
+          "algorithm": "sha256",
+          "hex": "6e993a3445b5165be1d544736fadaa7d46d65c63d07ed71b1552bb51a5bd0813"
+        }
+      },
+      "secretRef": {
+        "id": "example.app-persona-credential",
+        "revision": "1",
+        "digest": {
+          "algorithm": "sha256",
+          "hex": "e90cf65d59c84838c7dd77bec933794873024e2c93cf8252a4079e494a04c4f8"
+        }
+      }
+    }
+  ],
+  "executionPolicyRef": {
+    "id": "example.execution-policy",
+    "revision": "1",
+    "digest": {
+      "algorithm": "sha256",
+      "hex": "f5150e48ea518c445afe198f0c7d643b4645faaeb4fe3d6d007d79209dc4de59"
+    }
+  },
+  "executionSecretRefs": [],
+  "network": {
+    "policyRef": {
+      "id": "example.network-policy",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "858db25db4c84793dd49f8bce7d12c9900326669c502880e1f5267895119efd2"
+      }
+    },
+    "enforcement": "host",
+    "inbound": "loopback_only",
+    "egress": "explicit_allowlist",
+    "allowedEndpointIds": [
+      "app"
+    ]
+  },
+  "data": {
+    "mode": "none"
+  },
+  "ownership": {
+    "leasePolicyRef": {
+      "id": "example.lease-policy",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "0cc0aa82f73b5bf800d872d90a515772246e60a1f26c0b827c823a1256afb26d"
+      }
+    },
+    "cleanupPlanRef": {
+      "id": "example.cleanup-plan",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "af70f7ee71e47a2ba88e31da4d90bcf0cd8a991cb24b937245704f17d5f6b1db"
+      }
+    },
+    "cleanupReserveMs": 10000
+  },
+  "artifacts": {
+    "destinationRef": {
+      "id": "example.artifact-destination",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "86b317ba249de72c702be4390a57b7bcd090aa5fdb086fe16e64479efa4f9fca"
+      }
+    },
+    "durability": "export_required",
+    "redactionPolicyRef": {
+      "id": "example.redaction-policy",
+      "revision": "1",
+      "digest": {
+        "algorithm": "sha256",
+        "hex": "ebe43b36aeba3427ee4be196757f1cc3d4acb47c34f02928f40ed0cf008d0a8c"
+      }
+    },
+    "retentionMs": 86400000,
+    "maxBytes": 16777216
+  },
+  "limits": {
+    "wallMs": 120000,
+    "cpu": 1,
+    "memoryMb": 1024,
+    "diskMb": 256,
+    "maxRequests": 100,
+    "maxBrowserActions": 0,
+    "maxProviderCalls": 0,
+    "maxAgentCalls": 0,
+    "maxSpendCents": 0
+  },
+  "allowedReplayModes": [
+    "fresh_execution",
+    "evidence_playback"
+  ]
+}

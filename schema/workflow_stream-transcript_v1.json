@@ -1,0 +1,1030 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "binding": {
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "campaignId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "caseRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "environmentRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "executionId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "generation": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "personaRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "requestRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "ownerId": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "tenantId": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "visibility": {
+              "enum": [
+                "public",
+                "owner_private",
+                "tenant_private"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "ownerId",
+            "tenantId",
+            "visibility"
+          ],
+          "type": "object"
+        },
+        "sourceSelectionRef": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "targetRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "campaignId",
+        "executionId",
+        "attemptId",
+        "generation",
+        "requestRef",
+        "sourceSelectionRef",
+        "caseRef",
+        "personaRef",
+        "targetRef",
+        "environmentRef",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "completeness": {
+      "enum": [
+        "complete",
+        "partial",
+        "missing"
+      ],
+      "type": "string"
+    },
+    "connectionId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "events": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "direction": {
+                "enum": [
+                  "client_to_server",
+                  "server_to_client",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              "eventId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "index": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "kind": {
+                "const": "chunk",
+                "type": "string"
+              },
+              "messageId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "payloadRef": {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "algorithm": {
+                        "const": "sha256",
+                        "type": "string"
+                      },
+                      "hex": {
+                        "pattern": "^[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "algorithm",
+                      "hex"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "providerEventId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sequence": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "eventId",
+              "sequence",
+              "direction",
+              "providerEventId",
+              "kind",
+              "messageId",
+              "index",
+              "payloadRef"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "chunkCount": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "direction": {
+                "enum": [
+                  "client_to_server",
+                  "server_to_client",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              "eventId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "message",
+                "type": "string"
+              },
+              "messageId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "payloadRef": {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "algorithm": {
+                        "const": "sha256",
+                        "type": "string"
+                      },
+                      "hex": {
+                        "pattern": "^[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "algorithm",
+                      "hex"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "providerEventId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sequence": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "eventId",
+              "sequence",
+              "direction",
+              "providerEventId",
+              "kind",
+              "messageId",
+              "chunkCount",
+              "payloadRef"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "direction": {
+                "enum": [
+                  "client_to_server",
+                  "server_to_client",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              "eventId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "progress",
+                "type": "string"
+              },
+              "progressRef": {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "algorithm": {
+                        "const": "sha256",
+                        "type": "string"
+                      },
+                      "hex": {
+                        "pattern": "^[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "algorithm",
+                      "hex"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "providerEventId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                ]
+              },
+              "sequence": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "eventId",
+              "sequence",
+              "direction",
+              "providerEventId",
+              "kind",
+              "requestId",
+              "progressRef"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "cancel_requested",
+                  "cancel_observed",
+                  "transport_closed",
+                  "backpressure_paused",
+                  "backpressure_resumed"
+                ],
+                "type": "string"
+              },
+              "direction": {
+                "enum": [
+                  "client_to_server",
+                  "server_to_client",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              "eventId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "evidenceRef": {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "algorithm": {
+                        "const": "sha256",
+                        "type": "string"
+                      },
+                      "hex": {
+                        "pattern": "^[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "algorithm",
+                      "hex"
+                    ],
+                    "type": "object"
+                  },
+                  "id": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "kind": {
+                "const": "control",
+                "type": "string"
+              },
+              "providerEventId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "maximum": 9007199254740991,
+                        "minimum": -9007199254740991,
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sequence": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "eventId",
+              "sequence",
+              "direction",
+              "providerEventId",
+              "kind",
+              "action",
+              "requestId",
+              "evidenceRef"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "direction": {
+                "enum": [
+                  "client_to_server",
+                  "server_to_client",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              "eventId": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "terminal",
+                "type": "string"
+              },
+              "providerEventId": {
+                "anyOf": [
+                  {
+                    "maxLength": 512,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reasonCode": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sequence": {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "completed",
+                  "transport_closed",
+                  "cancelled",
+                  "timed_out",
+                  "failed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "eventId",
+              "sequence",
+              "direction",
+              "providerEventId",
+              "kind",
+              "status",
+              "reasonCode"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 5000,
+      "type": "array"
+    },
+    "negotiatedFeatures": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "operationId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "protocolVersion": {
+      "maxLength": 400,
+      "minLength": 1,
+      "type": "string"
+    },
+    "reconnectAttemptId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "requestId": {
+      "anyOf": [
+        {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resume": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "lastEventId": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "lastProviderEventId": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastSequence": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "priorTranscriptRef": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "priorTranscriptRef",
+            "lastEventId",
+            "lastProviderEventId",
+            "lastSequence"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "workflow.stream-transcript/v1",
+      "type": "string"
+    },
+    "streamId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "transport": {
+      "enum": [
+        "sse",
+        "ndjson",
+        "websocket",
+        "mcp.stdio",
+        "mcp.streamable_http",
+        "app.bridge"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "binding",
+    "operationId",
+    "connectionId",
+    "streamId",
+    "requestId",
+    "reconnectAttemptId",
+    "transport",
+    "protocolVersion",
+    "negotiatedFeatures",
+    "resume",
+    "events",
+    "completeness"
+  ],
+  "type": "object"
+}

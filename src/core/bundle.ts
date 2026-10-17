@@ -3,10 +3,12 @@
  * hashes, every self digest, re-derives assertions from the frozen case and step observations and
  * re-reduces the outcome. A bundle whose reduction disagrees with its receipt is not evidence.
  */
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { createDurableDirectory, requireRealDirectory, syncDirectory, syncDirectoryAncestors, syncRegularFile, writeExclusiveDurable } from './atomicFiles.ts';
+import { readBoundedFile } from './boundedFile.ts';
 import { checkCellEvidence } from './bundleEvidence.ts';
-import { BundleSnapshot, BUNDLE_SCHEMA_VERSION } from './bundleSnapshot.ts';
+import { BundleSnapshot, BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
 export { BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
 import {
   CampaignResult, CaseFixturePlan, CaseSpec, ExecutionReceipt, RunRequest, SeedRecipe, SelectionManifest, canonicalize, digestOfBytes, parseAs,
@@ -21,7 +23,7 @@ import { cellBundleName, videoBundlePath } from './bundlePaths.ts';
 
 
 function writeJson(path: string, value: unknown): void {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  writeExclusiveDurable(path, Buffer.from(`${JSON.stringify(value, null, 2)}\n`));
 }
 
 export type CellRecords = {
@@ -30,11 +32,57 @@ export type CellRecords = {
   media?: Array<{ digest: string; bytes: Buffer }>;
 };
 
+
+function safeBundlePath(root: string, path: string): string {
+  if (isAbsolute(path) || path.includes('\\') || /[\x00-\x1f\x7f]/.test(path) || path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('unsafe execution bundle path');
+  return join(root, path);
+}
+
+/**
+ * Source commit under an owned quiescent local tree and the existing ledger writer.
+ * Payloads are exclusive and durable; candidate reduction precedes manifest publication.
+ * A crash/failure retains the local lock and incomplete records for explicit reconciliation.
+ */
 export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; bundle?: FrozenBundle; request?: RunRequest; selection?: SelectionManifest; receipts?: ExecutionReceipt[]; campaign?: CampaignResult }): void {
-  mkdirSync(join(input.dir, 'cells'), { recursive: true });
+  createDurableDirectory(input.dir);
+  try { lstatSync(join(input.dir, 'manifest.json')); throw new Error('execution bundle already sealed; existing evidence is never overwritten'); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  if (readdirSync(input.dir).some(name => name.startsWith('.bundle-pending-'))) throw new Error('incomplete execution seal; reconcile retained staging before retrying');
+  const lock = join(input.dir, '.bundle-write.lock');
+  try { mkdirSync(lock, { mode: 0o700 }); }
+  catch { throw new Error('execution bundle write is locked; reconcile incomplete records before retrying'); }
+  let staging: string | null = null; let published = false;
+  try {
+    syncDirectory(input.dir);
+    const candidateBytes = writeBundlePayloads(input);
+    if (candidateBytes) {
+      staging = mkdtempSync(join(input.dir, '.bundle-pending-'));
+      const temporary = join(staging, 'manifest.json');
+      writeExclusiveDurable(temporary, candidateBytes);
+      syncDirectory(staging);
+      const snapshot = BundleSnapshot.fromCandidateManifest(input.dir, readBoundedFile(temporary, BUNDLE_LIMITS.manifestBytes));
+      const checked = verifySnapshot(snapshot);
+      if (!checked.verification.ok || !checked.records) throw new Error(`execution candidate failed verification: ${checked.verification.problems.slice(0, 20).join('; ')}`);
+      if (digestOfValue(checked.records.receipts.map(receipt => refKey(receipt.ref)).sort()).hex !== digestOfValue(input.receipts!.map(receipt => refKey(receipt.ref)).sort()).hex) throw new Error('execution candidate receipts differ from frozen final records');
+      // Exclusive atomic commit marker: never replace a preexisting manifest.
+      linkSync(temporary, join(input.dir, 'manifest.json'));
+      published = true;
+      syncDirectory(input.dir);
+      rmSync(staging, { recursive: true }); staging = null;
+    }
+    rmSync(lock, { recursive: true });
+    syncDirectory(input.dir);
+  } catch (error) {
+    if (published) throw new Error('execution bundle published but final directory/lock durability is unconfirmed; verify the existing bundle before retrying', { cause: error });
+    throw new Error(`${error instanceof Error ? error.message : 'execution seal failed'}; execution bundle incomplete; reconcile the retained local lock and records before retrying`, { cause: error });
+  }
+}
+
+function writeBundlePayloads(input: { dir: string; cell?: CellRecords; bundle?: FrozenBundle; request?: RunRequest; selection?: SelectionManifest; receipts?: ExecutionReceipt[]; campaign?: CampaignResult }): Buffer | null {
+  createDurableDirectory(join(input.dir, 'cells'));
   if (input.cell) {
-    const cellDir = join(input.dir, 'cells', cellBundleName(input.cell.id));
-    mkdirSync(cellDir, { recursive: true });
+    const cellDir = safeBundlePath(input.dir, `cells/${cellBundleName(input.cell.id)}`);
+    createDurableDirectory(cellDir);
     writeJson(join(cellDir, 'receipt.json'), input.cell.receipt);
     writeJson(join(cellDir, 'environment.json'), input.cell.environment);
     writeJson(join(cellDir, 'fixtures.json'), input.cell.fixtureManifest);
@@ -43,38 +91,53 @@ export function writeExecutionBundle(input: { dir: string; cell?: CellRecords; b
     writeJson(join(cellDir, 'accounting.json'), { routing: input.cell.routing, costs: input.cell.costs, accounting: input.cell.receipt.accounting });
     writeJson(join(cellDir, 'assertions.json'), input.cell.receipt.assertions);
     writeJson(join(cellDir, 'cleanup.json'), input.cell.receipt.cleanup);
-    writeFileSync(join(cellDir, 'events.jsonl'), input.cell.eventsJsonl);
+    writeExclusiveDurable(join(cellDir, 'events.jsonl'), Buffer.from(input.cell.eventsJsonl));
     writeJson(join(cellDir, 'finalization.json'), input.cell.finalization);
     for (const artifact of input.cell.media ?? []) {
       if (!/^[a-f0-9]{64}$/.test(artifact.digest) || digestOfBytes(artifact.bytes).hex !== artifact.digest) throw new Error('invalid media digest');
-      mkdirSync(join(cellDir, 'media'), { recursive: true });
-      writeFileSync(join(input.dir, videoBundlePath(input.cell.id, artifact.digest)), artifact.bytes, { mode: 0o600 });
+      createDurableDirectory(join(cellDir, 'media'));
+      writeExclusiveDurable(safeBundlePath(input.dir, videoBundlePath(input.cell.id, artifact.digest)), artifact.bytes);
     }
-    return;
+    if (input.cell.media?.length) syncDirectory(join(cellDir, 'media'));
+    syncDirectory(cellDir);
+    syncDirectory(join(input.dir, 'cells'));
+    return null;
   }
   if (!input.bundle || !input.request || !input.selection || !input.receipts || !input.campaign) throw new Error('incomplete bundle input');
   writeJson(join(input.dir, 'request.json'), input.request);
   writeJson(join(input.dir, 'selection.json'), input.selection);
-  mkdirSync(join(input.dir, 'cases'), { recursive: true });
+  createDurableDirectory(join(input.dir, 'cases'));
   for (const caseRef of input.request.caseRefs) {
     const key = `${caseRef.id}@${caseRef.revision}#${caseRef.digest.hex}`;
-    writeJson(join(input.dir, 'cases', `${caseRef.id}.json`), input.bundle.documents[key]);
+    const path = safeBundlePath(input.dir, `cases/${caseRef.id}.json`);
+    createDurableDirectory(dirname(path));
+    writeJson(path, input.bundle.documents[key]);
   }
   writeJson(join(input.dir, 'documents.json'), input.bundle.documents);
   writeJson(join(input.dir, 'campaign.json'), input.campaign);
   const files: Array<{ path: string; sha256: string; bytes: number }> = [];
+  let totalBytes = 0;
   const walk = (dir: string, prefix: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
-      if (entry.name === 'manifest.json') continue;
+      if (!prefix && entry.name === '.bundle-write.lock') continue;
       const full = join(dir, entry.name);
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink()) throw new Error(`symlink in execution payload ${rel}`);
       if (entry.isDirectory()) { if (entry.name === 'host') continue; walk(full, rel); }
-      else { const bytes = readFileSync(full); files.push({ path: rel, sha256: digestOfBytes(bytes).hex, bytes: bytes.byteLength }); }
+      else {
+        if (files.length >= BUNDLE_LIMITS.files) throw new Error('execution bundle exceeds bounded payload limits');
+        const bytes = readBoundedFile(full, BUNDLE_LIMITS.fileBytes);
+        totalBytes += bytes.byteLength;
+        if (totalBytes > BUNDLE_LIMITS.totalBytes) throw new Error('execution bundle exceeds bounded payload limits');
+        syncRegularFile(full);
+        files.push({ path: rel, sha256: digestOfBytes(bytes).hex, bytes: bytes.byteLength });
+      }
     }
+    syncDirectory(dir);
   };
   walk(input.dir, '');
   const manifest = { schemaVersion: BUNDLE_SCHEMA_VERSION, executionId: input.receipts[0]?.executionId ?? null, campaignId: input.campaign.campaignId, reducer: REDUCER_REF, runner: input.selection.cells[0]?.expectedTarget.runner ?? HTTP_RUNNER_CAPABILITIES.ref, files, createdAt: new Date().toISOString() };
-  writeJson(join(input.dir, 'manifest.json'), manifest);
+  return Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 export type BundleVerification = { ok: boolean; problems: string[]; outcome: CampaignResult['outcome'] | null; receipts: number };
@@ -85,6 +148,59 @@ type Inspection = { verification: BundleVerification; records: Omit<VerifiedBund
 export function verifyBundle(dir: string): BundleVerification {
   try { return verifyBundleRecords(dir).verification; }
   catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 }; }
+}
+
+/**
+ * Publish only the verified snapshot's sealed bytes. The owned local parent must exist;
+ * cooperating writers share an exclusive lock, and existing outputs are never merged/overwritten.
+ * A crash leaves a private staging directory/lock to reconcile, or a complete verified output.
+ * No automatic stale-lock breaking, distributed fencing or hostile-parent race protection.
+ */
+export function exportVerifiedBundle(source: string, output: string): BundleVerification {
+  let snapshot: BundleSnapshot;
+  let verification: BundleVerification;
+  try {
+    snapshot = new BundleSnapshot(source);
+    verification = verifySnapshot(snapshot).verification;
+  } catch (error) {
+    return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 };
+  }
+  if (!verification.ok) return verification;
+  const destination = resolve(output);
+  const parent = dirname(destination);
+  requireRealDirectory(parent);
+  const lock = join(parent, `.${basename(destination)}.publish.lock`);
+  try { mkdirSync(lock, { mode: 0o700 }); }
+  catch { throw new Error('bundle publication is locked; reconcile the owned publication lock before retrying'); }
+  let staging: string | null = null;
+  try {
+    try { lstatSync(destination); throw new Error('bundle output already exists; choose a fresh output directory'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    syncDirectoryAncestors(parent);
+    staging = mkdtempSync(join(parent, '.tracegrove-publish-'));
+    const directories = new Set<string>([staging]);
+    for (const path of snapshot.paths()) {
+      const file = join(staging, path);
+      let directory = dirname(file);
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      while (directory !== parent) { directories.add(directory); if (directory === staging) break; directory = dirname(directory); }
+      writeExclusiveDurable(file, snapshot.read(path));
+    }
+    // Commit marker last, from the same bounded snapshot that was independently reduced.
+    writeExclusiveDurable(join(staging, 'manifest.json'), snapshot.manifestBytes());
+    for (const directory of [...directories].sort((a, b) => b.length - a.length)) syncDirectory(directory);
+    const copied = verifyBundle(staging);
+    if (!copied.ok) throw new Error('staged bundle failed verification; no output published');
+    renameSync(staging, destination);
+    staging = null;
+    // If this fails, the complete output may exist; do not retry blindly or delete it.
+    try { syncDirectory(parent); }
+    catch { throw new Error('bundle published but directory durability is unconfirmed; verify existing output before retrying'); }
+    return copied;
+  } finally {
+    if (staging) rmSync(staging, { recursive: true, force: true });
+    rmSync(lock, { recursive: true });
+  }
 }
 
 export function readVerifiedBundle(dir: string): VerifiedBundleRecords {

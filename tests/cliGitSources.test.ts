@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { gitFixture, cleanupGitRepositories } from './fixtures/git.ts';
 import { localScope } from '../src/core/corpus.ts';
-import { GitSourceResolution, verifySelfDigest } from '../src/protocol/index.ts';
+import { CliErrorReport, GitSourceResolution, verifySelfDigest } from '../src/protocol/index.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const cli = (...args: string[]) => spawnSync(process.execPath,
@@ -23,7 +23,10 @@ it('exports a sealed owner-private source resolution through the actual CLI with
   expect(verifySelfDigest(artifact)).toBe(true); expect(artifact.matrix.repositories[0]!.headCommit).toBe(f.head);
   if (process.platform !== 'win32') expect(statSync(output).mode & 0o777).toBe(0o600);
   const repeated = cli('source-resolve', '--input', input, '--output', output, '--json');
-  expect(repeated.status).toBe(2); expect(repeated.stderr).toContain('already exists');
+  expect(repeated.status).toBe(2); expect(repeated.stderr).toBe('');
+  expect(CliErrorReport.parse(JSON.parse(repeated.stdout))).toMatchObject({ errorClass: 'conflict', exitCode: 2, reasons: [{ code: 'state_conflict' }] });
+  const prose = cli('source-resolve', '--input', input, '--output', output, '--json=false');
+  expect(prose.status).toBe(2); expect(prose.stdout).toBe(''); expect(prose.stderr).toContain('already exists');
   expect(JSON.parse(readFileSync(output, 'utf8')).ref).toEqual(artifact.ref);
 });
 it('refuses malformed/oversized input and foreign scope before writing output', () => {
@@ -37,7 +40,9 @@ it('rejects incomplete source resolution without creating a partial output', () 
   const f = gitFixture(); const input = join(f.root, 'repositories.json'); const output = join(f.root, 'source.json');
   writeFileSync(input, JSON.stringify({ scope: localScope(), repositories: [{ ...f.selected, head: 'missing-private-ref' }] }));
   const result = cli('source-resolve', '--input', input, '--output', output, '--json');
-  expect(result.status).toBe(2); expect(existsSync(output)).toBe(false); expect(result.stderr).not.toContain('missing-private-ref');
+  expect(result.status).toBe(2); expect(existsSync(output)).toBe(false); expect(result.stderr).toBe('');
+  expect(result.stdout).not.toContain('missing-private-ref');
+  expect(CliErrorReport.parse(JSON.parse(result.stdout))).toMatchObject({ errorClass: 'conflict', exitCode: 2, reasons: [{ code: 'state_conflict' }] });
 });
 it('rejects an ignored scope/actor flag before opening even a nonexistent input', () => {
   const result = cli('source-resolve', '--input', '/missing-source-file.json', '--output', '/unused.json', '--actor', 'claimed-owner');

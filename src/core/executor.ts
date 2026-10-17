@@ -4,14 +4,14 @@
  * boundary/host/identity observations and artifacts, cleans owned resources and seals a receipt.
  * The reducer derives every verdict; drivers and hosts only supply observations.
  */
-import { mkdirSync } from 'node:fs';
+import { lstatSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
-  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
-  type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
+  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, sameRef, sameScope, selfDigest, verifySelfDigest,
+  type Accounting, type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
   type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
@@ -22,13 +22,15 @@ import { MockLoopbackHost } from '../hosts/mock.ts';
 import type { ExecutorHost, HostSession } from '../hosts/types.ts';
 import { LocalArtifactStore } from './artifacts.ts';
 import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
-import { writeExecutionBundle } from './bundle.ts';
+import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
+import { requireRealDirectory, syncDirectory } from './atomicFiles.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { compileCase, type CompiledCase } from './compiler.ts';
 import { Deadline } from './deadline.ts';
 import { Blocked, Conflict, InfrastructureFailure } from './errors.ts';
 import { EventLog } from './events.ts';
 import type { LocalLedger } from './ledger.ts';
+import { ExecutionOwnership, assertInterruptedOwnershipResolved } from './executionOwnership.ts';
 import type { FrozenBundle } from './planner.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
@@ -84,6 +86,35 @@ type PreparedCell = {
 
 function ownerFor(scope: Scope): string {
   return scope.ownerId;
+}
+
+/** Readback reconciles a local commit; it never acquires resources or trusts cached PASS/summary. */
+function committedRunSummary(input: { stateDir: string; ledger: LocalLedger; request: RunRequest; selection: SelectionManifest; scope: Scope;
+  executionId: string; attemptId: string; generation: number; attemptNumber: number }): RunSummary {
+  const { executionId, attemptId, generation, attemptNumber, request, selection, scope, ledger } = input;
+  if (!/^[A-Za-z0-9_-]+$/.test(executionId) || !Number.isInteger(generation) || generation < 1 || !Number.isInteger(attemptNumber) || attemptNumber < 1)
+    throw new Conflict('committed_execution_binding_invalid');
+  const executionDir = join(input.stateDir, 'executions', executionId);
+  let checked: ReturnType<typeof readVerifiedBundle>;
+  try { requireRealDirectory(executionDir); checked = readVerifiedBundle(executionDir); }
+  catch { throw new Conflict('committed_execution_evidence_invalid; preserve the existing execution and reconcile its missing or corrupt evidence'); }
+  const finalized = ledger.current(`execution:${executionId}`);
+  const finalizedRefs = ledger.history(`execution:${executionId}`).filter(row => row.type === 'cell.finalized').map(row => row.data.receiptRef);
+  if (!sameRef(checked.request.ref, request.ref) || !sameRef(checked.selection.ref, selection.ref) || !sameScope(checked.campaign.scope, scope) ||
+      checked.campaign.campaignId !== request.campaignId || !checked.receipts.length ||
+      checked.receipts.some(receipt => receipt.executionId !== executionId || receipt.attemptId !== attemptId || receipt.attemptNumber !== attemptNumber ||
+        receipt.environment.generation !== generation || !sameScope(receipt.scope, scope) || receipt.idempotencyKey !== request.idempotencyKey) ||
+      digestOfValue(finalizedRefs.map(ref => digestOfValue(ref).hex).sort()).hex !== digestOfValue(checked.receipts.map(receipt => digestOfValue(receipt.ref).hex).sort()).hex ||
+      finalized?.type === 'finalized' && (digestOfValue(finalized.data.campaignResultRef).hex !== digestOfValue(checked.campaign.ref).hex || finalized.data.outcome !== checked.campaign.outcome))
+    throw new Conflict('committed_execution_binding_mismatch; no acquisition was replayed');
+  return { executionId, attemptId, generation, campaignId: request.campaignId, outcome: checked.campaign.outcome,
+    exitCode: EXIT_CODES[checked.campaign.outcome], reasonCodes: [...new Set(checked.receipts.flatMap(receipt => receipt.reasonCodes))],
+    receipts: checked.receipts, campaign: checked.campaign, executionDir, redelivered: true };
+}
+
+function hasCommittedManifest(executionDir: string): boolean {
+  try { lstatSync(join(executionDir, 'manifest.json')); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw new Conflict('committed_execution_evidence_unreadable'); }
 }
 
 export async function executeBundle(options: RunOptions): Promise<RunSummary> {
@@ -151,10 +182,24 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     const admitted = ledger.history(`execution:${executionId}`).find((entry) => entry.type === 'admitted');
     if (admitted?.data.requestDigest !== request.ref.digest.hex) throw new Conflict('idempotency key is already bound to a different frozen request');
     const state = ledger.current(`execution:${executionId}`);
+    const binding = { executionId, attemptId: String(admitted?.data.attemptId), generation: Number(admitted?.data.generation),
+      campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope };
+    const checkedSummary = () => committedRunSummary({ stateDir, ledger, request, selection, scope, executionId,
+      attemptId: binding.attemptId, generation: binding.generation, attemptNumber: Number(admitted?.data.attemptNumber) });
     if (state && state.type === 'finalized') {
-      return { ...(state.data.summary as RunSummary), redelivered: true };
+      return checkedSummary();
     }
-    if (state && state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state.type}); redelivery reconciles, it does not start another attempt`);
+    if (!state || state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state?.type ?? 'missing execution state'}); redelivery reconciles, it does not start another attempt`);
+    assertInterruptedOwnershipResolved(ledger, binding);
+    if (hasCommittedManifest(join(stateDir, 'executions', executionId))) {
+      const recovered = checkedSummary();
+      // A crashed publisher may have linked the valid manifest before syncing its directory.
+      try { syncDirectory(recovered.executionDir); }
+      catch { throw new Conflict('committed_execution_durability_unconfirmed; preserve the committed bytes; no acquisition was replayed'); }
+      ledger.append(`execution:${executionId}`, state.version, 'finalized', { outcome: recovered.outcome, campaignResultRef: recovered.campaign.ref,
+        receiptRef: recovered.receipts[0]?.ref ?? null, recoveredFromCommittedBundle: true, summary: { ...recovered, receipts: [], redelivered: false } });
+      return recovered;
+    }
     predecessor = (state?.data.receiptRef as Ref | undefined) ?? null;
     attemptNumber = Number(existing.data.attemptNumber ?? 1) + 1;
   }
@@ -171,6 +216,8 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   }), 'budget reservation');
   ledger.append(`execution:${executionId}`, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, attemptId, generation, attemptNumber, reservation: reservation.ref });
   ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
+  const ownership = new ExecutionOwnership(ledger, { executionId, attemptId, generation, campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope });
+  ownership.initialize();
   const artifacts = new LocalArtifactStore(join(stateDir, 'artifacts'));
   const campaignDeadline = Deadline.in(request.limits.deadlineMs);
   const receipts: ExecutionReceipt[] = [];
@@ -178,7 +225,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   let phaseVersion = ledger.version(`execution:${executionId}`);
 
   for (const item of prepared) {
-    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope, executionId, attemptId, generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, executionDir, hosts, bundle, onEvent: options.onEvent });
+    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope, executionId, attemptId, generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, ownership, executionDir, hosts, bundle, onEvent: options.onEvent });
     receipts.push(receipt);
     phaseVersion = ledger.append(`execution:${executionId}`, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
   }
@@ -196,7 +243,7 @@ type CellContext = {
   item: PreparedCell; request: NonNullable<FrozenBundle['request']>; selection: SelectionManifest; fidelityPlan: FidelityPlan;
   campaignFixturePlan: CampaignFixturePlan | null; intelligencePolicy: IntelligencePolicy; docs: DocStore; scope: Scope;
   executionId: string; attemptId: string; generation: number; attemptNumber: number; predecessor: Ref | null; reservation: BudgetReservation;
-  campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; executionDir: string;
+  campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; ownership: ExecutionOwnership; executionDir: string;
   hosts: { local: ExecutorHost; mock: ExecutorHost }; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
 };
 
@@ -222,11 +269,14 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   const credentialNames = [...new Set([...(authRecipe.credentialName ? [authRecipe.credentialName] : []), ...compiled.credentialNames])];
   const workspaceDir = join(ctx.executionDir, 'host', cell.selectionCellId.replace(/[^A-Za-z0-9._-]/g, '_'));
+  const hostOwnershipKey = `host:${cell.selectionCellId}`;
+  ctx.ownership.reserve(hostOwnershipKey, 'host', cell.selectionCellId, hostPlan.ref);
   mkdirSync(workspaceDir, { recursive: true });
   const host = hostPlan.adapter === 'mock_loopback' ? ctx.hosts.mock : ctx.hosts.local;
   const mockResponses = hostPlan.mockResponsesRef ? ctx.docs.get<MockResponses>(MockResponses, hostPlan.mockResponsesRef, 'mock responses') : null;
   try {
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
+    ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
   } catch (error) {
     if (error instanceof Blocked) blockedReasons.push(...error.reasons.map((r) => r.code));
@@ -285,7 +335,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const runtimeVariables: Record<string, unknown> = { execution_nonce: attemptId, lease_namespace: cell.selectionCellId, target_origin: origin };
 
   // ---- preparing: fixtures through registered actions with independent readback ----
-  if (item.fixture && session && driver && blockedReasons.length === 0) {
+  if (item.fixture && session && driver && !infrastructureFailure && blockedReasons.length === 0) {
     const { recipe, payload, registry } = item.fixture;
     const order = topoOrder(recipe);
     const manifestEntities: FixtureManifest['entities'] = [];
@@ -306,6 +356,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const allocatingEvent = log.emit('fixture.allocating', null, { entityKey, actionId: action.actionId, effectKey: `${attemptId}:${entityKey}` });
       try {
         if (action.effect !== 'create') throw new HttpStepError('fixture_ownership_unavailable', 'only a registered create action can allocate an owned fixture');
+        ctx.ownership.reserve(`fixture:${cell.selectionCellId}:${entityKey}`, 'fixture', cell.selectionCellId, recipe.ref);
         uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
         if (action.expectStatus !== null && observation.status !== action.expectStatus) throw new HttpStepError('unexpected_status', `${action.actionId} returned ${observation.status}, expected ${action.expectStatus}`);
@@ -319,8 +370,10 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         if (!parsedId.success) throw new HttpStepError('fixture_identity_unobserved', 'captured fixture ID is invalid');
         const physicalId = parsedId.data;
         const cleanupHandle = entity.cleanup ? { actionId: entity.cleanup.actionId, args: { ...variables, ...outputs } } : null;
-        const allocatedEvent = log.emit('fixture.allocated', null, { entityKey, physicalId, status: observation.status, requestId: observation.requestId, cleanupHandle }, { requestId: observation.requestId });
+        // Keep the observed cleanup handle in memory before any fallible acknowledgement/export callback.
         allocated.push({ entityKey, physicalId, cleanup: cleanupHandle, absence: entity.cleanup ? entity.cleanup.absenceReadback : null });
+        ctx.ownership.observed(`fixture:${cell.selectionCellId}:${entityKey}`, [physicalId]);
+        const allocatedEvent = log.emit('fixture.allocated', null, { entityKey, physicalId, status: observation.status, requestId: observation.requestId, cleanupHandle }, { requestId: observation.requestId });
         uncertainAllocations.delete(entityKey);
         let readbackRefs: Ref[] = [];
         if (entity.readback) {
@@ -456,9 +509,20 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   }
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
-  const { cleanup, criticalCleanupConfirmed } = await collectCleanup({ allocated,
+  // Journal failure must never prevent best-effort cleanup of already acquired resources.
+  let ownershipWriteError: unknown;
+  try {
+    if (session) ctx.ownership.cleaning(hostOwnershipKey);
+    for (const entry of allocated) ctx.ownership.cleaning(`fixture:${cell.selectionCellId}:${entry.entityKey}`);
+  } catch (error) { ownershipWriteError = error; }
+  const { cleanup, criticalCleanupConfirmed, confirmedFixtureKeys, hostCleanupConfirmed } = await collectCleanup({ allocated,
     uncertainAllocations: uncertainAllocations.size, registry: item.fixture?.registry ?? null,
     driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
+  if (!ownershipWriteError) {
+    if (session && hostCleanupConfirmed) ctx.ownership.removed(hostOwnershipKey);
+    for (const entry of allocated) if (confirmedFixtureKeys.includes(entry.entityKey)) ctx.ownership.removed(`fixture:${cell.selectionCellId}:${entry.entityKey}`);
+  }
+  if (ownershipWriteError) throw ownershipWriteError;
   const hostSeconds = (monotonicMs() - hostStartedMs) / 1000;
 
   // ---- sealing ----

@@ -10,17 +10,115 @@ and tracegrove re-checks everything they write before you see it.
 
 ![tracegrove ui: a run shown as a tree of scenarios, each step with its request, timing and status](docs/images/ui-run.png)
 
-## The 60-second tour
+## First run: an isolated app and verified evidence
 
-```text
-npx --no-install tracegrove init                     # detect FastAPI / Django / Node, write a config and one example flow
-npx --no-install tracegrove ui                       # the grove: run, discover, draft, history, settings
-npx --no-install tracegrove draft --intent "a stranger can't read or delete someone else's note"
-npx --no-install tracegrove test                     # run, verify, seal: .tracegrove/runs/latest/
+The [consolidated implementation and release plan](docs/capability-schema-foundation.md) records
+what is implemented, in progress, planned and blocked, with exact PRs and evidence.
+
+This candidate is unpublished. Start from an authorized checkout of the reviewed commit;
+run the following from its root. Do not install an unrelated registry package with `npx tracegrove`.
+The first run needs **Node >=22.22.0 and <23**, npm with lockfile-v3 support, a POSIX shell,
+writable workspace/temp storage and loopback sockets. Linux is exercised in CI; macOS is
+implemented through the POSIX host but remains unqualified on Hope's offline Mac. Windows
+process-tree execution is blocked. This API sample needs no Docker, Python, browser, model,
+cloud account or application credentials. Dependency installation needs authorized npm access.
+Use one shell session for these blocks. Agents with stateless shell calls should execute the
+bootstrap, build and quickstart blocks together so the selected PATH and writable npm cache persist.
+
+Check `node --version`. If Node 22 is absent and this environment permits dependency installation,
+this optional bootstrap installs a pinned toolchain into an owned temporary folder:
+
+```bash
+TRACEGROVE_TOOLS="$(mktemp -d)"
+npm install --prefix "$TRACEGROVE_TOOLS" --cache "$TRACEGROVE_TOOLS/cache" node@22.23.3 npm@10.9.9
+export PATH="$TRACEGROVE_TOOLS/node_modules/.bin:$PATH"
+node --version
 ```
 
-This release candidate has not been published. Install a local packed archive before using the CLI examples;
-use `npx --no-install tracegrove` to avoid resolving an unrelated registry package.
+Keep that PATH for the verifier **and the app it launches**. If installation or network access is
+denied, select an already provisioned environment; do not change network or permission settings.
+Then build (the temporary npm cache also works in clouds with a read-only home directory):
+
+```bash
+export npm_config_cache="$(mktemp -d)"
+npm ci
+npm run build
+```
+
+Run this single quickstart. It creates an empty owned sample directory, checks configuration and
+runtime prerequisites, starts a real notes app with isolated synthetic fixtures, and re-verifies
+the saved evidence. No agent CLI is invoked.
+
+<!-- onboarding-quickstart:start -->
+```bash
+set -euo pipefail
+TRACEGROVE_CLI="$PWD/dist/cli/main.js"
+TRACEGROVE_DEMO="$(mktemp -d)"
+node "$TRACEGROVE_CLI" sample-config --sample notes-api --output "$TRACEGROVE_DEMO"
+node "$TRACEGROVE_CLI" doctor --config "$TRACEGROVE_DEMO/verification/workflow.yaml" --json
+node "$TRACEGROVE_CLI" check --dir "$TRACEGROVE_DEMO" --json
+node "$TRACEGROVE_CLI" test --config "$TRACEGROVE_DEMO/tracegrove.config.yaml" --json | tee "$TRACEGROVE_DEMO/run.json"
+TRACEGROVE_RUN="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")).runDir' "$TRACEGROVE_DEMO/run.json")"
+node "$TRACEGROVE_CLI" verify-bundle --bundle "$TRACEGROVE_RUN/bundle" --json
+printf 'Evidence retained at %s\n' "$TRACEGROVE_RUN"
+```
+<!-- onboarding-quickstart:end -->
+
+Expected: doctor has `blocked: false`, check has `ok: true`, test exits 0 with
+`outcome: passed` and `bundleVerified: true`, and verification has `ok: true`.
+`TRACEGROVE_RUN` contains `summary.json`, `summary.md`, `junit.xml`, `request.json` and `bundle/`.
+The run's receipts retain fixture removal and host-process cleanup confirmations. Keep the
+evidence before deleting your sample directory; ephemeral clouds require exporting it through
+an already authorized artifact destination. A successful process exit alone is insufficient.
+
+For a browser journey, install the pinned Playwright Chromium through the environment's approved
+dependency setup (`npx --no-install playwright install chromium`; Linux also needs its system
+libraries), generate `--sample notes-browser` into a **different empty directory**, and select
+`test --grep notes.browser`. Missing browser/system dependencies are blockers, not permission
+to install system packages or open ports automatically. For a small human UI use
+`node "$TRACEGROVE_CLI" ui --dir "$TRACEGROVE_DEMO"`; when the cloud has no authorized UI preview,
+use the JSON and saved artifacts. Public inbound access is unnecessary for the CLI journey.
+
+| Environment | Current qualification and needed setup |
+| --- | --- |
+| This Codex Linux cloud | Actual native/API/browser fixture journeys recorded; Node 22 and writable temp needed. General portable-profile dispatch and host network confinement remain unqualified. |
+| GitHub-hosted Linux CI | Native, browser, Django and two isolated Docker sample lanes exercised. This does not qualify every coding-cloud runtime. |
+| Hope's macOS machine | Offline; actual clean-start/journey/cleanup evidence unavailable. Needs Node 22, app dependencies, allowed process/loopback access and artifact storage. |
+| Other Codex or Claude coding clouds | Unqualified until capability discovery and the same clean-start journey pass. Do not assume Docker, persistent disks, root, browser libraries or inbound access. |
+| OrgX-triggered cloud/workflow | Unqualified. Task dispatch alone does not provide a runner, workspace, secret broker, network policy or cleanup lease. |
+| Existing external staging | No general external-host adapter or secret broker is wired into this CLI. Declaring an origin/placement does not enable it; keep blocked until authorized adapter qualification. |
+
+The [portable environment contract and rollout gates](docs/portable-environments.md) give the exact
+current-versus-needed matrix, generated SDK templates and credential-reference contract. Those
+templates are experimental SDK records, **not** additional `tracegrove.config.yaml` fields.
+
+If a check fails, use its code and recovery action. `check --dir` validates authoring;
+`doctor --dir <project> --json` finds the authoring config, writes its derived corpus and checks
+the selected native plan. From a project subdirectory, `doctor --json` finds the config above it.
+`doctor --config <low-level workflow.yaml> --profile <name> --json` checks the existing host plan.
+Doctor returns `tracegrove.doctor/v1` JSON with the selected host/corpus refs, source/runtime
+digests, checks, errors and recovery actions; exit 2 means blocked. It never starts the app,
+but can invoke the configured interpreter with `--version`. Browser executable presence is
+installation metadata; engine launch, system libraries and video capture remain untested.
+Its result always says `execution: not_started` and `verificationVerdict: not_evaluated`.
+Portable SDK profiles and external staging are not executable doctor configurations.
+Neither command proves a running app. Top-level failures with `--json` return
+`tracegrove.cli-error/v1` on stdout with a quiet stderr, a public error class, bounded reason codes,
+recovery actions and the process exit code. Doctor retains its `tracegrove.doctor/v1` report.
+These error envelopes omit exception text, paths, argument values and stacks; successful reports,
+doctor diagnostics and retained artifacts keep their existing contents and access requirements.
+`--json false` and `--json=false` retain prose errors; `--jsonl` retains its existing event stream
+and top-level error behavior. Completed `test --json` reports keep their established schema.
+Exit 1 means assertion failure, 2 blocked/inconclusive, 3 infrastructure failure,
+4 cancellation. Do not retry assertions into a clean result or discard the first attempt.
+
+Retry `test` only after fixing the reported cause; it creates a fresh execution with owned
+fixtures and preserves prior run folders. To stop, send one interrupt and allow cleanup to finish;
+unconfirmed cleanup requires reconciliation of that run's owned resources before another attempt.
+`verify-bundle` and UI recording playback inspect saved evidence; a new `test` performs new actions.
+Credentials belong in the environment's authorized resolver. Never put real credentials in
+flows, `app.env`, launch args, profiles or artifacts. The sample issues temporary synthetic persona
+tokens in memory; execution permissions remain the host's separate authority.
 
 What makes it different:
 
@@ -204,7 +302,7 @@ What the adapters cover now and what's next:
 
 | Area | Supported now | Next |
 | --- | --- | --- |
-| App launch | node, fastapi, django, any command; free port, data dir, per-persona tokens | `app.setup` commands (alembic, prisma, knex) |
+| App launch | node, fastapi, django; free port, data dir, per-persona tokens. Command wrappers remain blocked | `app.setup` commands (alembic, prisma, knex) |
 | Seeding | Fixtures created through the app's API, read back, deleted with confirmed absence | SQL seeding, repo seed commands (factory_boy, Prisma seed), snapshots |
 | Databases | SQLite via `TRACEGROVE_DATA_DIR` | `db: postgres` per-run database with `DATABASE_URL`, DB-state oracles, Redis/Mongo services |
 | Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |

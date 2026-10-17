@@ -11,6 +11,7 @@ const Manifest = z.object({ schemaVersion: z.literal(BUNDLE_SCHEMA_VERSION), exe
   files: z.array(z.object({ path: z.string().min(1).max(2048), sha256: z.string().regex(/^[a-f0-9]{64}$/),
     bytes: z.number().int().nonnegative().max(BUNDLE_LIMITS.fileBytes) }).strict()).min(1).max(BUNDLE_LIMITS.files),
 }).strict();
+const CANDIDATE = Symbol('internal candidate manifest');
 
 function json(bytes: Uint8Array, path: string): unknown {
   try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
@@ -20,10 +21,17 @@ function json(bytes: Uint8Array, path: string): unknown {
 /** Sealed bytes, not issuer authority. Caller owns/authorizes the quiescent artifact directory. */
 export class BundleSnapshot {
   readonly manifestDigest: Digest;
+  readonly #manifestBytes: Buffer;
   readonly #files = new Map<string, Buffer>();
-  constructor(dir: string) {
+  /** Internal writer readback only; public verification still requires the committed manifest. */
+  static fromCandidateManifest(dir: string, bytes: Uint8Array): BundleSnapshot {
+    return new BundleSnapshot(dir, { token: CANDIDATE, bytes });
+  }
+  constructor(dir: string, candidate?: { token: typeof CANDIDATE; bytes: Uint8Array }) {
     if (!lstatSync(dir).isDirectory()) throw new Error('bundle root must be a real directory');
-    const manifestBytes = readBounded(join(dir, 'manifest.json'), BUNDLE_LIMITS.manifestBytes);
+    if (candidate && (candidate.token !== CANDIDATE || candidate.bytes.byteLength > BUNDLE_LIMITS.manifestBytes)) throw new Error('invalid bounded candidate manifest');
+    const manifestBytes = candidate ? Buffer.from(candidate.bytes) : readBounded(join(dir, 'manifest.json'), BUNDLE_LIMITS.manifestBytes);
+    this.#manifestBytes = manifestBytes;
     this.manifestDigest = digestOfBytes(manifestBytes);
     const manifest = Manifest.parse(json(manifestBytes, 'manifest.json'));
     let total = 0;
@@ -45,6 +53,7 @@ export class BundleSnapshot {
   }
   has(path: string): boolean { return this.#files.has(path); }
   paths(): string[] { return [...this.#files.keys()]; }
+  manifestBytes(): Buffer { return Buffer.from(this.#manifestBytes); }
   read(path: string): Buffer {
     const bytes = this.#files.get(path);
     if (!bytes) throw new Error(`unsealed required file ${path}`);

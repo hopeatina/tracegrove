@@ -4,7 +4,7 @@
  * the library API. Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive,
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
@@ -14,13 +14,14 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
-import { verifyBundle } from '../core/bundle.ts';
+import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
+import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { checkCleanupFiles } from './cleanup.ts';
-import { parseArgs, type Args } from './arguments.ts';
+import { jsonRequested, parseArgs, type Args } from './arguments.ts';
+import { cliErrorReport } from './errors.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
-import { sourceIdentityDigest } from '../hosts/local.ts';
-import { observeApplicationRuntime } from '../hosts/runtime.ts';
+import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
+import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
 import { resolveSourceFiles } from './source.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
@@ -74,7 +75,7 @@ Agent-friendly commands (every one takes --json and never starts the app):
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
-  doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
+  doctor [--dir <dir>|--config <yaml>] [--profile <name>]\n                                                       inspect native setup and plan; never launch the app
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
   seed --request <request.json> --preview              show planned fixture resources and cleanup (no effects)
   run --request <request.json> [--jsonl]               admit and execute the frozen request
@@ -234,32 +235,12 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'doctor': {
-      const project = loadProject(args.flags['config']);
-      const profileName = flag(args, 'profile') ?? project.config.defaultProfile;
-      const profile = project.config.profiles[profileName];
-      if (!profile) throw new Blocked([{ code: 'unknown_profile', detail: profileName }]);
-      const hostRef = project.fileRefs.get(profile.hostPlanRef ?? project.config.executionHostRef)!;
-      const hostPlan = project.corpus.getAs(HostPlan, hostRef);
-      const checks: Array<{ check: string; state: string; detail: string }> = [];
-      checks.push({ check: 'node', state: process.versions.node.startsWith('22.') ? 'ok' : 'warn', detail: process.version });
-      if (hostPlan.launch) {
-        const cwd = resolve(project.root, hostPlan.launch.cwd);
-        try {
-          const identity = sourceIdentityDigest(cwd, hostPlan.launch.identitySourceFiles);
-          checks.push({ check: 'identity_sources', state: 'ok', detail: `${identity.entries.length} file(s), digest ${identity.hex.slice(0, 12)}` });
-        } catch (error) { checks.push({ check: 'identity_sources', state: 'blocked', detail: String((error as Error).message) }); }
-        try {
-          const runtime = await observeApplicationRuntime(hostPlan.launch.command, cwd, process.env.PATH ?? '');
-          checks.push({ check: 'application_runtime', state: 'ok', detail: `${runtime.runtime} (${runtime.version}); executable digest ${runtime.executableSha256.slice(0, 12)}` });
-        } catch (error) { checks.push({ check: 'application_runtime', state: 'blocked', detail: String((error as Error).message) }); }
-      } else {
-        checks.push({ check: 'host', state: 'ok', detail: `${hostPlan.adapter} binds a declared target; no launch` });
-      }
-      const bundle = plan({ project, profileName, scope: localScope() });
-      checks.push({ check: 'plan', state: bundle.blockers.length === 0 ? 'ok' : 'blocked', detail: bundle.blockers.length === 0 ? `${bundle.request!.caseRefs.length} case(s), ${bundle.excludedCells.length} excluded` : bundle.blockers.map((b) => `${b.code}: ${b.detail}`).join('; ') });
-      const blocked = checks.some((c) => c.state === 'blocked');
-      out(args, { profile: profileName, checks, blocked }, checks.map((c) => `${c.state.padEnd(8)} ${c.check}: ${c.detail}`).join('\n') + `\n${blocked ? 'BLOCKED: resolve the items above' : 'doctor made no effects and observed no running product; run plan next'}`);
-      return blocked ? 2 : 0;
+      const report = await inspectDoctor(args.flags);
+      out(args, report, report.checks.map(c => `${c.state.padEnd(8)} ${c.check}: ${c.detail}${c.action !== 'none' ? `\n  action: ${c.action}` : ''}`).join('\n') +
+        report.errors.map(e => `\nBLOCKED ${e.code}: ${e.detail}\n  action: ${e.action}`).join('') +
+        `\n${report.blocked ? 'BLOCKED: resolve the items above' : 'Metadata checks passed; application execution and verification have not started.'}\n` +
+        `${report.selection?.compiledFilesWritten ? 'Derived corpus files were written. ' : ''}Doctor never launches the app; interpreter --version probes may run. No running product was observed.`);
+      return report.exitCode;
     }
 
     case 'plan': {
@@ -349,10 +330,9 @@ async function main(argv: string[]): Promise<number> {
       const output = resolve(args.flags['output']);
       const dir = join(stateDir, 'executions', executionId);
       if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId }]);
-      mkdirSync(output, { recursive: true });
-      cpSync(dir, output, { recursive: true, filter: (src) => !src.includes(`${executionId}/host`) });
-      const verification = verifyBundle(output);
-      out(args, { output, verification }, `exported to ${output}; verification ${verification.ok ? 'ok' : `FAILED: ${verification.problems.join('; ')}`}`);
+      createDurableDirectory(dirname(output));
+      const verification = exportVerifiedBundle(dir, output);
+      out(args, { output, verification, published: verification.ok }, verification.ok ? `exported to ${output}; verification ok` : `bundle invalid; no output published: ${verification.problems.join('; ')}`);
       return verification.ok ? 0 : 2;
     }
 
@@ -396,6 +376,11 @@ function readBundle(path: string): FrozenBundle {
 }
 
 main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {
+  // Argument failures happen before the doctor handler; retain its structured JSON contract.
+  if (jsonRequested(process.argv.slice(2))) {
+    const report = process.argv[2] === 'doctor' ? doctorFailure(error) : cliErrorReport(error, process.argv[2]);
+    process.stdout.write(`${JSON.stringify(report)}\n`); process.exitCode = report.exitCode; return;
+  }
   if (error instanceof Blocked) { process.stderr.write(`BLOCKED: ${error.reasons.map((r) => `${r.code}: ${r.detail} (owner: ${r.owner}; action: ${r.action})`).join('\n')}\n`); process.exitCode = 2; return; }
   if (error instanceof Conflict) { process.stderr.write(`CONFLICT: ${error.message}\n`); process.exitCode = 2; return; }
   if (error instanceof SchemaViolation) { process.stderr.write(`INVALID: ${error.message}\n`); process.exitCode = 2; return; }

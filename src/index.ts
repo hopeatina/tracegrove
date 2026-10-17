@@ -18,7 +18,7 @@ export { activateScenario, type ScenarioActivationPorts } from './core/scenarioA
 export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
 export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } from './core/source-analysis.ts';
 export { resolveGitSources, GitSourceReader, GIT_RESOLVER_REF, type GitSourceAuthorization } from './core/gitSources.ts';
-export { verifyBundle, readVerifiedBundle, readVerifiedVideo, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
+export { exportVerifiedBundle, verifyBundle, readVerifiedBundle, readVerifiedVideo, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';
 export { materializeLogicalPayload } from './core/generators.ts';
@@ -28,3 +28,7 @@ export { BrowserDriver, BrowserStepError } from './adapters/browser/driver.ts';
 export { LocalProcessHost, sourceIdentityDigest } from './hosts/local.ts';
 export { MockLoopbackHost } from './hosts/mock.ts';
 export type { ExecutorHost, HostSession, HostStartContext } from './hosts/types.ts';
+
+export * from './core/capabilityBoundary.ts';
+export * from './core/capabilityLifecycle.ts';
+export * from './core/environmentPreflight.ts';

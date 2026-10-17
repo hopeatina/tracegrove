@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "baseDelayMs": {
+      "maximum": 2592000000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "maxAttempts": {
+      "maximum": 10,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "maxDelayMs": {
+      "maximum": 2592000000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "maxElapsedMs": {
+      "maximum": 2592000000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "maxRequests": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "maxAttempts",
+    "baseDelayMs",
+    "maxDelayMs",
+    "maxElapsedMs",
+    "maxRequests"
+  ],
+  "type": "object"
+}

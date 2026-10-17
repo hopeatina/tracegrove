@@ -26,6 +26,15 @@ jobs:
       - run: npm run verify
       - run: npm run test:conformance
       - run: npm run build
+      - name: README first-use journey and verified cleanup
+        id: readme-onboarding
+        run: npm run test:onboarding
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.readme-onboarding.outcome != 'skipped'
+        with:
+          name: readme-onboarding
+          path: artifacts/qa/readme-onboarding/
+          if-no-files-found: warn
       - name: Verify immutable source resolution through the built CLI
         env:
           WORKFLOW_VERIFY_TEST_CLI: compiled
