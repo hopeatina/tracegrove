@@ -73,11 +73,13 @@ Network events record methods, paths, and response statuses without request
 headers or query strings. Recording more than 512 network events invalidates
 collection. Required traces and declared redaction policies remain blocked.
 
-Before closing a successful session, collection requests a compositor capture
-and waits for a fresh presented frame through Playwright’s public screencast
-callback, then stops and flushes the encoder. A screenshot acknowledgement
-alone does not establish recording delivery. This uses the cleanup deadline,
-not an arbitrary recording delay.
+Before closing a successful session, collection completes a layout-aware
+screenshot, then requests another capture and waits for a frame presented after
+the first capture through Playwright’s public screencast callback. Only then
+does it stop and flush the encoder. A fresh frame delivered during the first
+capture can still contain older pixels. This uses the cleanup deadline, not an
+arbitrary recording delay. Collection failures name their capture, frame, or
+flush phase without exposing page text or Playwright diagnostics.
 The controller seals the recording bytes into the portable bundle and records
 browser duration and artifact bytes. Verification reproduces the frozen runner
 capabilities, independently reduces browser assertions, and checks video hashes

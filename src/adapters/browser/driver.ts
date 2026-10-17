@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type CDPSession, type Locator, type Page, type Request } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,7 +7,7 @@ import { readBoundedFile } from '../../core/boundedFile.ts';
 import { BrowserCommand, BrowserObservation, BrowserNetworkObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
 
 export class BrowserStepError extends Error {
-  constructor(readonly code: string) { super(code); this.name = 'BrowserStepError'; }
+  constructor(readonly code: string, readonly phase?: 'capture' | 'frame' | 'flush') { super(phase ? `${code}:${phase}` : code); this.name = 'BrowserStepError'; }
 }
 
 /** Local browser facts only. Qualification and artifact admission belong to the controller. */
@@ -23,7 +23,6 @@ export class BrowserDriver {
     private readonly page: Page,
     private readonly mediaDir: string,
     private readonly inputMode: 'pointer' | 'keyboard' | 'touch',
-    private readonly compositor: CDPSession,
   ) {}
 
   static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
@@ -88,7 +87,7 @@ export class BrowserDriver {
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
-      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', network);
+      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
       await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: { width: 1280, height: 720 },
         onFrame: frame => { driver.latestFrameAt = frame.timestamp; driver.onFrame?.(frame.timestamp); },
       });
@@ -187,7 +186,12 @@ export class BrowserDriver {
   async collectVideo(maxBytes = 32 * 1024 * 1024, deadline = Deadline.in(5000)): Promise<Buffer> {
     if (!this.closing) {
       const signal = deadline.signal();
+      let phase: 'capture' | 'frame' | 'flush' = 'capture';
       try {
+        signal.throwIfAborted();
+        // Complete a layout-aware capture before defining the freshness barrier;
+        // a newly delivered frame can still contain pixels queued before this capture.
+        await this.page.screenshot({ type: 'png', animations: 'allow', caret: 'initial', timeout: Math.max(1, deadline.remainingMs()) });
         signal.throwIfAborted();
         // A DOM read or screenshot acknowledgement can precede recording delivery.
         // Browser presentation timestamps exclude frames already in flight.
@@ -206,21 +210,23 @@ export class BrowserDriver {
             if (captured && presented) finish();
           };
           signal.addEventListener('abort', abort, { once: true });
-          void this.compositor.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false })
+          void this.page.screenshot({ type: 'png', animations: 'allow', caret: 'initial', timeout: Math.max(1, deadline.remainingMs()) })
             .then(() => {
               captured = true;
+              phase = 'frame';
               presented ||= this.latestFrameAt >= since;
               if (presented) finish();
             }, finish);
         });
         signal.throwIfAborted();
+        phase = 'flush';
         const abort = () => { void this.close().catch(() => {}); };
         signal.addEventListener('abort', abort, { once: true });
         try { await this.page.screencast.stop(); signal.throwIfAborted(); }
         finally { signal.removeEventListener('abort', abort); }
       } catch {
         await this.close();
-        throw new BrowserStepError('video_final_frame_unavailable');
+        throw new BrowserStepError('video_final_frame_unavailable', phase);
       }
     }
     await this.close();
