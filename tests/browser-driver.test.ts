@@ -167,6 +167,6 @@ describe('real isolated browser driver', () => {
 
   it('refuses collection when the final paint deadline has expired', async () => {
     await start(); await execute({ kind: 'navigate', path: '/' });
-    await expect(driver!.collectVideo(1024 * 1024, new Deadline(0))).rejects.toMatchObject({ code: 'video_final_frame_unavailable' });
+    await expect(driver!.collectVideo(1024 * 1024, new Deadline(0))).rejects.toMatchObject({ code: 'video_final_frame_unavailable', phase: 'capture' });
   });
 });

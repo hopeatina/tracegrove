@@ -7,7 +7,7 @@ import { readBoundedFile } from '../../core/boundedFile.ts';
 import { BrowserCommand, BrowserObservation, BrowserNetworkObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
 
 export class BrowserStepError extends Error {
-  constructor(readonly code: string) { super(code); this.name = 'BrowserStepError'; }
+  constructor(readonly code: string, readonly phase?: 'capture' | 'frame' | 'flush') { super(phase ? `${code}:${phase}` : code); this.name = 'BrowserStepError'; }
 }
 
 /** Local browser facts only. Qualification and artifact admission belong to the controller. */
@@ -189,12 +189,14 @@ export class BrowserDriver {
   async collectVideo(maxBytes = 32 * 1024 * 1024, deadline = Deadline.in(5000)): Promise<Buffer> {
     if (!this.closing) {
       const signal = deadline.signal();
+      let phase: 'capture' | 'frame' | 'flush' = 'capture';
       try {
         signal.throwIfAborted();
-        // The public screenshot API waits for an available rendering surface and retries
-        // transient capture failures during navigation. Raw CDP capture can race
-        // that surface, even after DOMContentLoaded on an unchanged page.
-        // Screenshot acknowledgement can still precede recording delivery.
+        // Complete a layout-aware capture before defining the freshness barrier;
+        // a newly delivered frame can still contain pixels queued before this capture.
+        await this.page.screenshot({ type: 'png', animations: 'allow', caret: 'initial', timeout: Math.max(1, deadline.remainingMs()) });
+        signal.throwIfAborted();
+        // A DOM read or screenshot acknowledgement can precede recording delivery.
         // Browser presentation timestamps exclude frames already in flight.
         const since = Date.now() + 1;
         await new Promise<void>((resolve, reject) => {
@@ -211,21 +213,23 @@ export class BrowserDriver {
             if (captured && presented) finish();
           };
           signal.addEventListener('abort', abort, { once: true });
-          void this.page.screenshot({ type: 'png', caret: 'initial', animations: 'allow', timeout: Math.max(1, deadline.remainingMs()) })
+          void this.page.screenshot({ type: 'png', animations: 'allow', caret: 'initial', timeout: Math.max(1, deadline.remainingMs()) })
             .then(() => {
               captured = true;
+              phase = 'frame';
               presented ||= this.latestFrameAt >= since;
               if (presented) finish();
             }, finish);
         });
         signal.throwIfAborted();
+        phase = 'flush';
         const abort = () => { void this.close().catch(() => {}); };
         signal.addEventListener('abort', abort, { once: true });
         try { await this.page.screencast.stop(); signal.throwIfAborted(); }
         finally { signal.removeEventListener('abort', abort); }
       } catch {
         await this.close();
-        throw new BrowserStepError('video_final_frame_unavailable');
+        throw new BrowserStepError('video_final_frame_unavailable', phase);
       }
     }
     await this.close();
