@@ -37,13 +37,16 @@ it('rejects mutated frozen profiles, scope drift and ambiguous endpoint/network 
   expect((await preflightPortableEnvironment({ ...f.intent, binding: { ...f.binding, sourceSelectionRef: ref('different-source') } }, f.ports)).errors).toEqual(['source_binding_mismatch']);
 });
 it('stops subsequent metadata probes if earlier authorization expires during preflight', async () => {
-  const f = fixture(); const implementation = f.ports.probe.getMockImplementation()!;
-  f.ports.probe.mockImplementation(async request => {
-    if ((request as {kind: string}).kind === 'authorization') return { ...await implementation(request), expiresAt: new Date(Date.now() + 10).toISOString() };
-    await new Promise(resolve => setTimeout(resolve, 20)); return implementation(request);
-  });
-  const report = await preflightPortableEnvironment(f.intent, f.ports);
-  expect(report.errors).toEqual(['preflight_observations_expired']); expect(f.ports.probe).toHaveBeenCalledTimes(2);
+  const f = fixture(); const implementation = f.ports.probe.getMockImplementation()!; let now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  try {
+    f.ports.probe.mockImplementation(async request => {
+      if ((request as {kind: string}).kind === 'authorization') return { ...await implementation(request), expiresAt: new Date(now + 10).toISOString() };
+      now += 20; return implementation(request);
+    });
+    const report = await preflightPortableEnvironment(f.intent, f.ports);
+    expect(report.errors).toEqual(['preflight_observations_expired']); expect(f.ports.probe).toHaveBeenCalledTimes(2);
+  } finally { clock.mockRestore(); }
 });
 it('stops before target/credential probing on denied authorization and omits raw errors', async () => {
   const f = fixture(); const implementation = f.ports.probe.getMockImplementation()!;
