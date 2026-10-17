@@ -86,6 +86,14 @@ describe('real isolated browser driver', () => {
     await expect(execute({ kind: 'navigate', path: '/' })).rejects.toMatchObject({ code: 'browser_closed' });
   });
 
+  it('records an unchanged final page without relying on another user action', async () => {
+    await start();
+    await execute({ kind: 'navigate', path: '/' });
+    const pixel = await finalVideoPixel(await driver!.collectVideo());
+    expect(pixel[0]).toBeGreaterThan(200);
+    expect(pixel[1]).toBeLessThan(30);
+  });
+
   it('rejects cross-origin URL resolution before contacting that origin', async () => {
     await start();
     await expect(execute({ kind: 'navigate', path: `//127.0.0.1:${(outside.address() as { port: number }).port}/` })).rejects.toMatchObject({ code: 'origin_not_admitted' });

@@ -6,7 +6,7 @@ running browser tests or using the driver:
 
 ```sh
 npm ci
-npx --no-install playwright install chromium
+PLAYWRIGHT_SKIP_BROWSER_GC=1 npx --no-install playwright install chromium
 npm test -- tests/browser-driver.test.ts
 ```
 
@@ -73,9 +73,11 @@ Network events record methods, paths, and response statuses without request
 headers or query strings. Recording more than 512 network events invalidates
 collection. Required traces and declared redaction policies remain blocked.
 
-Before closing a successful session, collection crosses a paint boundary and
-captures the compositor so a completed DOM observation is present in the final
-video frame. This uses the cleanup deadline, not an arbitrary recording delay.
+Before closing a successful session, collection requests a compositor capture
+and waits for a fresh presented frame through Playwright’s public screencast
+callback, then stops and flushes the encoder. A screenshot acknowledgement
+alone does not establish recording delivery. This uses the cleanup deadline,
+not an arbitrary recording delay.
 The controller seals the recording bytes into the portable bundle and records
 browser duration and artifact bytes. Verification reproduces the frozen runner
 capabilities, independently reduces browser assertions, and checks video hashes

@@ -14,6 +14,8 @@ export class BrowserStepError extends Error {
 export class BrowserDriver {
   private closing: Promise<void> | undefined;
   private busy = false;
+  private latestFrameAt = 0;
+  private onFrame: ((timestamp: number) => void) | undefined;
   private constructor(
     private readonly origin: string,
     private readonly browser: Browser,
@@ -50,7 +52,6 @@ export class BrowserDriver {
         ...(input.locale ? { locale: input.locale } : {}),
         ...(input.timezoneId ? { timezoneId: input.timezoneId } : {}),
         reducedMotion: input.reducedMotion ? 'reduce' : 'no-preference',
-        recordVideo: { dir: mediaDir, size: { width: 1280, height: 720 } },
       });
       await context.routeWebSocket('**/*', socket => socket.close());
       const page = await context.newPage();
@@ -87,7 +88,12 @@ export class BrowserDriver {
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
-      return new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', network);
+      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', network);
+      await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: { width: 1280, height: 720 },
+        onFrame: frame => { driver.latestFrameAt = frame.timestamp; driver.onFrame?.(frame.timestamp); },
+      });
+      signal.throwIfAborted();
+      return driver;
     } catch (error) {
       await browser?.close();
       await rm(mediaDir, { recursive: true, force: true });
@@ -177,27 +183,48 @@ export class BrowserDriver {
     return this.closing;
   }
 
-  /** Closing flushes the real recording; the caller must seal it in its evidence store. */
+  /** Wait for a presented recording frame, then flush the encoder before closure. */
   async collectVideo(maxBytes = 32 * 1024 * 1024, deadline = Deadline.in(5000)): Promise<Buffer> {
     if (!this.closing) {
       const signal = deadline.signal();
-      const abort = () => { void this.close().catch(() => {}); };
-      signal.addEventListener('abort', abort, { once: true });
       try {
         signal.throwIfAborted();
-        // A DOM read can finish before its pixels reach the recording. Capture
-        // the compositor directly: background/headless animation clocks may pause.
-        await this.compositor.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+        // A DOM read or screenshot acknowledgement can precede recording delivery.
+        // Browser presentation timestamps exclude frames already in flight.
+        const since = Date.now() + 1;
+        await new Promise<void>((resolve, reject) => {
+          let captured = false;
+          let presented = false;
+          const finish = (error?: unknown) => {
+            this.onFrame = undefined;
+            signal.removeEventListener('abort', abort);
+            if (error) reject(error); else resolve();
+          };
+          const abort = () => finish(signal.reason);
+          this.onFrame = timestamp => {
+            presented ||= timestamp >= since;
+            if (captured && presented) finish();
+          };
+          signal.addEventListener('abort', abort, { once: true });
+          void this.compositor.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false })
+            .then(() => {
+              captured = true;
+              presented ||= this.latestFrameAt >= since;
+              if (presented) finish();
+            }, finish);
+        });
         signal.throwIfAborted();
+        const abort = () => { void this.close().catch(() => {}); };
+        signal.addEventListener('abort', abort, { once: true });
+        try { await this.page.screencast.stop(); signal.throwIfAborted(); }
+        finally { signal.removeEventListener('abort', abort); }
       } catch {
         await this.close();
         throw new BrowserStepError('video_final_frame_unavailable');
-      } finally { signal.removeEventListener('abort', abort); }
+      }
     }
     await this.close();
-    const path = await this.page.video()?.path();
-    if (!path) throw new BrowserStepError('video_missing');
-    const bytes = readBoundedFile(path, maxBytes);
+    const bytes = readBoundedFile(join(this.mediaDir, 'recording.webm'), maxBytes);
     if (!bytes.length) throw new BrowserStepError('video_empty');
     return bytes;
   }
