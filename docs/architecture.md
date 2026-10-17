@@ -93,9 +93,9 @@ individual HTTP checks passed.
 
 | Need | Now | Gap and proposed adapter | Priority |
 | --- | --- | --- | --- |
-| Start workers next to the app | No (one component per host) | `components:` list in config: app + `celery worker`, RQ, Sidekiq, BullMQ, Dramatiq, Temporal worker; each its own supervised process, attested identity, health check | P0 |
+| Start workers next to the app | `report-jobs` app starts a separate local worker; aggregate source identity includes its code | `components:` list in config: app + `celery worker`, RQ, Sidekiq, BullMQ, Dramatiq, Temporal worker; each its own supervised process, attested identity, health check | P0 |
 | Broker | No | `services: redis/rabbitmq` with per-run vhost/db index | P0 |
-| Wait for a job to finish | Only by polling an HTTP readback | `job.submit` + `observe: { job: id, state: SUCCESS }` via Celery result backend / Flower API, BullMQ queue API; eager mode is explicitly not a real boundary | P1 |
+| Wait for a job to finish | HTTP polling qualified against a persisted queue and separate worker; independent report readback catches false success, with cancellation, idempotency and failure controls | `job.submit` + `observe: { job: id, state: SUCCESS }` via Celery result backend / Flower API, BullMQ queue API; eager mode is explicitly not a real boundary | P1 |
 | Scheduled jobs (beat, cron) | No | logical clock control (`clockProfileRef` exists in the schema) plus a "tick" step | P2 |
 
 ### Third-party services and mocks

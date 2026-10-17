@@ -6,6 +6,7 @@ import { Blocked } from '../../core/errors.ts';
 import { ComponentProfile, LaunchRecipe } from '../../protocol/index.ts';
 import { sourceIdentityDigest } from '../../hosts/local.ts';
 import { SampleName } from './catalog.ts';
+import { compileProject } from '../../authoring/compile.ts';
 
 const HostTemplate = z.object({ launch: LaunchRecipe }).passthrough();
 const ComponentTemplate = z.object({ components: ComponentProfile.shape.components }).passthrough();
@@ -30,6 +31,11 @@ export function writeSample(samplesRoot: string, name: SampleName, output: strin
     detail: output, action: 'choose an empty output directory; existing files are never overwritten' }]);
   mkdirSync(output, { recursive: true });
   cpSync(join(samplesRoot, 'notes-api'), output, { recursive: true });
+  if (name === 'report-jobs') {
+    for (const owned of ['tracegrove', 'verification', 'app/app.mjs']) rmSync(join(output, owned), { recursive: true, force: true });
+    cpSync(join(samplesRoot, name), output, { recursive: true });
+    return compileProject(join(output, 'tracegrove.config.yaml')).workflowConfigPath;
+  }
   if (name === 'notes-browser') cpSync(join(samplesRoot, name), output, { recursive: true });
   if (name === 'notes-django') {
     cpSync(join(samplesRoot, name), output, { recursive: true });

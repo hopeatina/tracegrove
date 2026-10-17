@@ -93,6 +93,21 @@
       ],
       "type": "object"
     },
+    "effects": {
+      "additionalProperties": false,
+      "description": "Declared job effect ceiling; observations must independently establish job behavior.",
+      "properties": {
+        "maxJobs": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maxJobs"
+      ],
+      "type": "object"
+    },
     "given": {
       "additionalProperties": {
         "type": "string"

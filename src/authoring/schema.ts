@@ -4,7 +4,7 @@
  * evidence by itself and nothing bypasses the planner, executor or reducer.
  */
 import { z } from 'zod';
-import { BrowserCommand, Persona, HexSha256 } from '../protocol/index.ts';
+import { ActionEnvelope, BrowserCommand, Persona, HexSha256 } from '../protocol/index.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -103,6 +103,7 @@ export const Flow = z.object({
   tags: z.array(Name).default([]),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),
+  effects: ActionEnvelope.pick({ maxJobs: true }).optional().describe('Declared job effect ceiling; observations must independently establish job behavior.'),
   browser: z.object({
     allowPaths: z.array(Path).min(1).max(64).describe('Path prefixes in this flow’s effect envelope, including browser assets and API calls.'),
     allowMethods: z.array(z.enum(HTTP_VERBS)).min(1).max(6).default(['GET', 'HEAD']),

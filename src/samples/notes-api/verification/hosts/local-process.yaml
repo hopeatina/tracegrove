@@ -12,7 +12,7 @@ launch:
   dataDirEnv: NOTES_DIR
   credentialsEnv: NOTES_TOKENS
   readiness: { path: /health, timeoutMs: 5000 }
-  identitySourceFiles: [app/app.mjs]
+  identitySourceFiles: [app/app.mjs, app/http.mjs]
   issuedCredentials:
     - { name: owner_token, subject: alice }
     - { name: intruder_token, subject: bob }

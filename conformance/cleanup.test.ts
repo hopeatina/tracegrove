@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
-import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy } from './helpers.ts';
-import { LocalProcessHost, sourceIdentityDigest } from '../src/hosts/local.ts';
+import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy, sampleIdentityDigest } from './helpers.ts';
+import { LocalProcessHost } from '../src/hosts/local.ts';
 import { ActionRegistry } from '../src/protocol/index.ts';
 import { collectCleanup } from '../src/core/cleanup.ts';
 import { Deadline } from '../src/core/deadline.ts';
@@ -27,7 +27,7 @@ describe('verifier.cleanup_ownership', () => {
   it('retains an uncertain allocation when the provider creates but omits its captured ID', async () => {
     const copy = sampleCopy(root => editFile(join(root, 'app/app.mjs'), text =>
       text.replace('return send(res, 201, { note });', 'return send(res, 201, { created: true });')));
-    const digest = sourceIdentityDigest(copy.root, ['app/app.mjs']).hex;
+    const digest = sampleIdentityDigest(copy.root).hex;
     editFile(join(copy.root, 'verification/components/notes-api.profile.yaml'), text =>
       text.replace(/hex: "?[0-9a-f]{64}"?/, `hex: "${digest}"`));
     const bundle = planSample(copy.configPath);

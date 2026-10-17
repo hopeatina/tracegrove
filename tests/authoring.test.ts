@@ -40,7 +40,7 @@ describe('authoring compiler', () => {
     const root = copy('notes-api');
     const compiled = compileProject(join(root, 'tracegrove.config.yaml'));
     expect(compiled.flows.map((f) => f.caseId)).toEqual(['notes.create-read-delete', 'notes.list']);
-    expect(compiled.sourceFiles).toEqual(['app/app.mjs']);
+    expect(compiled.sourceFiles).toEqual(['app/app.mjs', 'app/http.mjs']);
     const bundle = plan({ project: loadProject(compiled.workflowConfigPath), profileName: 'real', scope: localScope() });
     expect(bundle.blockers).toEqual([]);
     expect(bundle.request?.caseRefs).toHaveLength(2);

@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy } from './helpers.ts';
+import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy, sampleIdentityDigest } from './helpers.ts';
 import { Blocked, Conflict } from '../src/core/errors.ts';
 import { HostFrame, PluginFrame, FRAME_MAX_BYTES, refKey } from '../src/protocol/index.ts';
 import type { ExecutorHost, HostSession } from '../src/hosts/types.ts';
@@ -115,8 +115,7 @@ describe('controlled product defect', () => {
       editFile(join(root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t); // identity pin now stale on purpose below
     });
     // Re-pin identity so the only difference is the behavior, not the digest.
-    const { sourceIdentityDigest } = await import('../src/hosts/local.ts');
-    const digest = sourceIdentityDigest(copy.root, ['app/app.mjs']).hex;
+    const digest = sampleIdentityDigest(copy.root).hex;
     editFile(join(copy.root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t.replace(/hex: "?[0-9a-f]{64}"?/, `hex: "${digest}"`));
     const bundle = planSample(copy.configPath);
     const summary = await runSample(bundle, copy.stateDir);
@@ -157,8 +156,7 @@ describe('verifier.operation_deadline', () => {
       editFile(join(root, 'verification', 'cases', 'notes.create.yaml'), (t) => t.replace(/timeoutMs: 5000/g, 'timeoutMs: 800'));
       editFile(join(root, 'verification', 'fixtures', 'existing-note.recipe.yaml'), (t) => t.replace(/    readback:\n      actionId: notes.read\/v1\n      predicate:\n        kind: all\n        predicates:\n          - \{ kind: status_equals, value: 200 \}\n          - \{ kind: json_path_equals, path: body.note.title, value: Existing note \}\n/, '    readback: null\n'));
     });
-    const { sourceIdentityDigest } = await import('../src/hosts/local.ts');
-    const digest = sourceIdentityDigest(copy.root, ['app/app.mjs']).hex;
+    const digest = sampleIdentityDigest(copy.root).hex;
     editFile(join(copy.root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t.replace(/hex: "?[0-9a-f]{64}"?/, `hex: "${digest}"`));
     rematerializePayload(copy.root);
     const bundle = planSample(copy.configPath);
