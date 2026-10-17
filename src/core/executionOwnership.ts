@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { digestOfValue, RefSchema, ScopeSchema, type Ref } from '../protocol/index.ts';
 import { Conflict } from './errors.ts';
 import type { LocalLedger } from './ledger.ts';
+import type { LedgerReadView } from './ledgerRecords.ts';
 const Binding = z.object({ executionId: z.string(), attemptId: z.string(), generation: z.number().int().positive(),
   campaignId: z.string(), requestDigest: z.string().regex(/^[a-f0-9]{64}$/), scope: ScopeSchema }).strict();
-type Binding = z.infer<typeof Binding>;
+export type ExecutionOwnershipBinding = z.infer<typeof Binding>;
+type Binding = ExecutionOwnershipBinding;
 const Resource = z.object({ key: z.string(), kind: z.enum(['host', 'fixture']), cellId: z.string(), planRef: RefSchema,
   state: z.enum(['reserved', 'observed', 'cleanup_pending', 'removed']),
   physicalIds: z.array(z.string()).max(64),
@@ -22,11 +24,7 @@ export class ExecutionOwnership {
     this.ledger.append(aggregate(this.binding.executionId), 0, 'ownership.initialized', { binding: this.binding, resources: [] });
   }
   private read() {
-    const row = this.ledger.current(aggregate(this.binding.executionId));
-    if (!row) throw new Conflict('ownership_inventory_missing; reconcile the interrupted attempt before retrying');
-    const inventory = Inventory.parse(row.data);
-    if (!equal(inventory.binding, this.binding)) throw new Conflict('ownership_binding_mismatch');
-    return { row, inventory };
+    return readExecutionOwnership(this.ledger, this.binding);
   }
   private change(type: string, update: (resources: z.infer<typeof Resource>[]) => void): void {
     const { row, inventory } = this.read(); update(inventory.resources);
@@ -61,11 +59,17 @@ export class ExecutionOwnership {
   }
 }
 
-/** An interrupted attempt never automatically replays an uncertain acquisition, including legacy missing inventory. */
-export function assertInterruptedOwnershipResolved(ledger: LocalLedger, expected: Binding): void {
+/** Read the same validated inventory without giving the reader any mutation methods. */
+export function readExecutionOwnership(ledger: LedgerReadView, expected: Binding) {
   const row = ledger.current(aggregate(expected.executionId));
   if (!row) throw new Conflict('ownership_inventory_missing; reconcile the interrupted attempt before retrying');
   const inventory = Inventory.parse(row.data);
   if (!equal(inventory.binding, expected)) throw new Conflict('ownership_binding_mismatch');
+  return { row, inventory };
+}
+
+/** An interrupted attempt never automatically replays an uncertain acquisition, including legacy missing inventory. */
+export function assertInterruptedOwnershipResolved(ledger: LedgerReadView, expected: Binding): void {
+  const { inventory } = readExecutionOwnership(ledger, expected);
   if (inventory.resources.some(r => r.state !== 'removed')) throw new Conflict('ownership_reconciliation_required; interrupted resources remain unresolved; no acquisition was replayed');
 }

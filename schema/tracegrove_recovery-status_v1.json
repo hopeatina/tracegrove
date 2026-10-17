@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actionAuthority": {
+      "const": "none",
+      "type": "string"
+    },
+    "bundle": {
+      "enum": [
+        "not_checked",
+        "absent",
+        "invalid",
+        "verified_bound"
+      ],
+      "type": "string"
+    },
+    "checkpoint": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "sequence": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "sequence",
+            "digest"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "enum": [
+        "ledger_snapshot_unavailable",
+        "ledger_snapshot_changed",
+        "ledger_snapshot_invalid",
+        "execution_missing",
+        "execution_binding_invalid",
+        "ownership_missing",
+        "ownership_invalid",
+        "ownership_unresolved",
+        "execution_in_flight",
+        "interrupted_without_manifest",
+        "committed_evidence_invalid",
+        "committed_binding_mismatch",
+        "committed_readback_available",
+        "finalized_evidence_verified",
+        "recovery_inspection_failed"
+      ],
+      "type": "string"
+    },
+    "execution": {
+      "const": "not_started_by_inspection",
+      "type": "string"
+    },
+    "exitCode": {
+      "anyOf": [
+        {
+          "const": 0,
+          "type": "number"
+        },
+        {
+          "const": 2,
+          "type": "number"
+        }
+      ]
+    },
+    "historicalOutcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "passed",
+            "assertion_failed",
+            "blocked",
+            "infrastructure_failed",
+            "inconclusive",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recordedPhase": {
+      "anyOf": [
+        {
+          "enum": [
+            "admitted",
+            "cell.finalized",
+            "interrupted",
+            "finalized",
+            "other"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recovery": {
+      "maxLength": 512,
+      "minLength": 1,
+      "type": "string"
+    },
+    "resources": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fixture": {
+              "additionalProperties": false,
+              "properties": {
+                "cleanup_pending": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "observed": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "removed": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reserved": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "reserved",
+                "observed",
+                "cleanup_pending",
+                "removed"
+              ],
+              "type": "object"
+            },
+            "host": {
+              "additionalProperties": false,
+              "properties": {
+                "cleanup_pending": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "observed": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "removed": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reserved": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "reserved",
+                "observed",
+                "cleanup_pending",
+                "removed"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "host",
+            "fixture"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "tracegrove.recovery-status/v1",
+      "type": "string"
+    },
+    "verificationVerdict": {
+      "const": "not_evaluated",
+      "type": "string"
+    },
+    "writerLock": {
+      "enum": [
+        "present",
+        "absent",
+        "unknown"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "exitCode",
+    "code",
+    "recovery",
+    "checkpoint",
+    "writerLock",
+    "recordedPhase",
+    "resources",
+    "bundle",
+    "historicalOutcome",
+    "actionAuthority",
+    "execution",
+    "verificationVerdict"
+  ],
+  "type": "object"
+}

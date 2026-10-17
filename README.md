@@ -115,6 +115,9 @@ Exit 1 means assertion failure, 2 blocked/inconclusive, 3 infrastructure failure
 Retry `test` only after fixing the reported cause; it creates a fresh execution with owned
 fixtures and preserves prior run folders. To stop, send one interrupt and allow cleanup to finish;
 unconfirmed cleanup requires reconciliation of that run's owned resources before another attempt.
+For recorded local recovery state, use `recovery-status --state-dir <owned-state> --execution <id> --json`.
+It reports a bounded read-only checkpoint and historical evidence; it never clears ownership,
+recovers locks or admits a retry. See [local recovery inspection](docs/local-execution-recovery.md#read-only-recovery-inspection).
 `verify-bundle` and UI recording playback inspect saved evidence; a new `test` performs new actions.
 Credentials belong in the environment's authorized resolver. Never put real credentials in
 flows, `app.env`, launch args, profiles or artifacts. The sample issues temporary synthetic persona

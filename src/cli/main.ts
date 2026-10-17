@@ -19,6 +19,7 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
+import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
@@ -83,6 +84,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   cases --config <workflow.yaml> [--id <id>] [--cursor <cursor>]
   rerun --request <request.json> --output <new.json>   freeze a fresh attempt on the same cases
   inspect --execution <id> --state-dir <dir> [--failed-step]
+  recovery-status --execution <id> --state-dir <dir>  inspect recorded recovery state; no effects or authority
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
@@ -232,6 +234,12 @@ async function main(argv: string[]): Promise<number> {
       writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
       out(args, { output, requestRef: bundle.request!.ref, replayOf: bundle.request!.replayOf }, `fresh rerun request: ${output}`);
       return 0;
+    }
+
+    case 'recovery-status': {
+      const report = inspectRecoveryStatus({ stateDir: args.flags['state-dir'], executionId: args.flags.execution, scope: localScope() });
+      out(args, report, `${report.code}\n${report.recovery}\nRecorded resources: ${report.resources ? JSON.stringify(report.resources) : 'unavailable'}\nNo cleanup or execution was attempted; this report grants no action authority.`);
+      return report.exitCode;
     }
 
     case 'doctor': {

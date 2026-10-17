@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CliErrorReport } from './schemas/cli.ts';
+import { RecoveryStatusReport } from './schemas/recoveryStatus.ts';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
 import * as P from './schemas/portableEnvironment.ts';
@@ -19,6 +20,7 @@ import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, Qu
 
 export * from './schemas/capability.ts';
 export * from './schemas/cli.ts';
+export * from './schemas/recoveryStatus.ts';
 export * from './schemas/capabilityLifecycle.ts';
 export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
@@ -92,6 +94,7 @@ export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
   'tracegrove.cli-error/v1': CliErrorReport,
+  'tracegrove.recovery-status/v1': RecoveryStatusReport,
   'workflow.portable-environment-profile/v1': P.PortableEnvironmentProfile,
   'workflow.portable-environment-intent/v1': P.PortableEnvironmentIntent,
   'workflow.portable-preflight/v1': P.PortablePreflightReport,
