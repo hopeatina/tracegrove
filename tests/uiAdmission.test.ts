@@ -45,7 +45,7 @@ function gate(root: string) {
   const started = join(root, 'started'); const release = join(root, 'release');
   // Bound scratch children even if the test runner itself is interrupted.
   const code = `writeFileSync(${JSON.stringify(started)}, 'started\\n', { flag: 'a' });
-const gateDeadline = Date.now() + 5000;
+const gateDeadline = Date.now() + 15000;
 while (!existsSync(${JSON.stringify(release)}) && Date.now() < gateDeadline) await new Promise(resolve => setTimeout(resolve, 10));
 `;
   return { started, release, code };
@@ -69,18 +69,24 @@ it.each(['draft', 'test'] as const)('admits one %s when two authenticated bodies
   const path = kind === 'draft' ? '/api/agent-draft' : '/api/test';
   const first = await pendingBody(server, path, token);
   const second = await pendingBody(server, path, token);
+  let firstCompleted: Awaited<typeof first.response> | undefined;
+  const firstResponsePromise = first.response.then(response => { firstCompleted = response; return response; });
   let secondResponse: Awaited<typeof second.response>;
   try {
     first.req.end(JSON.stringify(kind === 'test' ? { grep: 'list' } : {}));
-    await expect.poll(() => existsSync(held.started)).toBe(true);
+    // Real child startup can be slow on a busy runner. A completed request is
+    // diagnostic evidence of startup failure, not a substitute for the marker.
+    await expect.poll(() => existsSync(held.started) ? 'started'
+      : firstCompleted ? `request completed before startup: ${JSON.stringify(firstCompleted).slice(0, 1000)}` : 'waiting for child startup',
+    { timeout: 10_000 }).toBe('started');
     second.req.end('{}');
     secondResponse = await second.response;
   } finally {
     writeFileSync(held.release, 'release');
     if (!second.req.writableEnded) second.req.end('{}');
-    await Promise.allSettled([first.response, second.response]);
+    await Promise.allSettled([firstResponsePromise, second.response]);
   }
-  const firstResponse = await first.response;
+  const firstResponse = await firstResponsePromise;
   expect(secondResponse.status).toBe(409);
   expect(firstResponse.status).toBe(200);
   expect(readFileSync(held.started, 'utf8').trim().split('\n')).toHaveLength(1);
