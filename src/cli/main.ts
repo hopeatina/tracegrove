@@ -4,7 +4,7 @@
  * the library API. Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive,
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
@@ -14,7 +14,8 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
-import { verifyBundle } from '../core/bundle.ts';
+import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
+import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
@@ -349,10 +350,9 @@ async function main(argv: string[]): Promise<number> {
       const output = resolve(args.flags['output']);
       const dir = join(stateDir, 'executions', executionId);
       if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId }]);
-      mkdirSync(output, { recursive: true });
-      cpSync(dir, output, { recursive: true, filter: (src) => !src.includes(`${executionId}/host`) });
-      const verification = verifyBundle(output);
-      out(args, { output, verification }, `exported to ${output}; verification ${verification.ok ? 'ok' : `FAILED: ${verification.problems.join('; ')}`}`);
+      createDurableDirectory(dirname(output));
+      const verification = exportVerifiedBundle(dir, output);
+      out(args, { output, verification, published: verification.ok }, verification.ok ? `exported to ${output}; verification ok` : `bundle invalid; no output published: ${verification.problems.join('; ')}`);
       return verification.ok ? 0 : 2;
     }
 

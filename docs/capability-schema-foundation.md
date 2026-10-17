@@ -5,12 +5,12 @@ scope and evidence change; the linked audit and environment guide are detailed s
 and receipts, not parallel delivery plans. Changes are already in progress in existing
 [foundation PR #21](https://github.com/hopeatina/tracegrove/pull/21), stacked on
 [release PR #19](https://github.com/hopeatina/tracegrove/pull/19). Both remain unmerged; #21 remains
-draft. No npm release is claimed.
+draft. No npm release is claimed. Hope subsequently authorized merging complete scoped changes through normal checks and continuing this plan. That authorization does not waive unfinished draft or qualification gates.
 
 ## Verified checkpoint and ownership
 
-Implementation checkpoint: `2a146bfc8be87589b9e536890d600c5230cb34c8`,
-[terminal green CI](https://github.com/hopeatina/tracegrove/actions/runs/39072367321).
+Implementation checkpoint: `dc4b35b064ef9eeaa5b603ec4be5577a073376ec`,
+[terminal green CI](https://github.com/hopeatina/tracegrove/actions/runs/39073076577).
 Runtime/profile source is identical to independently reviewed
 `3894ed6e43b32c0177be03397e22df757405ed6c`; subsequent changes clarify documentation and make
 the lease-expiry regression deterministic. Local verification: 378 passed, two Python sample
@@ -39,12 +39,13 @@ silently, force-push shared work, or bypass draft/review/branch holds.
 | Streams / MCP / app bridges | Implemented | Typed transport/revision/features, chunks versus logical messages, correlation, errors, cancel/disconnect/resume and fidelity classes; negative conformance. Actual SSE/WebSocket/MCP SDK transports, widget bridge and installed signed-in hosts remain unimplemented/unqualified. |
 | Environment profile and preflight | Implemented | Reference-only profile/intent schemas, generated alongside/staging examples and bounded SDK metadata probes. Separate persona secrets from execution actor/policy; stale/foreign/unknown/denied requirements fail closed. No general profile-to-CLI dispatch, secret broker or cloud adapter is installed. |
 | README-only onboarding | Implemented | One minimal source quickstart, Node/npm prerequisites/bootstrap, doctor/check/test JSON, expected artifacts and cleanup/retry instructions. Independent fresh Linux checkout/toolchain/cache/sample passed in 39 seconds with no source/flow repair; original/copied bundles verified and owned processes/workspaces absent. Final command block is unchanged. |
-| Ephemeral-host onboarding artifacts | Implemented, CI gate pending | CI runs the exact README block and a deliberate assertion-failure regression. Both locally and independently passed: original/copied bundles verify, failed CLI exit 1 remains nonpassing, and cleanup is checked. Available failed-run evidence exports before rethrow; absent capture/export failure stays explicit. Final committed-head CI must pass. |
+| Ephemeral-host onboarding artifacts | Implemented | CI runs the exact README block and a deliberate assertion-failure regression. Both locally and independently passed: original/copied bundles verify, failed CLI exit 1 remains nonpassing, and cleanup is checked. Available failed-run evidence exports before rethrow; absent capture/export failure stays explicit. Exact checkpoint CI passed and retained the positive/negative artifacts. |
 | Ecosystem adapter reuse | Planned | Reuse Playwright, native JUnit output and typed lifecycle ports. Next qualify one async app/store/worker fixture using controlled Compose/Testcontainers where available. OpenAPI-assisted authoring, Playwright/JUnit import, optional OTLP span links, Allure/SARIF views and provider adapters remain proposals. No universal shell/action DSL. |
 | Mocks versus real boundaries | Planned | Keep whole-app mock, component fake/WireMock, sanitized recording, sandbox, protocol-client/Inspector, widget fixture and actual installed-host evidence distinct. Fake success never qualifies a real provider, SSO or client. |
 | Golden fixture tranche | Planned | Candidates: TodoMVC (4), Cypress Real World App (6), Docker Voting App (4), then FastAPI full-stack/Petclinic if useful. None is golden or run here. Verify license/source/dependency/runtime/image pins, owned seeds/reset, clean baseline, seeded defects, unrelated controls, independent readback and cleanup first. |
 | Real environment qualification | Blocked | Hope's Mac is offline; other Codex/Claude clouds, OrgX-triggered runtime and external staging have no qualified runner/broker/access journey here. Discover capabilities; never assume Docker, root, persistent disks, public inbound access or permission to change network policy. |
-| Durable safety/recovery integration | Blocked | Durable acquisition journals/CAS/fencing, atomic artifact publication, expired-lease recovery, host network confinement, executable redaction and real-provider crash/interleaving tests remain unfinished integration gates. Pure/schema tests cannot close them. |
+| Atomic verified local export | Implemented, CI gate pending | CLI export and authoring test publish one verified snapshot through private staging and an exclusive cooperating-writer lock, fsync files/ancestors and atomically rename; immutable object writes use exclusive links. Independent review closed parent-durability and preexisting-symlink findings. Local390 passed/two skips,85schemas; actual concurrent-process and writer-SIGKILL tests. Original execution-directory durability, power-loss and distributed/provider publication remain unqualified. |
+| Durable safety/recovery integration | In progress | Existing-ledger host/fixture intent, observed ownership and cleanup records plus unresolved-interruption replay gate implemented in an isolated reviewed milestone; real native/HTTP-create lost-ack SIGKILL tests pass. Independent review found host/fixture cleanup-key collision, now being fixed before integration. No automatic janitor/discharge or durable supervisor acknowledgement. Expired leases, distributed fencing, host network confinement, executable redaction and real-provider recovery remain open. |
 | Independent review | Implemented | Independent AI reviews reproduced/fixed four capability defects and one preflight deadline defect; code and README were re-reviewed. This is not named-expert feedback, human owner approval or provider integration approval. The harness failure-retention finding is fixed and independently rechecked on positive and deliberate-failure paths. |
 | Npm publication / protected merge | Blocked | Draft prerequisite stack and review/qualification gates remain. Npm publisher authentication/name ownership is unresolved (`ENEEDAUTH`; prior E404 does not prove name entitlement). No credentials or publication attempted; registry integrity/install verification remains unperformed. |
 
@@ -83,7 +84,8 @@ owner; do not create competing outreach or imply GitHub issues are customers.
 
 1. **Close current first-slice checks:** success and available failed-run evidence retention,
    copied-byte verification and the deliberate-failure regression passed local independent review.
-   Complete exact-head CI and retain its artifacts; preserve failure/cleanup uncertainty. Keep #21 draft.
+   Exact checkpoint CI passed with retained artifacts. Continue reviewed atomic export/durable
+   inventory changes; pass their exact-head CI and preserve failure/cleanup uncertainty. Keep #21 draft.
 2. **Review and wire native onboarding:** reuse the existing compiler/HostPlan resolver for profile
    selection and doctor capability discovery. Scenarios stay shared; each environment resolves
    workspace/build, endpoint, existing secret refs, scoped execution authority and artifact storage.

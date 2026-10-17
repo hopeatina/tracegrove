@@ -20,10 +20,12 @@ function json(bytes: Uint8Array, path: string): unknown {
 /** Sealed bytes, not issuer authority. Caller owns/authorizes the quiescent artifact directory. */
 export class BundleSnapshot {
   readonly manifestDigest: Digest;
+  readonly #manifestBytes: Buffer;
   readonly #files = new Map<string, Buffer>();
   constructor(dir: string) {
     if (!lstatSync(dir).isDirectory()) throw new Error('bundle root must be a real directory');
     const manifestBytes = readBounded(join(dir, 'manifest.json'), BUNDLE_LIMITS.manifestBytes);
+    this.#manifestBytes = manifestBytes;
     this.manifestDigest = digestOfBytes(manifestBytes);
     const manifest = Manifest.parse(json(manifestBytes, 'manifest.json'));
     let total = 0;
@@ -45,6 +47,7 @@ export class BundleSnapshot {
   }
   has(path: string): boolean { return this.#files.has(path); }
   paths(): string[] { return [...this.#files.keys()]; }
+  manifestBytes(): Buffer { return Buffer.from(this.#manifestBytes); }
   read(path: string): Buffer {
     const bytes = this.#files.get(path);
     if (!bytes) throw new Error(`unsealed required file ${path}`);

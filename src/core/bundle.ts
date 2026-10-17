@@ -3,8 +3,9 @@
  * hashes, every self digest, re-derives assertions from the frozen case and step observations and
  * re-reduces the outcome. A bundle whose reduction disagrees with its receipt is not evidence.
  */
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import { requireRealDirectory, syncDirectory, syncDirectoryAncestors, writeExclusiveDurable } from './atomicFiles.ts';
 import { checkCellEvidence } from './bundleEvidence.ts';
 import { BundleSnapshot, BUNDLE_SCHEMA_VERSION } from './bundleSnapshot.ts';
 export { BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
@@ -85,6 +86,59 @@ type Inspection = { verification: BundleVerification; records: Omit<VerifiedBund
 export function verifyBundle(dir: string): BundleVerification {
   try { return verifyBundleRecords(dir).verification; }
   catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 }; }
+}
+
+/**
+ * Publish only the verified snapshot's sealed bytes. The owned local parent must exist;
+ * cooperating writers share an exclusive lock, and existing outputs are never merged/overwritten.
+ * A crash leaves a private staging directory/lock to reconcile, or a complete verified output.
+ * No automatic stale-lock breaking, distributed fencing or hostile-parent race protection.
+ */
+export function exportVerifiedBundle(source: string, output: string): BundleVerification {
+  let snapshot: BundleSnapshot;
+  let verification: BundleVerification;
+  try {
+    snapshot = new BundleSnapshot(source);
+    verification = verifySnapshot(snapshot).verification;
+  } catch (error) {
+    return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 };
+  }
+  if (!verification.ok) return verification;
+  const destination = resolve(output);
+  const parent = dirname(destination);
+  requireRealDirectory(parent);
+  const lock = join(parent, `.${basename(destination)}.publish.lock`);
+  try { mkdirSync(lock, { mode: 0o700 }); }
+  catch { throw new Error('bundle publication is locked; reconcile the owned publication lock before retrying'); }
+  let staging: string | null = null;
+  try {
+    try { lstatSync(destination); throw new Error('bundle output already exists; choose a fresh output directory'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    syncDirectoryAncestors(parent);
+    staging = mkdtempSync(join(parent, '.tracegrove-publish-'));
+    const directories = new Set<string>([staging]);
+    for (const path of snapshot.paths()) {
+      const file = join(staging, path);
+      let directory = dirname(file);
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      while (directory !== parent) { directories.add(directory); if (directory === staging) break; directory = dirname(directory); }
+      writeExclusiveDurable(file, snapshot.read(path));
+    }
+    // Commit marker last, from the same bounded snapshot that was independently reduced.
+    writeExclusiveDurable(join(staging, 'manifest.json'), snapshot.manifestBytes());
+    for (const directory of [...directories].sort((a, b) => b.length - a.length)) syncDirectory(directory);
+    const copied = verifyBundle(staging);
+    if (!copied.ok) throw new Error('staged bundle failed verification; no output published');
+    renameSync(staging, destination);
+    staging = null;
+    // If this fails, the complete output may exist; do not retry blindly or delete it.
+    try { syncDirectory(parent); }
+    catch { throw new Error('bundle published but directory durability is unconfirmed; verify existing output before retrying'); }
+    return copied;
+  } finally {
+    if (staging) rmSync(staging, { recursive: true, force: true });
+    rmSync(lock, { recursive: true });
+  }
 }
 
 export function readVerifiedBundle(dir: string): VerifiedBundleRecords {
