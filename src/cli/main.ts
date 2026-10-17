@@ -17,7 +17,8 @@ import { createRerun } from '../core/rerun.ts';
 import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { checkCleanupFiles } from './cleanup.ts';
-import { parseArgs, type Args } from './arguments.ts';
+import { jsonRequested, parseArgs, type Args } from './arguments.ts';
+import { cliErrorReport } from './errors.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
@@ -376,14 +377,9 @@ function readBundle(path: string): FrozenBundle {
 
 main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {
   // Argument failures happen before the doctor handler; retain its structured JSON contract.
-  const rawOptions = process.argv.slice(3);
-  const jsonIndex = rawOptions.findIndex(option => option === '--json' || option.startsWith('--json='));
-  const jsonValue = rawOptions[jsonIndex] === '--json'
-    ? (['false', 'true'].includes(rawOptions[jsonIndex + 1] ?? '') ? rawOptions[jsonIndex + 1] : 'true')
-    : rawOptions[jsonIndex]?.slice('--json='.length);
-  const jsonRequested = jsonIndex >= 0 && jsonValue === 'true';
-  if (process.argv[2] === 'doctor' && jsonRequested) {
-    process.stdout.write(`${JSON.stringify(doctorFailure(error))}\n`); process.exitCode = 2; return;
+  if (jsonRequested(process.argv.slice(2))) {
+    const report = process.argv[2] === 'doctor' ? doctorFailure(error) : cliErrorReport(error, process.argv[2]);
+    process.stdout.write(`${JSON.stringify(report)}\n`); process.exitCode = report.exitCode; return;
   }
   if (error instanceof Blocked) { process.stderr.write(`BLOCKED: ${error.reasons.map((r) => `${r.code}: ${r.detail} (owner: ${r.owner}; action: ${r.action})`).join('\n')}\n`); process.exitCode = 2; return; }
   if (error instanceof Conflict) { process.stderr.write(`CONFLICT: ${error.message}\n`); process.exitCode = 2; return; }

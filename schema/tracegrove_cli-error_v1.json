@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "command": {
+      "anyOf": [
+        {
+          "enum": [
+            "help",
+            "init",
+            "test",
+            "list",
+            "compile",
+            "show",
+            "ui",
+            "discover",
+            "check",
+            "draft",
+            "settings",
+            "sample-config",
+            "validate",
+            "doctor",
+            "plan",
+            "seed",
+            "run",
+            "controller",
+            "cases",
+            "rerun",
+            "inspect",
+            "export",
+            "verify-bundle",
+            "verify-cleanup",
+            "source-resolve",
+            "schema"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "errorClass": {
+      "enum": [
+        "blocked",
+        "conflict",
+        "invalid_input",
+        "infrastructure_failure",
+        "unexpected_failure"
+      ],
+      "type": "string"
+    },
+    "exitCode": {
+      "anyOf": [
+        {
+          "const": 2,
+          "type": "number"
+        },
+        {
+          "const": 3,
+          "type": "number"
+        }
+      ]
+    },
+    "omittedReasonCount": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "reasons": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "unknown_command",
+              "unknown_flag",
+              "duplicate_flag",
+              "unexpected_argument",
+              "invalid_boolean",
+              "missing_argument",
+              "conflicting_flags",
+              "invalid_argument",
+              "config_not_found",
+              "invalid_authoring_file",
+              "invalid_yaml",
+              "no_flows",
+              "no_flows_selected",
+              "unknown_profile",
+              "launch_executable_missing",
+              "application_runtime_unrecognized",
+              "command_adapter_unqualified",
+              "run_not_found",
+              "execution_not_found",
+              "invalid_request_file",
+              "invalid_port",
+              "prerequisite_unavailable",
+              "state_conflict",
+              "invalid_document",
+              "invalid_json",
+              "input_unavailable",
+              "access_denied",
+              "infrastructure_failure",
+              "unexpected_failure"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "recovery": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "recovery"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "tracegrove.cli-error/v1",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "command",
+    "errorClass",
+    "exitCode",
+    "reasons",
+    "omittedReasonCount"
+  ],
+  "type": "object"
+}

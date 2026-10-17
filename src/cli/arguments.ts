@@ -44,6 +44,17 @@ const deny = (code: string, detail: string, command: string): never => {
   throw new Blocked([{ code, detail, owner: 'operator', action: `workflow-verify ${command} --help` }]);
 };
 
+/** Best-effort output selection before parsing can fail. Duplicate flags still fail parsing. */
+export function jsonRequested(argv: string[]): boolean {
+  const options = argv.slice(1);
+  const index = options.findIndex(option => option === '--json' || option.startsWith('--json='));
+  if (index < 0) return false;
+  const value = options[index] === '--json'
+    ? (['false', 'true'].includes(options[index + 1] ?? '') ? options[index + 1] : 'true')
+    : options[index]?.slice('--json='.length);
+  return value === 'true';
+}
+
 /** Validate every option before file access, admission or execution. No ignored arguments. */
 export function parseArgs(argv: string[]): Args {
   const first = argv[0] ?? 'help';

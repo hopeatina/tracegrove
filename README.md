@@ -102,9 +102,14 @@ but can invoke the configured interpreter with `--version`. Browser executable p
 installation metadata; engine launch, system libraries and video capture remain untested.
 Its result always says `execution: not_started` and `verificationVerdict: not_evaluated`.
 Portable SDK profiles and external staging are not executable doctor configurations.
-Neither command proves a running app. Other top-level argument/prerequisite errors can still be prose
-on stderr even with `--json`; preserve stderr and the exit status. Completed `test --json` reports
-are structured. Exit 1 means assertion failure, 2 blocked/inconclusive, 3 infrastructure failure,
+Neither command proves a running app. Top-level failures with `--json` return
+`tracegrove.cli-error/v1` on stdout with a quiet stderr, a public error class, bounded reason codes,
+recovery actions and the process exit code. Doctor retains its `tracegrove.doctor/v1` report.
+These error envelopes omit exception text, paths, argument values and stacks; successful reports,
+doctor diagnostics and retained artifacts keep their existing contents and access requirements.
+`--json false` and `--json=false` retain prose errors; `--jsonl` retains its existing event stream
+and top-level error behavior. Completed `test --json` reports keep their established schema.
+Exit 1 means assertion failure, 2 blocked/inconclusive, 3 infrastructure failure,
 4 cancellation. Do not retry assertions into a clean result or discard the first attempt.
 
 Retry `test` only after fixing the reported cause; it creates a fresh execution with owned

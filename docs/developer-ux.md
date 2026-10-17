@@ -227,6 +227,36 @@ tracegrove · notes · app sha 3e8d13bc9bd1
 | 4 | Login-recipe personas (POST /login, cookie or token capture) for apps whose auth can't be patched; external `url:` targets with declared, unverified identity | No |
 | 5 | Browser surface using shared typed `browser:` commands, independent DOM/API checks, and verified Grove recording playback | Implemented locally; staging qualification remains open |
 
+## Structured command failures
+
+An uncaught command failure with `--json`, `--json true` or `--json=true` writes one
+`tracegrove.cli-error/v1` result to stdout and no exception diagnostic to stderr. The strict
+schema is exported as `schema/tracegrove_cli-error_v1.json` and `CliErrorReport` from the
+protocol package. For example, `tracegrove run --json` returns exit 2 and:
+
+```json
+{"schemaVersion":"tracegrove.cli-error/v1","command":"run","errorClass":"blocked","exitCode":2,"reasons":[{"code":"missing_argument","message":"A required option or option value is missing.","recovery":"Run tracegrove help and correct the command options."}],"omittedReasonCount":0}
+```
+
+Messages and recovery actions come from a controlled public vocabulary. Raw exception text,
+stacks, supplied argument values, configuration contents and arbitrary internal reason codes
+are omitted. At most 32 reasons are returned; `omittedReasonCount` reports any remainder.
+Unknown prerequisites use `prerequisite_unavailable`. Unknown command names become `command: null`.
+This trades detailed candidate diagnostics for a bounded machine result; keep private evidence
+under its existing access policy when investigating a failure.
+
+Existing process exit statuses are preserved: blocked/conflict/schema failures use 2;
+infrastructure and unexpected failures use 3. A top-level JSON parse failure retains its legacy
+exit 3 with `errorClass: invalid_input` and `invalid_json`. The report's exit code equals the
+process status. It does not assert that execution never started or authorize a retry: a failure
+can follow partial effects, and uncertain ownership must be reconciled before replay.
+
+Doctor retains `tracegrove.doctor/v1`. Completed test/run results and assertion failures retain
+their existing JSON and exit codes 0/1/2/3/4. Returned check/verification results keep their existing
+schemas. `--json false` and `--json=false` keep prose errors, and `--jsonl` keeps its existing event
+stream and top-level error behavior. Successful reports, doctor reports and artifacts are outside
+this error envelope's omission policy; this change establishes no artifact redaction guarantee.
+
 ## Found along the way
 
 - The bundle verifier re-derived "infrastructure failed" only from step reason codes, so any run whose app never started produced a bundle that failed its own verification. The PR fixes this by also reading the sealed `host.failed` event; that evidence can only move a cell away from passed.
