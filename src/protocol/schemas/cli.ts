@@ -15,7 +15,7 @@ export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
   command: z.enum(['help', 'init', 'test', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
     'settings', 'sample-config', 'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
-    'rerun', 'inspect', 'export', 'verify-bundle', 'verify-cleanup', 'source-resolve', 'schema']).nullable(),
+    'rerun', 'inspect', 'export', 'verify-bundle', 'verify-cleanup', 'source-resolve', 'recovery-status', 'schema']).nullable(),
   errorClass: z.enum(['blocked', 'conflict', 'invalid_input', 'infrastructure_failure', 'unexpected_failure']),
   exitCode: z.union([z.literal(2), z.literal(3)]),
   reasons: z.array(Reason).min(1).max(32), omittedReasonCount: z.number().int().nonnegative(),

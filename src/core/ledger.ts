@@ -8,15 +8,12 @@ import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, 
 import { hostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { z } from 'zod';
 import { Conflict } from './errors.ts';
 import { nowIso } from './clock.ts';
+import { JournalRecord, parseJournal, type JournalEntry } from './ledgerRecords.ts';
+export type { JournalEntry } from './ledgerRecords.ts';
 
-export type JournalEntry = { seq: number; at: string; aggregateId: string; version: number; type: string; data: Record<string, unknown> };
 export type LockFile = { writerId: string; pid: number; startedAt: string; host: string; endpoint: string | null; tokenDigest: string | null };
-const JournalRecord = z.object({ seq: z.number().int().positive().safe(), at: z.string().datetime({ offset: true }),
-  aggregateId: z.string().min(1).max(512), version: z.number().int().positive().safe(), type: z.string().min(1).max(256),
-  data: z.record(z.string(), z.unknown()) }).strict();
 
 function syncPath(path: string): void {
   const fd = openSync(path, 'r');
@@ -74,13 +71,7 @@ export class LocalLedger {
   private load(): void {
     if (!existsSync(this.journalPath)) return;
     const text = readFileSync(this.journalPath, 'utf8');
-    if (text && !text.endsWith('\n')) throw new Conflict('unterminated ledger record; reconcile the journal before writing');
-    const lines = text.split('\n').filter((line) => line.trim().length > 0);
-    for (const line of lines) {
-      const entry = JournalRecord.parse(JSON.parse(line));
-      if (entry.seq !== this.seq + 1 || entry.version !== (this.versions.get(entry.aggregateId) ?? 0) + 1) {
-        throw new Conflict(`corrupt journal at sequence ${entry.seq}: non-contiguous sequence or aggregate version`);
-      }
+    for (const entry of parseJournal(text)) {
       this.entries.push(entry);
       this.seq = Math.max(this.seq, entry.seq);
       this.versions.set(entry.aggregateId, entry.version);

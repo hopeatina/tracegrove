@@ -31,6 +31,7 @@
             "verify-bundle",
             "verify-cleanup",
             "source-resolve",
+            "recovery-status",
             "schema"
           ],
           "type": "string"

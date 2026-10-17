@@ -10,7 +10,7 @@ import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
-  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, sameRef, sameScope, selfDigest, verifySelfDigest,
+  SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type Accounting, type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
   type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
@@ -23,6 +23,7 @@ import type { ExecutorHost, HostSession } from '../hosts/types.ts';
 import { LocalArtifactStore } from './artifacts.ts';
 import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
 import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
+import { checkCommittedExecutionBinding } from './executionReadback.ts';
 import { requireRealDirectory, syncDirectory } from './atomicFiles.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { compileCase, type CompiledCase } from './compiler.ts';
@@ -98,15 +99,8 @@ function committedRunSummary(input: { stateDir: string; ledger: LocalLedger; req
   let checked: ReturnType<typeof readVerifiedBundle>;
   try { requireRealDirectory(executionDir); checked = readVerifiedBundle(executionDir); }
   catch { throw new Conflict('committed_execution_evidence_invalid; preserve the existing execution and reconcile its missing or corrupt evidence'); }
-  const finalized = ledger.current(`execution:${executionId}`);
-  const finalizedRefs = ledger.history(`execution:${executionId}`).filter(row => row.type === 'cell.finalized').map(row => row.data.receiptRef);
-  if (!sameRef(checked.request.ref, request.ref) || !sameRef(checked.selection.ref, selection.ref) || !sameScope(checked.campaign.scope, scope) ||
-      checked.campaign.campaignId !== request.campaignId || !checked.receipts.length ||
-      checked.receipts.some(receipt => receipt.executionId !== executionId || receipt.attemptId !== attemptId || receipt.attemptNumber !== attemptNumber ||
-        receipt.environment.generation !== generation || !sameScope(receipt.scope, scope) || receipt.idempotencyKey !== request.idempotencyKey) ||
-      digestOfValue(finalizedRefs.map(ref => digestOfValue(ref).hex).sort()).hex !== digestOfValue(checked.receipts.map(receipt => digestOfValue(receipt.ref).hex).sort()).hex ||
-      finalized?.type === 'finalized' && (digestOfValue(finalized.data.campaignResultRef).hex !== digestOfValue(checked.campaign.ref).hex || finalized.data.outcome !== checked.campaign.outcome))
-    throw new Conflict('committed_execution_binding_mismatch; no acquisition was replayed');
+  checkCommittedExecutionBinding(ledger, checked, { executionId, attemptId, generation, attemptNumber, scope, campaignId: request.campaignId,
+    requestDigest: request.ref.digest.hex, requestRef: request.ref, selectionRef: selection.ref });
   return { executionId, attemptId, generation, campaignId: request.campaignId, outcome: checked.campaign.outcome,
     exitCode: EXIT_CODES[checked.campaign.outcome], reasonCodes: [...new Set(checked.receipts.flatMap(receipt => receipt.reasonCodes))],
     receipts: checked.receipts, campaign: checked.campaign, executionDir, redelivered: true };
