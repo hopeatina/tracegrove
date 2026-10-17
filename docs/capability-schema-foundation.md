@@ -1,4 +1,116 @@
-# Capability schema foundation — review draft
+# Tracegrove consolidated implementation and release plan — review draft
+
+This is the single progress plan for the work discussed with Hope. Update this document as
+scope and evidence change; the linked audit and environment guide are detailed specifications
+and receipts, not parallel delivery plans. Changes are already in progress in existing
+[foundation PR #21](https://github.com/hopeatina/tracegrove/pull/21), stacked on
+[release PR #19](https://github.com/hopeatina/tracegrove/pull/19). Both remain unmerged; #21 remains
+draft. No npm release is claimed.
+
+## Verified checkpoint and ownership
+
+Implementation checkpoint: `2a146bfc8be87589b9e536890d600c5230cb34c8`,
+[terminal green CI](https://github.com/hopeatina/tracegrove/actions/runs/39072367321).
+Runtime/profile source is identical to independently reviewed
+`3894ed6e43b32c0177be03397e22df757405ed6c`; subsequent changes clarify documentation and make
+the lease-expiry regression deterministic. Local verification: 378 passed, two Python sample
+skips, 47 files, 85 schemas, build passed. The 18 portable conformance cases use synthetic host
+ports and do not qualify actual environments. Any later commit requires its own exact-head checks.
+
+Release #19 remains at `7fe001f3cb59fdd9a03341d9ecebfe1d9cc8b41a`,
+[green CI](https://github.com/hopeatina/tracegrove/actions/runs/39057963180), inspected
+`tracegrove@0.3.0` tarball and clean packed-install positive/negative browser smoke. That tarball
+does not contain this later draft foundation. Browser prerequisite
+[#18](https://github.com/hopeatina/tracegrove/pull/18) remains intentionally draft at
+`452c898a11c2d7a061fa71bc57ddabc1945b96e1`; its original GitHub author is `hopeatina`, but no
+linked active cloud-task reference was verifiable. Its broader qualification gaps are not waived.
+Concurrent [typed-authoring #20](https://github.com/hopeatina/tracegrove/pull/20) at
+`d2846b2ccc3a372b737d58abd45afb8595dd5437` is preserved separately. Do not duplicate or merge it
+silently, force-push shared work, or bypass draft/review/branch holds.
+
+## Implemented / in progress / planned / blocked
+
+| Area | State | Actual result and remaining boundary |
+| --- | --- | --- |
+| Agent CLI and small human UI audit | Implemented | First-use, structured run output/exit codes, evidence privacy/provenance, setup friction, desktop/375px Grove and recovery audited in the [release audit](release-audit-2026-10-17.md). Uniform top-level JSON errors, better first-use Next.js launch, accessible UI traversal and hosted client acceptance remain gaps. |
+| Native HTTP/Chromium execution | Implemented | Real isolated fixture journeys, DOM/API readback, verified recordings and cleanup; read-only timeout recording defects fixed and concurrent browser-author work reconciled. No general hosted/network-containment qualification. |
+| Typed core and domain extensions | Implemented | Additive scoped operations/observations, versioned typed semantics/extensions, native provenance and lossless existing mappings. Worker/contract/database/pipeline examples are contracts, not executable adapters. Existing v1 compiler/executor remains authoritative. |
+| Retry, ownership, identity and replay | Implemented | Pure bounded retry/Retry-After, ambiguous-effect reconciliation, teardown inventory, safe artifact naming, logical/run/attempt separation and explicit replay validation. These helpers do not perform provider effects or engine replay. |
+| Streams / MCP / app bridges | Implemented | Typed transport/revision/features, chunks versus logical messages, correlation, errors, cancel/disconnect/resume and fidelity classes; negative conformance. Actual SSE/WebSocket/MCP SDK transports, widget bridge and installed signed-in hosts remain unimplemented/unqualified. |
+| Environment profile and preflight | Implemented | Reference-only profile/intent schemas, generated alongside/staging examples and bounded SDK metadata probes. Separate persona secrets from execution actor/policy; stale/foreign/unknown/denied requirements fail closed. No general profile-to-CLI dispatch, secret broker or cloud adapter is installed. |
+| README-only onboarding | Implemented | One minimal source quickstart, Node/npm prerequisites/bootstrap, doctor/check/test JSON, expected artifacts and cleanup/retry instructions. Independent fresh Linux checkout/toolchain/cache/sample passed in 39 seconds with no source/flow repair; original/copied bundles verified and owned processes/workspaces absent. Final command block is unchanged. |
+| Ephemeral-host onboarding artifacts | In progress | CI runs the exact README block. A retained-copy/verification change is under review; reviewer found the failing-shell path can still lose its available bundle in `/tmp`. Export failure evidence while preserving nonzero status, add a deliberate-failure regression, then run exact-head CI. Do not count the uncommitted harness fix as complete. |
+| Ecosystem adapter reuse | Planned | Reuse Playwright, native JUnit output and typed lifecycle ports. Next qualify one async app/store/worker fixture using controlled Compose/Testcontainers where available. OpenAPI-assisted authoring, Playwright/JUnit import, optional OTLP span links, Allure/SARIF views and provider adapters remain proposals. No universal shell/action DSL. |
+| Mocks versus real boundaries | Planned | Keep whole-app mock, component fake/WireMock, sanitized recording, sandbox, protocol-client/Inspector, widget fixture and actual installed-host evidence distinct. Fake success never qualifies a real provider, SSO or client. |
+| Golden fixture tranche | Planned | Candidates: TodoMVC (4), Cypress Real World App (6), Docker Voting App (4), then FastAPI full-stack/Petclinic if useful. None is golden or run here. Verify license/source/dependency/runtime/image pins, owned seeds/reset, clean baseline, seeded defects, unrelated controls, independent readback and cleanup first. |
+| Real environment qualification | Blocked | Hope's Mac is offline; other Codex/Claude clouds, OrgX-triggered runtime and external staging have no qualified runner/broker/access journey here. Discover capabilities; never assume Docker, root, persistent disks, public inbound access or permission to change network policy. |
+| Durable safety/recovery integration | Blocked | Durable acquisition journals/CAS/fencing, atomic artifact publication, expired-lease recovery, host network confinement, executable redaction and real-provider crash/interleaving tests remain unfinished integration gates. Pure/schema tests cannot close them. |
+| Independent review | Implemented | Independent AI reviews reproduced/fixed four capability defects and one preflight deadline defect; code and README were re-reviewed. This is not named-expert feedback, human owner approval or provider integration approval. New harness failure-retention finding remains open. |
+| Npm publication / protected merge | Blocked | Draft prerequisite stack and review/qualification gates remain. Npm publisher authentication/name ownership is unresolved (`ENEEDAUTH`; prior E404 does not prove name entitlement). No credentials or publication attempted; registry integrity/install verification remains unperformed. |
+
+## Actual three-PR OrgX outcomes
+
+Exact base/head commits, acceptance criteria, argv, timings and receipts are in the
+[release audit](release-audit-2026-10-17.md#three-real-orgx-pr-trials) and its recovered-host section.
+
+| Real PR trial | Observed host outcome | What it does not prove |
+| --- | --- | --- |
+| [#3620](https://github.com/hopeatina/orgx/pull/3620), settings UI | HTTP 200, visible Autopilot permissions heading, verified 436507-byte video; 64.550 seconds | No approval/revocation interaction, production persona or complete permissions workflow |
+| [#3614](https://github.com/hopeatina/orgx/pull/3614), client/MCP retry contract | Liveness 200, GET on POST-only save-plan route 405, verified bundle; 38.381 seconds | No real Redis idempotency, installed MCP-client exchange or write acceptance |
+| [#3645](https://github.com/hopeatina/orgx/pull/3645), receipt workflow | Liveness 200; receipt search 503 workspace_access_unavailable; verified failed bundle; 59.262 seconds | No passing receipt/worker/business workflow; missing offline workspace/store prerequisite remains |
+
+The separate 76 mocked OrgX tests are not host acceptance. Dependency reuse differed from PR
+lockfiles. No production/customer mutation, live approval, prohibited database/RLS/HTTP integrity
+replay, denied staging retry, paid service/model call, credential transfer or security change is
+authorized by these results. Local Docker registry HTTPS was refused; hosted CI Docker samples
+passed separately. Preserve all original failed attempts and limits.
+
+## Expert review lenses and prospective pilots
+
+Apply independent architecture/type-system, agent/human onboarding, security/ownership,
+distributed recovery/async, protocol/streaming and evidence/data-quality lenses. Challenge actual
+authority, source/build closure, normalized-versus-native mapping loss, missing capture, partial
+provisioning, retry effects, cancellation, cleanup and replay before broad integration. Existing
+AI review is concrete code review; research-derived expert lenses are not expert endorsements.
+
+Parent public-source research suggested Twenty, Activepieces, LibreChat, Trigger.dev, dlt and
+Data360 MCP as pain/compatibility references and possible pilot prospects; the linked questions
+below preserve those sources. No prospect interview, outreach, access grant, paid commitment,
+customer validation or measured customer value is established. Reuse any existing central pilot
+owner; do not create competing outreach or imply GitHub issues are customers.
+
+## Execution order and acceptance gates
+
+1. **Finish current first slice:** retain success and available failed-run evidence in the
+   onboarding artifact, verify copied bytes, preserve failure status and cleanup uncertainty;
+   add the failure regression and complete exact-head CI/re-review. Keep #21 draft.
+2. **Review and wire native onboarding:** reuse the existing compiler/HostPlan resolver for profile
+   selection and doctor capability discovery. Scenarios stay shared; each environment resolves
+   workspace/build, endpoint, existing secret refs, scoped execution authority and artifact storage.
+   Follow the [current-versus-needed matrix and typed templates](portable-environments.md).
+3. **Qualify each actual environment:** independently follow only the README from clean setup,
+   record manual steps/failures/time, actual positive/negative journey, authorization/capability
+   evidence, verified exported artifacts and owned-resource cleanup. Test Mac when available and
+   each selected coding/workflow cloud separately. Do not promote a host from schema/fixture tests.
+4. **External staging and OrgX-triggered execution:** implement reviewed host/broker integrations
+   only with existing access. Distinguish reading a borrowed deployment from provisioning beside
+   the runner; never restart/delete a borrowed app or broaden privileges. Denied paths remain held.
+5. **Expand reusable ecosystem coverage:** qualify one real async fixture across request, broker,
+   worker, durable store and UI with non-consuming observations and observed correlation; add
+   provider-specific contracts only where they solve measured onboarding/verification gaps. Keep
+   native artifacts and all attempt identities, and exercise partial failure/crash/interleaving.
+6. **Release:** reconcile stacked owners/reviews, finish the declared release scope and required
+   checks, build/pack/inspect the final merged source and clean-install it. Hope personally completes
+   supported npm login/OTP/name confirmation without sharing credentials in chat. Publish through
+   the reviewed normal process; then verify actual registry version/integrity and clean registry
+   install. Existing source tags and green tests never establish npm publication.
+
+The sections below retain the detailed schema design, provider mappings, research questions and
+unfinished recovery gates. They remain part of this consolidated plan.
+
+---
+
+## Capability foundation design
 
 This is a schema/admission boundary, not a provider installation or a new execution engine. Existing CLI behavior and workflow v1 records remain authoritative. No external operation is dispatched by this slice.
 

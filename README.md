@@ -12,6 +12,9 @@ and tracegrove re-checks everything they write before you see it.
 
 ## First run: an isolated app and verified evidence
 
+The [consolidated implementation and release plan](docs/capability-schema-foundation.md) records
+what is implemented, in progress, planned and blocked, with exact PRs and evidence.
+
 This candidate is unpublished. Start from an authorized checkout of the reviewed commit;
 run the following from its root. Do not install an unrelated registry package with `npx tracegrove`.
 The first run needs **Node >=22.22.0 and <23**, npm with lockfile-v3 support, a POSIX shell,
