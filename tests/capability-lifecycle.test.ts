@@ -76,6 +76,9 @@ it('separates evidence playback from fresh-fixture reruns and refuses unsupporte
   expect(() => validateCapabilityReplay({ ...plan, mode: 'fixture_rerun', targetBinding: binding }, ['fixture_rerun'])).toThrow('rerun_requires_fresh_attempt_and_fixtures');
   const rerun = { ...plan, mode: 'fixture_rerun', targetBinding: { ...binding, executionId: 'new-exec', attemptId: 'new-attempt' }, freshFixtureRefs: [ref('fresh-fixture')] };
   expect(validateCapabilityReplay(rerun, ['fixture_rerun'])).toEqual(rerun);
+  for (const freshFixtureRefs of [[plan.pins.fixtureRef], [{ ...plan.pins.fixtureRef, revision: '2' }], [ref('fresh-fixture'), ref('fresh-fixture')]]) {
+    expect(() => validateCapabilityReplay({ ...rerun, freshFixtureRefs }, ['fixture_rerun'])).toThrow('rerun_requires_distinct_fresh_fixtures');
+  }
   expect(() => validateCapabilityReplay({ ...rerun, mode: 'workflow_history_replay', historyRef: ref('history'), targetCodeRef: ref('new-code') }, ['workflow_history_replay'])).toThrow('history_code_compatibility_unreviewed');
   expect(() => validateCapabilityReplay({ ...plan, pins: { seedRef: ref('seed') } })).toThrow();
 });

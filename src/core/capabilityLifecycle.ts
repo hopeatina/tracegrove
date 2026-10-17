@@ -55,6 +55,7 @@ export function validateCapabilityReplay(value: unknown, supportedModes: readonl
     if (plan.targetBinding || plan.freshFixtureRefs.length || plan.externalEffects !== 'none' || !sameRef(plan.sourceCodeRef, plan.targetCodeRef)) throw new CapabilityBoundaryError('playback_must_not_execute_actions');
   } else {
     if (!plan.targetBinding || plan.targetBinding.executionId === plan.sourceBinding.executionId || plan.targetBinding.attemptId === plan.sourceBinding.attemptId || !plan.freshFixtureRefs.length) throw new CapabilityBoundaryError('rerun_requires_fresh_attempt_and_fixtures');
+    if (plan.freshFixtureRefs.some(ref => ref.id === plan.pins.fixtureRef.id) || new Set(plan.freshFixtureRefs.map(ref => ref.id)).size !== plan.freshFixtureRefs.length) throw new CapabilityBoundaryError('rerun_requires_distinct_fresh_fixtures');
     if (plan.targetBinding.scope.ownerId !== plan.sourceBinding.scope.ownerId || !same(plan.targetBinding.scope, plan.sourceBinding.scope)) throw new CapabilityBoundaryError('replay_scope_mismatch');
     if (plan.mode === 'workflow_history_replay' && (!plan.historyRef || (!sameRef(plan.sourceCodeRef, plan.targetCodeRef) && !plan.compatibilityReviewRef))) throw new CapabilityBoundaryError('history_code_compatibility_unreviewed');
   }

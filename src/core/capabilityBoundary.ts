@@ -99,6 +99,7 @@ export async function admitCapabilityOperation(value: unknown, currentValue: unk
   const descriptor = parse(CapabilityDescriptor, descriptorValue);
   if (descriptor.id !== operation.capability.id || descriptor.version !== operation.capability.version || descriptor.availability !== 'observed_supported') deny('unsupported_capability');
   if (!descriptor.semantics.includes(operation.input.kind)) deny('unsupported_semantics');
+  if (operation.input.kind === 'wiremock.contract' && !descriptor.evidenceClasses.includes('deterministic_fake')) deny('unsupported_evidence_class');
   if (operation.input.kind === 'protocol.session') {
     const input = operation.input;
     const protocol = descriptor.protocols.find(p => p.transport === input.transport && p.version === input.protocolVersion);
@@ -133,12 +134,18 @@ export async function verifyCapabilityObservation(value: unknown, operationValue
   if (!equal(observation.producer, descriptor.producer)) deny('producer_mismatch');
   if (!descriptor.evidenceClasses.includes(observation.evidenceClass)) deny('unsupported_evidence_class');
   if (operation.input.kind === 'protocol.session' && observation.evidenceClass !== operation.input.evidenceClass) deny('evidence_class_mismatch');
+  if (operation.input.kind === 'wiremock.contract' && observation.evidenceClass !== 'deterministic_fake') deny('evidence_class_mismatch');
   const permittedFacts: Record<CapabilityInput['kind'], readonly CapabilityObservation['facts']['kind'][]> = {
     'resource.lifecycle': ['resource'], 'http.step': ['http'], 'browser.step': ['browser'], 'api.fixture': ['resource', 'http'],
     'worker.job': ['worker'], 'wiremock.contract': ['contract'], 'database.fixture': ['database', 'resource'],
     'pipeline.check': ['pipeline'], 'protocol.session': ['stream', 'protocol_message'],
   };
   if (!permittedFacts[operation.input.kind].includes(observation.facts.kind)) deny('observation_semantics_mismatch');
+  if (operation.input.kind === 'worker.job' && observation.facts.kind === 'worker' && operation.input.jobId !== null && observation.facts.jobId !== operation.input.jobId) deny('job_correlation_mismatch');
+  if (observation.facts.kind === 'resource' && !sameRef(observation.facts.resourceRef, operation.resourceRef)) deny('resource_correlation_mismatch');
+  if (operation.input.kind === 'wiremock.contract' && observation.facts.kind === 'contract' && !sameRef(operation.input.contractRef, observation.facts.contractRef)) deny('contract_correlation_mismatch');
+  if (operation.input.kind === 'database.fixture' && observation.facts.kind === 'database' && (!operation.input.queryRef || !sameRef(operation.input.queryRef, observation.facts.queryRef))) deny('query_correlation_mismatch');
+  if (operation.input.kind === 'pipeline.check' && observation.facts.kind === 'pipeline' && !sameRef(operation.input.suiteRef, observation.facts.suiteRef)) deny('suite_correlation_mismatch');
   if (observation.facts.kind === 'protocol_message') {
     const facts = observation.facts;
     if (operation.input.kind !== 'protocol.session' || facts.requestId !== operation.input.requestId) deny('request_correlation_mismatch');
@@ -152,6 +159,17 @@ export async function verifyCapabilityObservation(value: unknown, operationValue
     if (bytes.byteLength > 16 * 1024 * 1024 || bytesRead > 64 * 1024 * 1024) deny('evidence_byte_limit');
     if (bytes.byteLength !== artifact.byteCount || !equal(digestOfBytes(bytes), artifact.ref.digest)) deny('evidence_digest_mismatch');
     snapshots.set(JSON.stringify(artifact.ref), bytes);
+  }
+  // A hash in normalized facts is not evidence that its referenced bytes were captured.
+  if (observation.completeness === 'complete') {
+    const facts = observation.facts;
+    const nativeRefs = facts.kind === 'worker' ? [facts.resultRef, facts.terminalReceiptRef]
+      : facts.kind === 'http' ? [facts.bodyRef]
+      : facts.kind === 'database' ? [facts.rowsRef]
+      : facts.kind === 'pipeline' ? [facts.nativeReportRef]
+      : facts.kind === 'stream' ? [facts.transcriptRef, ...facts.logicalMessageRefs] : [];
+    if (nativeRefs.some(ref => ref && !snapshots.has(JSON.stringify(ref)))) deny('referenced_native_evidence_missing');
+    if (observation.correlations.some(link => link.relationship === 'observed' && link.evidenceRefs.some(ref => !snapshots.has(JSON.stringify(ref))))) deny('correlation_evidence_missing');
   }
   if (observation.factsRef) {
     const bytes = snapshots.get(JSON.stringify(observation.factsRef)); if (!bytes) deny('facts_evidence_missing');
@@ -218,6 +236,10 @@ export async function verifyCapabilityStream(value: unknown, operationValue: unk
     if (!equal(digestOfBytes(bytes), ref.digest)) deny('evidence_digest_mismatch'); return bytes;
   };
   for (const item of transcript.events) {
+    if (item.kind === 'progress' || item.kind === 'control') {
+      if (item.requestId !== null && item.requestId !== transcript.requestId) deny('request_correlation_mismatch');
+      await read(item.kind === 'progress' ? item.progressRef : item.evidenceRef);
+    }
     if (item.kind === 'chunk') { const bytes = await read(item.payloadRef); chunks.set(item.messageId, [...(chunks.get(item.messageId) ?? []), bytes]); }
     if (item.kind === 'message') {
       const bytes = await read(item.payloadRef); const parts = chunks.get(item.messageId);

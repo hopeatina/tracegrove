@@ -18,7 +18,7 @@ function fixture(input: CapabilityInput = mapExistingStep(step)) {
   const descriptor = CapabilityDescriptor.parse({ schemaVersion: 'workflow.capability-descriptor/v1', id: 'cap.test', version: 1, producer,
     semantics: ['resource.lifecycle', 'http.step', 'browser.step', 'api.fixture', 'worker.job', 'wiremock.contract', 'database.fixture', 'pipeline.check', 'protocol.session'],
     inputSchemaRef: ref('input-schema'), resultSchemaRef: ref('result-schema'), availability: 'observed_supported', evidenceRefs: [ref('probe')],
-    evidenceClasses: ['local_real', 'protocol_client'], protocols: [{ semantics: ['mcp.tools', 'mcp.progress'], transport: 'mcp.streamable_http', version: 'peer-pinned-revision', features: ['tools', 'progress', 'cancel'] }], extensions: [] });
+    evidenceClasses: ['local_real', 'protocol_client', 'deterministic_fake'], protocols: [{ semantics: ['mcp.tools', 'mcp.progress'], transport: 'mcp.streamable_http', version: 'peer-pinned-revision', features: ['tools', 'progress', 'cancel'] }], extensions: [] });
   const operation = CapabilityOperation.parse({ schemaVersion: 'workflow.capability-operation/v1', binding, operationId: 'operation.1', logicalOperationId: 'case.read', idempotencyKey: null, retryOf: null, phase: capabilityPhase(input),
     capability: { id: 'cap.test', version: 1, required: true }, resourceRef: ref('resource'), deadlineAt: '2099-01-01T00:00:00Z', fixtureRef: null, input, extensions: [] });
   const resource = { schemaVersion: 'workflow.scoped-resource/v1', ref: ref('resource'), binding, kind: input.kind === 'resource.lifecycle' ? input.resourceKind : 'application', isolation: 'owned_isolated',
@@ -249,4 +249,49 @@ it('keeps protocol/tool errors and app bridge state separate from transport comp
   const token = await verifyCapabilityObservation(observation, f.operation, f.descriptor, f.ports.readArtifact);
   expect(assessCapabilityEvidence(token)).toMatchObject({ executionStatus: 'completed', verificationVerdict: 'not_evaluated', observation: { facts: { resultState: 'protocol_error', bridgeState: 'error' } } });
   await expect(verifyCapabilityObservation({ ...observation, evidence: observation.evidence.slice(0, 1) }, f.operation, f.descriptor, f.ports.readArtifact)).rejects.toThrow('native_message_evidence_missing');
+});
+
+function withFacts(f: ReturnType<typeof fixture>, facts: CapabilityObservation['facts'], nativeRefs: Ref[] = []) {
+  const bytes = Buffer.from(JSON.stringify(facts)); const factsRef = f.store('review-facts', bytes);
+  return { ...f.observation, facts, factsRef, evidence: [factsRef, ...nativeRefs].map(ref => ({ ref,
+    byteCount: ref.id === factsRef.id ? bytes.length : Buffer.byteLength(ref.id), mediaType: 'application/json', producer,
+    redaction: 'not_required' as const, redactionPolicyRef: null })) };
+}
+it('binds worker observations to the frozen job and verifies terminal output and receipt bytes', async () => {
+  const f = fixture({ kind: 'worker.job', version: 1, action: 'observe', jobTypeRef: ref('type'), inputRef: null,
+    jobId: 'expected-job', idempotencyKey: 'key', observationMode: 'non_consuming' });
+  const resultRef = f.store('job-result', Buffer.from('job-result')); const terminalReceiptRef = f.store('job-receipt', Buffer.from('job-receipt'));
+  const facts = { kind: 'worker' as const, jobId: 'expected-job', state: 'succeeded' as const, resultRef, terminalReceiptRef };
+  await expect(verifyCapabilityObservation(withFacts(f, { ...facts, jobId: 'another-job' }), f.operation, f.descriptor, f.ports.readArtifact)).rejects.toThrow('job_correlation_mismatch');
+  for (const nativeRefs of [[], [resultRef], [terminalReceiptRef]]) {
+    await expect(verifyCapabilityObservation(withFacts(f, facts, nativeRefs), f.operation, f.descriptor, f.ports.readArtifact)).rejects.toThrow('referenced_native_evidence_missing');
+  }
+  const observation = withFacts(f, facts, [resultRef, terminalReceiptRef]);
+  expect(assessCapabilityEvidence(await verifyCapabilityObservation(observation, f.operation, f.descriptor, f.ports.readArtifact)).evidenceVerdict).toBe('admissible');
+  const originalRead = f.ports.readArtifact.getMockImplementation()!;
+  f.ports.readArtifact.mockImplementation(async ref => ref.id === resultRef.id ? Buffer.from('substitute') : originalRead(ref));
+  await expect(verifyCapabilityObservation(observation, f.operation, f.descriptor, f.ports.readArtifact)).rejects.toThrow('evidence_digest_mismatch');
+});
+it('keeps deterministic contract fakes from acquiring signed-in-host fidelity', async () => {
+  const f = fixture({ kind: 'wiremock.contract', version: 1, action: 'observe', contractRef: ref('contract'), mappingRef: ref('mapping'), interactionId: 'interaction', fidelity: 'deterministic_fake' });
+  f.descriptor.evidenceClasses.push('signed_in_host');
+  const observation = withFacts(f, { kind: 'contract', contractRef: ref('contract'), matched: 1, unmatched: 0, fidelity: 'deterministic_fake' });
+  await expect(verifyCapabilityObservation({ ...observation, evidenceClass: 'signed_in_host' }, f.operation, f.descriptor, f.ports.readArtifact)).rejects.toThrow('evidence_class_mismatch');
+  const valid = { ...observation, evidenceClass: 'deterministic_fake' };
+  expect(assessCapabilityEvidence(await verifyCapabilityObservation(valid, f.operation, f.descriptor, f.ports.readArtifact)).observation.evidenceClass).toBe('deterministic_fake');
+  await expect(admitCapabilityOperation(f.operation, binding, { ...f.descriptor, evidenceClasses: ['signed_in_host'] }, f.ports)).rejects.toThrow('unsupported_evidence_class');
+});
+it.each(['progress', 'control'] as const)('verifies %s request correlation and native bytes, including cancellation races', async kind => {
+  const f = streamFixture(); const native = f.store('event-proof', Buffer.from('event-proof'));
+  const event = kind === 'progress'
+    ? { kind, requestId: 'request.1', progressRef: native, eventId: 'review-event', sequence: 0, direction: 'server_to_client', providerEventId: null }
+    : { kind, requestId: 'request.1', action: 'cancel_requested', evidenceRef: native, eventId: 'review-event', sequence: 0, direction: 'client_to_server', providerEventId: null };
+  const transcript = { ...f.transcript, events: [event, ...f.transcript.events.map(item => ({ ...item, sequence: item.sequence + 1 }))] };
+  await expect(verifyCapabilityStream(transcript, f.operation, f.ports.readArtifact)).resolves.toMatchObject({ evidenceVerdict: 'admissible' });
+  await expect(verifyCapabilityStream({ ...transcript, events: [{ ...event, requestId: 'foreign' }, ...transcript.events.slice(1)] }, f.operation, f.ports.readArtifact)).rejects.toThrow('request_correlation_mismatch');
+  const originalRead = f.ports.readArtifact.getMockImplementation()!;
+  f.ports.readArtifact.mockImplementation(async ref => { if (ref.id === native.id) throw new Error('missing artifact'); return originalRead(ref); });
+  await expect(verifyCapabilityStream(transcript, f.operation, f.ports.readArtifact)).rejects.toThrow('missing artifact');
+  f.ports.readArtifact.mockImplementation(async ref => ref.id === native.id ? Buffer.from('substitute') : originalRead(ref));
+  await expect(verifyCapabilityStream(transcript, f.operation, f.ports.readArtifact)).rejects.toThrow('evidence_digest_mismatch');
 });
