@@ -29,3 +29,51 @@ No fetch, checkout, model call or review approval occurs. Missing or multiple me
 Bounds: 32 repositories, 500 changed paths, 1 MiB per captured/cited blob, 4 MiB per full diff/tree listing/tree object, 8,192 trees per selected commit, 32 MiB of captured payload bytes and ten seconds per Git command. CLI input is at most 256 KiB. The artifact includes changed blobs and full diffs, not every source object: later citation reads require the selected objects in an authorized Git store. Full source-object transport remains separate work.
 
 The output is a `RevisionMatrix`, not a complete runtime `SourceSelection` or qualified source-to-target proof. Independent element/coverage checking, reviewed source admission, hosted lifecycle storage and execution wiring remain separate gates. Tests use real temporary repositories, including dirty/moved checkouts, bare and SHA-256 repositories, corrupt objects, denied/revoked scope, missing objects, oversized blobs, configured helpers and the actual source/built CLI.
+
+## Run selected revisions independently
+
+Materialize complete regular-file trees from the frozen resolution using an explicit
+authorized local repository mapping. Relative `--root` paths resolve beside the
+input JSON. Output directories must not exist, and their parent must already exist.
+
+```sh
+tracegrove source-materialize --input source.json --repository application --root . --side base --output ./base-snapshot
+tracegrove source-materialize --input source.json --repository application --root . --side head --output ./head-snapshot
+tracegrove test --config ./base-snapshot/source/tracegrove.config.yaml
+tracegrove test --config ./head-snapshot/source/tracegrove.config.yaml
+```
+
+Each output contains `source/` and a sealed `snapshot.json` with the resolution and
+repository references, exact commit, side, and every file's original Git mode,
+byte count and SHA-256 digest. `materializeGitSnapshot(input, authorize)` exposes
+the same operation through the SDK. Authorization runs before object reads and
+again before output allocation. No fetch, checkout, dependency installation, app
+execution, Git filters or hooks occur during materialization. Later `test` runs
+execute trusted project code and use the ordinary compiler and app identity checks.
+
+The reader validates the commit/tree closure and independently rehashes every blob,
+including unchanged files. It refuses an empty tree, symlinks, submodules, unsupported
+modes, nonportable names, case/Unicode aliases, more than 10,000 files, blobs over
+1 MiB, or more than 32 MiB of file bytes. These are complete-coverage limits: it
+never silently excludes a file to make a snapshot pass. A private output is created
+only after all object reads succeed; the manifest is written last, and write failure
+removes only the directory this operation exclusively created. Existing output is
+preserved. The host filesystem and Git executable remain trusted.
+
+The CLI regression test creates a real authorization bug and its fix in separate
+commits, freezes them, dirties the checkout and moves its branch. Separate CLI
+processes run the identical saved flow against both materialized revisions: the
+base fails the ownership assertion and the head passes. Both bundles are re-read
+and re-reduced, app digests match the snapshot's source bytes, and cleanup is
+confirmed. CI repeats this through the built distribution and retains both sealed
+bundles, source trees, snapshot manifests and resolution in `source-regression-proof`.
+Another process can verify those bundles or rerun either snapshot without discovery;
+the artifact README gives the exact commands. Locally, set
+`TRACEGROVE_SOURCE_PROOF_DIR` to a new directory when running
+`tests/cliGitSnapshot.test.ts` to retain the same proof.
+
+A snapshot is mutable after publication; its manifest describes the captured
+bytes. It is local source transport, not a remote repository attestation or a
+runtime `SourceSelection`. The host does not yet populate revision repository
+observations from this manifest. Automatic source-to-target qualification,
+reviewed lifecycle admission and hosted activation remain separate work.

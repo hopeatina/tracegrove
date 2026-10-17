@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RefSchema, ScopeSchema, GitRevision, RepositoryPath } from '../primitives.ts';
+import { RefSchema, ScopeSchema, GitRevision, GitObjectId, RepositoryPath, DigestSchema } from '../primitives.ts';
 import { RevisionMatrix } from './source.ts';
 
 export const GitRepositoryBinding = z.object({ repositoryRef: RefSchema, root: z.string().min(1).max(8192) }).strict();
@@ -14,3 +14,14 @@ export const GitSourceResolution = z.object({ schemaVersion: z.literal('workflow
   payloads: z.array(z.object({ ref: RefSchema, base64: z.string().max(6 * 1024 * 1024) }).strict()).min(1).max(1032),
 }).strict();
 export type GitSourceResolution = z.infer<typeof GitSourceResolution>;
+
+export const GIT_SNAPSHOT_LIMITS = { files: 10_000, fileBytes: 1_048_576, totalBytes: 32 * 1024 * 1024 } as const;
+export const GitSnapshotSide = z.enum(['base', 'head']);
+export const GitSourceSnapshot = z.object({
+  schemaVersion: z.literal('workflow.git-source-snapshot/v1'), ref: RefSchema, scope: ScopeSchema,
+  resolutionRef: RefSchema, repositoryRef: RefSchema, side: GitSnapshotSide, commit: GitObjectId,
+  files: z.array(z.object({ path: RepositoryPath, mode: z.enum(['100644', '100755']),
+    digest: DigestSchema, bytes: z.number().int().nonnegative().max(GIT_SNAPSHOT_LIMITS.fileBytes),
+  }).strict()).min(1).max(GIT_SNAPSHOT_LIMITS.files),
+}).strict();
+export type GitSourceSnapshot = z.infer<typeof GitSourceSnapshot>;

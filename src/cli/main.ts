@@ -22,7 +22,7 @@ import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload,
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { writeSample } from './samples/write.ts';
-import { resolveSourceFiles } from './source.ts';
+import { resolveSourceFiles, materializeSourceFiles } from './source.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
@@ -88,6 +88,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
                                                        check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
   source-resolve --input <repositories.json> --output <source.json>
+  source-materialize --input <source.json> --repository <id> --root <local-repo> --side base|head --output <new-dir>
                                                        freeze local Git commit pairs and complete diffs (no fetch or review)
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
@@ -98,6 +99,11 @@ async function main(argv: string[]): Promise<number> {
     case 'help': process.stdout.write(`${HELP}\n`); return 0;
     case 'source-resolve': {
       const result = await resolveSourceFiles(args.flags.input, args.flags.output);
+      out(args, result.summary, result.text);
+      return 0;
+    }
+    case 'source-materialize': {
+      const result = await materializeSourceFiles(args.flags.input, args.flags.repository, args.flags.root, args.flags.side, args.flags.output);
       out(args, result.summary, result.text);
       return 0;
     }

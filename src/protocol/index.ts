@@ -7,7 +7,7 @@ import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
-import { GitSourceRequest, GitSourceResolution } from './schemas/gitSources.ts';
+import { GitSourceRequest, GitSourceResolution, GitSourceSnapshot } from './schemas/gitSources.ts';
 import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
@@ -45,6 +45,7 @@ export const SCHEMA_REGISTRY = {
   'workflow.replay-assessment/v1': ReplayAssessment,
   'workflow.scenario-activation/v1': ScenarioActivation,
   'workflow.git-source-resolution/v1': GitSourceResolution,
+  'workflow.git-source-snapshot/v1': GitSourceSnapshot,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,

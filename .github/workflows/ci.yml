@@ -29,7 +29,14 @@ jobs:
       - name: Verify immutable source resolution through the built CLI
         env:
           WORKFLOW_VERIFY_TEST_CLI: compiled
-        run: npm test -- tests/cliGitSources.test.ts tests/typed-authoring.test.ts --maxWorkers=2
+          TRACEGROVE_SOURCE_PROOF_DIR: ${{ runner.temp }}/source-regression-proof
+        run: npm test -- tests/cliGitSources.test.ts tests/cliGitSnapshot.test.ts tests/typed-authoring.test.ts --maxWorkers=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-regression-proof
+          path: ${{ runner.temp }}/source-regression-proof/
+          if-no-files-found: ignore
       - name: Qualify clean native and mocked Docker lanes
         run: |
           npm run test:container -- native-real
