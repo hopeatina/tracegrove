@@ -28,3 +28,6 @@ export { BrowserDriver, BrowserStepError } from './adapters/browser/driver.ts';
 export { LocalProcessHost, sourceIdentityDigest } from './hosts/local.ts';
 export { MockLoopbackHost } from './hosts/mock.ts';
 export type { ExecutorHost, HostSession, HostStartContext } from './hosts/types.ts';
+
+export * from './core/capabilityBoundary.ts';
+export * from './core/capabilityLifecycle.ts';
