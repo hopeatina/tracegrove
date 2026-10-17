@@ -308,8 +308,10 @@ Still open: full runtime source selection,
 hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
 Selected Git base/head trees can now be materialized into private independent
 directories with `source-materialize`; the [source guide](docs/git-source-resolution.md#run-selected-revisions-independently)
-shows running the same saved flow against each revision. This transports and checks
-local immutable source bytes; automatic runtime revision attestation remains open.
+shows running the same saved flow against each revision. `test --source-snapshot`
+binds local launch content to the manifest: the supervisor verifies and copies the
+pinned tree into its owned workspace. Automatic authenticated runtime revision
+attestation remains open.
 Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 
 ## Zero-OrgX quickstart (low-level corpus)

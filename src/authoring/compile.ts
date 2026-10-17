@@ -8,7 +8,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml, stringify } from 'yaml';
 import type { z } from 'zod';
 import { Blocked } from '../core/errors.ts';
-import { AUTHORING_SCOPE, ProjectLoader } from '../core/corpus.ts';
+import { AUTHORING_SCOPE, ProjectLoader, localScope } from '../core/corpus.ts';
 import { materializeLogicalPayload } from '../core/generators.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntimeSync } from '../hosts/runtime.ts';
@@ -19,6 +19,8 @@ import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
+import { djangoBootstrap } from '../hosts/launchTemplates.ts';
+import { SnapshotSource } from './snapshotSource.ts';
 
 export const CONFIG_FILE = 'tracegrove.config.yaml';
 export const CONFIG_FILES = [CONFIG_FILE, 'tracegrove.config.ts'] as const;
@@ -39,7 +41,7 @@ export type CompileResult = {
   sourceDigest: string;
   sourceFiles: string[];
 };
-export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined };
+export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined };
 
 type Json = unknown;
 
@@ -200,7 +202,7 @@ function launchFor(config: AuthoringConfig, root: string, appRoot: string): { cw
     case 'django': {
       const dir = resolve(appRoot, app.entry ?? '.');
       if (!existsSync(join(dir, 'manage.py'))) fail('missing_manage_py', `no manage.py in ${relative(appRoot, dir) || '.'}`, 'set app.entry to the folder containing manage.py');
-      const bootstrap = "import os, subprocess, sys; subprocess.run([sys.executable, 'manage.py', 'migrate', '--noinput'], check=True); os.execv(sys.executable, [sys.executable, 'manage.py', 'runserver', '127.0.0.1:{port}', '--noreload'])";
+      const bootstrap = djangoBootstrap('{port}');
       return { cwd: dir, command: python, args: ['-c', bootstrap], runtime: 'python' };
     }
     case 'command':
@@ -217,6 +219,7 @@ function write(dir: string, rel: string, doc: Json): void {
 
 export function compileProject(configPath: string, options: CompileOptions = {}): CompileResult {
   const root = dirname(resolve(configPath));
+  const snapshotSource = options.sourceSnapshot ? new SnapshotSource(resolve(root, options.sourceSnapshot), localScope()) : null;
   const config = loadAuthoringConfig(resolve(configPath));
   const testDir = resolve(root, config.testDir);
   const appRoot = resolve(root, config.app.root);
@@ -254,6 +257,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
   const launch = launchFor(config, root, appRoot);
   const launchCwd = launch.cwd;
+  const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir);
   if (config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
   const runtime = observeApplicationRuntimeSync(launch.command, launchCwd, process.env.PATH ?? '');
   launch.command = runtime.executable;
@@ -295,6 +299,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       identitySourceFiles: identity.entries.map((entry) => entry.path),
       issuedCredentials: personas.map((name) => ({ name: `${name}_token`, subject: config.personas[name]!.subject })),
       portMode: 'assigned', runtime: launch.runtime,
+      ...(sourceSnapshot ? { sourceSnapshot } : {}),
     },
     mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: 'fresh_directory_and_port', networkRules: ['loopback_only'],
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],

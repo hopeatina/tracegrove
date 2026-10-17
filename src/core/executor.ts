@@ -247,7 +247,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   let observedTarget: TargetTuple | null = null;
   let identityMatched: boolean | null = null;
   if (session) {
-    observedTarget = targetFromComponentAttestations(cell.expectedTarget, session.attestations);
+    observedTarget = targetFromComponentAttestations(cell.expectedTarget, session.attestations, hostPlan.launch, scope);
     const comparison = compareTargets(cell.expectedTarget, observedTarget);
     identityMatched = comparison.matched;
     log.emit('identity.compared', null, { matched: comparison.matched, mismatches: comparison.mismatches });

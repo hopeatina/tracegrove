@@ -204,7 +204,7 @@ export const IdentityAttestation = z.object({
   issuer: z.enum(['local_launcher', 'declared_binding']),
   trustPolicy: z.enum(['launcher_computed_source_digest', 'operator_declared_unverified']),
   evidence: z.object({ files: z.array(z.object({ path: z.string().max(LIMITS.shortText), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict()).max(256),
-    runtimeProbe: RuntimeObservation.optional(), observedHealthBody: JsonValue.nullable() }).strict(),
+    runtimeProbe: RuntimeObservation.optional(), sourceSnapshotRef: RefSchema.optional(), observedHealthBody: JsonValue.nullable() }).strict(),
   observedAt: IsoDateTime,
 }).strict().superRefine((attestation, ctx) => {
   if (attestation.identity.kind !== 'source_digest') return;

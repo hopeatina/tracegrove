@@ -10,6 +10,7 @@ import { compileCase } from './compiler.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { videoBundlePath } from './bundlePaths.ts';
 import { targetFromComponentAttestations } from './targetObservation.ts';
+import { snapshotAttestationProblems } from './snapshotEvidence.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -63,7 +64,7 @@ export function checkCellEvidence(input: {
   const attestations = host.attestations.map((a) => parseAs(IdentityAttestation, a, 'attestation'));
   for (const a of attestations) record(a, a.ref, 'attestation');
   const observed = r.environment.observed;
-  if (observed && digestOfValue(observed).hex !== digestOfValue(targetFromComponentAttestations(cell.expectedTarget, attestations)).hex) {
+  if (observed && digestOfValue(observed).hex !== digestOfValue(targetFromComponentAttestations(cell.expectedTarget, attestations, plan.launch, r.scope)).hex) {
     problem('target differs from host observations');
   }
   if (observed && r.environment.provenance.runtime === 'live') {
@@ -71,7 +72,9 @@ export function checkCellEvidence(input: {
       const attestation = attestations.find((a) => a.componentId === id);
       if (!attestation || attestation.issuer !== 'local_launcher' || attestation.trustPolicy !== 'launcher_computed_source_digest') { problem(`required identity ${id} lacks trusted attestation`); continue; }
       const identity = observed.components.find((c) => c.componentId === id)?.identity;
-      if (digestOfValue(identity ?? null).hex !== digestOfValue(attestation.identity).hex) problem(`identity ${id} differs from attestation`);
+      const sourceProblems = plan.launch?.componentId === id ? snapshotAttestationProblems(plan.launch, attestation, r.scope) : [];
+      if (identity !== null && identity !== undefined) for (const message of sourceProblems) problem(message);
+      if (!sourceProblems.length && digestOfValue(identity ?? null).hex !== digestOfValue(attestation.identity).hex) problem(`identity ${id} differs from attestation`);
     }
   }
   const boundaries = (read('boundaries.json') as unknown[]).map((b) => parseAs(BoundaryObservation, b, 'boundary'));

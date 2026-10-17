@@ -39,8 +39,8 @@ input JSON. Output directories must not exist, and their parent must already exi
 ```sh
 tracegrove source-materialize --input source.json --repository application --root . --side base --output ./base-snapshot
 tracegrove source-materialize --input source.json --repository application --root . --side head --output ./head-snapshot
-tracegrove test --config ./base-snapshot/source/tracegrove.config.yaml
-tracegrove test --config ./head-snapshot/source/tracegrove.config.yaml
+tracegrove test --config ./base-snapshot/source/tracegrove.config.yaml --source-snapshot ./base-snapshot/snapshot.json
+tracegrove test --config ./head-snapshot/source/tracegrove.config.yaml --source-snapshot ./head-snapshot/snapshot.json
 ```
 
 Each output contains `source/` and a sealed `snapshot.json` with the resolution and
@@ -73,7 +73,25 @@ the artifact README gives the exact commands. Locally, set
 `tests/cliGitSnapshot.test.ts` to retain the same proof.
 
 A snapshot is mutable after publication; its manifest describes the captured
-bytes. It is local source transport, not a remote repository attestation or a
-runtime `SourceSelection`. The host does not yet populate revision repository
-observations from this manifest. Automatic source-to-target qualification,
-reviewed lifecycle admission and hosted activation remain separate work.
+bytes. `test` and `compile` accept `--source-snapshot` for an explicit per-command
+binding. Compilation checks the manifest, local owner scope and every pinned file.
+The frozen launch plan includes that binding; the trusted supervisor checks the
+files again, copies only pinned inputs into its private owned workspace, and
+starts the app there. Untracked files cannot enter the launch copy. Post-plan drift
+in any pinned file, including files outside the entrypoint's source glob, blocks
+startup. The supervisor owns and removes the private copy after stop, startup
+failure or controlling-client disconnect.
+
+Pinned launches support the Node file, FastAPI module and canonical Django launch
+templates. Opaque eval/shell wrappers and entrypoints outside the snapshot are
+refused. The attestation binds the supervisor-computed source digest and snapshot
+reference; saved-bundle verification rechecks the exact file closure and manifest
+digests. Dependency installations, interpreter binaries and application environment
+remain separately supplied inputs; this is not a process sandbox or a complete
+dependency attestation. The CLI refuses snapshots from another local scope.
+
+This is local source-content binding, not authenticated Git/remote/deployment
+identity or a runtime `SourceSelection`. A self-sealed manifest does not prove
+who resolved its commit. The host does not yet populate repository observations
+or promote qualification from this manifest. Authenticated resolver/admission
+policy, reviewed lifecycle execution and hosted activation remain separate work.

@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { BrowserAction, BrowserLocator } from './browser.ts';
+import { GitSnapshotBinding } from './gitSources.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
   RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList,
@@ -430,6 +431,7 @@ export const LaunchRecipe = z.object({
   // in args and env values, and waits on the readiness path alone.
   portMode: z.enum(['reported', 'assigned']).optional(),
   runtime: ShortText.optional(), // compiler-observed hint; launch attestation uses a fresh interpreter probe
+  sourceSnapshot: GitSnapshotBinding.optional(),
 }).strict();
 export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 

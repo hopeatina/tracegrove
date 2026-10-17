@@ -18,4 +18,11 @@ observed metadata and recomputing all file/document hashes cannot create passing
 source or deployment evidence. Unsupported target observations need a real host
 contract before they can qualify. Honest blocked attempts retain their evidence.
 
+An optional source-snapshot binding covers local launch content. Its frozen
+manifest must match the admitted scope and supervisor observation; every attested
+identity file must belong to that manifest with the same bytes. The reader also
+recomputes the source digest from those file observations. This binds captured
+local content, without supplying unimplemented repository/deployment observations
+or authenticating the manifest's Git resolver.
+
 This is integrity and record-consistency verification. A passing mocked bundle retains its mocked proof boundary. It is not live qualification, trusted issuer identity, tenant authorization or production acceptance. The host must authorize a quiescent artifact directory and apply its own issuer/admission policy. The snapshot API is not a remote filesystem ACL or a defense against a hostile process replacing parent directories during capture.

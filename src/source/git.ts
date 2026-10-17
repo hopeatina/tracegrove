@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { Conflict } from '../core/errors.ts';
 import { GitObjectId, GitRevision, RepositoryPath } from '../protocol/primitives.ts';
 import { GIT_SNAPSHOT_LIMITS } from '../protocol/schemas/gitSources.ts';
+import { assertSnapshotPaths } from './snapshotPaths.ts';
 
 export type GitChange = { path: string; oldMode: string; newMode: string; oldId: string; newId: string; status: 'A' | 'D' | 'M' | 'T' };
 
@@ -102,27 +103,17 @@ export class GitRepository {
     const listing = new TextDecoder('utf-8', { fatal: true }).decode(this.run(['ls-tree', '-r', '-z', '--full-tree', commit], 4 * 1024 * 1024));
     const records = listing.split('\0');
     if (records.pop() !== '' || !records.length || records.length > GIT_SNAPSHOT_LIMITS.files) throw new Conflict('Git snapshot requires a complete nonempty bounded tree');
-    const seen = new Set<string>(); const spellings = new Map<string, string>(); let total = 0;
-    return records.map(record => {
+    let total = 0;
+    const entries = records.map(record => {
       const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t(.+)$/.exec(record);
       if (!match) throw new Conflict('Git snapshot refuses symlinks, submodules and unsupported modes');
       const path = RepositoryPath.parse(match[3]);
-      // One portable name per file: avoid metadata, device names and case/Unicode aliases.
-      const canonical = path.normalize('NFC').toLowerCase();
-      if (seen.has(canonical) || path.split('/').some(part => /^(?:\.git|con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part) || /[. ]$/.test(part) || /[<>"|?*]/.test(part))) {
-        throw new Conflict('Git snapshot path is not portable or is duplicated');
-      }
-      const parts = path.split('/');
-      for (let length = 1; length <= parts.length; length++) {
-        const prefix = parts.slice(0, length).join('/'); const key = prefix.normalize('NFC').toLowerCase();
-        if (spellings.has(key) && spellings.get(key) !== prefix) throw new Conflict('Git snapshot contains aliased directory names');
-        spellings.set(key, prefix);
-      }
-      seen.add(canonical);
       const bytes = this.blob(match[2]!); total += bytes.length;
       if (total > GIT_SNAPSHOT_LIMITS.totalBytes) throw new Conflict('complete Git snapshot exceeds the total byte bound');
       return { path, mode: match[1] as '100644' | '100755', bytes };
     });
+    assertSnapshotPaths(entries.map(entry => entry.path));
+    return entries;
   }
   file(commit: string, path: string): Buffer {
     this.verifyRevision(commit); RepositoryPath.parse(path);

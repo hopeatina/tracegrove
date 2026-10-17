@@ -38,7 +38,12 @@ it('independent base/head CLI runs prove the same saved authorization flow fails
     const snapshot = GitSourceSnapshot.parse(JSON.parse(readFileSync(join(output, 'snapshot.json'), 'utf8')));
     expect(verifySelfDigest(snapshot)).toBe(true); expect(snapshot.commit).toBe(side === 'base' ? base : head);
     const source = join(output, 'source');
-    const run = cli('test', '--config', join(source, 'tracegrove.config.yaml'), '--grep', 'notes.create-read-delete', '--json');
+    const compiled = cli('compile', '--config', join(source, 'tracegrove.config.yaml'), '--source-snapshot', join(output, 'snapshot.json'), '--json');
+    expect(compiled.status, compiled.stderr).toBe(0);
+    const doctor = cli('doctor', '--config', join(source, '.tracegrove/compiled/workflow.yaml'), '--json');
+    expect(doctor.status, doctor.stderr).toBe(0);
+    expect(JSON.parse(doctor.stdout).checks).toContainEqual(expect.objectContaining({ check: 'source_snapshot', state: 'ok' }));
+    const run = cli('test', '--config', join(source, 'tracegrove.config.yaml'), '--source-snapshot', join(output, 'snapshot.json'), '--grep', 'notes.create-read-delete', '--json');
     expect(run.status, run.stderr).toBe(side === 'base' ? 1 : 0);
     const summary = Summary.parse(JSON.parse(run.stdout));
     expect(summary.outcome).toBe(side === 'base' ? 'assertion_failed' : 'passed');
@@ -78,6 +83,6 @@ it('independent base/head CLI runs prove the same saved authorization flow fails
       }
       cpSync(run.bundleDir, join(destination, 'bundle'), { recursive: true });
     }
-    writeFileSync(join(archive, 'README.md'), '# Independent local source regression proof\n\nBase: assertion_failed (ownership read allowed). Head: passed (ownership read denied).\nThe saved flow is byte-identical. Each attempt has its own campaign, execution and fresh state.\n\nVerify each retained `base/bundle` and `head/bundle` with `tracegrove verify-bundle --bundle <path>`.\nRerun each snapshot with `tracegrove test --config <base|head>/source/tracegrove.config.yaml --grep notes.create-read-delete`.\nThese are local application observations, not hosted activation or deployed revision attestations.\n');
+    writeFileSync(join(archive, 'README.md'), '# Independent local source regression proof\n\nBase: assertion_failed (ownership read allowed). Head: passed (ownership read denied).\nThe saved flow is byte-identical. Each attempt has its own campaign, execution and fresh state.\n\nVerify each retained `base/bundle` and `head/bundle` with `tracegrove verify-bundle --bundle <path>`.\nIn the matching admitted local scope, rerun with `tracegrove test --config <base|head>/source/tracegrove.config.yaml --source-snapshot <base|head>/snapshot.json --grep notes.create-read-delete`.\nScope labels do not grant remote identity or cross-owner access.\nThese are local application observations, not hosted activation or deployed revision attestations.\n');
   }
-});
+}, 60_000); // Nine independent CLI processes plus real app launches; their own deadlines remain enforced.

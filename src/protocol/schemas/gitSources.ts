@@ -25,3 +25,5 @@ export const GitSourceSnapshot = z.object({
   }).strict()).min(1).max(GIT_SNAPSHOT_LIMITS.files),
 }).strict();
 export type GitSourceSnapshot = z.infer<typeof GitSourceSnapshot>;
+export const GitSnapshotBinding = z.object({ snapshot: GitSourceSnapshot, root: z.string().min(1).max(8192), cwd: z.union([z.literal('.'), RepositoryPath]) }).strict();
+export type GitSnapshotBinding = z.infer<typeof GitSnapshotBinding>;

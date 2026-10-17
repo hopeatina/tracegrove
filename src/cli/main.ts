@@ -23,6 +23,8 @@ import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { writeSample } from './samples/write.ts';
 import { resolveSourceFiles, materializeSourceFiles } from './source.ts';
+import { readGitSnapshotTree } from '../source/snapshotTree.ts';
+import { sameScope } from '../protocol/canonical.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
@@ -58,9 +60,10 @@ const HELP = `tracegrove <command> [--flags]
 Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found from the current folder):
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+       [--source-snapshot <snapshot.json>]              verify and launch an owner-bound private source copy
   list [--json]                                        list flows with their ids, tags and steps
   show [--run latest|<name>] [--json]                  print a run's summary
-  compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
+  compile [--json] [--source-snapshot <snapshot.json>]   write the derived v1 corpus to .tracegrove/compiled/
   ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
 
 Agent-friendly commands (every one takes --json and never starts the app):
@@ -116,7 +119,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'compile': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'), { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined });
       out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
       return 0;
     }
@@ -134,7 +137,7 @@ async function main(argv: string[]): Promise<number> {
       process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, signal: controller.signal,
           ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) });
         out(args, report, renderText(report, compiled.root));
         return report.exitCode;
@@ -250,6 +253,14 @@ async function main(argv: string[]): Promise<number> {
       checks.push({ check: 'node', state: process.versions.node.startsWith('22.') ? 'ok' : 'warn', detail: process.version });
       if (hostPlan.launch) {
         const cwd = resolve(project.root, hostPlan.launch.cwd);
+        if (hostPlan.launch.sourceSnapshot) {
+          const pin = hostPlan.launch.sourceSnapshot;
+          if (!sameScope(pin.snapshot.scope, localScope())) throw new Blocked([{ code: 'snapshot_scope_mismatch', detail: 'snapshot belongs to another local owner' }]);
+          try {
+            const files = readGitSnapshotTree(pin.snapshot, resolve(project.root, pin.root));
+            checks.push({ check: 'source_snapshot', state: 'ok', detail: `${files.length} pinned file(s); no application launched` });
+          } catch { checks.push({ check: 'source_snapshot', state: 'blocked', detail: 'Pinned source tree no longer matches its manifest' }); }
+        }
         try {
           const identity = sourceIdentityDigest(cwd, hostPlan.launch.identitySourceFiles);
           checks.push({ check: 'identity_sources', state: 'ok', detail: `${identity.entries.length} file(s), digest ${identity.hex.slice(0, 12)}` });

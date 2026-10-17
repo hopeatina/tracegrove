@@ -61,7 +61,9 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
   const failedAssertion = receipt.assertions.find((a) => a.result !== 'pass');
-  if (failedStep) {
+  if (receipt.outcome === 'blocked' && receipt.steps.every(step => step.result === 'not_run')) {
+    failure = { step: '(before steps)', message: receipt.reasonCodes.join(', ') || 'blocked before steps', observed: null };
+  } else if (failedStep) {
     const name = stepInfo.get(failedStep.stepId)?.name ?? failedStep.stepId;
     const status = failedStep.reasonCode?.match(/^unexpected_status:(\d+)$/);
     const expected = receipt.assertions.find((a) => a.assertionId === `${failedStep.stepId}.expect`);
@@ -144,7 +146,7 @@ export type TestOptions = CompileOptions & {
 
 export async function runTests(options: TestOptions): Promise<{ report: TestRunReport; compiled: CompileResult }> {
   const startedAt = new Date();
-  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags });
+  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot });
   const project = loadProject(compiled.workflowConfigPath);
   const scope = localScope();
   const bundle: FrozenBundle = plan({ project, profileName: 'real', scope });
