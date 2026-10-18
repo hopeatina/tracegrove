@@ -26,8 +26,8 @@ export const qualificationStrataDigest = (selection: SelectionManifest) => diges
 });
 
 export type ScenarioReadPorts = Pick<ScenarioPorts, 'read' | 'resolveDefinition' | 'resolveSelection' | 'validateDefinition'>;
-export async function readScenarioSnapshot(ports: ScenarioReadPorts, token: ScenarioRevisionToken): Promise<ScenarioSnapshot> {
-  const snapshot = Snapshot.parse(await ports.read(token.id, structuredClone(token.scope)));
+export function validateScenarioSnapshot(raw: unknown, token: ScenarioRevisionToken): ScenarioSnapshot {
+  const snapshot = Snapshot.parse(raw);
   const p = snapshot.projection;
   if (p.id !== token.id || !sameScope(p.scope, token.scope) || p.aggregateVersion !== token.expectedAggregateVersion ||
       !sameRef(p.definitionRef, token.expectedDefinitionRef) || p.invalidationEpoch !== token.expectedInvalidationEpoch ||
@@ -44,20 +44,29 @@ export async function readScenarioSnapshot(ports: ScenarioReadPorts, token: Scen
       !unique(history.flatMap(a => a.stateLeaseRefs.map(ref => ref.id)))) throw new Conflict('scenario history reuses campaign, attempt or leased-state identities');
   return snapshot;
 }
-export async function resolveScenarioDefinition(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<ScenarioDefinition> {
-  const value = ScenarioDefinition.parse(await ports.resolveDefinition(structuredClone(ref), structuredClone(scope)));
+export async function readScenarioSnapshot(ports: ScenarioReadPorts, token: ScenarioRevisionToken): Promise<ScenarioSnapshot> {
+  return validateScenarioSnapshot(await ports.read(token.id, structuredClone(token.scope)), token);
+}
+export function validateScenarioDefinition(raw: unknown, ref: Ref, scope: Scope): ScenarioDefinition {
+  const value = ScenarioDefinition.parse(raw);
   if (!sameRef(value.ref, ref) || !sameScope(value.scope, scope) || !verifySelfDigest(value)) throw new Conflict('scenario definition digest or scope mismatch');
   if (refKeys(value.caseRefs).length !== value.caseRefs.length) throw new Conflict('duplicate scenario case reference');
-  await ports.validateDefinition(structuredClone(value));
   return value;
 }
-export async function resolveQualificationSelection(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<SelectionManifest> {
-  const value = SelectionManifest.parse(await ports.resolveSelection(structuredClone(ref), structuredClone(scope)));
+export async function resolveScenarioDefinition(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<ScenarioDefinition> {
+  const value = validateScenarioDefinition(await ports.resolveDefinition(structuredClone(ref), structuredClone(scope)), ref, scope);
+  await ports.validateDefinition(structuredClone(value)); return value;
+}
+export function validateQualificationSelection(raw: unknown, ref: Ref, scope: Scope): SelectionManifest {
+  const value = SelectionManifest.parse(raw);
   if (!sameRef(value.ref, ref) || !sameScope(value.scope, scope) || !verifySelfDigest(value)) throw new Conflict('qualification selection digest or scope mismatch');
   if (!value.cells.length || new Set(value.cells.map(c => c.selectionCellId)).size !== value.cells.length ||
       new Set(value.excludedCells.map(c => c.cellKey)).size !== value.excludedCells.length ||
       value.excludedCells.some(c => !c.reason.trim())) throw new Conflict('qualification selection is empty, duplicated or lacks exclusion reasons');
   return value;
+}
+export async function resolveQualificationSelection(ports: ScenarioReadPorts, ref: Ref, scope: Scope): Promise<SelectionManifest> {
+  return validateQualificationSelection(await ports.resolveSelection(structuredClone(ref), structuredClone(scope)), ref, scope);
 }
 
 export function validateQualificationMatrix(scenario: ScenarioDefinition, matrix: SelectionManifest, selected: SelectionManifest): void {

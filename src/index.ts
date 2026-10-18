@@ -13,6 +13,7 @@ export { searchCases, getCase } from './core/lookup.ts';
 export { createRerun } from './core/rerun.ts';
 export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, type ReviewSnapshot } from './core/review.ts';
 export { registerQualificationRound, invalidateScenario, qualificationStrataDigest, ScenarioRevisionToken, type ScenarioPorts, type ScenarioSnapshot } from './core/scenario.ts';
+export { LocalScenarioStore, type LocalScenarioAuthority } from './core/localScenarioStore.ts';
 export { reduceQualificationRound, type QualificationResultPorts } from './core/qualification.ts';
 export { assessScenarioReplay, type ReplayAssessmentPorts } from './core/replayAssessment.ts';
 export { activateScenario, type ScenarioActivationPorts } from './core/scenarioActivation.ts';
