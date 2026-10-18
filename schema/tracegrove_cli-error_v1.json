@@ -32,6 +32,7 @@
             "export",
             "verify-bundle",
             "compare",
+            "usage",
             "result-ingest",
             "results",
             "awr-prepare",

@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { digestOfBytes } from '../protocol/index.ts';
 import { requireRealDirectory } from './atomicFiles.ts';
 import { readBoundedFile } from './boundedFile.ts';
-import { parseJournal, type LedgerReadView } from './ledgerRecords.ts';
+import { parseJournal, type JournalEntry, type LedgerReadView } from './ledgerRecords.ts';
 
 export const LEDGER_INSPECTION_LIMITS = { journalBytes: 16 * 1024 * 1024, lockBytes: 8192, records: 100000 } as const;
 export class LedgerInspectionError extends Error {
@@ -12,6 +12,7 @@ export class LedgerInspectionError extends Error {
 }
 export function inspectLedger(stateDir: string): LedgerReadView & {
   head: { sequence: number; digest: string }; writerLock: 'present' | 'absent'; assertUnchanged(): void;
+  admissions(): JournalEntry[];
 } {
   const dir = join(resolve(stateDir), 'ledger'); const journal = join(dir, 'journal.jsonl');
   const lock = join(dir, 'lock.json');
@@ -34,9 +35,15 @@ export function inspectLedger(stateDir: string): LedgerReadView & {
   let entries: ReturnType<typeof parseJournal>;
   try { entries = parseJournal(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes), LEDGER_INSPECTION_LIMITS.records); }
   catch { throw new LedgerInspectionError('ledger_snapshot_invalid'); }
+  const byAggregate = new Map<string, JournalEntry[]>();
+  for (const entry of entries) {
+    const history = byAggregate.get(entry.aggregateId) ?? [];
+    history.push(entry); byAggregate.set(entry.aggregateId, history);
+  }
   return {
     head: { sequence: entries.at(-1)?.seq ?? 0, digest }, writerLock: lockBefore === null ? 'absent' : 'present',
-    current(id) { return structuredClone(entries.filter(entry => entry.aggregateId === id).at(-1) ?? null); },
-    history(id) { return structuredClone(entries.filter(entry => entry.aggregateId === id)); }, assertUnchanged,
+    admissions() { return structuredClone(entries.filter(entry => entry.type === 'admitted')); },
+    current(id) { return structuredClone(byAggregate.get(id)?.at(-1) ?? null); },
+    history(id) { return structuredClone(byAggregate.get(id) ?? []); }, assertUnchanged,
   };
 }

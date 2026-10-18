@@ -21,6 +21,7 @@ import { readFrozenBundle } from '../core/frozenBundle.ts';
 import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
 import { compareReplays } from '../core/replayComparison.ts';
+import { inspectAttemptInventory } from '../core/attemptInventory.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
@@ -115,6 +116,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
+  usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
   awr-prepare --sink <dir> --id <result-id> --destination <json>
                                                        freeze a redacted AWR export and exact destination; no network
@@ -429,6 +431,16 @@ async function main(argv: string[]): Promise<number> {
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
         ledger?.close();
       }
+    }
+
+    case 'usage': {
+      const report = inspectAttemptInventory({ stateDir: args.flags['state-dir'], scope: localScope() });
+      const rows = report.attempts.map(row => `  ${row.executionId ?? `admission #${row.admissionSequence}`} · ${row.kind} · ${row.status}${row.outcome ? ` · ${row.outcome}` : ''}`);
+      out(args, report, `Execution inventory · ${report.code}\n${rows.join('\n')}\n` +
+        (report.recordedUsageSubtotal ? `Recorded runner wall time: ${report.recordedUsageSubtotal.runnerSeconds}s across ${report.recordedUsageSubtotal.receipts} retained receipts.\n` : 'Usage unavailable.\n') +
+        (report.recordedPricing ? `Recorded estimated subtotal: ${report.recordedPricing.estimatedSubtotalCents ?? 'unavailable'} cents; ${report.recordedPricing.unpricedEstimates} unpriced receipt(s).\n` : 'Pricing unavailable.\n') +
+        'Checkpoint admissions only; recorded subtotals are not authenticated invoices. No recovery or execution was performed.');
+      return report.exitCode;
     }
 
     case 'compare': {

@@ -40,6 +40,7 @@ export const COMMAND_SCHEMAS = {
   export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
+  usage: z.object({ ...common, 'state-dir': Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
   'awr-prepare': z.object({ ...common, sink: Text, id: IdString, destination: Text }).strict(),
