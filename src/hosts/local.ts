@@ -6,26 +6,18 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { join, resolve, relative, isAbsolute } from 'node:path';
-import { HostCapabilityObservation, HostLease, IdentityAttestation, digestOfBytes, freeze, parseAs, sha256Hex } from '../protocol/index.ts';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { HostCapabilityObservation, HostLease, IdentityAttestation, digestOfValue, freeze, parseAs, sameRef, sameScope, verifySelfDigest, type LaunchRecipe, type GitCommitObservation } from '../protocol/index.ts';
+import { verifyGitSnapshotProofMetadata } from '../source/gitObjectProof.ts';
 import { Deadline, sleep } from '../core/deadline.ts';
 import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
 import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
 import { observeApplicationRuntime } from './runtime.ts';
-
-export function sourceIdentityDigest(root: string, files: string[]): { hex: string; entries: Array<{ path: string; sha256: string }> } {
-  const entries = [...files].sort().map((rel) => {
-    const abs = resolve(root, rel);
-    const relToRoot = relative(root, abs);
-    if (relToRoot.startsWith('..') || isAbsolute(relToRoot)) throw new Blocked([{ code: 'identity_file_outside_root', detail: rel }]);
-    if (!existsSync(abs)) throw new Blocked([{ code: 'identity_file_missing', detail: rel, owner: 'operator', action: 'materialize the pinned source before launching' }]);
-    return { path: rel, sha256: sha256Hex(readFileSync(abs)) };
-  });
-  const combined = entries.map((e) => `${e.path}\n${e.sha256}\n`).join('');
-  return { hex: digestOfBytes(combined).hex, entries };
-}
+import { SnapshotLaunchObservation, SnapshotLaunchFailure, identityFromEntries, sourceIdentityDigest } from './sourceIdentity.ts';
+import { NativeJobDriver } from '../adapters/job/driver.ts';
+export { sourceIdentityDigest } from './sourceIdentity.ts';
 
 export function buildCapabilityObservation(input: { hostPlanRef: HostLease['hostPlanRef']; leaseRef: HostLease['ref'] | null; scope: HostStartContext['scope']; executionId: string; supported: string[]; unsupported: string[] }): HostCapabilityObservation {
   const capabilities = [
@@ -94,8 +86,14 @@ export class LocalProcessHost implements ExecutorHost {
     const launch = context.hostPlan.launch;
     if (!launch) throw new Blocked([{ code: 'host_launch_missing', detail: context.hostPlan.ref.id }]);
     const cwd = resolve(context.projectRoot, launch.cwd);
-    const identity = sourceIdentityDigest(cwd, launch.identitySourceFiles);
+    if (launch.sourceSnapshot && (!verifySelfDigest(launch.sourceSnapshot.snapshot) || !sameScope(launch.sourceSnapshot.snapshot.scope, context.scope))) {
+      throw new Blocked([{ code: 'snapshot_scope_or_digest_mismatch', detail: 'The launch snapshot must match the admitted local owner and sealed manifest' }]);
+    }
+    let identity = sourceIdentityDigest(cwd, launch.identitySourceFiles);
+    let observedSnapshotRef: SnapshotLaunchObservation['snapshotRef'] | undefined;
+    let observedGitSource: GitCommitObservation | undefined;
     const runtime = await observeApplicationRuntime(launch.command, cwd, process.env.PATH ?? '', context.signal);
+    if (launch.nativeJobs && runtime.family !== 'node') throw new Blocked([{ code: 'native_job_runtime_unsupported', detail: 'The native job bridge requires a Node application' }]);
     const dataDir = join(context.workspaceDir, 'data');
     mkdirSync(dataDir, { recursive: true });
     const credentials = new Map<string, string>();
@@ -114,15 +112,40 @@ export class LocalProcessHost implements ExecutorHost {
     const values = { port: String(assignedPort), dataDir };
     const launchEnv = assigned ? Object.fromEntries(Object.entries(launch.env).map(([k, v]) => [k, substitute(v, values)])) : launch.env;
     const launchArgs = assigned ? launch.args.map((arg) => substitute(arg, values)) : launch.args;
-    const env: Record<string, string> = { ...launchEnv, PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
+    const env: Record<string, string> = { ...launchEnv, ...(launch.nativeJobs ? { TRACEGROVE_NATIVE_JOBS: launch.nativeJobs } : {}), PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
     const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js';
     const child: ChildProcess = fork(new URL(`./localSupervisor.${extension}`, import.meta.url), [], {
       cwd, env: { PATH: process.env.PATH ?? '' }, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
+    const nativeJobs = launch.nativeJobs ? new NativeJobDriver(child) : undefined;
     let ownedCleanupConfirmed = false;
     child.on('message', (message: unknown) => {
       if (message && typeof message === 'object' && 'kind' in message && message.kind === 'host.cleaned') ownedCleanupConfirmed = true;
     });
+    const sourceObservation = launch.sourceSnapshot ? new Promise<SnapshotLaunchObservation>((resolveSource, reject) => {
+      const failed = (stage: string) => { cleanup(); reject(new Blocked([{ code: 'snapshot_source_unavailable', detail: 'The supervisor could not verify the pinned source tree' }, { code: `snapshot_preparation_${stage}`, detail: 'Pinned source preparation did not complete' }])); };
+      const exited = () => failed('owner_exit');
+      const timer = setTimeout(() => failed('timeout'), launch.readiness.timeoutMs);
+      const onMessage = (message: unknown) => {
+        const failure = SnapshotLaunchFailure.safeParse(message);
+        if (failure.success) return failed(failure.data.stage);
+        const parsed = SnapshotLaunchObservation.safeParse(message);
+        if (!parsed.success) return;
+        if (!sameRef(parsed.data.snapshotRef, launch.sourceSnapshot!.snapshot.ref) || identityFromEntries(parsed.data.identity.entries).hex !== parsed.data.identity.hex) return failed('observation');
+        try {
+          const expected = launch.sourceSnapshot!.snapshot.commitProof ? { ...verifyGitSnapshotProofMetadata(launch.sourceSnapshot!.snapshot).binding, verification: 'actual_file_bytes' } : undefined;
+          if (digestOfValue(parsed.data.gitSource ?? null).hex !== digestOfValue(expected ?? null).hex) return failed('objects');
+        } catch { return failed('objects'); }
+        cleanup(); resolveSource(parsed.data);
+      };
+      const cleanup = () => { clearTimeout(timer); child.off('message', onMessage); child.off('exit', exited); child.off('error', exited); };
+      child.on('message', onMessage); child.once('exit', exited); child.once('error', exited);
+    }) : null;
+    sourceObservation?.catch(() => undefined);
+    const sourceLaunch: Pick<LaunchRecipe, 'sourceSnapshot' | 'nativeJobs'> = launch.sourceSnapshot ? {
+      sourceSnapshot: { ...launch.sourceSnapshot, root: resolve(context.projectRoot, launch.sourceSnapshot.root) },
+    } : {};
+    if (launch.nativeJobs) sourceLaunch.nativeJobs = launch.nativeJobs;
     // Candidate output may contain credentials. Drain it without exporting it as proof; keep a
     // short, secret-redacted tail only to explain a startup failure.
     let stderrTail = '';
@@ -139,7 +162,7 @@ export class LocalProcessHost implements ExecutorHost {
       child.stdout?.resume();
       child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`)));
       child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)));
-      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir });
+      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
       resolvePort(assignedPort);
     }) : await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
@@ -151,7 +174,7 @@ export class LocalProcessHost implements ExecutorHost {
       });
       child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`)); });
       child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)); });
-      child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir });
+      child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
     });
     const origin = `http://127.0.0.1:${port}`;
     const stopPolling = new AbortController();
@@ -164,8 +187,14 @@ export class LocalProcessHost implements ExecutorHost {
     const ready = waitReady(origin, launch.readiness.path, Deadline.in(launch.readiness.timeoutMs), AbortSignal.any([context.signal, stopPolling.signal]));
     ready.catch(() => undefined);
     let healthBody: unknown;
-    try { healthBody = exitedEarly ? await Promise.race([ready, exitedEarly]) : await ready; }
+    try {
+      const [health, source] = await Promise.all([exitedEarly ? Promise.race([ready, exitedEarly]) : ready, sourceObservation,
+        nativeJobs?.waitReady(Deadline.in(launch.readiness.timeoutMs), context.signal)]);
+      healthBody = health;
+      if (source) { identity = source.identity; observedSnapshotRef = source.snapshotRef; observedGitSource = source.gitSource; }
+    }
     catch (error) {
+      stopPolling.abort();
       if (assigned && error instanceof InfrastructureFailure && !error.message.includes('last app output')) throw new InfrastructureFailure(`${error.message}${startupHint()}`);
       throw error;
     }
@@ -179,12 +208,13 @@ export class LocalProcessHost implements ExecutorHost {
       identity: { kind: 'source_digest' as const, sourceDigest: { algorithm: 'sha256' as const, hex: identity.hex }, runtime: runtime.runtime },
       issuer: 'local_launcher' as const,
       trustPolicy: 'launcher_computed_source_digest' as const,
-      evidence: { files: identity.entries, runtimeProbe: runtime, observedHealthBody: (healthBody ?? null) as never },
+      evidence: { files: identity.entries, runtimeProbe: runtime, observedHealthBody: (healthBody ?? null) as never,
+        ...(observedSnapshotRef ? { sourceSnapshotRef: observedSnapshotRef } : {}), ...(observedGitSource ? { gitSource: observedGitSource } : {}) },
       observedAt: nowIso(),
     }), 'identity attestation');
     const observation = buildCapabilityObservation({
       hostPlanRef: context.hostPlan.ref, leaseRef: lease.ref, scope: context.scope, executionId: context.executionId,
-      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence'],
+      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence', ...(nativeJobs ? ['native_job'] : [])],
       unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
     });
     let stopResult: Promise<{ confirmed: boolean; detail: string }> | null = null;
@@ -196,6 +226,7 @@ export class LocalProcessHost implements ExecutorHost {
         { entityKey: 'host.workspace', physicalId: context.workspaceDir, boundaryId: 'storage' },
       ],
       dataDir,
+      ...(nativeJobs ? { nativeJobs } : {}),
       stop(reason: string) {
         if (stopResult) return stopResult;
         stopResult = (async () => {

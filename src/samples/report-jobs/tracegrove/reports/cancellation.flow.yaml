@@ -1,0 +1,15 @@
+title: Cancellation is acknowledged by the worker and leaves no report
+tags: [jobs, cancellation]
+effects: { maxJobs: 1 }
+given: { report: held-job }
+steps:
+  - name: request cancellation
+    POST: /jobs/{report.jobId}/cancel
+    expect: 202
+  - name: worker acknowledges cancellation
+    GET: /jobs/{report.jobId}
+    observe: true
+    expect: { status: 200, json: { job.status: cancelled }, present: [job.workerPid] }
+  - name: no report was published
+    GET: /reports/{report.jobId}
+    expect: 404

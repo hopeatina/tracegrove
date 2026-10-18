@@ -91,6 +91,11 @@
           },
           "type": "object"
         },
+        "nativeJobs": {
+          "const": "node_ipc/v1",
+          "description": "Opt in to the application-owned native Node job bridge.",
+          "type": "string"
+        },
         "python": {
           "description": "fastapi/django: interpreter (default .venv/bin/python when present, else python3).",
           "type": "string"

@@ -10,6 +10,8 @@ import { plan } from '../core/planner.ts';
 import { CaseSpec, HostPlan, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
+import { readGitSnapshotTree } from '../source/snapshotTree.ts';
+import { sameScope } from '../protocol/canonical.ts';
 
 type Issue = { code: string; detail: string; owner: string; action: string };
 type Check = { check: string; state: 'ok' | 'warn' | 'blocked'; detail: string; code: string; action: string };
@@ -70,6 +72,14 @@ export async function inspectDoctor(options: { config?: string | undefined; dir?
       check('host', 'blocked', 'local host requires POSIX process-group termination', 'local_process_tree_unsupported', 'select a qualified POSIX host');
     if (host.launch) {
       const cwd = resolve(project.root, host.launch.cwd);
+      if (host.launch.sourceSnapshot) {
+        const pin = host.launch.sourceSnapshot;
+        if (!sameScope(pin.snapshot.scope, localScope())) doctorFailure(new Blocked([{ code: 'snapshot_scope_mismatch', detail: 'snapshot belongs to another local owner' }]), report);
+        else try {
+          const files = readGitSnapshotTree(pin.snapshot, resolve(project.root, pin.root));
+          check('source_snapshot', 'ok', `${files.length} pinned file(s); no application launched`, 'source_snapshot_verified');
+        } catch { check('source_snapshot', 'blocked', 'Pinned source tree no longer matches its manifest', 'source_snapshot_mismatch', 'materialize the snapshot again'); }
+      }
       try {
         const identity = sourceIdentityDigest(cwd, host.launch.identitySourceFiles);
         report.source = { digest: identity.hex, files: identity.entries.length };

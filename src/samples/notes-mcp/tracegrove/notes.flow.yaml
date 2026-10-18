@@ -1,0 +1,20 @@
+title: MCP creation is independently visible through the notes API
+effects:
+  maxMcpCalls: 1
+  allowedMcpTools: [notes.create]
+steps:
+  - name: create
+    mcp:
+      endpoint: /mcp
+      tool: notes.create
+      arguments: { title: Protocol proof, body: Saved by the native application }
+    expect:
+      json: { structuredContent.note.title: Protocol proof }
+    save: { noteId: structuredContent.note.id }
+  - GET: /notes/{noteId}
+    expect:
+      status: 200
+      json: { note.title: Protocol proof, note.ownerId: alice }
+  - GET: /notes/{noteId}
+    as: intruder
+    expect: 403

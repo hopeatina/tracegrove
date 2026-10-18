@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
-import { CONFIG_FILE, STATE_DIR, compileProject, loadAuthoringConfig, type CompileResult } from './compile.ts';
+import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompileResult } from './compile.ts';
 import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
 import { draftFlow, gitInfo } from './discover.ts';
@@ -22,6 +22,8 @@ import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
 import { heal, listHeals, undoHeal } from './heal.ts';
 import { projectStatus } from './status.ts';
+import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
+import { readRunSource } from './runSource.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -49,10 +51,12 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const agentSay = (line: string) => { live.agent.lines.push(line.replaceAll(`${dir}/`, '')); if (live.agent.lines.length > 80) live.agent.lines.splice(0, live.agent.lines.length - 80); };
   let activity: RunActivity = { status: 'idle', event: null, stepId: null, label: 'No run in progress', observedAt: new Date().toISOString() };
 
-  const configPath = () => join(dir, CONFIG_FILE);
+  const configPath = () => configInDirectory(dir) ?? join(dir, CONFIG_FILE);
   const compiled = (): { result: CompileResult | null; error: ReturnType<typeof errorBody> | null } => {
-    if (!existsSync(configPath())) return { result: null, error: null };
-    try { return { result: compileProject(configPath()), error: null }; } catch (error) { return { result: null, error: errorBody(error) }; }
+    try {
+      const path = configPath();
+      return { result: existsSync(path) ? compileProject(path) : null, error: null };
+    } catch (error) { return { result: null, error: errorBody(error) }; }
   };
   const runs = () => {
     const runsDir = join(dir, STATE_DIR, 'runs');
@@ -72,7 +76,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       for (const name of readdirSync(d)) {
         const path = join(d, name);
         if (statSync(path).isDirectory()) walk(path);
-        else if (/\.flow\.ya?ml\.pruned$/.test(name)) {
+        else if (/\.flow\.(?:ya?ml|ts)\.pruned$/.test(name)) {
           let title = name;
           try { const doc = parseYaml(readFileSync(path, 'utf8')) as { title?: unknown }; if (typeof doc?.title === 'string') title = doc.title; } catch { /* keep name */ }
           out.push({ file: relative(dir, path).split(sep).join('/'), title });
@@ -83,7 +87,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     return out.sort((a, b) => a.file.localeCompare(b.file));
   };
   const flowPath = (file: unknown, suffix: '' | '.pruned') => {
-    if (typeof file !== 'string' || !/^[A-Za-z0-9_./-]+\.flow\.ya?ml$/.test(file) || file.split('/').includes('..')) return null;
+    if (typeof file !== 'string' || !/^[A-Za-z0-9_./-]+\.flow\.(?:ya?ml|ts)$/.test(file) || file.split('/').includes('..')) return null;
     const abs = resolve(dir, file + suffix);
     const root = testDir();
     return abs.startsWith(root + sep) ? abs : null;
@@ -94,6 +98,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
     return { settings: resolveAgentSettings(dir, config), detected: detectAgents(), drafting };
   };
+  const sourceInfo = (result: CompileResult | null, error: ReturnType<typeof errorBody> | null) => ({
+    selection: savedVerificationSource(dir), binding: result?.sourceBinding ?? null,
+    status: error ? 'blocked' : 'ready', error,
+  });
 
   const handle = async (req: IncomingMessage, res: ServerResponse, port: number) => {
     const send = (status: number, body: unknown, type = 'application/json') => {
@@ -112,14 +120,25 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const { result, error } = compiled();
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
-        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo() });
+        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/source/preview') {
+        const body = await readJson(req);
+        if (typeof body.path !== 'string' || !body.path.trim() || body.path.length > 8192) return send(400, { error: 'Enter a snapshot manifest path.' });
+        return send(200, previewVerificationSource(dir, body.path.trim(), loadAuthoringConfig(configPath())));
+      }
+      if (req.method === 'POST' && url.pathname === '/api/source') {
+        const body = await readJson(req);
+        saveVerificationSource(dir, body.source, loadAuthoringConfig(configPath()));
+        const { result, error } = compiled();
+        return send(200, sourceInfo(result, error));
       }
       if (req.method === 'POST' && url.pathname === '/api/prune') {
         const body = await readJson(req);
         const graft = body.graft === true;
         const live = flowPath(body.file, '');
         const cut = flowPath(body.file, '.pruned');
-        if (!live || !cut) return send(400, { error: 'file must be a .flow.yaml under the test folder' });
+        if (!live || !cut) return send(400, { error: 'file must be a .flow.yaml, .flow.yml, or .flow.ts under the test folder' });
         const [from, to] = graft ? [cut, live] : [live, cut];
         if (!existsSync(from)) return send(404, { error: `${body.file} is not ${graft ? 'pruned' : 'a live flow'}` });
         if (existsSync(to)) return send(409, { error: `${relative(dir, to)} already exists` });
@@ -202,7 +221,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!/^[A-Za-z0-9_.:-]+$/.test(name)) return send(400, { error: 'bad run name' });
         const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
-        return existsSync(file) ? send(200, JSON.parse(readFileSync(file, 'utf8'))) : send(404, { error: 'run not found' });
+        return existsSync(file) ? send(200, readRunSource(dirname(file), JSON.parse(readFileSync(file, 'utf8')) as TestRunReport)) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
         const body = await readJson(req);
@@ -214,7 +233,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         try {
           const { report } = await job;
           activity = { status: 'finished', event: null, stepId: null, label: `Run finished: ${report.outcome}`, observedAt: report.finishedAt };
-          return send(200, report);
+          return send(200, readRunSource(report.runDir, report));
         } catch (error) {
           activity = { status: 'failed', event: null, stepId: null, label: 'Run could not be completed', observedAt: new Date().toISOString() };
           throw error;

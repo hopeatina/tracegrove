@@ -1,30 +1,31 @@
 import { z } from 'zod';
-import { RunRequest } from '../protocol/index.ts';
+import { IdString, RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { SampleName } from './samples/catalog.ts';
 
 const Text = z.string().min(1).max(8192);
 const Bool = z.boolean().optional();
 const common = { json: Bool, help: Bool };
+const ExecutionId = Text.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'execution ID must be one local path segment');
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
   init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
-  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, heal: Bool }).strict(),
+  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, heal: Bool, 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional() }).strict(),
   status: z.object({ ...common, dir: Text.optional() }).strict(),
   heal: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-agent': Bool, 'dry-run': Bool, undo: Text.optional() }).strict(),
   list: z.object({ ...common, config: Text.optional() }).strict(),
-  compile: z.object({ ...common, config: Text.optional() }).strict(),
+  compile: z.object({ ...common, config: Text.optional(), 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional() }).strict(),
   show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),
   ui: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), port: Text.optional() }).strict(),
   discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional() }).strict(),
   check: z.object({ ...common, dir: Text.optional() }).strict(),
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
-  settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
+  settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text.optional(), dir: Text.optional(), profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,
-    purpose: RunRequest.shape.purpose.optional() }).strict(),
+    purpose: RunRequest.shape.purpose.optional(), 'work-binding': Text.optional() }).strict(),
   seed: z.object({ ...common, request: Text, preview: Bool }).strict(),
   run: z.object({ ...common, request: Text, 'state-dir': Text.optional(), jsonl: Bool }).strict(),
   controller: z.object({ ...common, 'state-dir': Text, 'project-root': Text }).strict(),
@@ -32,12 +33,24 @@ export const COMMAND_SCHEMAS = {
     surface: Text.optional(), text: Text.optional(), cursor: Text.optional(),
     limit: Text.regex(/^[1-9][0-9]{0,2}$/).refine(value => Number(value) <= 100, 'limit must be 1..100').optional() }).strict(),
   rerun: z.object({ ...common, request: Text, output: Text }).strict(),
-  inspect: z.object({ ...common, execution: Text, 'state-dir': Text, 'failed-step': Bool }).strict(),
-  export: z.object({ ...common, execution: Text, 'state-dir': Text, output: Text }).strict(),
+  inspect: z.object({ ...common, execution: ExecutionId.optional(), 'state-dir': Text.optional(), request: Text.optional(), bundle: Text.optional(), 'failed-step': Bool }).strict()
+    .refine(flags => flags.request ? !flags.execution && !flags['state-dir'] && !flags.bundle && !flags['failed-step']
+      : flags.bundle ? !flags.execution && !flags['state-dir'] : !!flags.execution && !!flags['state-dir'],
+    'choose --request, --bundle, or --execution with --state-dir; --failed-step is only for execution evidence'),
+  export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
+  'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
+  results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
+  'awr-prepare': z.object({ ...common, sink: Text, id: IdString, destination: Text }).strict(),
+  'awr-inspect': z.object({ ...common, sink: Text, id: IdString }).strict(),
+  'awr-deliver': z.object({ ...common, sink: Text, id: IdString, 'credential-env': Text.regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional() }).strict(),
+  'report-prepare': z.object({ ...common, sink: Text, id: IdString, target: Text }).strict(),
+  'report-inspect': z.object({ ...common, sink: Text, id: IdString }).strict(),
+  'report-attach': z.object({ ...common, sink: Text, id: IdString, 'credential-env': Text.regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional() }).strict(),
   'verify-cleanup': z.object({ ...common, proof: Text, expectation: Text, trust: Text }).strict(),
   'source-resolve': z.object({ ...common, input: Text, output: Text }).strict(),
   'recovery-status': z.object({ ...common, 'state-dir': Text, execution: Text }).strict(),
+  'source-materialize': z.object({ ...common, input: Text, repository: Text, root: Text, side: z.enum(['base', 'head']), output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
 } as const;
 export type Args = {

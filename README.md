@@ -352,6 +352,12 @@ these conventions and the loop, so Claude Code, Codex or Cursor pick them up fro
 
 ## How it fits together
 
+Prefer TypeScript? Use `tracegrove.config.ts` with `defineConfig`, `.flow.ts`
+with `flow`, and `.fixture.ts` with `fixture`, all exported by
+`workflow-verify/authoring`. These reuse the YAML validation and execution path.
+See [typed authoring](docs/developer-ux.md#typescript-authoring) for examples,
+module evaluation bounds, and supported TypeScript syntax.
+
 ```text
  tracegrove.config.yaml + tracegrove/**/*.flow.yaml + fixtures
         │  authoring compiler (src/authoring)
@@ -373,7 +379,7 @@ What the adapters cover now and what's next:
 | App launch | node, fastapi, django; free port, data dir, per-persona tokens. Command wrappers remain blocked | `app.setup` commands (alembic, prisma, knex) |
 | Seeding | Fixtures created through the app's API, read back, deleted with confirmed absence | SQL seeding, repo seed commands (factory_boy, Prisma seed), snapshots |
 | Databases | SQLite via `TRACEGROVE_DATA_DIR` | `db: postgres` per-run database with `DATABASE_URL`, DB-state oracles, Redis/Mongo services |
-| Async jobs | Poll an HTTP readback until it holds | `components:` for Celery/RQ/BullMQ workers, broker services, job-state observe |
+| Async jobs | Separate-worker SQLite samples through HTTP or native Node IPC: persisted output, idempotency, cancellation, owner isolation | Independently supervised/attested Celery/RQ/BullMQ workers and broker services; hosted provider qualification |
 | Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
 | Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
 | Browser | Typed short flows and low-level corpus, authenticated local personas, DOM/API assertions, sealed video and Grove playback | Staging qualification, trace/redaction collectors and controller-death cleanup |
@@ -407,7 +413,10 @@ What exists and is exercised by tests:
 The local controller owns an exclusive ledger and accepts authenticated loopback commands
 for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
 execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
-campaign while preserving case digests and original request lineage.
+campaign while preserving case digests and original request lineage. Use
+`inspect --request` for static frozen-plan checks and `inspect --bundle` for independently
+verified evidence. [Inspection and export](docs/verified-bundles.md#inspect-and-hand-off-a-frozen-run)
+use sealed snapshots; lifecycle reruns require fresh owner registration.
 
 The POSIX local host uses a trusted supervisor with an IPC ownership channel. If
 the controller is killed, the supervisor terminates the application process group
@@ -446,19 +455,51 @@ independent review policy, full source transport and runtime identity remain sep
 `LocalReviewStore` connects that API to the existing single-writer journal and preserves
 reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
 requires trusted host admission and source checking; it does not supply distributed authority.
+`promoteScenario` binds actual current review storage to a proposed scenario and retains
+the full plan, gaps and source-validation snapshot. [Source promotion](docs/source-promotion.md)
+remains separate from structural validation, execution and activation.
 
 Scenario qualification now has a typed registration/invalidation API with exact-matrix
-and monotonic-history checks. It registers pending work and invalidates semantic edits;
+and monotonic-history checks. [Structural validation](docs/scenario-structure.md) shares
+the executor's static preflight and atomically moves authorized proposed/degraded
+scenarios to validating, without running them. The lifecycle API records pending work
+and invalidates semantic edits;
 it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
 `reduceQualificationRound` binds an entire verified terminal campaign to the registered
 cell/attempt allocations, retaining failed and mock evidence without granting a live
 proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
+`LocalQualificationResults` retains those complete rounds through the existing immutable
+result sink and supplies a durable replay-assessment index, with fresh issuer checks on reads.
 `assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
 and failed history, requires at least two independent live campaigns and checks the latest
 admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
 `activateScenario` rechecks that evidence and publishes an authenticated activation through
 an atomic host port, with exact round selection and idempotent receipt recovery. See
-[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
+[activation contract](docs/scenario-activation.md); hosted authority and activated regression execution remain open.
+`LocalScenarioStore.activationPorts(results, authority)` publishes the active projection,
+receipt and full assessment records together on the existing local ledger, after fresh
+evidence and explicit owner authorization checks. Historical receipts cannot reverse invalidation.
+`LocalScenarioStore` persists actual registration on the local ledger. The SDK's
+`prepareQualificationExecution` and explicit runtime owner connect those admissions
+to new executions using allocated cell identities, with current authority checks
+before effects. See [registered execution](docs/qualification-registration.md#executing-a-registered-round).
+
+`result-ingest --bundle <run/bundle> --sink <directory>` retains an independently
+re-verified local bundle in the existing single-writer ledger and an immutable
+archive. `results --sink <directory>` lists scoped receipts;
+`results --sink <directory> --id <result-id>` freshly re-verifies a retained result
+after the producer's directory is gone. The [result sink](docs/result-sink.md)
+preserves failed and mocked outcomes, rejects conflicting deliveries, and never
+treats storage acceptance as issuer authentication, qualification, or activation.
+
+The optional [AWR delivery adapter](docs/awr-delivery.md) freezes a redacted report
+and destination in that same ledger. `awr-prepare`, `awr-inspect`, and `awr-deliver`
+separate preparation from authenticated import, retain failed product verdicts,
+and retry the original key after a lost acknowledgement without rerunning tests.
+Imported evidence remains unverified; native work acceptance is a separate gate.
+The [work-report attachment stage](docs/work-report-attachment.md) links an imported
+report to its original frozen work binding, rechecks hosted receipt identity, and
+recovers lost attachment acknowledgements independently of import or execution.
 
 The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
 fixtures and independent readback, and verifies recordings in the portable bundle.
@@ -466,6 +507,18 @@ Browser short flows run through `tracegrove test`; Grove plays receipt-bound rec
 after rechecking the bundle. See the browser sample and guide for the exact syntax.
 Still open: full runtime source selection,
 hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
+Selected Git base/head trees can now be materialized into private independent
+directories with [Git object proofs](docs/git-object-proof.md) checked against actual
+file bytes and rechecked by the launch supervisor. Metadata-only proof checks do not
+establish runtime verification. Add `--source-repository-role application` to bind a
+single resolver-head snapshot to its measured Git-object repository tuple and frozen
+source selection. Local revision qualification is covered; hosted issuer authentication
+and remote repository ownership remain separate.
+Use `source-materialize`; the [source guide](docs/git-source-resolution.md#run-selected-revisions-independently)
+shows running the same saved flow against each revision. `test --source-snapshot`
+binds local launch content to the manifest: the supervisor verifies and copies the
+pinned tree into its owned workspace. Automatic authenticated runtime revision
+attestation remains open.
 Agent drafting checks compilation; it does not confirm intended behavior or approve a plan.
 
 ## Zero-OrgX quickstart (low-level corpus)
@@ -481,6 +534,25 @@ node dist/cli/main.js verify-bundle --bundle ./notes/verification/.workflow-veri
 
 No OrgX account, database, Docker, Python or model call is involved. The real sample's
 proof claim is local application behavior at the attested source digest, not deployment.
+
+To exercise asynchronous work, generate `sample-config --sample report-jobs --output
+./reports`, then run `tracegrove test --config ./reports/tracegrove.config.yaml`.
+The [report jobs sample](src/samples/report-jobs/README.md) uses a real separate worker
+and persisted SQLite queue. Completion requires an independent output readback;
+accepting a submission alone cannot pass. Its controlled missing-output defect
+produces a sealed failed attempt. No model calls or external accounts are used.
+For low-level commands, use the config path printed by sample generation.
+For native `job.submit`, `job.observe`, and `job.cancel`, generate
+`sample-config --sample report-native --output ./native-reports` instead.
+The [native job bridge](docs/native-jobs.md) uses the same application, worker,
+and storage with typed Node IPC requests and job observations. Hosted providers,
+independent worker attestation and distributed crash recovery remain open.
+
+For local MCP tools, install the pinned optional SDK and generate
+`sample-config --sample notes-mcp --output ./mcp-notes`. The
+[MCP protocol driver](docs/mcp-driver.md) uses the same planner, persona, evidence
+and CLI path, with explicit tool/call limits and independent HTTP readback.
+Protocol results do not qualify a widget host or mobile surface.
 
 ## Checks
 

@@ -1,10 +1,12 @@
 import { RunnerProfile, digestOfValue, refKey, verifySelfDigest, type Ref, type RunnerCapabilities } from '../protocol/index.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
+import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
+import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
 import { Blocked } from './errors.ts';
 
 export function runnerCapabilitiesFor(profile: RunnerProfile): RunnerCapabilities {
-  const caps = { ...(profile.adapter === 'browser' ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES),
+  const caps = { ...(profile.adapter === 'mcp' ? MCP_RUNNER_CAPABILITIES : profile.adapter === 'native_job' ? NATIVE_JOB_RUNNER_CAPABILITIES : profile.adapter === 'browser' ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES),
     maxStepsPerCase: profile.maxStepsPerCase, cancellation: profile.cancellation };
   const base = { ...caps, ref: { id: caps.ref.id, revision: caps.ref.revision } };
   return { ...caps, ref: { ...base.ref, digest: digestOfValue(base) } };

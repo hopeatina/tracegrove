@@ -11,12 +11,17 @@ import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
+import { ScenarioPromotion } from './schemas/promotion.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
-import { GitSourceRequest, GitSourceResolution } from './schemas/gitSources.ts';
+import { GitSourceRequest, GitSourceResolution, GitSourceSnapshot } from './schemas/gitSources.ts';
 import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
+import { NativeJobAction, NativeJobObservation, NativeJobRequest, NativeJobResponse, NativeJobReady } from './schemas/nativeJob.ts';
+import { ResultIngestReceipt } from './schemas/resultSink.ts';
+import { WorkflowEvidenceProjection } from './schemas/evidenceProjection.ts';
+import { McpToolCall, McpToolObservation } from './schemas/mcp.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
-  ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
+  ScenarioActivationIntent, ScenarioActivation, ScenarioStructuralValidation } from './schemas/scenario.ts';
 
 export * from './schemas/capability.ts';
 export * from './schemas/cli.ts';
@@ -32,18 +37,26 @@ export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
 export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
+export * from './schemas/promotion.ts';
 export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
 export * from './schemas/browser.ts';
+export * from './schemas/mcp.ts';
+export * from './schemas/nativeJob.ts';
+export * from './schemas/resultSink.ts';
+export * from './schemas/evidenceProjection.ts';
 export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
+  'workflow.result-ingest/v1': ResultIngestReceipt,
+  'workflow.evidence-projection/v1': WorkflowEvidenceProjection,
   'workflow.config/v1': WorkflowConfig,
   'workflow.suite/v1': Suite,
   'workflow.corpus/v1': CorpusManifest,
   'workflow.source-plan/v1': SourcePlan,
   'workflow.plan-review/v1': PlanReview,
+  'workflow.scenario-promotion/v1': ScenarioPromotion,
   'workflow.revisions/v1': RevisionMatrix,
   'workflow.change-model/v1': ChangeModel,
   'workflow.source-validation/v1': PlanSourceValidation,
@@ -54,7 +67,9 @@ export const SCHEMA_REGISTRY = {
   'workflow.replay-finding/v1': ReplayFinding,
   'workflow.replay-assessment/v1': ReplayAssessment,
   'workflow.scenario-activation/v1': ScenarioActivation,
+  'workflow.scenario-structure/v1': ScenarioStructuralValidation,
   'workflow.git-source-resolution/v1': GitSourceResolution,
+  'workflow.git-source-snapshot/v1': GitSourceSnapshot,
   'workflow.case/v1': D.CaseSpec,
   'workflow.persona/v1': D.Persona,
   'workflow.auth-recipe/v1': D.AuthRecipe,
@@ -108,6 +123,13 @@ export const NON_DOCUMENT_SCHEMAS = {
   'workflow.capability-operation/v1': C.CapabilityOperation,
   'workflow.capability-observation/v1': C.CapabilityObservation,
   'workflow.stream-transcript/v1': C.StreamTranscript,
+  'workflow.native-job-action/v1': NativeJobAction,
+  'workflow.native-job-observation/v1': NativeJobObservation,
+  'workflow.mcp-tool-call/v1': McpToolCall,
+  'workflow.mcp-tool-observation/v1': McpToolObservation,
+  'workflow.native-job-request/v1': NativeJobRequest,
+  'workflow.native-job-response/v1': NativeJobResponse,
+  'workflow.native-job-ready/v1': NativeJobReady,
   'workflow.browser-command/v1': BrowserCommand,
   'workflow.browser-locator/v1': BrowserLocator,
   'workflow.browser-observation/v1': BrowserObservation,

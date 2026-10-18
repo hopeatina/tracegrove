@@ -1,0 +1,12 @@
+title: A failed worker job exposes failure and leaves no report
+tags: [jobs, failure]
+effects: { maxJobs: 1 }
+given: { report: failed-job }
+steps:
+  - name: worker records its failure
+    GET: /jobs/{report.jobId}
+    observe: true
+    expect: { status: 200, json: { job.status: failed }, present: [job.workerPid] }
+  - name: failure did not publish a report
+    GET: /reports/{report.jobId}
+    expect: 404

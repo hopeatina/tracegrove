@@ -11,20 +11,27 @@ import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
 import { LocalLedger } from '../core/ledger.ts';
+import { LocalResultSink } from '../core/resultSink.ts';
 import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
-import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
+import { exportVerifiedBundle, verifyBundle, VerifiedBundleSnapshot } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
+import { readFrozenBundle } from '../core/frozenBundle.ts';
+import { inspectFrozenPlan } from '../core/planInspection.ts';
+import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
 import { checkCleanupFiles } from './cleanup.ts';
+import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
 import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
+import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
-import { resolveSourceFiles } from './source.ts';
+import { resolveSourceFiles, materializeSourceFiles } from './source.ts';
+import { readGitSnapshotTree } from '../source/snapshotTree.ts';
+import { sameScope } from '../protocol/canonical.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
@@ -36,6 +43,7 @@ import { heal, undoHeal } from '../authoring/heal.ts';
 import { projectRoot, projectStatus } from '../authoring/status.ts';
 import { runActivity } from '../authoring/activity.ts';
 import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
+import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -61,18 +69,21 @@ function samplesDir(): string {
 
 const HELP = `tracegrove <command> [--flags]
 
-Everyday commands (read tracegrove.config.yaml, found by walking up from the current folder):
+Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walking up from the current folder):
   (no command)                                         where this project stands and what to run next
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
        [--heal]                                        on failure, heal and re-run (see heal)
+       [--source-snapshot <snapshot.json>]              verify and launch an owner-bound private source copy
+       [--source-repository-role <role>]                bind the verified resolver head to a repository role
   heal [--dir <dir>] [--no-agent] [--dry-run]          fix setup and drifted tests, prove each fix by re-running, keep only
        [--agent claude|codex] [--model <m>]            what passes; product bugs are reported, never hidden
   heal --undo <id|latest>                              put back every change a heal kept
   status [--dir <dir>] [--json]                        project health plus ordered next commands (for people and agents)
   list [--json]                                        list flows with their ids, tags and steps
   show [--run latest|<name>] [--json]                  print a run's summary
-  compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
+  compile [--json] [--source-snapshot <snapshot.json>]   write the derived v1 corpus to .tracegrove/compiled/
+          [--source-repository-role <role>]            bind a single resolver-head repository
   ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
 
 Agent-friendly commands (every one takes --json and never starts the app):
@@ -81,13 +92,15 @@ Agent-friendly commands (every one takes --json and never starts the app):
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
-  test, list, show and compile take --config <tracegrove.config.yaml>; the commands above use --dir.
+           [--source-snapshot <snapshot.json> | --working-tree]  save the next run's input; never edits team config
+  test, list, show and compile take --config <tracegrove.config.yaml|tracegrove.config.ts>; the commands above use --dir.
 
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor [--dir <dir>|--config <yaml>] [--profile <name>]\n                                                       inspect native setup and plan; never launch the app
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
+       [--work-binding <json>]                        freeze an existing work ID and requirement refs before execution
   seed --request <request.json> --preview              show planned fixture resources and cleanup (no effects)
   run --request <request.json> [--jsonl]               admit and execute the frozen request
   controller --state-dir <dir> --project-root <dir>    own the local ledger; CLI runs delegate
@@ -95,12 +108,28 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   rerun --request <request.json> --output <new.json>   freeze a fresh attempt on the same cases
   inspect --execution <id> --state-dir <dir> [--failed-step]
   recovery-status --execution <id> --state-dir <dir>  inspect recorded recovery state; no effects or authority
+  inspect --bundle <dir> [--failed-step]               inspect independently verified saved evidence
+  inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
+  awr-prepare --sink <dir> --id <result-id> --destination <json>
+                                                       freeze a redacted AWR export and exact destination; no network
+  awr-inspect --sink <dir> --id <result-id>              show saved delivery and acknowledgement state
+  awr-deliver --sink <dir> --id <result-id> [--credential-env <name>]
+                                                       retry the frozen import; default secret env TRACEGROVE_ORGX_TOKEN
+  report-prepare --sink <dir> --id <result-id> --target <json>
+                                                       freeze attachment to the exact bound work; no network
+  report-inspect --sink <dir> --id <result-id>           inspect independent attachment acknowledgement state
+  report-attach --sink <dir> --id <result-id> [--credential-env <name>]
+                                                       recheck the imported receipt, then attach it in review; no completion
+  results --sink <dir> [--id <record-id>]               list receipts; --id re-verifies its retained archive
+          [--limit 1..100] [--cursor <opaque>]           bounded, snapshot-stable pages; issuer remains unverified
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
                                                        check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
   source-resolve --input <repositories.json> --output <source.json>
+  source-materialize --input <source.json> --repository <id> --root <local-repo> --side base|head --output <new-dir>
                                                        freeze local Git commit pairs and complete diffs (no fetch or review)
 
 Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructure failure, 4 cancelled.`;
@@ -145,6 +174,11 @@ async function main(argv: string[]): Promise<number> {
       out(args, result.summary, result.text);
       return 0;
     }
+    case 'source-materialize': {
+      const result = await materializeSourceFiles(args.flags.input, args.flags.repository, args.flags.root, args.flags.side, args.flags.output);
+      out(args, result.summary, result.text);
+      return 0;
+    }
 
     case 'init': {
       const dir = resolve(flag(args, 'dir') ?? '.');
@@ -154,7 +188,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'compile': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'), { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined });
       out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
       return 0;
     }
@@ -174,7 +208,7 @@ async function main(argv: string[]): Promise<number> {
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
         live.update('Compiling flows and starting the app');
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
           onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
             if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
             else live.update(runActivity(event).label);
@@ -230,16 +264,25 @@ async function main(argv: string[]): Promise<number> {
     case 'settings': {
       const dir = resolve(flag(args, 'dir') ?? '.');
       const provider = flag(args, 'agent'); const model = flag(args, 'model');
-      if (provider !== null || model !== null) {
+      const snapshot = flag(args, 'source-snapshot');
+      const workingTree = args.flags['working-tree'] === true;
+      if (snapshot !== null && workingTree) throw new Conflict('Choose --source-snapshot or --working-tree, not both');
+      if (provider !== null || model !== null || snapshot !== null || workingTree) {
         const current = readLocalSettings(dir);
         const agent = { ...current.agent };
         if (provider !== null && provider !== agent.provider && model === null) delete agent.model;
-        writeLocalSettings(dir, { ...current, agent: { ...agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
+        const source = snapshot !== null ? previewVerificationSource(dir, resolve(snapshot), loadAuthoringConfig(findConfig(dir))).selection
+          : workingTree ? { kind: 'working_tree' as const } : null;
+        writeLocalSettings(dir, { ...current,
+          ...(provider !== null || model !== null ? { agent: { ...agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } } : {}),
+          ...(source ? { verification: { source } } : {}),
+        });
       }
       let config = null; try { config = loadAuthoringConfig(findConfig(dir)); } catch { config = null; }
       const settings = resolveAgentSettings(dir, config);
       const detected = detectAgents();
-      out(args, { settings, detected }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}`);
+      const verificationSource = savedVerificationSource(dir);
+      out(args, { settings, detected, verificationSource }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}\nverification input: ${verificationSource.kind === 'snapshot' ? verificationSource.path + ' (pinned local snapshot)' : 'working tree'}`);
       return 0;
     }
 
@@ -314,7 +357,8 @@ async function main(argv: string[]): Promise<number> {
       const project = loadProject(args.flags['config']);
       const profileName = flag(args, 'profile') ?? project.config.defaultProfile;
       const output = resolve(args.flags['output']);
-      const bundle = plan({ project, profileName, scope: localScope(), purpose: args.flags.purpose ?? 'trial' });
+      const workBinding = args.flags['work-binding'] ? RunRequest.shape.workBinding.parse(readConfigurationJson(args.flags['work-binding'], 262144)) : null;
+      const bundle = plan({ project, profileName, scope: localScope(), purpose: args.flags.purpose ?? 'trial', workBinding });
       mkdirSync(dirname(output), { recursive: true });
       writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
       const summary = { output, profile: profileName, requestDigest: bundle.request?.ref.digest.hex ?? null, idempotencyKey: bundle.request?.idempotencyKey ?? null, cells: bundle.request?.caseRefs.length ?? 0, excluded: bundle.excludedCells, blockers: bundle.blockers, estimatedCostCents: bundle.estimatedCostCents, requirements: bundle.requirements };
@@ -378,16 +422,23 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'inspect': {
-      const stateDir = resolve(args.flags['state-dir']);
-      const executionId = args.flags['execution'];
-      const dir = join(stateDir, 'executions', executionId);
-      if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId, owner: 'operator', action: 'check the execution id and state dir' }]);
-      const campaign = parseAs(CampaignResult, JSON.parse(readFileSync(join(dir, 'campaign.json'), 'utf8')), 'campaign');
-      const cells = readdirSync(join(dir, 'cells')).map((name) => parseAs(ExecutionReceipt, JSON.parse(readFileSync(join(dir, 'cells', name, 'receipt.json'), 'utf8')), 'receipt'));
-      const failed = cells.flatMap((r) => r.steps.filter((s) => s.result !== 'completed').slice(0, 1).map((s) => ({ cell: r.selectionCellId, step: s.stepId, result: s.result, reason: s.reasonCode, output: s.output })));
-      if (args.flags['failed-step']) { out(args, { executionId, failed }, failed.length ? failed.map((f) => `${f.cell} step ${f.step}: ${f.result} (${f.reason ?? 'no reason'})\n${JSON.stringify(f.output, null, 2)}`).join('\n') : 'no failed step'); return 0; }
-      out(args, { executionId, outcome: campaign.outcome, coverage: campaign.coverage, cells: cells.map((r) => ({ cell: r.selectionCellId, outcome: r.outcome, reasonCodes: r.reasonCodes, steps: r.steps.map((s) => `${s.stepId}:${s.result}`), assertions: r.assertions.map((a) => `${a.assertionId}:${a.result}`) })) },
-        `${campaign.outcome.toUpperCase()} campaign ${campaign.campaignId}\n` + cells.map((r) => `  ${r.selectionCellId}: ${r.outcome} [${r.reasonCodes.join(', ') || 'no reasons'}]\n    steps: ${r.steps.map((s) => `${s.stepId}:${s.result}`).join(' ')}\n    assertions: ${r.assertions.map((a) => `${a.assertionId}:${a.result}`).join(' ')}`).join('\n'));
+      if (args.flags.request) {
+        const inspection = inspectFrozenPlan(readBundle(args.flags.request), localScope());
+        out(args, inspection, `${inspection.structural.toUpperCase()} frozen structure · ${inspection.cells.length} cell(s)\nexecution authority: ${inspection.executionAuthority}\n` +
+          inspection.blockers.map(b => `${b.code}: ${b.detail}`).join('\n'));
+        return inspection.structural === 'valid' ? 0 : 2;
+      }
+      const executionId = args.flags.execution ?? null;
+      const dir = args.flags.bundle ? resolve(args.flags.bundle) : join(resolve(args.flags['state-dir']!), 'executions', executionId!);
+      if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: dir, owner: 'operator', action: 'check the bundle or execution path' }]);
+      const snapshot = VerifiedBundleSnapshot.open(dir);
+      if (args.flags['failed-step']) {
+        const inspection = inspectFailedSteps(snapshot, executionId); const { failed } = inspection;
+        out(args, inspection, failed.length ? failed.map((f) => `${f.cell} step ${f.step}: ${f.result} (${f.reason ?? 'no reason'})\n${JSON.stringify(f.output, null, 2)}`).join('\n') : 'no failed step'); return 0;
+      }
+      const inspection = inspectExecution(snapshot, executionId);
+      out(args, inspection, `${inspection.outcome.toUpperCase()} campaign ${inspection.campaignId} · evidence verified\n` +
+        inspection.cells.map(r => `  ${r.cell}: ${r.outcome} [${r.reasonCodes.join(', ') || 'no reasons'}]\n    steps: ${r.steps.join(' ')}\n    assertions: ${r.assertions.join(' ')}`).join('\n'));
       return 0;
     }
 
@@ -407,6 +458,41 @@ async function main(argv: string[]): Promise<number> {
       const verification = verifyBundle(resolve(args.flags['bundle']));
       out(args, verification, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
       return verification.ok ? 0 : 2;
+    }
+
+    case 'awr-prepare':
+    case 'awr-inspect':
+    case 'awr-deliver':
+    case 'report-prepare':
+    case 'report-inspect':
+    case 'report-attach': {
+      const { runAwrCommand } = await import('../integrations/awr/cli.ts').catch(() => {
+        throw new Conflict('AWR integration unavailable; install the optional peer @useorgx/agent-work-receipt@0.3.0');
+      });
+      const state = await runAwrCommand(args.command, args.flags);
+      out(args, state, `${state.status}: ${state.prepared.ref.id}\nAttempts: ${state.attempts}; target verdict is in the saved receipt.\nImported evidence remains unverified; native acceptance and outcomes are separate.`);
+      return 0;
+    }
+    case 'result-ingest':
+    case 'results': {
+      if (args.command === 'results' && args.flags.id && (args.flags.cursor !== undefined || args.flags.limit !== undefined)) throw new Conflict('Choose --id or pagination options, not both');
+      const scope = localScope(); const ledger = LocalLedger.open(resolve(args.flags.sink));
+      try {
+        const sink = new LocalResultSink(ledger, scope, { authorize: async requested => {
+          if (!sameScope(requested, scope)) throw new Conflict('Result scope differs from the local operator');
+        } });
+        if (args.command === 'result-ingest') {
+          const result = await sink.ingest(resolve(args.flags.bundle));
+          out(args, result, `${result.replayed ? 'already retained' : 'retained'}: ${result.receipt.ref.id}\noutcome: ${result.receipt.retainedOutcome}; planned lanes: ${result.receipt.plannedLanes.join(', ') || 'unavailable'}\nissuer unverified; qualification not evaluated\narchive: ${result.bundleDir}`);
+        } else if (args.flags.id) {
+          const result = await sink.get(args.flags.id);
+          out(args, result, `${result.receipt.ref.id}\nretained outcome: ${result.receipt.retainedOutcome}; archive re-verified\nplanned lanes: ${result.receipt.plannedLanes.join(', ') || 'unavailable'}\nissuer unverified; qualification not evaluated\narchive: ${result.bundleDir}`);
+        } else {
+          const page = await sink.list({ ...(args.flags.cursor ? { cursor: args.flags.cursor } : {}), ...(args.flags.limit ? { limit: Number(args.flags.limit) } : {}) });
+          out(args, page, `${page.records.map(record => `${record.ref.id}  ${record.retainedOutcome}  [${record.plannedLanes.join(', ')}]  ${record.campaignRef.id}`).join('\n') || 'No retained results.'}\nStored receipts only; archives not checked. Issuers unverified; qualification not evaluated.${page.nextCursor ? `\nnext cursor: ${page.nextCursor}` : ''}`);
+        }
+        return 0;
+      } finally { ledger.close(); }
     }
 
     case 'verify-cleanup': {
@@ -437,9 +523,7 @@ async function main(argv: string[]): Promise<number> {
 }
 
 function readBundle(path: string): FrozenBundle {
-  const bundle = JSON.parse(readFileSync(resolve(path), 'utf8')) as FrozenBundle;
-  if (bundle.schemaVersion !== 'workflow.frozen-request-bundle/v1') throw new Blocked([{ code: 'invalid_request_file', detail: path, owner: 'operator', action: 'pass the file written by plan' }]);
-  return bundle;
+  return readFrozenBundle(resolve(path));
 }
 
 main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {

@@ -37,6 +37,22 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
   const credentialNames = new Set<string>();
   if (spec.capture.video === 'required' && !capabilities.captureFormats.includes('video/webm')) reasons.push({ code: 'required_video_unsupported', detail: 'runner does not advertise video capture' });
   const browserSteps = spec.steps.filter(step => step.kind.startsWith('ui.'));
+  const jobSteps = spec.steps.filter(step => step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel');
+  const mcpSteps = spec.steps.filter(step => step.kind === 'mcp.call');
+  if (mcpSteps.length > (spec.effects.maxMcpCalls ?? 0)) reasons.push({ code: 'mcp_call_limit', detail: 'MCP calls exceed the explicitly declared effect ceiling' });
+  for (const step of mcpSteps) {
+    if (!spec.effects.allowedHosts.length) reasons.push({ code: 'mcp_origin_not_admitted', detail: `${step.id}: no application host is allowed` });
+    if (!spec.effects.allowedMcpTools?.includes(step.command.tool)) reasons.push({ code: 'mcp_tool_not_admitted', detail: `${step.id}: tool is outside the effect envelope` });
+    if (spec.effects.mode !== 'designated_writes') reasons.push({ code: 'mcp_effect_not_admitted', detail: `${step.id}: MCP tool annotations cannot establish read-only authority` });
+    if (step.retry.attempts !== 1) reasons.push({ code: 'mcp_retry_unsupported', detail: `${step.id}: MCP tool effects require single-attempt admission` });
+    if (!spec.effects.allowedMethods.includes('POST') || !spec.effects.allowedResourcePrefixes.some(prefix => step.command.endpoint === prefix || step.command.endpoint.startsWith(`${prefix}/`))) reasons.push({ code: 'mcp_endpoint_not_admitted', detail: `${step.id}: endpoint is outside the effect envelope` });
+  }
+  if (jobSteps.filter(step => step.kind === 'job.submit').length > spec.effects.maxJobs) reasons.push({ code: 'job_effect_limit', detail: 'job submissions exceed the declared effect ceiling' });
+  for (const step of jobSteps) {
+    if (!spec.effects.allowedJobQueues?.includes(step.command.queue)) reasons.push({ code: 'job_queue_not_admitted', detail: `${step.id}: native queue is outside the effect envelope` });
+    if (step.retry.attempts !== 1) reasons.push({ code: 'job_retry_unsupported', detail: `${step.id}: native jobs require single-attempt admission` });
+    if (spec.effects.mode === 'read_only' && step.kind !== 'job.observe') reasons.push({ code: 'job_write_not_admitted', detail: `${step.id}: mutation requires designated_writes` });
+  }
   if (browserSteps.some(step => step.retry.attempts !== 1)) reasons.push({ code: 'browser_retry_unsupported', detail: 'browser effects require a single attempt; replay requires a new admission' });
   if (browserSteps.length > spec.limits.maxBrowserActions) reasons.push({ code: 'browser_action_limit', detail: 'browser steps exceed the case action budget' });
   if (browserSteps.length && spec.capture.trace === 'required') reasons.push({ code: 'browser_trace_unavailable', detail: 'required browser traces are not implemented' });
@@ -65,6 +81,8 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     if (step.kind === 'ui.navigate') templateNames(step.path, used);
     if (step.kind === 'ui.action') templateNames(step.command, used);
     if (step.kind === 'ui.observe') templateNames(step.target, used);
+    if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') templateNames(step.command, used);
+    if (step.kind === 'mcp.call') templateNames(step.command.arguments, used);
     for (const name of used) if (!declared.has(name)) reasons.push({ code: 'undeclared_variable', detail: `${step.id} uses {${name}} without declaring it in inputs` });
     for (const [name, source] of Object.entries(step.inputs) as Array<[string, VariableSource]>) {
       switch (source.kind) {
@@ -83,6 +101,7 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
           break;
         }
         case 'credential':
+          if (step.kind === 'mcp.call') reasons.push({ code: 'mcp_credential_expansion_unsupported', detail: `${step.id}: use MCP auth rather than expanding credentials into tool arguments` });
           if (step.kind.startsWith('ui.')) reasons.push({ code: 'browser_credential_expansion_unsupported', detail: `${step.id}: credentials cannot be filled into recorded browser steps` });
           credentialNames.add(source.name); break;
         case 'literal':
@@ -101,7 +120,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     if (!stepsById.has(assertion.stepId)) reasons.push({ code: 'assertion_unknown_step', detail: `${assertion.id} -> ${assertion.stepId}` });
     const assertedStep = stepsById.get(assertion.stepId);
     if (assertion.oracle.name === 'browser.observation' && !assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: browser oracle needs a browser step` });
-    if (assertion.oracle.name === 'http.observation' && assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle cannot evaluate browser facts` });
+    if (assertion.oracle.name === 'http.observation' && (assertedStep?.kind.startsWith('ui.') || assertedStep?.kind.startsWith('job.') || assertedStep?.kind === 'mcp.call')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle needs an HTTP step` });
+    if (assertion.oracle.name === 'mcp.observation' && assertedStep?.kind !== 'mcp.call') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: MCP oracle needs an MCP call` });
+    if (assertion.oracle.name === 'job.observation' && !assertedStep?.kind.startsWith('job.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: job oracle needs a native job step` });
   }
   if (spec.assertions.filter((a) => a.required).length === 0) reasons.push({ code: 'no_required_assertion', detail: 'a case needs at least one required assertion' });
   if (reasons.length > 0) throw new Blocked(reasons.map((r) => ({ ...r, owner: 'case author', action: 'fix the case definition and review it again' })));

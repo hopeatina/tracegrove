@@ -192,6 +192,7 @@ export function loadProject(configPath: string, scope?: Scope): LoadedProject {
   const fileRefs = new Map<string, Ref>();
   const pathsToLoad: string[] = [config.executionHostRef, config.intelligencePolicyRef];
   if (config.sourceSetRef) pathsToLoad.push(config.sourceSetRef);
+  if (config.sourceSelectionRef) pathsToLoad.push(config.sourceSelectionRef);
   for (const profile of Object.values(config.profiles)) {
     pathsToLoad.push(profile.environmentPlanRef, profile.personaRef, profile.fidelityProfileRef, profile.runnerRef);
     if (profile.hostPlanRef) pathsToLoad.push(profile.hostPlanRef);

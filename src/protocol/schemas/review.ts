@@ -46,3 +46,6 @@ export const PlanEditProjection = z.object({
   currentReviewRef: RefSchema.nullable(),
 }).strict();
 export type PlanEditProjection = z.infer<typeof PlanEditProjection>;
+export const PlanRevisionToken = z.object({ id: IdString, scope: ScopeSchema, expectedEditRevision: PositiveInt,
+  expectedSourcePlanRef: RefSchema }).strict();
+export type PlanRevisionToken = z.infer<typeof PlanRevisionToken>;

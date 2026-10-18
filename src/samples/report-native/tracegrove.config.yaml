@@ -1,0 +1,11 @@
+project: native_reports
+app:
+  adapter: node
+  nativeJobs: node_ipc/v1
+  entry: app/jobs-api.mjs
+  sources: [app/**]
+  inject: { port: PORT, dataDir: REPORTS_DIR, tokens: REPORTS_TOKENS }
+personas:
+  owner: { subject: alice }
+  intruder: { subject: bob }
+defaults: { stepTimeoutMs: 3000, caseTimeoutMs: 20000 }

@@ -5,9 +5,10 @@
 import { z } from 'zod';
 import {
   Cents, DigestSchema, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt,
-  RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList,
+  RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList, GitObjectId,
 } from '../primitives.ts';
 import { AccountClass, BoundaryMode, BoundaryRule, ComponentIdentity, ComponentKind, EnvironmentClass, FidelityLane, Limits } from './definitions.ts';
+import { GitCommitObservation } from './gitSources.ts';
 
 const record = <V extends string>(version: V) => ({
   schemaVersion: z.literal(version),
@@ -27,8 +28,8 @@ export const SourceSelection = z.object({
     repositoryRole: IdString,
     canonicalUrl: UrlString,
     requestedExpression: ShortText,
-    headCommit: z.string().regex(/^[0-9a-f]{40}$/),
-    baseCommit: z.string().regex(/^[0-9a-f]{40}$/).nullable(),
+    headCommit: GitObjectId,
+    baseCommit: GitObjectId.nullable(),
     origin: RepositoryOrigin,
     sourceObjectsRef: RefSchema.nullable(),
     lockfileDigest: DigestSchema,
@@ -56,7 +57,7 @@ export const TargetTuple = z.object({
     repositoryRole: IdString,
     canonicalUrl: UrlString,
     requestedRef: ShortText,
-    resolvedCommit: z.string().regex(/^[0-9a-f]{40}$/),
+    resolvedCommit: GitObjectId,
     origin: RepositoryOrigin,
     sourceObjectsRef: RefSchema.nullable(),
     lockfileDigest: DigestSchema,
@@ -204,7 +205,7 @@ export const IdentityAttestation = z.object({
   issuer: z.enum(['local_launcher', 'declared_binding']),
   trustPolicy: z.enum(['launcher_computed_source_digest', 'operator_declared_unverified']),
   evidence: z.object({ files: z.array(z.object({ path: z.string().max(LIMITS.shortText), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict()).max(256),
-    runtimeProbe: RuntimeObservation.optional(), observedHealthBody: JsonValue.nullable() }).strict(),
+    runtimeProbe: RuntimeObservation.optional(), sourceSnapshotRef: RefSchema.optional(), gitSource: GitCommitObservation.optional(), observedHealthBody: JsonValue.nullable() }).strict(),
   observedAt: IsoDateTime,
 }).strict().superRefine((attestation, ctx) => {
   if (attestation.identity.kind !== 'source_digest') return;

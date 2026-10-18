@@ -4,11 +4,12 @@
  * Producer flags are redundant checks, never authority.
  */
 import {
-  AssertionObservation, BrowserObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
+  AssertionObservation, BrowserObservation, NativeJobObservation, McpToolObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
   type Assertion, type CaseSpec, type EnvironmentBinding, type ExecutionReceipt, type Outcome,
   type PredicateT, type Ref, type SelectionManifest, type StepObservation, type TargetTuple, type Scope,
 } from '../protocol/index.ts';
 import { nowIso } from './clock.ts';
+import { isInfrastructureStepFailure } from './errors.ts';
 
 export const REDUCER_REF: Ref = (() => {
   const base = { id: 'tracegrove.reducer', revision: '0.1.0' };
@@ -77,6 +78,8 @@ export function evaluateAssertions(spec: CaseSpec, environmentClass: Environment
       result = 'not_applicable';
     } else if (!step || step.result === 'not_run' || step.result === 'cancelled') {
       result = 'not_observed'; reasonCode = step ? `step_${step.result}` : 'step_missing';
+    } else if (step.result === 'failed' && isInfrastructureStepFailure(step.reasonCode)) {
+      result = 'not_observed'; reasonCode = step.reasonCode;
     } else if (assertion.oracle.name === 'step.result') {
       const evaluation = evaluatePredicate(assertion.predicate, { stepResult: step.result });
       result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason;
@@ -87,6 +90,15 @@ export function evaluateAssertions(spec: CaseSpec, environmentClass: Environment
         const evaluation = evaluatePredicate(assertion.predicate, { browser: browser.data });
         result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason;
       }
+    } else if (assertion.oracle.name === 'mcp.observation') {
+      const mcp = McpToolObservation.safeParse(step.output);
+      const expected = spec.steps.find(item => item.id === assertion.stepId);
+      if (!mcp.success || expected?.kind !== 'mcp.call' || mcp.data.tool !== expected.command.tool || mcp.data.endpoint !== expected.command.endpoint) { result = 'not_observed'; reasonCode = 'invalid_mcp_observation'; }
+      else { const evaluation = evaluatePredicate(assertion.predicate, { body: mcp.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
+    } else if (assertion.oracle.name === 'job.observation') {
+      const job = NativeJobObservation.safeParse(step.output);
+      if (!job.success) { result = 'not_observed'; reasonCode = 'invalid_native_job_observation'; }
+      else { const evaluation = evaluatePredicate(assertion.predicate, { body: job.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
     } else {
       const output = (step.output ?? null) as { status?: number; body?: unknown } | null;
       if (!output) { result = 'not_observed'; reasonCode = 'no_observation_recorded'; }
@@ -266,11 +278,15 @@ export function reduceCampaign(input: { scope: Scope; campaignId: string; reques
 export function compareTargets(expected: TargetTuple, observed: TargetTuple | null): { matched: boolean | null; mismatches: string[] } {
   if (!observed) return { matched: null, mismatches: ['no observed target'] };
   const mismatches: string[] = [];
+  for (const field of Object.keys(expected) as Array<keyof TargetTuple>) {
+    if (field !== 'components' && !jsonEqual(expected[field], observed[field])) mismatches.push(`${field}: identity differs`);
+  }
   for (const componentId of expected.requiredComponents) {
     const exp = expected.components.find((c) => c.componentId === componentId);
     const obs = observed.components.find((c) => c.componentId === componentId);
     if (!exp || !exp.identity) { mismatches.push(`${componentId}: expected identity missing`); continue; }
     if (!obs || !obs.identity) { mismatches.push(`${componentId}: not observed`); continue; }
+    if (exp.kind !== obs.kind) mismatches.push(`${componentId}: component kind differs`);
     if (digestOfValue(exp.identity).hex !== digestOfValue(obs.identity).hex) mismatches.push(`${componentId}: identity differs`);
   }
   if (mismatches.some((m) => m.endsWith('not observed'))) return { matched: null, mismatches };

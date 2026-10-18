@@ -22,6 +22,7 @@ export const WorkflowConfig = z.object({
   defaultProfile: IdString,
   outputDir: z.string().min(1).max(LIMITS.shortText),
   sourceSetRef: FileRef.nullable(),
+  sourceSelectionRef: FileRef.optional(),
   executionHostRef: FileRef,
   intelligencePolicyRef: FileRef,
   profiles: z.record(IdString, ConfigProfile),

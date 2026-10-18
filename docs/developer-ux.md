@@ -178,7 +178,55 @@ cleanup:
 
 `{ words: 6 }` uses the deterministic generator; the logical payload is materialized at compile time, so there is no digest to paste.
 
-## Commands
+## TypeScript authoring
+
+Use `tracegrove.config.ts` instead of the YAML config for editor completion and
+shared constants. Flows and fixtures can independently use `.flow.ts` and
+`.fixture.ts`; YAML and TypeScript files can coexist when their logical names
+differ. They all compile through the same Zod schemas into the same corpus.
+
+```ts
+// tracegrove.config.ts
+import { defineConfig } from 'workflow-verify/authoring';
+
+export default defineConfig({
+  project: 'notes',
+  app: { adapter: 'node', entry: 'app/app.mjs' },
+  personas: { owner: { subject: 'alice' } },
+});
+```
+
+```ts
+// tracegrove/notes/health.flow.ts
+import { flow } from 'workflow-verify/authoring';
+
+export default flow({
+  title: 'The application is ready',
+  steps: [{ GET: '/health', expect: 200 }],
+});
+```
+
+`fixture({...})` supplies the same editor types for fixture recipes. The helpers
+preserve input values; the ordinary compiler validates and fills defaults. Run
+your TypeScript checker for editor contracts and `tracegrove check` for canonical
+runtime validation. `test`, `list`, `compile`, discovery and Grove use either
+config format. `init` preserves an existing TypeScript config.
+
+TypeScript authoring executes trusted project code, including during `check` and
+discovery; it is outside the application sandbox. Each module loads in a fresh
+Node process so edits to imported helpers are seen on the next compilation.
+Evaluation is limited to five seconds and a 1 MiB JSON-compatible default export.
+Console output does not contaminate CLI JSON. Errors report the failing module
+without forwarding arbitrary module diagnostics.
+
+Use Node 22's erasable TypeScript: include extensions on relative imports and use
+`import type` for types. Enums, parameter properties, JSX, and tsconfig path aliases
+are not transformed. The package's Node version requirement still applies. Keep
+one project config; discovery rejects competing YAML and TypeScript configs.
+An explicit `--config` on `test`, `list`, or `compile` selects a format when both
+are intentionally present.
+
+## Command reference
 
 ```text
 tracegrove init                     detect FastAPI / Django / Node, write config + an example flow + .gitignore entry
@@ -223,7 +271,7 @@ tracegrove · notes · app sha 3e8d13bc9bd1
 | --- | --- | --- |
 | 1 | Config + flow + fixture compiler, node/fastapi/django presets, assigned port mode, app-output-on-startup-failure, `test`/`list`/`compile`/`show`/`init`, run folders with summary.md/json/junit, Node/FastAPI/Django samples | Yes; generic command host remains unqualified |
 | 2 | `lanes:` with an offline mock lane compiled from recorded responses; `--update-snapshots` to record them | No |
-| 3 | `tracegrove.config.ts` with `defineConfig` and a typed `flow()` builder for editor autocompletion; JSON Schema for the YAML files so VS Code validates them today | Schema export only |
+| 3 | `tracegrove.config.ts` with `defineConfig`, `flow()` and `fixture()` for editor completion; canonical JSON Schema for YAML | Implemented through the shared compiler; no alternative executor |
 | 4 | Login-recipe personas (POST /login, cookie or token capture) for apps whose auth can't be patched; external `url:` targets with declared, unverified identity | No |
 | 5 | Browser surface using shared typed `browser:` commands, independent DOM/API checks, and verified Grove recording playback | Implemented locally; staging qualification remains open |
 

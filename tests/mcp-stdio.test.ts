@@ -24,8 +24,8 @@ afterEach(async context => {
 it('pins the actual registry SDK and captures negotiated native stdio messages with verified protocol-client fidelity', async () => {
   const packageInfo = JSON.parse(readFileSync(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8'));
   const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
-  expect(packageInfo.version).toBe('1.31.0'); expect(packageInfo.license).toBe('MIT');
-  expect(lock.packages['node_modules/@modelcontextprotocol/sdk'].integrity).toBe('sha512-UvTMgnNlnIBO/22ob2RcVGDlcvOslQs8T59+FTGdA0L27a39fdGF/EDETNtDVK4DZGpwomlsYpRdA8UXcVL/pw==');
+  expect(packageInfo.version).toBe('1.32.1'); expect(packageInfo.license).toBe('MIT');
+  expect(lock.packages['node_modules/@modelcontextprotocol/sdk'].integrity).toBe('sha512-2DdE+SJDtzLEEWzY1ZjY7Q+VcPhcV1KisD3zI4u0XZyktsjHum1mwbMI+JaulUBi2OZk+KJAi2uPXzxichPkdw==');
   const fixture = await start();
   expect(fixture.client.getServerCapabilities()?.tools).toBeDefined();
   expect((await fixture.client.listTools()).tools.some(tool => tool.name === 'echo')).toBe(true);

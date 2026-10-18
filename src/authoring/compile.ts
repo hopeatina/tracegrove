@@ -3,7 +3,7 @@
  * `.tracegrove/compiled/`. The compiled folder is loaded by the ordinary corpus loader, so the
  * planner, executor, reducer and bundle verifier see exactly what they always see.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml, stringify } from 'yaml';
 import type { z } from 'zod';
@@ -17,9 +17,16 @@ import { AuthoringConfig, Fixture, Flow, HTTP_VERBS, type Expect, type FlowStep,
 import { compileBrowserStep } from './browser.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
+import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
+import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
+import { readAuthoringModule } from './module.ts';
+import { applicationLaunch } from './appLaunch.ts';
+import { describeSnapshot, resolveVerificationSource } from './verificationSource.ts';
+import type { VerificationSourceBinding } from './sourceSelection.ts';
 
 export const CONFIG_FILE = 'tracegrove.config.yaml';
+export const CONFIG_FILES = [CONFIG_FILE, 'tracegrove.config.ts'] as const;
 export const STATE_DIR = '.tracegrove';
 const APP_ID = 'app';
 const ORIGIN = `launch://${APP_ID}`;
@@ -36,8 +43,9 @@ export type CompileResult = {
   flows: CompiledFlowInfo[];
   sourceDigest: string;
   sourceFiles: string[];
+  sourceBinding: VerificationSourceBinding;
 };
-export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined };
+export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined };
 
 type Json = unknown;
 
@@ -48,8 +56,11 @@ function fail(code: string, detail: string, action: string): never {
 function readAuthoring<T extends z.ZodType>(schema: T, path: string, root: string): z.infer<T> {
   const rel = relative(root, path) || path;
   let raw: unknown;
-  try { raw = parseYaml(readFileSync(path, 'utf8'), { strict: true }); }
-  catch (error) { fail('invalid_yaml', `${rel}: ${(error as Error).message.split('\n')[0]}`, `fix the YAML syntax in ${rel}`); }
+  try { raw = path.endsWith('.ts') ? readAuthoringModule(path) : parseYaml(readFileSync(path, 'utf8'), { strict: true }); }
+  catch (error) {
+    if (error instanceof Blocked) throw error;
+    fail('invalid_yaml', `${rel}: ${(error as Error).message.split('\n')[0]}`, `fix the YAML syntax in ${rel}`);
+  }
   const parsed = schema.safeParse(raw ?? {});
   if (!parsed.success) {
     const issues = parsed.error.issues.map((issue) => `${rel}${issue.path.length ? ` at ${issue.path.join('.')}` : ''}: ${issue.message}`);
@@ -58,18 +69,25 @@ function readAuthoring<T extends z.ZodType>(schema: T, path: string, root: strin
   return parsed.data;
 }
 
-/** Walk up from `start` to the nearest tracegrove.config.yaml. */
+/** One project has one config; never silently choose between YAML and TypeScript. */
+export function configInDirectory(dir: string): string | null {
+  const found = CONFIG_FILES.map(name => join(dir, name)).filter(path => existsSync(path));
+  if (found.length > 1) fail('ambiguous_config', `${dir}: found ${CONFIG_FILES.join(' and ')}`, 'keep one project config, or pass --config explicitly');
+  return found[0] ?? null;
+}
+
+/** Walk up from `start` to the nearest project config. */
 export function findConfig(start: string): string {
   let dir = resolve(start);
-  if (existsSync(dir) && !dir.endsWith('.yaml') && !dir.endsWith('.yml')) {
+  if (existsSync(dir) && statSync(dir).isDirectory()) {
     while (true) {
-      const candidate = join(dir, CONFIG_FILE);
-      if (existsSync(candidate)) return candidate;
+      const candidate = configInDirectory(dir);
+      if (candidate) return candidate;
       const parent = dirname(dir);
       if (parent === dir) break;
       dir = parent;
     }
-    fail('config_not_found', `no ${CONFIG_FILE} in ${resolve(start)} or any parent`, 'run tracegrove init');
+    fail('config_not_found', `no ${CONFIG_FILES.join(' or ')} in ${resolve(start)} or any parent`, 'run tracegrove init');
   }
   if (!existsSync(dir)) fail('config_not_found', dir, 'pass the path to tracegrove.config.yaml');
   return dir;
@@ -103,7 +121,7 @@ function findFiles(dir: string, suffix: string): string[] {
 }
 
 export function caseIdFor(project: string, testDir: string, file: string): string {
-  const rel = relative(testDir, file).split(sep).join('/').replace(/\.flow\.ya?ml$/, '');
+  const rel = relative(testDir, file).split(sep).join('/').replace(/\.flow\.(?:ya?ml|ts)$/, '');
   void project;
   return rel.split('/').join('.').replace(/[^A-Za-z0-9._-]/g, '-');
 }
@@ -173,41 +191,19 @@ function firstSegment(path: string): string {
 
 type FixtureUse = { alias: string; name: string; fixture: Fixture };
 
-function launchFor(config: AuthoringConfig, root: string, appRoot: string): { cwd: string; command: string; args: string[]; runtime: string } {
-  const app = config.app;
-  // A python path with a slash is relative to the config file; a bare name is looked up on PATH.
-  const configured = app.python && app.python.includes('/') ? resolve(root, app.python) : app.python;
-  const python = configured ?? (existsSync(join(appRoot, '.venv', 'bin', 'python')) ? join(appRoot, '.venv', 'bin', 'python') : 'python3');
-  switch (app.adapter) {
-    case 'node':
-      if (!app.entry) fail('missing_entry', 'app.entry is required for adapter node (e.g. src/server.js)', 'set app.entry');
-      return { cwd: appRoot, command: process.execPath, args: [app.entry], runtime: `node${process.versions.node.split('.')[0]}` };
-    case 'fastapi':
-      if (!app.entry) fail('missing_entry', 'app.entry is required for adapter fastapi (module:app, e.g. app.main:app)', 'set app.entry');
-      return { cwd: appRoot, command: python, args: ['-m', 'uvicorn', app.entry, '--host', '127.0.0.1', '--port', '{port}'], runtime: 'python' };
-    case 'django': {
-      const dir = resolve(appRoot, app.entry ?? '.');
-      if (!existsSync(join(dir, 'manage.py'))) fail('missing_manage_py', `no manage.py in ${relative(appRoot, dir) || '.'}`, 'set app.entry to the folder containing manage.py');
-      const bootstrap = "import os, subprocess, sys; subprocess.run([sys.executable, 'manage.py', 'migrate', '--noinput'], check=True); os.execv(sys.executable, [sys.executable, 'manage.py', 'runserver', '127.0.0.1:{port}', '--noreload'])";
-      return { cwd: dir, command: python, args: ['-c', bootstrap], runtime: 'python' };
-    }
-    case 'command':
-      if (!app.run) fail('missing_run', 'app.run is required for adapter command (e.g. "npm start")', 'set app.run');
-      return { cwd: appRoot, command: 'sh', args: ['-c', `exec ${app.run}`], runtime: 'command' };
-  }
-}
-
 function write(dir: string, rel: string, doc: Json): void {
   const abs = join(dir, rel);
   mkdirSync(dirname(abs), { recursive: true });
-  writeFileSync(abs, `# generated by tracegrove compile; edit the .flow.yaml / tracegrove.config.yaml instead\n${stringify(doc, { lineWidth: 0 })}`);
+  writeFileSync(abs, `# generated by tracegrove compile; edit the source flow or project config instead\n${stringify(doc, { lineWidth: 0 })}`);
 }
 
 export function compileProject(configPath: string, options: CompileOptions = {}): CompileResult {
   const root = dirname(resolve(configPath));
+  const snapshotSource = resolveVerificationSource(root, options.sourceSnapshot);
+  if (options.sourceRepositoryRole !== undefined && !snapshotSource) fail('snapshot_repository_unbound', 'A repository role needs a selected source snapshot.', 'pass --source-snapshot with --source-repository-role');
   const config = loadAuthoringConfig(resolve(configPath));
   const testDir = resolve(root, config.testDir);
-  const appRoot = resolve(root, config.app.root);
+  const appRoot = resolve(snapshotSource?.root ?? root, config.app.root);
   const compiledDir = join(root, STATE_DIR, 'compiled');
   const personas = Object.keys(config.personas);
   const defaultPersona = personas[0]!;
@@ -215,26 +211,40 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   // ---- discover flows and fixtures ----
   const fixtureDir = join(testDir, 'fixtures');
   const fixtures = new Map<string, Fixture>();
-  for (const file of findFiles(fixtureDir, '.fixture.yaml')) fixtures.set(basename(file).replace(/\.fixture\.yaml$/, ''), readAuthoring(Fixture, file, root));
-  const flowFiles = findFiles(testDir, '.flow.yaml').concat(findFiles(testDir, '.flow.yml'));
+  const fixturePaths = new Map<string, string>();
+  for (const file of [...findFiles(fixtureDir, '.fixture.yaml'), ...findFiles(fixtureDir, '.fixture.ts')].sort()) {
+    const name = basename(file).replace(/\.fixture\.(?:yaml|ts)$/, '');
+    if (fixturePaths.has(name)) fail('duplicate_fixture', `fixture ${name} has more than one authoring file`, 'keep one format for each fixture');
+    fixturePaths.set(name, file);
+  }
+  for (const [name, file] of fixturePaths) fixtures.set(name, readAuthoring(Fixture, file, root));
+  const flowFiles = [...findFiles(testDir, '.flow.yaml'), ...findFiles(testDir, '.flow.yml'), ...findFiles(testDir, '.flow.ts')].sort();
   if (flowFiles.length === 0) fail('no_flows', `no *.flow.yaml under ${relative(root, testDir) || '.'}`, 'write a flow, or run tracegrove init for an example');
-  const parsedFlows = flowFiles.map((file) => ({ file, caseId: caseIdFor(config.project, testDir, file), flow: readAuthoring(Flow, file, root) }));
+  const indexedFlows = flowFiles.map((file) => ({ file, caseId: caseIdFor(config.project, testDir, file) }));
   const seen = new Set<string>();
-  for (const { caseId, file } of parsedFlows) {
+  for (const { caseId, file } of indexedFlows) {
     if (seen.has(caseId)) fail('duplicate_case_id', `${relative(root, file)} derives ${caseId}, which another flow already uses`, 'rename one of the files');
     seen.add(caseId);
   }
+  const parsedFlows = indexedFlows.map(row => ({ ...row, flow: readAuthoring(Flow, row.file, root) }));
   const selected = parsedFlows.filter(({ caseId, flow, file }) =>
     (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
   if (selected.length === 0) fail('no_flows_selected', `no flow matches${options.grep ? ` --grep ${options.grep}` : ''}${options.tags?.length ? ` --tag ${options.tags.join(',')}` : ''}`, 'run tracegrove list to see flow ids and tags');
   const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
-  const runner = hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const hasJobs = selected.some(({ flow }) => flow.steps.some(step => 'job' in step));
+  const hasMcp = selected.some(({ flow }) => flow.steps.some(step => 'mcp' in step));
+  if (hasMcp && (hasJobs || hasBrowser)) fail('mixed_mcp_runner_unqualified', 'MCP, native job and browser runners are not qualified together', 'select separate flows with --grep');
+  if (hasJobs && hasBrowser) fail('mixed_native_browser_unqualified', 'Native job and browser runners are not qualified together', 'run separate flows with --grep');
+  if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
+  const runner = hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
   // ---- attested source identity ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
-  const launch = launchFor(config, root, appRoot);
+  const launch = applicationLaunch(config, root, appRoot);
   const launchCwd = launch.cwd;
+  const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir, options.sourceRepositoryRole);
+  const sourceSelection = sourceSnapshot?.repositoryRole ? snapshotSource!.selection(sourceSnapshot) : null;
   if (config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
   const runtime = observeApplicationRuntimeSync(launch.command, launchCwd, process.env.PATH ?? '');
   launch.command = runtime.executable;
@@ -245,6 +255,14 @@ export function compileProject(configPath: string, options: CompileOptions = {})
 
   rmSync(compiledDir, { recursive: true, force: true });
   mkdirSync(compiledDir, { recursive: true });
+  if (sourceSelection && sourceSnapshot) {
+    write(compiledDir, 'source-snapshot.yaml', sourceSnapshot.snapshot);
+    write(compiledDir, 'source-revisions.yaml', sourceSelection.matrix);
+    write(compiledDir, 'source-selection.yaml', { ...sourceSelection.selection,
+      revisionMatrixRef: { $file: './source-revisions.yaml' },
+      repositories: sourceSelection.selection.repositories.map(repository => ({ ...repository, sourceObjectsRef: { $file: './source-snapshot.yaml' } })),
+    });
+  }
   const ref = (id: string) => ({ id: `${config.project}.${id}`, revision: '1' });
 
   // ---- shared definitions ----
@@ -276,14 +294,18 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       identitySourceFiles: identity.entries.map((entry) => entry.path),
       issuedCredentials: personas.map((name) => ({ name: `${name}_token`, subject: config.personas[name]!.subject })),
       portMode: 'assigned', runtime: launch.runtime,
+      ...(sourceSnapshot ? { sourceSnapshot } : {}),
+      ...(hasJobs ? { nativeJobs: config.app.nativeJobs } : {}),
     },
     mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: 'fresh_directory_and_port', networkRules: ['loopback_only'],
-    requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
+    requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000, cleanupReserveMs: 10_000,
   });
-  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: hasBrowser ? 'browser' : 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
-  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: hasBrowser ? 'web' : 'http_api', protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
-  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: hasBrowser ? 'web' : 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
+  const runnerAdapter = hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
+  const surfaceKind = hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
+  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed' });
+  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
+  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe', ...(hasMcp ? ['mcp.call'] : [])] });
   const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass: 'local', readbackOracleRef: null, interceptorRef: null });
   write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: [boundary('application'), boundary('storage')] });
   const stage = { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 };
@@ -325,13 +347,43 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const label = 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      const label = 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
       const where = `${rel} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
       const inputs: Record<string, Json> = {};
       const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
+      if ('mcp' in step) {
+        if (statusOf(step.expect) !== null) fail('mcp_http_expectation', where, 'use expect.json for MCP protocol observations');
+        const command = { ...step.mcp, arguments: bindTemplates(step.mcp.arguments as Json, scope, inputs, where) };
+        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const configured = predicateFor(step.expect);
+        const predicate = { kind: 'all', predicates: [{ kind: 'json_path_equals', path: 'body.isError', value: false }, ...(configured ? [configured] : [])] };
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: 'mcp.call', command, auth, captures, timeoutMs, inputs, retry: { attempts: 1 } });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: ['isolated_candidate'], stepId: id,
+          oracle: { name: 'mcp.observation', version: '1' }, predicate, coverageTags: flow.tags });
+        methods.add('POST'); prefixes.add(step.mcp.endpoint);
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: 'MCP', path: `${step.mcp.endpoint} ${step.mcp.tool}`, as: step.as ?? defaultPersona, expectStatus: null, expectation: 'MCP tool result and configured facts' });
+        return;
+      }
+      if ('job' in step) {
+        if (statusOf(step.expect) !== null) fail('native_job_http_expectation', where, 'use expect.json for native job facts');
+        const command = bindTemplates(step.job as Json, scope, inputs, where);
+        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const predicate = predicateFor(step.expect);
+        if (step.job.action === 'read' && !predicate) fail('native_job_read_expectation', where, 'add expect.json to bound native readback polling');
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: step.job.action === 'read' ? 'job.observe' : step.job.action === 'cancel' ? 'job.cancel' : 'job.submit', command, auth, captures, timeoutMs, inputs, retry: { attempts: 1 },
+          ...(step.job.action === 'read' ? { predicate, pollIntervalMs: 50 } : {}) });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: ['isolated_candidate'], stepId: id,
+          oracle: { name: predicate ? 'job.observation' : 'step.result', version: '1' }, predicate: predicate ?? { kind: 'step_result', value: 'completed' }, coverageTags: flow.tags });
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: 'JOB', path: `${step.job.action} ${step.job.queue}`, as: step.as ?? defaultPersona, expectStatus: null, expectation: predicate ? 'Configured native job facts' : 'Native operation completes' });
+        return;
+      }
       if ('browser' in step) {
         const browser = compileBrowserStep({ step, id, timeoutMs, inputs, bind: value => bindTemplates(value, scope, inputs, where) });
         steps.push(browser.step);
@@ -411,13 +463,15 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     }
     write(compiledDir, `cases/${caseId}.yaml`, {
       schemaVersion: 'workflow.case/v1', ref: { id: caseId, revision: '1' }, purpose: flow.title, workflowId: caseId,
-      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
-      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
-      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(browserFlow ? ['ui.navigate', 'ui.action', 'ui.observe'] : []), ...(given.size ? ['fixture.http'] : [])],
+      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: hasMcp ? 'integration' : browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
+      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
+      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(hasMcp ? ['mcp.call'] : []), ...(browserFlow ? ['ui.navigate', 'ui.action', 'ui.observe'] : []), ...(given.size ? ['fixture.http'] : [])],
       requiredBoundaries: [{ boundaryId: 'application', mode: 'real' }, { boundaryId: 'storage', mode: 'real' }],
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
-      effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: 0, cleanupRecipeRef: null },
+      effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
+        ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}),
+        ...(hasMcp ? { maxMcpCalls: flow.effects?.maxMcpCalls ?? 0, allowedMcpTools: flow.effects?.allowedMcpTools ?? [] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
       capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
       baselineRef: null, generation: null,
@@ -428,8 +482,10 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   write(compiledDir, 'cases/suite.yaml', { schemaVersion: 'workflow.suite/v1', id: `${config.project}.suite`, cases: suiteCases });
   write(compiledDir, 'workflow.yaml', {
     schemaVersion: 'workflow.config/v1', project: config.project, suiteRef: './cases/suite.yaml', defaultProfile: PROFILE, outputDir: './output', sourceSetRef: null,
+    ...(sourceSelection ? { sourceSelectionRef: './source-selection.yaml' } : {}),
     executionHostRef: './host.yaml', intelligencePolicyRef: './policy.yaml',
     profiles: { [PROFILE]: { class: 'isolated_candidate', environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
   });
-  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles };
+  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles,
+    sourceBinding: snapshotSource ? describeSnapshot(snapshotSource.snapshot) : { kind: 'working_tree' } };
 }

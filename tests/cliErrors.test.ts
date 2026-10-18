@@ -69,7 +69,7 @@ it('reports a missing interpreter without launching the app or revealing the con
 it('does not expose JSON parser excerpts or schema diagnostics from corrupt inputs', () => {
   const root = scratch(); const path = join(root, 'request.json');
   writeFileSync(path, `{ "private": "${privateText}" invalid }`);
-  expect(failure(['run', '--request', path, '--json'])).toMatchObject({ errorClass: 'invalid_input', exitCode: 3, reasons: [{ code: 'invalid_json' }] });
+  expect(failure(['run', '--request', path, '--json'])).toMatchObject({ errorClass: 'blocked', exitCode: 2, reasons: [{ code: 'invalid_request_file' }] });
   writeFileSync(path, JSON.stringify({ schemaVersion: privateText }));
   const output = join(root, 'rerun.json');
   expect(failure(['rerun', '--request', path, '--output', output, '--json'])).toMatchObject({ exitCode: 2, reasons: [{ code: 'invalid_request_file' }] });
@@ -138,4 +138,10 @@ it('preserves completed low-level run JSON and assertion exit status', () => {
   expect(negative).toMatchObject({ outcome: 'assertion_failed', exitCode: 1, redelivered: false });
   expect(negative.schemaVersion).toBeUndefined(); expect(verifyBundle(negative.executionDir).ok).toBe(true);
   expect(negative.executionId).not.toBe(positive.executionId);
+});
+
+it('names every parsed command in its structured error report', async () => {
+  const { COMMAND_SCHEMAS } = await import('../src/cli/arguments.ts');
+  const { CliErrorReport } = await import('../src/protocol/index.ts');
+  expect([...CliErrorReport.shape.command.unwrap().options].sort()).toEqual(Object.keys(COMMAND_SCHEMAS).sort());
 });

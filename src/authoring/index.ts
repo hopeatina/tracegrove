@@ -1,7 +1,7 @@
-export { compileProject, findConfig, caseIdFor, CONFIG_FILE, STATE_DIR, type CompileResult, type CompiledFlowInfo } from './compile.ts';
+export { compileProject, findConfig, configInDirectory, caseIdFor, CONFIG_FILE, CONFIG_FILES, STATE_DIR, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 export { runTests, resolveRun, renderJunit, renderMarkdown, renderText, type TestRunReport, type CaseReport } from './run.ts';
 export { initProject, detect, AUTH_SNIPPETS } from './init.ts';
-export { AuthoringConfig, Flow, FlowStep, HttpFlowStep, BrowserFlowStep, Fixture, RunVideo, exportAuthoringSchemas } from './schema.ts';
+export { AuthoringConfig, Flow, FlowStep, HttpFlowStep, BrowserFlowStep, JobFlowStep, Fixture, RunVideo, exportAuthoringSchemas } from './schema.ts';
 export { discover, draftFlow, gitInfo, scanSource, type Discovery, type Route } from './discover.ts';
 export { startUi, type UiServer } from './ui.ts';
 export { buildAgentCommand, buildDraftPrompt, detectAgents, readLocalSettings, resolveAgentSettings, runAgent, writeLocalSettings, DEFAULT_MODELS, type AgentSettings, type AgentRunResult } from './agent.ts';
@@ -9,3 +9,6 @@ export { checkProject, discoverProject, draftWithAgent, type CheckResult, type D
 export { RunActivity, runActivity } from './activity.ts';
 export { heal, undoHeal, listHeals, classify, guardFlowEdit, type HealReport, type HealFinding, type HealChange, type HealOptions } from './heal.ts';
 export { projectStatus, projectRoot, type ProjectStatus, type NextAction } from './status.ts';
+export { defineConfig, flow, fixture } from './typed.ts';
+export { VerificationSourceSelection, VerificationSourceBinding } from './sourceSelection.ts';
+export { previewVerificationSource, saveVerificationSource, savedVerificationSource } from './verificationSource.ts';

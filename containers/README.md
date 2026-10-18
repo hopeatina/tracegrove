@@ -8,6 +8,25 @@ npm run test:container -- native-real
 npm run test:container -- offline-contract
 ```
 
+If the desktop credential helper stalls while looking up the public base image,
+opt into an anonymous client for this qualification only:
+
+```sh
+npm run test:container -- native-real --anonymous-public-registry
+npm run test:container -- offline-contract --anonymous-public-registry
+```
+
+This mode uses a temporary Docker client configuration with no copied registry
+credentials. It requires a local Unix socket, preserves the observed buildx plugin
+location, and compares the daemon ID before and after configuring the client.
+It refuses remote daemons or a changed daemon identity. Your original client
+configuration remains untouched; the temporary directory is removed and its
+cleanup is recorded in `qualification.json`. Default credential behavior is
+unchanged. This is an explicit public-registry option, not a fallback after an
+authentication error. The image digest and runtime network restrictions stay
+pinned. Docker documents these per-client controls in its
+[CLI configuration reference](https://docs.docker.com/reference/cli/docker/).
+
 The build context contains only the verifier source, locked dependencies, sample templates and container entrypoint. The base image is pinned by digest and was observed running Node 22.23.3. The image builds the compiled CLI independently of any host `dist` or `node_modules` directory.
 
 At runtime the verifier and the notes application run inside one container. There are no OrgX credentials, model calls, database, external network or published ports. The wrapper limits the container to one CPU, 512 MiB RAM and 128 processes; the root filesystem is read-only, capabilities are dropped, and the application workspace lives in a 256 MiB temporary filesystem. Only the evidence subdirectory is mounted for writeback. Image and container IDs remain outside that mount.
