@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdString, RunRequest } from '../protocol/index.ts';
+import { CliCommandName, IdString, RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { SampleName } from './samples/catalog.ts';
 
@@ -39,6 +39,7 @@ export const COMMAND_SCHEMAS = {
     'choose --request, --bundle, or --execution with --state-dir; --failed-step is only for execution evidence'),
   export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
+  compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
   'awr-prepare': z.object({ ...common, sink: Text, id: IdString, destination: Text }).strict(),
@@ -52,7 +53,7 @@ export const COMMAND_SCHEMAS = {
   'recovery-status': z.object({ ...common, 'state-dir': Text, execution: Text }).strict(),
   'source-materialize': z.object({ ...common, input: Text, repository: Text, root: Text, side: z.enum(['base', 'head']), output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
-} as const;
+} as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];

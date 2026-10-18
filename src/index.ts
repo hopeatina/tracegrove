@@ -15,6 +15,7 @@ export { CoordinationSnapshotSchema, CoordinationCommandSchema, transitionCoordi
 export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
 export { createRerun } from './core/rerun.ts';
+export { compareReplays } from './core/replayComparison.ts';
 export { editPlan, reviewPlan, type PlanReviewPorts, type ReviewSnapshot } from './core/review.ts';
 export { promoteScenario, ApprovedPlanReview, type ApprovedPlanSnapshot, type ScenarioPromotionPorts } from './core/sourcePromotion.ts';
 export { ReviewedSourceDocuments, validateReviewedSourceDocuments, validateReviewedSourceSelection } from './core/sourceReviewEvidence.ts';

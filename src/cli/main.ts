@@ -20,6 +20,7 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readFrozenBundle } from '../core/frozenBundle.ts';
 import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
+import { compareReplays } from '../core/replayComparison.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
@@ -113,6 +114,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
   awr-prepare --sink <dir> --id <result-id> --destination <json>
                                                        freeze a redacted AWR export and exact destination; no network
@@ -427,6 +429,19 @@ async function main(argv: string[]): Promise<number> {
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
         ledger?.close();
       }
+    }
+
+    case 'compare': {
+      let baseline: VerifiedBundleSnapshot, candidate: VerifiedBundleSnapshot;
+      try {
+        baseline = VerifiedBundleSnapshot.open(resolve(args.flags.baseline)); candidate = VerifiedBundleSnapshot.open(resolve(args.flags.candidate));
+      } catch { throw new Conflict('comparison requires two valid evidence bundles'); }
+      const report = compareReplays(baseline, candidate);
+      const rows = report.rows.map(row => `${row.dimensions.caseId} [${row.dimensions.personaId}, ${row.dimensions.environmentId}]\n` +
+        `  ${row.baseline.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} → ${row.candidate.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} · ${row.change}`);
+      out(args, report, `Verified recorded comparison · ${report.executionIdentityRelation}\n${rows.join('\n')}\n` +
+        `Provided bundles only; issuer not authenticated; qualification not evaluated.\nExcluded cells: baseline ${report.baseline.excludedCells.length}, candidate ${report.candidate.excludedCells.length}`);
+      return 0;
     }
 
     case 'inspect': {
