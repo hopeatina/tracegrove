@@ -1,9 +1,9 @@
-import { z } from 'zod';
-import { IdString, RefSchema, ScenarioActivation, ScenarioActivationIntent, ScenarioProjection, digestOfValue, freeze,
+import { ScenarioActivation, ScenarioActivationIntent, ScenarioProjection, digestOfValue,
   refKey, sameDigest, sameRef, sameScope, verifySelfDigest, type Digest, type Ref, type Scope, type ScenarioReplayAssessment } from '../protocol/index.ts';
 import { assessScenarioReplay, type ReplayAssessmentPorts } from './replayAssessment.ts';
 import { readScenarioSnapshot, resolveScenarioDefinition } from './scenario.ts';
-import { Blocked, Conflict } from './errors.ts';
+import { Conflict } from './errors.ts';
+import { ActivationActor, assertActivationBindings, deriveScenarioActivation } from './activationDecision.ts';
 import { nowIso } from './clock.ts';
 
 export interface ScenarioActivationPorts extends ReplayAssessmentPorts {
@@ -16,7 +16,6 @@ export interface ScenarioActivationPorts extends ReplayAssessmentPorts {
   compareAndSwapActivation(intent: ScenarioActivationIntent, next: ScenarioProjection,
     activation: ScenarioActivation, evidence: ScenarioReplayAssessment): Promise<boolean>;
 }
-const Actor = z.object({ actorId: IdString, policyRef: RefSchema }).strict();
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 async function priorActivation(ports: ScenarioActivationPorts, intent: ScenarioActivationIntent, digest: Digest): Promise<ScenarioActivation | null> {
@@ -37,32 +36,16 @@ export async function activateScenario(ports: ScenarioActivationPorts, input: Sc
   const intent = { ...parsed, roundRefs: [...parsed.roundRefs].sort((a, b) => compare(refKey(a), refKey(b))) };
   if (new Set(intent.roundRefs.map(refKey)).size !== intent.roundRefs.length) throw new Conflict('activation selects duplicate rounds');
   const intentDigest = digestOfValue(intent);
-  const actor = Actor.parse(await ports.authorizeActivation(structuredClone(intent.snapshot.scope), structuredClone(intentDigest)));
+  const actor = ActivationActor.parse(await ports.authorizeActivation(structuredClone(intent.snapshot.scope), structuredClone(intentDigest)));
   const prior = await priorActivation(ports, intent, intentDigest);
   if (prior) return prior;
   const { projection } = await readScenarioSnapshot(ports, intent.snapshot);
   if (projection.state !== 'validating') throw new Conflict('explicit activation requires a validating scenario');
   const scenario = await resolveScenarioDefinition(ports, projection.definitionRef, intent.snapshot.scope);
-  if (!sameRef(intent.replayContractRef, scenario.replayContractRef) || !sameRef(intent.qualificationPolicyRef, scenario.qualificationPolicyRef) ||
-      !sameRef(intent.qualificationMatrixRef, scenario.qualificationMatrixRef) || !sameRef(intent.targetProfileRef, scenario.qualificationTargetProfileRef)) {
-    throw new Conflict('activation replay/policy/matrix/target bindings changed');
-  }
+  assertActivationBindings(intent, scenario);
   // Re-derive from authenticated raw evidence; a submitted readiness boolean is never accepted.
   const report = await assessScenarioReplay(ports, intent.snapshot);
-  const latest = report.rounds.find(round => report.latestAdmissionRef && sameRef(round.admissionRef, report.latestAdmissionRef));
-  if (!report.qualifies || intent.roundRefs.length < report.requiredRounds ||
-      !intent.roundRefs.every(ref => report.qualifyingRoundRefs.some(qualified => sameRef(ref, qualified))) ||
-      !latest?.assessment || !intent.roundRefs.some(ref => sameRef(ref, latest.assessment!.roundRef))) {
-    throw new Blocked([{ code: 'scenario_not_qualified', detail: 'Selected independent live rounds must satisfy current policy and include the latest admitted round',
-      owner: 'scenario owner', action: 'Complete qualification or review the current evidence and selection' }]);
-  }
-  const assessmentRefs = intent.roundRefs.map(ref => report.rounds.find(round => round.assessment && sameRef(round.assessment.roundRef, ref))!.assessment!.ref);
-  const activation = ScenarioActivation.parse(freeze({ schemaVersion: 'workflow.scenario-activation/v1',
-    ref: { id: `scenario-activation-${intentDigest.hex}`, revision: '1' }, scope: intent.snapshot.scope, intent, intentDigest,
-    actorId: actor.actorId, authorizationPolicyRef: actor.policyRef, assessmentRefs, activatedAt: nowIso(),
-  }));
-  const next = ScenarioProjection.parse({ ...projection, aggregateVersion: projection.aggregateVersion + 1, state: 'active',
-    qualificationRoundRefs: intent.roundRefs, activationDecisionRef: activation.ref });
+  const { activation, next } = deriveScenarioActivation(intent, projection, scenario, report, actor, nowIso());
   if (!await ports.compareAndSwapActivation(structuredClone(intent), structuredClone(next), structuredClone(activation), structuredClone(report))) {
     const raced = await priorActivation(ports, intent, intentDigest);
     if (raced) return raced;

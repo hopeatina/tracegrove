@@ -38,7 +38,14 @@ jobs:
       - name: Verify immutable source resolution through the built CLI
         env:
           WORKFLOW_VERIFY_TEST_CLI: compiled
-        run: npm test -- tests/cliGitSources.test.ts --maxWorkers=2
+          TRACEGROVE_SOURCE_PROOF_DIR: ${{ runner.temp }}/source-regression-proof
+        run: npm test -- tests/cliGitSources.test.ts tests/cliGitSnapshot.test.ts tests/typed-authoring.test.ts --maxWorkers=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-regression-proof
+          path: ${{ runner.temp }}/source-regression-proof/
+          if-no-files-found: ignore
       - name: Qualify clean native and mocked Docker lanes
         id: container-qualification
         run: |
@@ -82,6 +89,25 @@ jobs:
           node dist/cli/main.js export --execution "$browser_execution" --state-dir "$RUNNER_TEMP/browser-sample/verification/.workflow-verify" --output "$RUNNER_TEMP/browser-bundle"
           node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/browser-bundle"
           node dist/cli/main.js test --config "$RUNNER_TEMP/browser-sample/tracegrove.config.yaml" --grep notes.browser
+      - name: Persisted async jobs from the built distribution
+        run: |
+          node dist/cli/main.js sample-config --sample report-jobs --output "$RUNNER_TEMP/jobs-sample" --json > "$RUNNER_TEMP/jobs-sample.json"
+          jobs_config=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).config)" "$RUNNER_TEMP/jobs-sample.json")
+          node dist/cli/main.js plan --config "$jobs_config" --profile real --output "$RUNNER_TEMP/jobs-request.json"
+          node dist/cli/main.js run --request "$RUNNER_TEMP/jobs-request.json" --state-dir "$RUNNER_TEMP/jobs-state" --json > "$RUNNER_TEMP/jobs-run.json"
+          jobs_execution=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).executionId)" "$RUNNER_TEMP/jobs-run.json")
+          node dist/cli/main.js export --execution "$jobs_execution" --state-dir "$RUNNER_TEMP/jobs-state" --output "$RUNNER_TEMP/jobs-bundle"
+          node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/jobs-bundle"
+          node dist/cli/main.js test --config "$RUNNER_TEMP/jobs-sample/tracegrove.config.yaml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: async-job-evidence-bundle
+          path: |
+            ${{ runner.temp }}/jobs-bundle
+            ${{ runner.temp }}/jobs-run.json
+            ${{ runner.temp }}/jobs-sample/.tracegrove/runs/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

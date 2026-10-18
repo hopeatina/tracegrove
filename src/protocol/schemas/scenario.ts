@@ -41,6 +41,11 @@ export type ReplayAssessment = z.infer<typeof ReplayAssessment>;
 export const ScenarioRevisionToken = z.object({ id: IdString, scope: ScopeSchema, expectedAggregateVersion: PositiveInt,
   expectedDefinitionRef: RefSchema, expectedInvalidationEpoch: NonNegInt, expectedLatestRoundSequence: NonNegInt }).strict();
 export type ScenarioRevisionToken = z.infer<typeof ScenarioRevisionToken>;
+export const ScenarioStructuralValidation = z.object({ schemaVersion: z.literal('workflow.scenario-structure/v1'), ref: RefSchema,
+  scope: ScopeSchema, snapshot: ScenarioRevisionToken, requestRef: RefSchema, qualificationMatrixRef: RefSchema,
+  executableClosureDigest: DigestSchema, actorId: IdString, authorizationPolicyRef: RefSchema, validatedAt: IsoDateTime,
+}).strict();
+export type ScenarioStructuralValidation = z.infer<typeof ScenarioStructuralValidation>;
 export const QualificationRoundIntent = z.object({ selectionManifestRef: RefSchema, stateLeaseRefs: refList().min(1) }).strict();
 export type QualificationRoundIntent = z.infer<typeof QualificationRoundIntent>;
 export const ScenarioReplayAssessment = z.object({ snapshot: ScenarioRevisionToken, policyRef: RefSchema,

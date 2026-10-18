@@ -1,8 +1,9 @@
 import {
-  FidelityPlan, ReplayAssessment, ReplayFinding, SourceSelection, digestOfValue, freeze, refKey, sameDigest, sameRef, sameScope,
+  FidelityPlan, HostPlan, ReplayAssessment, ReplayFinding, SourceSelection, digestOfValue, freeze, refKey, sameDigest, sameRef, sameScope,
   type QualificationPolicy, type ReplayFindingCode, type ScenarioDefinition,
 } from '../protocol/index.ts';
 import type { QualificationEvidence } from './qualification.ts';
+import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 
 /** Derive proof strength from independently checked observations; outcome flags alone grant nothing. */
 export function assessReplayEvidence(evidence: QualificationEvidence, policy: QualificationPolicy, scenario: ScenarioDefinition): {
@@ -28,7 +29,10 @@ export function assessReplayEvidence(evidence: QualificationEvidence, policy: Qu
   });
   if (!identity) codes.add('target_identity_unproven');
   const source = bundle.request.sourceSelectionRef ? SourceSelection.safeParse(bundle.documents[refKey(bundle.request.sourceSelectionRef)]) : null;
-  const revision = live && identity && source?.success === true && sameRef(source.data.ref, bundle.request.sourceSelectionRef!) &&
+  const sourceClosure = bundle.selection.cells.every(cell => repositorySelectionProblems(bundle.request, cell,
+    HostPlan.parse(bundle.documents[refKey(cell.executionHostRef)]), bundle.documents).length === 0);
+  const reviewedSource = scenario.sourcePlanRef === null || (bundle.request.sourcePlanRef !== null && sameRef(scenario.sourcePlanRef, bundle.request.sourcePlanRef));
+  const revision = live && identity && sourceClosure && reviewedSource && source?.success === true && sameRef(source.data.ref, bundle.request.sourceSelectionRef!) &&
     sameScope(source.data.scope, round.scope) && source.data.repositories.length > 0 &&
     source.data.repositories.every(repository => repository.resolverRef !== null) &&
     source.data.excludedRoles.every(role => role.reasonRef !== null) &&

@@ -1,20 +1,44 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const fault = vi.hoisted(() => ({ sync: false }));
+const fault = vi.hoisted(() => ({ sync: false, directoryInode: null as number | null }));
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return { ...actual, fsyncSync: (fd: number) => { if (fault.sync) throw new Error('injected sync failure'); actual.fsyncSync(fd); } };
+  return { ...actual, fsyncSync: (fd: number) => { if (fault.sync || (fault.directoryInode !== null && actual.fstatSync(fd).ino === fault.directoryInode)) throw new Error('injected sync failure'); actual.fsyncSync(fd); } };
 });
 import { LocalLedger } from '../src/core/ledger.ts';
+import { LocalResultSink } from '../src/core/resultSink.ts';
+import { localScope } from '../src/core/corpus.ts';
+import { cleanupTemps, planSample, runSample, sampleCopy } from '../conformance/helpers.ts';
+import { digestOfValue } from '../src/protocol/index.ts';
 
 const dirs: string[] = []; const handles: LocalLedger[] = [];
 function open(dir = mkdtempSync(join(tmpdir(), 'tracegrove-ledger-'))) {
   if (!dirs.includes(dir)) dirs.push(dir);
   const ledger = LocalLedger.open(dir); handles.push(ledger); return { dir, ledger };
 }
-afterEach(() => { fault.sync = false; for (const handle of handles.splice(0)) handle.close(); for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => { fault.sync = false; fault.directoryInode = null; for (const handle of handles.splice(0)) handle.close(); cleanupTemps(); for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+
+it('does not publish a result when archive durability fails before the ledger append', async () => {
+  const sample = sampleCopy(); const run = await runSample(planSample(sample.configPath, 'offline-contract'), sample.stateDir);
+  const { ledger } = open(); const sink = new LocalResultSink(ledger, localScope(), { authorize: async () => {} });
+  fault.sync = true; await expect(sink.ingest(run.executionDir)).rejects.toThrow('injected sync failure'); fault.sync = false;
+  expect((await sink.list()).records).toEqual([]);
+});
+
+it('does not publish an orphan on retry while its archive namespace still cannot sync', async () => {
+  const sample = sampleCopy(); const run = await runSample(planSample(sample.configPath, 'offline-contract'), sample.stateDir);
+  const { dir, ledger } = open(); const sink = new LocalResultSink(ledger, localScope(), { authorize: async () => {} });
+  const objects = join(dir, `result-objects-${digestOfValue(localScope()).hex}`); mkdirSync(objects);
+  fault.directoryInode = statSync(objects).ino;
+  await expect(sink.ingest(run.executionDir)).rejects.toThrow('injected sync failure');
+  await expect(sink.ingest(run.executionDir)).rejects.toThrow('injected sync failure');
+  expect((await sink.list()).records).toEqual([]);
+  fault.directoryInode = null;
+  const accepted = await sink.ingest(run.executionDir);
+  expect(accepted.replayed).toBe(false); expect((await sink.list()).records).toHaveLength(1);
+});
 
 it('does not consume a sequence when serialization fails before writing', () => {
   const { dir, ledger } = open(); const circular: Record<string, unknown> = {}; circular.self = circular;

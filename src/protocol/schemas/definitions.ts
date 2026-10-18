@@ -5,6 +5,9 @@
  */
 import { z } from 'zod';
 import { BrowserAction, BrowserLocator } from './browser.ts';
+import { GitSnapshotBinding } from './gitSources.ts';
+import { NativeJobAction } from './nativeJob.ts';
+import { McpToolCall } from './mcp.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
   RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList,
@@ -110,21 +113,27 @@ export const ObserveStep = z.object({
 /** Declared but unimplemented in the HTTP runner; capability checks must block these. */
 export const UnsupportedStep = z.object({
   ...stepCommon,
-  kind: z.enum(['job.submit', 'integration.action', 'mcp.call', 'widget.action', 'native.action', 'computer.action']),
+  kind: z.enum(['integration.action', 'widget.action', 'native.action', 'computer.action']),
   parameters: z.record(z.string().max(LIMITS.id), JsonValue),
 }).strict();
 
 export const BrowserNavigateStep = z.object({ ...stepCommon, kind: z.literal('ui.navigate'), path: HttpTemplatePath }).strict();
 export const BrowserActionStep = z.object({ ...stepCommon, kind: z.literal('ui.action'), command: BrowserAction }).strict();
 export const BrowserObserveStep = z.object({ ...stepCommon, kind: z.literal('ui.observe'), target: BrowserLocator, predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();
-export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, UnsupportedStep]);
+const jobCommon = { ...stepCommon, auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) };
+export const JobSubmitStep = z.object({ ...jobCommon, kind: z.literal('job.submit'), command: NativeJobAction.options[0] }).strict();
+export const JobObserveStep = z.object({ ...jobCommon, kind: z.literal('job.observe'), command: NativeJobAction.options[1], predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();
+export const JobCancelStep = z.object({ ...jobCommon, kind: z.literal('job.cancel'), command: NativeJobAction.options[2] }).strict();
+export const McpCallStep = z.object({ ...stepCommon, kind: z.literal('mcp.call'), command: McpToolCall,
+  auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
+export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, JobSubmitStep, JobObserveStep, JobCancelStep, McpCallStep, UnsupportedStep]);
 export type Step = z.infer<typeof Step>;
 
 export const Assertion = z.object({
   id: IdString,
   required: z.boolean(),
   environmentClasses: z.array(EnvironmentClass).min(1).max(4),
-  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'step.result']), version: z.literal('1') }).strict(),
+  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'job.observation', 'mcp.observation', 'step.result']), version: z.literal('1') }).strict(),
   stepId: IdString,
   predicate: Predicate,
   coverageTags: idList(32),
@@ -139,6 +148,9 @@ export const ActionEnvelope = z.object({
   maxCreates: NonNegInt,
   maxMessages: NonNegInt,
   maxJobs: NonNegInt,
+  allowedJobQueues: idList(32).optional(),
+  allowedMcpTools: z.array(McpToolCall.shape.tool).max(64).optional(),
+  maxMcpCalls: NonNegInt.optional(),
   cleanupRecipeRef: RefSchema.nullable(),
 }).strict();
 
@@ -430,12 +442,14 @@ export const LaunchRecipe = z.object({
   // in args and env values, and waits on the readiness path alone.
   portMode: z.enum(['reported', 'assigned']).optional(),
   runtime: ShortText.optional(), // compiler-observed hint; launch attestation uses a fresh interpreter probe
+  sourceSnapshot: GitSnapshotBinding.optional(),
+  nativeJobs: z.literal('node_ipc/v1').optional(),
 }).strict();
 export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 
 export const RunnerProfile = z.object({
   ...defined('workflow.runner-profile/v1'),
-  adapter: z.enum(['http', 'browser']),
+  adapter: z.enum(['http', 'browser', 'native_job', 'mcp']),
   maxStepsPerCase: PositiveInt,
   cancellation: z.enum(['confirmed', 'best_effort']),
 }).strict();

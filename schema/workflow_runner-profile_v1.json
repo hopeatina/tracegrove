@@ -5,7 +5,9 @@
     "adapter": {
       "enum": [
         "http",
-        "browser"
+        "browser",
+        "native_job",
+        "mcp"
       ],
       "type": "string"
     },

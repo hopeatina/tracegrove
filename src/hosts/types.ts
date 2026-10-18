@@ -26,6 +26,7 @@ export type HostSession = {
   interceptorRefs: import('../protocol/index.ts').Ref[];
   ownedResources: Array<{ entityKey: string; physicalId: string; boundaryId: string }>;
   dataDir: string | null;
+  nativeJobs?: import('../adapters/job/types.ts').NativeJobSession;
   stop(reason: string): Promise<{ confirmed: boolean; detail: string }>;
 };
 

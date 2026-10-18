@@ -12,10 +12,11 @@ import { delegateRun } from '../core/controller.ts';
 import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
+import type { VerificationSourceBinding } from './sourceSelection.ts';
 
 export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
@@ -30,9 +31,15 @@ export type TestRunReport = {
   blockers: Array<{ code: string; detail: string; action: string }>;
   cases: CaseReport[];
   totals: { passed: number; failed: number; other: number };
+  sourceBinding?: VerificationSourceBinding | null;
 };
 
 const OUTCOME_LABEL: Record<string, string> = { passed: 'pass', assertion_failed: 'fail', blocked: 'blocked', infrastructure_failed: 'error', inconclusive: 'inconclusive', cancelled: 'cancelled' };
+
+function sourceLabel(source: TestRunReport['sourceBinding']): string {
+  if (!source) return 'not recorded';
+  return source.kind === 'working_tree' ? 'working tree' : `local snapshot ${source.commit} · ${source.files} files · sha256:${source.ref.digest.hex}`;
+}
 
 function stamp(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-');
@@ -45,6 +52,8 @@ function excerpt(value: unknown, max = 240): string {
 
 function observedLine(output: unknown): string | null {
   if (!output || typeof output !== 'object') return null;
+  const mcp = McpToolObservation.safeParse(output);
+  if (mcp.success) return `MCP ${mcp.data.endpoint} ${mcp.data.tool} -> ${mcp.data.isError ? 'tool error' : 'result'} ${excerpt(mcp.data.structuredContent ?? mcp.data.content)}`;
   const o = output as { method?: string; url?: string; status?: number; body?: unknown; bodyText?: string | null };
   const path = o.url ? o.url.replace(/^https?:\/\/[^/]+/, '') : '';
   return `${o.method ?? ''} ${path} -> ${o.status ?? '?'} ${excerpt(o.body ?? o.bodyText ?? '')}`.trim();
@@ -56,13 +65,17 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     const info = stepInfo.get(s.stepId);
     const output = s.output as { status?: number } | null;
     const browser = BrowserObservation.safeParse(s.output);
-    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
-      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : {}) };
+    const job = NativeJobObservation.safeParse(s.output);
+    const mcp = McpToolObservation.safeParse(s.output);
+    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
+      ...(mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
   const failedAssertion = receipt.assertions.find((a) => a.result !== 'pass');
-  if (failedStep) {
+  if (receipt.outcome === 'blocked' && receipt.steps.every(step => step.result === 'not_run')) {
+    failure = { step: '(before steps)', message: receipt.reasonCodes.join(', ') || 'blocked before steps', observed: null };
+  } else if (failedStep) {
     const name = stepInfo.get(failedStep.stepId)?.name ?? failedStep.stepId;
     const status = failedStep.reasonCode?.match(/^unexpected_status:(\d+)$/);
     const expected = receipt.assertions.find((a) => a.assertionId === `${failedStep.stepId}.expect`);
@@ -103,7 +116,7 @@ export function renderJunit(report: TestRunReport): string {
 }
 
 export function renderText(report: TestRunReport, root: string): string {
-  const lines = [`tracegrove · ${report.project} · app sha ${report.sourceDigest.slice(0, 12)}`, ''];
+  const lines = [`tracegrove · ${report.project} · app sha ${report.sourceDigest.slice(0, 12)}`, `input request: ${sourceLabel(report.sourceBinding)}`, ''];
   for (const b of report.blockers) lines.push(`  BLOCKED  ${b.code}: ${b.detail}`, `           fix: ${b.action}`);
   for (const c of report.cases) {
     const label = (OUTCOME_LABEL[c.outcome] ?? c.outcome).toUpperCase().padEnd(7);
@@ -121,6 +134,7 @@ export function renderText(report: TestRunReport, root: string): string {
 
 export function renderMarkdown(report: TestRunReport): string {
   const lines = [`# tracegrove run: ${report.outcome}`, '', `- Project: \`${report.project}\``, `- Started: ${report.startedAt}`, `- App source digest: \`${report.sourceDigest}\``, `- Execution: \`${report.executionId ?? 'none'}\``, `- Evidence bundle verified: ${report.bundleVerified === null ? 'n/a' : report.bundleVerified ? 'yes' : '**no**'}`, ''];
+  lines.push(`Input request: ${sourceLabel(report.sourceBinding)}`, '');
   if (report.blockers.length) {
     lines.push('## Blocked', '', ...report.blockers.map((b) => `- **${b.code}**: ${b.detail}. Fix: ${b.action}`), '');
   }
@@ -145,7 +159,7 @@ export type TestOptions = CompileOptions & {
 
 export async function runTests(options: TestOptions): Promise<{ report: TestRunReport; compiled: CompileResult }> {
   const startedAt = new Date();
-  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags });
+  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot, sourceRepositoryRole: options.sourceRepositoryRole });
   const project = loadProject(compiled.workflowConfigPath);
   const scope = localScope();
   const bundle: FrozenBundle = plan({ project, profileName: 'real', scope });
@@ -196,6 +210,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     project: compiled.config.project, outcome, exitCode: summary?.exitCode ?? 2,
     startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
     executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, bundleVerified,
+    sourceBinding: compiled.sourceBinding,
     blockers: bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, action: b.action })),
     cases,
     totals: { passed: cases.filter((c) => c.outcome === 'passed').length, failed: cases.filter((c) => c.outcome === 'assertion_failed').length, other: cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length },

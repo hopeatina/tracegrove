@@ -5,16 +5,17 @@
  * The reducer derives every verdict; drivers and hosts only supply observations.
  */
 import { lstatSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
-  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
+  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type Accounting, type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
+  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation,
 } from '../protocol/index.ts';
-import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
+import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
+import { NativeJobError } from '../adapters/job/driver.ts';
 import { BrowserStepError } from '../adapters/browser/driver.ts';
 import { CaseBrowserSession } from '../adapters/browser/session.ts';
 import { LocalProcessHost } from '../hosts/local.ts';
@@ -26,15 +27,17 @@ import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
 import { checkCommittedExecutionBinding } from './executionReadback.ts';
 import { requireRealDirectory, syncDirectory } from './atomicFiles.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
-import { compileCase, type CompiledCase } from './compiler.ts';
+import { applyTemplateDeep } from './compiler.ts';
 import { Deadline } from './deadline.ts';
-import { Blocked, Conflict, InfrastructureFailure } from './errors.ts';
+import { Blocked, Conflict, InfrastructureFailure, isInfrastructureStepFailure } from './errors.ts';
 import { EventLog } from './events.ts';
 import type { LocalLedger } from './ledger.ts';
 import { ExecutionOwnership, assertInterruptedOwnershipResolved } from './executionOwnership.ts';
 import type { FrozenBundle } from './planner.ts';
-import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
+import { checkedFrozenRequest, prepareFrozenCells, type DocStore, type PreparedCell } from './executionPreparation.ts';
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
+import { targetFromComponentAttestations } from './targetObservation.ts';
+import { authorizeQualificationExecution, type QualificationExecutionOwner } from './qualificationExecution.ts';
 
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
 
@@ -52,37 +55,7 @@ export type RunOptions = {
   signal?: AbortSignal;
   onEvent?: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => void;
   hosts?: { local?: ExecutorHost; mock?: ExecutorHost };
-};
-
-class DocStore {
-  private readonly docs = new Map<string, unknown>();
-  constructor(documents: Record<string, unknown>) {
-    for (const [key, doc] of Object.entries(documents)) this.docs.set(key, doc);
-  }
-  get<T>(schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }, ref: Ref, label: string): T {
-    const doc = this.docs.get(refKey(ref));
-    if (!doc) throw new Blocked([{ code: 'unresolved_ref', detail: `${label}: ${refKey(ref)} is not in the frozen bundle`, owner: 'operator', action: 'plan again; the bundle must carry the executable closure' }]);
-    if (!verifySelfDigest(doc as { ref: Ref }) || !sameDigest((doc as { ref: Ref }).ref.digest, ref.digest)) {
-      throw new Blocked([{ code: 'digest_mismatch', detail: `${label}: ${refKey(ref)} bytes do not hash to the referenced digest`, owner: 'operator', action: 'plan again from reviewed definitions' }]);
-    }
-    const result = schema.safeParse(doc);
-    if (!result.success || result.data === undefined) throw new Blocked([{ code: 'schema_violation', detail: `${label}: ${refKey(ref)}` }]);
-    return result.data;
-  }
-  runnerCapabilities(expected: Ref): RunnerCapabilities { return frozenRunnerCapabilities(Object.fromEntries(this.docs), expected); }
-}
-
-type PreparedCell = {
-  cell: SelectionManifest['cells'][number];
-  spec: CaseSpec;
-  compiled: CompiledCase;
-  persona: Persona;
-  authRecipe: AuthRecipe;
-  binding: SurfaceBinding;
-  environmentPlan: EnvironmentPlan;
-  hostPlan: HostPlan;
-  fixture: { plan: CaseFixturePlan; recipe: SeedRecipe; payload: LogicalPayload; registry: ActionRegistry } | null;
-  fidelityCell: FidelityPlan['cells'][number];
+  qualification?: QualificationExecutionOwner;
 };
 
 function ownerFor(scope: Scope): string {
@@ -114,72 +87,37 @@ function hasCommittedManifest(executionDir: string): boolean {
 export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   const { bundle, stateDir, ledger, scope } = options;
   const signal = options.signal ?? new AbortController().signal;
-  if (!bundle.request) throw new Blocked(bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, owner: b.owner, action: b.action })));
-  const request = bundle.request;
-  if (!verifySelfDigest(request)) throw new Blocked([{ code: 'request_digest_mismatch', detail: 'the frozen request was modified after planning', owner: 'operator', action: 'plan again' }]);
-  if (digestOfValue(request.requestedScope).hex !== digestOfValue(scope).hex) {
-    throw new Blocked([{ code: 'scope_mismatch', detail: 'request scope differs from the authenticated controller owner' }]);
+  const request = checkedFrozenRequest(bundle, scope);
+  if ((request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) &&
+      !(request.purpose === 'qualification' && options.qualification)) {
+    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'qualification requires an authenticated runtime owner; source trials and activated regression admission are unavailable' }]);
   }
-  if (request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) {
-    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'reviewed source plans, qualification and activated regression admission require the unimplemented lifecycle authority' }]);
-  }
-  const docs = new DocStore(bundle.documents);
-  const selection = docs.get<SelectionManifest>(SelectionManifest, request.selectionManifestRef, 'selection');
-  if (digestOfValue(selection.scope).hex !== digestOfValue(scope).hex) throw new Blocked([{ code: 'selection_scope_mismatch', detail: 'selection is outside the admitted owner scope' }]);
-  const selectedCases = [...new Set(selection.cells.map((cell) => refKey(cell.caseRef)))].sort();
-  const requestedCases = request.caseRefs.map(refKey).sort();
-  if (digestOfValue(selectedCases).hex !== digestOfValue(requestedCases).hex) throw new Blocked([{ code: 'request_selection_mismatch', detail: 'request cases must exactly match the frozen selection' }]);
-  const fidelityPlan = docs.get<FidelityPlan>(FidelityPlan, request.fidelityPlanRef, 'fidelity plan');
-  if (!sameDigest(fidelityPlan.selectionManifestRef.digest, selection.ref.digest)) throw new Blocked([{ code: 'fidelity_plan_foreign_selection', detail: 'fidelity plan binds a different selection manifest' }]);
-  const campaignFixturePlan = request.fixturePlanRef ? docs.get<CampaignFixturePlan>(CampaignFixturePlan, request.fixturePlanRef, 'fixture plan') : null;
-  if (campaignFixturePlan && !sameDigest(campaignFixturePlan.selectionManifestRef.digest, selection.ref.digest)) throw new Blocked([{ code: 'fixture_plan_foreign_selection', detail: 'fixture plan binds a different selection manifest' }]);
-  const intelligencePolicy = docs.get<IntelligencePolicy>(IntelligencePolicy, request.intelligencePolicyRef, 'intelligence policy');
-  const requiredCells = selection.cells.filter((c) => c.required);
-  if (requiredCells.length === 0) throw new Blocked([{ code: 'empty_required_matrix', detail: 'no required cell selected' }]);
-
-  // Resolve and compile every cell before any effect.
-  const prepared: PreparedCell[] = selection.cells.map((cell) => {
-    const spec = docs.get<CaseSpec>(CaseSpec, cell.caseRef, 'case');
-    const persona = docs.get<Persona>(Persona, cell.personaRef, 'persona');
-    const authRecipe = docs.get<AuthRecipe>(AuthRecipe, persona.authRecipeRef, 'auth recipe');
-    const binding = docs.get<SurfaceBinding>(SurfaceBinding, cell.surfaceBindingRef, 'surface binding');
-    const environmentPlan = docs.get<EnvironmentPlan>(EnvironmentPlan, cell.environmentRef, 'environment plan');
-    const hostPlan = docs.get<HostPlan>(HostPlan, cell.executionHostRef, 'host plan');
-    const capabilities = docs.runnerCapabilities(cell.expectedTarget.runner);
-    const fidelityCell = fidelityPlan.cells.find((f) => f.selectionCellId === cell.selectionCellId);
-    if (!fidelityCell) throw new Blocked([{ code: 'fidelity_cell_missing', detail: cell.selectionCellId }]);
-    for (const required of spec.requiredBoundaries) {
-      const rule = fidelityCell.boundaries.find((b) => b.boundaryId === required.boundaryId);
-      if (!rule || rule.mode !== required.mode) throw new Blocked([{ code: 'fidelity_mode_mismatch', detail: `${spec.ref.id} requires ${required.boundaryId}=${required.mode}`, owner: 'operator', action: 'a live-required case cannot run under a substituted boundary' }]);
-    }
-    let fixture: PreparedCell['fixture'] = null;
-    const fixtureCell = campaignFixturePlan?.cells.find((f) => f.selectionCellId === cell.selectionCellId) ?? null;
-    if (spec.fixturePlanRef) {
-      if (!fixtureCell?.caseFixturePlanRef || !sameDigest(fixtureCell.caseFixturePlanRef.digest, spec.fixturePlanRef.digest)) throw new Blocked([{ code: 'fixture_plan_missing', detail: `${spec.ref.id} requires its fixture plan in the campaign plan`, owner: 'operator', action: 'a null fixture plan cannot skip required starting state' }]);
-      const plan = docs.get<CaseFixturePlan>(CaseFixturePlan, spec.fixturePlanRef, 'case fixture plan');
-      const recipe = docs.get<SeedRecipe>(SeedRecipe, plan.seedRecipeRef, 'seed recipe');
-      const payload = docs.get<LogicalPayload>(LogicalPayload, plan.logicalPayloadRef, 'logical payload');
-      const registry = docs.get<ActionRegistry>(ActionRegistry, recipe.actionRegistryRef, 'action registry');
-      fixture = { plan, recipe, payload, registry };
-    }
-    const compiled = compileCase(spec, capabilities, fixture?.recipe ?? null);
-    return { cell, spec, compiled, persona, authRecipe, binding, environmentPlan, hostPlan, fixture, fidelityCell };
-  });
+  const { docs, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, prepared } = prepareFrozenCells(bundle, scope, request);
 
   // Idempotent admission: the same frozen key reconciles the existing execution.
-  const idemAggregate = `idempotency:${request.idempotencyKey}`;
+  const qualification = options.qualification && request.purpose === 'qualification'
+    ? await authorizeQualificationExecution(options.qualification, request, selection, ledger, null) : null;
+  if (qualification && resolve(join(stateDir, 'ledger')) !== resolve(ledger.dir)) throw new Conflict('qualification state directory must belong to the registration owner ledger');
+  const idemAggregate = qualification ? `qualification-execution:${qualification.admission.ref.digest.hex}` : `idempotency:${request.idempotencyKey}`;
   const existing = ledger.current(idemAggregate);
   let predecessor: Ref | null = null;
   let attemptNumber = 1;
   if (existing) {
-    const executionId = String(existing.data.executionId);
-    const admitted = ledger.history(`execution:${executionId}`).find((entry) => entry.type === 'admitted');
+    const admissionHistory = qualification ? ledger.history(idemAggregate) : ledger.history(`execution:${String(existing.data.executionId)}`);
+    const admitted = admissionHistory.find((entry) => entry.type === 'admitted');
+    const executionId = qualification ? String(admitted?.data.executionId) : String(existing.data.executionId);
     if (admitted?.data.requestDigest !== request.ref.digest.hex) throw new Conflict('idempotency key is already bound to a different frozen request');
-    const state = ledger.current(`execution:${executionId}`);
+    if (qualification && admitted?.data.stateDir !== resolve(stateDir)) throw new Conflict('qualification execution is already bound to another state directory');
+    const state = qualification ? existing : ledger.current(`execution:${executionId}`);
     const binding = { executionId, attemptId: String(admitted?.data.attemptId), generation: Number(admitted?.data.generation),
       campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope };
     const checkedSummary = () => committedRunSummary({ stateDir, ledger, request, selection, scope, executionId,
       attemptId: binding.attemptId, generation: binding.generation, attemptNumber: Number(admitted?.data.attemptNumber) });
+    if (qualification) {
+      // Qualification rounds bind per-cell allocations on the registration owner's ledger; they never replay or self-recover.
+      if (state && state.type === 'finalized') return { ...(state.data.summary as RunSummary), redelivered: true };
+      throw new Conflict('qualification attempt is incomplete; reconcile it instead of replaying allocated effects');
+    }
     if (state && state.type === 'finalized') {
       return checkedSummary();
     }
@@ -199,29 +137,40 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   }
   if (request.limits.costCeilingCents < bundle.estimatedCostCents) throw new Blocked([{ code: 'insufficient_budget_headroom', detail: `estimate ${bundle.estimatedCostCents} > ceiling ${request.limits.costCeilingCents}` }]);
 
-  const executionId = newId('exec');
-  const attemptId = newId('attempt');
+  const executionId = qualification?.admission.attempts[0]!.executionId ?? newId('exec');
+  const attemptId = qualification?.admission.attempts[0]!.attemptId ?? newId('attempt');
+  if (qualification && ledger.current(`execution:${executionId}`)) throw new Conflict('qualification allocation was already claimed; reconcile its execution');
   const generation = 1;
   const executionDir = join(stateDir, 'executions', executionId);
-  mkdirSync(executionDir, { recursive: true });
+  mkdirSync(join(stateDir, 'executions'), { recursive: true });
+  mkdirSync(executionDir, { recursive: !qualification });
+  const executionAggregate = qualification ? idemAggregate : `execution:${executionId}`;
   const reservation = parseAs(BudgetReservation, freeze({
     schemaVersion: 'workflow.budget-reservation/v1' as const, ref: { id: `${executionId}.reservation`, revision: '1' }, scope,
     campaignId: request.campaignId, executionId, attemptId, actionCents: request.limits.costCeilingCents, cleanupCents: 0, uncertainCents: 0, state: 'reserved' as const, reservedAt: nowIso(),
   }), 'budget reservation');
-  ledger.append(`execution:${executionId}`, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, attemptId, generation, attemptNumber, reservation: reservation.ref });
-  ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
+  ledger.append(executionAggregate, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, executionId, attemptId, generation, attemptNumber, reservation: reservation.ref,
+    ...(qualification ? { stateDir: resolve(stateDir), qualificationRoundRef: qualification.admission.ref } : {}) });
+  if (!qualification) ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
   const ownership = new ExecutionOwnership(ledger, { executionId, attemptId, generation, campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope });
   ownership.initialize();
   const artifacts = new LocalArtifactStore(join(stateDir, 'artifacts'));
   const campaignDeadline = Deadline.in(request.limits.deadlineMs);
   const receipts: ExecutionReceipt[] = [];
   const hosts = { local: options.hosts?.local ?? new LocalProcessHost(), mock: options.hosts?.mock ?? new MockLoopbackHost() };
-  let phaseVersion = ledger.version(`execution:${executionId}`);
+  let phaseVersion = ledger.version(executionAggregate);
 
   for (const item of prepared) {
-    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope, executionId, attemptId, generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, ownership, executionDir, hosts, bundle, onEvent: options.onEvent });
+    const allocation = qualification?.admission.attempts.find(a => a.selectionCellId === item.cell.selectionCellId);
+    const beforeEffect = qualification && options.qualification ? async () => {
+      try { await authorizeQualificationExecution(options.qualification!, request, selection, ledger, item.cell.selectionCellId); }
+      catch { throw new HttpStepError('qualification_authority_unavailable', 'Qualification registration, source, state or effect authority is no longer current'); }
+    } : undefined;
+    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope,
+      executionId: allocation?.executionId ?? executionId, attemptId: allocation?.attemptId ?? attemptId,
+      generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, ownership, executionDir, hosts, bundle, onEvent: options.onEvent, beforeEffect });
     receipts.push(receipt);
-    phaseVersion = ledger.append(`execution:${executionId}`, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
+    phaseVersion = ledger.append(executionAggregate, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
   }
   const campaign = reduceCampaign({ scope, campaignId: request.campaignId, requestRef: request.ref, selection, receipts });
   writeExecutionBundle({ dir: executionDir, bundle, request, selection, receipts, campaign });
@@ -229,7 +178,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     executionId, attemptId, generation, campaignId: request.campaignId, outcome: campaign.outcome, exitCode: EXIT_CODES[campaign.outcome],
     reasonCodes: [...new Set(receipts.flatMap((r) => r.reasonCodes))], receipts, campaign, executionDir, redelivered: false,
   };
-  ledger.append(`execution:${executionId}`, phaseVersion, 'finalized', { outcome: campaign.outcome, campaignResultRef: campaign.ref, receiptRef: receipts[0]?.ref ?? null, summary: { ...summary, receipts: [], campaign } });
+  ledger.append(executionAggregate, phaseVersion, 'finalized', { outcome: campaign.outcome, campaignResultRef: campaign.ref, receiptRef: receipts[0]?.ref ?? null, summary: { ...summary, receipts: [], campaign } });
   return summary;
 }
 
@@ -239,6 +188,7 @@ type CellContext = {
   executionId: string; attemptId: string; generation: number; attemptNumber: number; predecessor: Ref | null; reservation: BudgetReservation;
   campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; ownership: ExecutionOwnership; executionDir: string;
   hosts: { local: ExecutorHost; mock: ExecutorHost }; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
+  beforeEffect?: (() => Promise<void>) | undefined;
 };
 
 async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
@@ -269,6 +219,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const host = hostPlan.adapter === 'mock_loopback' ? ctx.hosts.mock : ctx.hosts.local;
   const mockResponses = hostPlan.mockResponsesRef ? ctx.docs.get<MockResponses>(MockResponses, hostPlan.mockResponsesRef, 'mock responses') : null;
   try {
+    if (ctx.beforeEffect) await ctx.beforeEffect();
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
@@ -290,13 +241,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   let observedTarget: TargetTuple | null = null;
   let identityMatched: boolean | null = null;
   if (session) {
-    observedTarget = {
-      ...cell.expectedTarget,
-      components: cell.expectedTarget.components.map((component) => {
-        const attestation = session!.attestations.find((a) => a.componentId === component.componentId);
-        return { componentId: component.componentId, kind: component.kind, identity: attestation ? attestation.identity : null };
-      }),
-    };
+    observedTarget = targetFromComponentAttestations(cell.expectedTarget, session.attestations, hostPlan.launch, scope);
     const comparison = compareTargets(cell.expectedTarget, observedTarget);
     identityMatched = comparison.matched;
     log.emit('identity.compared', null, { matched: comparison.matched, mismatches: comparison.mismatches });
@@ -350,6 +295,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const allocatingEvent = log.emit('fixture.allocating', null, { entityKey, actionId: action.actionId, effectKey: `${attemptId}:${entityKey}` });
       try {
         if (action.effect !== 'create') throw new HttpStepError('fixture_ownership_unavailable', 'only a registered create action can allocate an owned fixture');
+        if (ctx.beforeEffect) await ctx.beforeEffect();
         ctx.ownership.reserve(`fixture:${cell.selectionCellId}:${entityKey}`, 'fixture', cell.selectionCellId, recipe.ref);
         uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
@@ -402,6 +348,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   // ---- running: compiled steps in frozen order; every step gets one terminal observation ----
   const captured: Record<string, Record<string, unknown>> = {};
+  let integrationOperations = 0;
+  let uncertainOperations = 0;
   let halted = blockedReasons.length > 0 || infrastructureFailure || !session || !driver || (fixtureState !== 'verified' && fixtureState !== 'not_required');
   for (const stepId of compiled.orderedStepIds) {
     const step = compiled.stepsById.get(stepId)!;
@@ -433,7 +381,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation | BrowserObservation;
+      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation;
+      if (ctx.beforeEffect) await ctx.beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
@@ -446,6 +395,28 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'observe') {
         observation = await driver!.observe({ origin, method: step.readback.method, path: step.readback.path, auth: step.readback.auth, variables, deadline, signal }, step.predicate, step.pollIntervalMs);
         captured[stepId] = captureValues(observation, step.captures);
+      } else if (step.kind === 'mcp.call') {
+        if (!spec.effects.allowedHosts.includes(`launch://${hostPlan.launch?.componentId}`)) throw new HttpStepError('mcp_origin_not_admitted', 'MCP application origin is outside the frozen effect envelope');
+        const command = McpToolCall.parse({ ...step.command, arguments: applyTemplateDeep(step.command.arguments, variables) });
+        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session?.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session?.credentials ?? []) });
+        let module: typeof import('../adapters/mcp/driver.ts');
+        try { module = await import('../adapters/mcp/driver.ts'); }
+        catch { throw new HttpStepError('mcp_driver_unavailable', 'Install the pinned optional MCP SDK before planning this flow'); }
+        integrationOperations++;
+        uncertainOperations++;
+        observation = await new module.McpDriver(origin).call(command, credential, deadline, signal);
+        if (!observation.isError) {
+          uncertainOperations--;
+          captured[stepId] = captureValues({ body: observation }, step.captures);
+        }
+      } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
+        if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
+        const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));
+        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session.credentials) });
+        observation = step.kind === 'job.observe' && command.action === 'read'
+          ? await session.nativeJobs.observe(command, credential, step.predicate, step.pollIntervalMs, deadline, signal)
+          : await session.nativeJobs.request(command, credential, deadline, signal);
+        captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'ui.navigate' || step.kind === 'ui.action' || step.kind === 'ui.observe') {
         if (authRecipe.credentialName && !session?.credentials.get(authRecipe.credentialName)) throw new HttpStepError('missing_persona_credential', 'browser persona credential was not issued');
         observation = await browser.execute(step, variables, deadline, signal);
@@ -453,14 +424,17 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         throw new HttpStepError('unsupported_operation', `${step.kind} is not implemented by the HTTP runner`);
       }
       const output = 'requestId' in observation ? redactObservation(observation) : observation;
-      const finished = log.emit('step.finished', stepId, { result: 'completed', observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
-      stepObservations.push({ stepId, result: 'completed', reasonCode: null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
+      const toolError = 'kind' in observation && observation.kind === 'mcp_tool' && observation.isError;
+      const result = toolError ? 'failed' as const : 'completed' as const;
+      const finished = log.emit('step.finished', stepId, { result, observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
+      stepObservations.push({ stepId, result, reasonCode: toolError ? 'mcp_tool_error' : null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
+      if (toolError) halted = true;
     } catch (error) {
-      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError ? error.code : 'transport_failure';
+      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError || error instanceof NativeJobError ? error.code : 'transport_failure';
       const code = rawCode === 'browser_cancelled' ? 'cancelled' : rawCode;
       const finished = log.emit('step.finished', stepId, { result: code === 'cancelled' ? 'cancelled' : 'failed', reason: code, message: String((error as Error).message) });
       if (code === 'cancelled' || code === 'browser_cancelled') cancelled = true;
-      else if (code === 'transport_failure' || code === 'deadline_exceeded') infrastructureFailure = true;
+      else if (isInfrastructureStepFailure(code)) infrastructureFailure = true;
       stepObservations.push({ stepId, result: code === 'cancelled' ? 'cancelled' : 'failed', reasonCode: code, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: null, output: null, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: 0 } });
       halted = true;
     }
@@ -510,7 +484,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     for (const entry of allocated) ctx.ownership.cleaning(`fixture:${cell.selectionCellId}:${entry.entityKey}`);
   } catch (error) { ownershipWriteError = error; }
   const { cleanup, criticalCleanupConfirmed, confirmedFixtureKeys, hostCleanupConfirmed } = await collectCleanup({ allocated,
-    uncertainAllocations: uncertainAllocations.size, registry: item.fixture?.registry ?? null,
+    uncertainAllocations: uncertainAllocations.size, uncertainOperations, registry: item.fixture?.registry ?? null,
     driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
   if (!ownershipWriteError) {
     if (session && hostCleanupConfirmed) ctx.ownership.removed(hostOwnershipKey);
@@ -545,7 +519,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     reservations: [{ reservationId: ctx.reservation.ref.id, kind: 'action', cents: ctx.reservation.actionCents }],
     runnerSeconds: Number(hostSeconds.toFixed(3)), browserSeconds: Number(browser.seconds.toFixed(3)), inferenceCalls: 0, inferenceTokens: 0, requestedModel: null, observedModel: null,
     providerRequestIds: stepObservations.flatMap((s) => (s.output && typeof s.output === 'object' && (s.output as { requestId?: string | null }).requestId ? [String((s.output as { requestId?: string | null }).requestId)] : [])),
-    integrationOperations: 0, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
+    integrationOperations, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
     routingDecisionRefs: [routing.ref], costObservationRefs: costs.map((c) => c.ref),
   };
   const receipt = parseAs(ExecutionReceipt, freeze({
@@ -553,7 +527,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     executionId, campaignId: request.campaignId, attemptId, attemptNumber: ctx.attemptNumber, predecessorAttemptRef: ctx.predecessor, retryReason: ctx.predecessor ? 'redelivery after interrupted attempt' : null,
     scope, requesterId: ownerFor(scope), caseRef: spec.ref, personaRef: item.persona.ref, surfaceBindingRef: item.binding.ref, variantRef: null,
     executionHostRef: hostPlan.ref, hostLeaseRef: session?.lease.ref ?? { id: `${executionId}.host-lease.unissued`, revision: '0', digest: digestOfValue('unissued') }, hostObservationRefs: session ? [session.observation.ref] : [],
-    environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: null,
+    environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: request.qualificationRoundRef,
     fixtureManifestRef: fixtureManifest?.ref ?? null, boundaryObservationRefs: boundaryObservations.map((b) => b.ref), proofClaim: spec.proofClaim,
     coverage: reduction.coverage, eventsDigest: eventsArtifact.ref.digest, assertions, steps: stepObservations, artifacts: allArtifacts, accounting,
     performance: stepObservations.filter((s) => s.timing).map((s) => ({ metric: `step.${s.stepId}.duration`, boundary: compiled.stepsById.get(s.stepId)!.kind.startsWith('ui.') ? 'browser' : 'http', clock: 'monotonic' as const, cellId: cell.selectionCellId, valueMs: s.timing!.durationMs, censored: false, warm: false, strata: { host: hostPlan.adapter } })),

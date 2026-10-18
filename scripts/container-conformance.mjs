@@ -3,13 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { ContainerProfile, ContainerCliReport, ContainerQualification, PassedBundle } from '../containers/contracts.mjs';
+import { DockerClient } from '../containers/dockerClient.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const profile = ContainerProfile.parse(process.argv[2] ?? 'native-real');
-if (process.argv.length > 4) throw new Error('Usage: test:container [native-real|offline-contract] [empty-output-directory]');
-const output = process.argv[3] ? resolve(process.argv[3]) : (() => {
+const args = parseArgs({ options: { 'anonymous-public-registry': { type: 'boolean', default: false } }, allowPositionals: true });
+const profile = ContainerProfile.parse(args.positionals[0] ?? 'native-real');
+if (args.positionals.length > 2) throw new Error('Usage: test:container [native-real|offline-contract] [empty-output-directory] [--anonymous-public-registry]');
+const output = args.positionals[1] ? resolve(args.positionals[1]) : (() => {
   const parent = join(root, 'artifacts/qa'); mkdirSync(parent, { recursive: true });
   return mkdtempSync(join(parent, 'container-'));
 })();
@@ -21,13 +24,11 @@ const runId = randomUUID();
 const receipt = { schemaVersion: 'container.qualification/v1', profile, imageId: null, containerId: null,
   runId, containerRemoved: false, runtimeExitCode: null, state: 'blocked', output,
   boundary: 'Verifier and native application inside one Docker container; no Docker-host attestation is claimed.' };
-function docker(args, timeout = 180000) {
-  const result = spawnSync('docker', args, { cwd: root, encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024 });
-  if (result.error || result.status !== 0) throw new Error(`docker ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
-  return result.stdout.trim();
-}
+let client;
+function docker(args, timeout = 180000) { if (!client) throw new Error('Docker client setup did not complete'); return client.run(args, timeout); }
 try {
   if (process.getuid === undefined || process.getgid === undefined) throw new Error('Container qualification requires a POSIX operator host');
+  client = new DockerClient(root, args.values['anonymous-public-registry']);
   docker(['info', '--format', '{{.ServerVersion}}'], 15000);
   docker(['build', '--file', 'containers/Dockerfile', '--iidfile', join(output, 'image-id'), '.'], 300000);
   receipt.imageId = z.string().regex(/^sha256:[a-f0-9]{64}$/).parse(readFileSync(join(output, 'image-id'), 'utf8').trim());
@@ -36,7 +37,7 @@ try {
     '--memory', '512m', '--cpus', '1', '--pids-limit', '128', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m',
     '--label', 'tracegrove.task=container-conformance', '--label', `tracegrove.run=${runId}`,
     '--mount', `type=bind,source=${evidence},target=/evidence`, receipt.imageId, profile],
-  { cwd: root, encoding: 'utf8', timeout: 180000, maxBuffer: 8 * 1024 * 1024 });
+  { cwd: root, env: client.environment, encoding: 'utf8', timeout: 180000, maxBuffer: 8 * 1024 * 1024 });
   receipt.containerId = z.string().regex(/^[a-f0-9]{64}$/).parse(readFileSync(join(output, 'container-id'), 'utf8').trim());
   receipt.runtimeExitCode = result.status;
   writeFileSync(join(output, 'container.stdout.txt'), result.stdout);
@@ -69,6 +70,9 @@ try {
     receipt.state = 'blocked';
     receipt.cleanupError = error instanceof Error ? error.message : 'Container cleanup unconfirmed';
   }
+  try { client?.dispose(); }
+  catch (error) { receipt.state = 'blocked'; receipt.cleanupError = error instanceof Error ? error.message : 'Docker client cleanup unconfirmed'; }
+  if (client) receipt.dockerClient = client.metadata;
   const qualified = ContainerQualification.parse(receipt);
   writeFileSync(join(output, 'qualification.json'), `${JSON.stringify(qualified, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(qualified)}\n`);

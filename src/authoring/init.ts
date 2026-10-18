@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, write
 import { join, relative, sep } from 'node:path';
 import { Blocked } from '../core/errors.ts';
 import { ADAPTERS } from './schema.ts';
-import { CONFIG_FILE, STATE_DIR } from './compile.ts';
+import { CONFIG_FILE, STATE_DIR, configInDirectory } from './compile.ts';
 
 type Adapter = typeof ADAPTERS[number];
 export type Detection = { adapter: Adapter; entry?: string; run?: string; sources: string[]; reason: string };
@@ -95,6 +95,8 @@ a 5xx), leave the flow red and report the bug. Never delete steps or expectation
 
 export function initProject(root: string, options: { force?: boolean } = {}): { files: string[]; detection: Detection; snippet: string } {
   const configPath = join(root, CONFIG_FILE);
+  const existing = configInDirectory(root);
+  if (existing && existing !== configPath) throw new Blocked([{ code: 'config_exists', detail: existing, owner: 'operator', action: 'edit the existing TypeScript config; init does not replace another format' }]);
   if (existsSync(configPath) && !options.force) throw new Blocked([{ code: 'config_exists', detail: configPath, owner: 'operator', action: 'edit it, or rerun with --force to overwrite' }]);
   const d = detect(root);
   const appLines = [`  adapter: ${d.adapter}`];

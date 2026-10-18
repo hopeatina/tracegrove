@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadProject, localScope, ProjectLoader, AUTHORING_SCOPE } from '../src/core/corpus.ts';
 import { materializeLogicalPayload } from '../src/core/generators.ts';
-import { SeedRecipe, parseAs, digestOfBytes } from '../src/protocol/index.ts';
+import { SeedRecipe, HostPlan, parseAs, digestOfBytes } from '../src/protocol/index.ts';
 import { stringify } from 'yaml';
+import { sourceIdentityDigest } from '../src/hosts/local.ts';
 import { plan, type FrozenBundle } from '../src/core/planner.ts';
 import { executeBundle, type RunOptions, type RunSummary } from '../src/core/executor.ts';
 import { LocalLedger } from '../src/core/ledger.ts';
@@ -38,6 +39,14 @@ export function sampleCopy(mutate?: (root: string) => void): { root: string; con
 
 export function editFile(path: string, edit: (text: string) => string): void {
   writeFileSync(path, edit(readFileSync(path, 'utf8')));
+}
+
+/** Hash the source closure declared by the sample's actual launcher. */
+export function sampleIdentityDigest(root: string) {
+  const loader = new ProjectLoader(join(root, 'verification'));
+  const host = parseAs(HostPlan, loader.loadDocument(join(root, 'verification/hosts/local-process.yaml')).value, 'host');
+  if (!host.launch || host.launch.identitySourceFiles.length === 0) throw new Error('Sample launcher must declare identity sources');
+  return sourceIdentityDigest(root, host.launch.identitySourceFiles);
 }
 
 export function planSample(configPath: string, profileName = 'native-real'): FrozenBundle {

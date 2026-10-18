@@ -1,0 +1,31 @@
+title: One queued report produces one persisted output for its owner
+tags: [jobs, smoke]
+effects: { maxJobs: 1 }
+given: { report: success-job }
+steps:
+  - name: redeliver the same request
+    POST: /jobs
+    json: { requestKey: "{report.requestKey}", title: Weekly review, mode: succeed }
+    expect: { status: 200, json: { deduplicated: true } }
+  - name: only one job exists
+    GET: /jobs
+    expect: { status: 200, count: { jobs: 1 } }
+  - name: worker completes the job
+    GET: /jobs/{report.jobId}
+    observe: true
+    expect: { status: 200, json: { job.status: succeeded }, present: [job.workerPid] }
+  - name: read persisted output independently
+    GET: /reports/{report.jobId}
+    expect: { status: 200, json: { report.content: "Report: Weekly review" } }
+  - name: another owner cannot read the job
+    GET: /jobs/{report.jobId}
+    as: intruder
+    expect: 403
+  - name: another owner cannot read the report
+    GET: /reports/{report.jobId}
+    as: intruder
+    expect: 403
+  - name: an anonymous caller is rejected
+    GET: /reports/{report.jobId}
+    as: none
+    expect: 401

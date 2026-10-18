@@ -36,7 +36,7 @@ export class BundleSnapshot {
     const manifest = Manifest.parse(json(manifestBytes, 'manifest.json'));
     let total = 0;
     for (const file of manifest.files) {
-      if (isAbsolute(file.path) || file.path.includes('\\') || /[\x00-\x1f\x7f]/.test(file.path) || file.path.split('/').some(part => !part || part === '.' || part === '..') || this.#files.has(file.path)) {
+      if (file.path === 'manifest.json' || isAbsolute(file.path) || file.path.includes('\\') || /[\x00-\x1f\x7f]/.test(file.path) || file.path.split('/').some(part => !part || part === '.' || part === '..') || this.#files.has(file.path)) {
         throw new Error(`unsafe or duplicate manifest path ${file.path}`);
       }
       total += file.bytes;
@@ -52,8 +52,8 @@ export class BundleSnapshot {
     }
   }
   has(path: string): boolean { return this.#files.has(path); }
-  paths(): string[] { return [...this.#files.keys()]; }
   manifestBytes(): Buffer { return Buffer.from(this.#manifestBytes); }
+  paths(): string[] { return [...this.#files.keys()]; }
   read(path: string): Buffer {
     const bytes = this.#files.get(path);
     if (!bytes) throw new Error(`unsealed required file ${path}`);

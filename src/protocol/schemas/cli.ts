@@ -13,9 +13,11 @@ export const CliErrorCode = z.enum([
 const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512), recovery: z.string().min(1).max(512) }).strict();
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
-  command: z.enum(['help', 'init', 'test', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
+  command: z.enum(['help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
     'settings', 'sample-config', 'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
-    'rerun', 'inspect', 'export', 'verify-bundle', 'verify-cleanup', 'source-resolve', 'recovery-status', 'schema']).nullable(),
+    'rerun', 'inspect', 'export', 'verify-bundle', 'result-ingest', 'results', 'awr-prepare', 'awr-inspect', 'awr-deliver',
+    'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve', 'recovery-status',
+    'source-materialize', 'schema']).nullable(),
   errorClass: z.enum(['blocked', 'conflict', 'invalid_input', 'infrastructure_failure', 'unexpected_failure']),
   exitCode: z.union([z.literal(2), z.literal(3)]),
   reasons: z.array(Reason).min(1).max(32), omittedReasonCount: z.number().int().nonnegative(),

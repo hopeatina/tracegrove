@@ -1,0 +1,12 @@
+create:
+  POST: /jobs
+  json: { requestKey: { uuid: true }, title: Failed report, mode: fail }
+  expect: 202
+save: { jobId: job.id }
+readback:
+  GET: /jobs/{jobId}
+  expect: { status: 200, json: { job.title: Failed report } }
+cleanup:
+  DELETE: /jobs/{jobId}
+  expect: 204
+  gone: { GET: "/jobs/{jobId}", status: 404 }

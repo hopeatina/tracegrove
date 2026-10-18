@@ -4,7 +4,8 @@
  * decides pass/fail. No interceptor exists in this driver; the mock lane is a separate host.
  */
 import { applyTemplate, applyTemplateDeep } from '../../core/compiler.ts';
-import { Deadline, sleep } from '../../core/deadline.ts';
+import { Deadline } from '../../core/deadline.ts';
+import { pollObservation } from '../poll.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { evaluatePredicate } from '../../core/reducer.ts';
 import type { PredicateT } from '../../protocol/index.ts';
@@ -48,7 +49,7 @@ export class HttpStepError extends Error {
   }
 }
 
-function bearerFor(spec: HttpRequestSpec, credentials: HttpCredentials): string | null {
+export function bearerFor(spec: Pick<HttpRequestSpec, 'auth'>, credentials: HttpCredentials): string | null {
   if (spec.auth.kind === 'none') return null;
   if (spec.auth.kind === 'persona') {
     if (!credentials.persona) throw new HttpStepError('missing_persona_credential', 'persona credential was not issued for this attempt');
@@ -101,37 +102,17 @@ export class HttpDriver {
 
   /** Poll an independent readback until the predicate holds or the deadline expires. */
   async observe(spec: HttpRequestSpec, predicate: PredicateT, pollIntervalMs: number): Promise<HttpObservation> {
-    let attempts = 0;
-    let last: HttpObservation | null = null;
-    while (true) {
-      if (spec.signal?.aborted) throw new HttpStepError('cancelled', 'observation cancelled');
-      if (last && spec.deadline.expired()) return last;
-      try {
-        attempts++;
-        last = await this.request(spec);
-        last.attempts = attempts;
-        if (evaluatePredicate(predicate, { status: last.status, body: last.body }).pass) return last;
-        if (spec.deadline.remainingMs() <= pollIntervalMs) return last;
-        await sleep(pollIntervalMs, spec.deadline.signal(spec.signal));
-      } catch (error) {
-        if (spec.signal?.aborted) throw new HttpStepError('cancelled', 'observation cancelled');
-        const timeout = error instanceof HttpStepError ? error.code === 'deadline_exceeded'
-          : error instanceof Error && error.name === 'TimeoutError';
-        // A later timeout cannot erase a completed product observation. Actual
-        // transport errors and cancellation remain failures, not fabricated reads.
-        if (last && timeout && spec.deadline.expired()) { last.attempts = attempts; return last; }
-        throw error;
-      }
-    }
+    return pollObservation({ read: () => this.request(spec), accepts: observation => evaluatePredicate(predicate, { status: observation.status, body: observation.body }).pass,
+      deadline: spec.deadline, pollIntervalMs, signal: spec.signal, cancelled: () => new HttpStepError('cancelled', 'observation cancelled') });
   }
 }
 
-export function captureValues(observation: HttpObservation, captures: Capture[]): Record<string, unknown> {
+export function captureValues(observation: Pick<HttpObservation, 'body'> & Partial<Pick<HttpObservation, 'status' | 'headers'>>, captures: Capture[]): Record<string, unknown> {
   const values: Record<string, unknown> = {};
   for (const capture of captures) {
     switch (capture.from) {
       case 'status': values[capture.name] = observation.status; break;
-      case 'header': values[capture.name] = capture.path ? observation.headers[capture.path.toLowerCase()] ?? null : null; break;
+      case 'header': values[capture.name] = capture.path ? observation.headers?.[capture.path.toLowerCase()] ?? null : null; break;
       case 'json': {
         let current: unknown = observation.body;
         for (const segment of (capture.path ?? '').split('.').filter(Boolean)) {

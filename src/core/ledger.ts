@@ -4,7 +4,7 @@
  * It does not claim distributed fencing. A stale lock (dead pid) may be broken after
  * recording a recovery event; a live lock refuses a second writer with a specific reason.
  */
-import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -12,13 +12,9 @@ import { Conflict } from './errors.ts';
 import { nowIso } from './clock.ts';
 import { JournalRecord, parseJournal, type JournalEntry } from './ledgerRecords.ts';
 export type { JournalEntry } from './ledgerRecords.ts';
+import { syncPath } from './fsDurability.ts';
 
 export type LockFile = { writerId: string; pid: number; startedAt: string; host: string; endpoint: string | null; tokenDigest: string | null };
-
-function syncPath(path: string): void {
-  const fd = openSync(path, 'r');
-  try { fsyncSync(fd); } finally { closeSync(fd); }
-}
 
 function pidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }

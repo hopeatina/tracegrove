@@ -5,6 +5,7 @@
  * navigation.
  * No build step and no framework; every string reaches the DOM through textContent.
  */
+import { SOURCE_CONTROLS_JS } from './uiSourceControls.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>tracegrove</title>
@@ -63,7 +64,8 @@ textarea{padding:12px;resize:vertical;min-height:88px;width:100%}
 .ms,.res{font:12px/16px var(--mono);text-align:right}
 .fix{display:flex;flex-direction:column;gap:4px;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--paper)}
 .fix:hover,.fix[aria-pressed=true]{border-color:var(--twig)}
-.obs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.obs>div{padding:10px 12px;border-radius:8px;background:var(--stone)}.obs .bad{background:var(--verm-bg)}.obs .good{background:var(--moss-bg)}
+.obs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:12px 0}.obs>div{min-width:0;overflow-wrap:anywhere;padding:10px 12px;border-radius:8px;background:var(--stone)}.obs .bad{background:var(--verm-bg)}.obs .good{background:var(--moss-bg)}
+.obs-long{grid-template-columns:minmax(0,1fr)}.obs .mono{white-space:pre-wrap}
 pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .think{display:inline-flex;gap:5px;align-items:center}.think i{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:pulse 1.2s ease-in-out infinite}
 .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
@@ -96,7 +98,7 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 .step.live,.node.live{box-shadow:inset 3px 0 0 var(--moss);background:var(--paper)}.live .dot{animation:breathe 1.1s ease-in-out infinite}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;margin-top:12px}
 @media (max-width:720px){header{padding:12px 16px}.page{padding:20px 16px 40px}.ctx{margin-left:0;width:100%}h1{font-size:23px;line-height:30px}
- .step{grid-template-columns:8px 1fr 48px;}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:1fr}}
+ .step{grid-template-columns:8px 1fr 48px;}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:minmax(0,1fr)}}
 </style></head><body>
 <header><span class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="color:var(--moss)"><path d="M12 21V11"/><path d="M12 14c-3 0-5-2-6-4"/><path d="M12 11c2.5 0 4.5-1.5 5.5-3.5"/><circle cx="6" cy="9" r="2.2"/><circle cx="17.8" cy="7.2" r="2.2"/><circle cx="12" cy="6" r="2.6"/><path d="M8 21h8"/></svg>tracegrove</span>
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
@@ -123,16 +125,18 @@ function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=
 async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
 function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
 
+${SOURCE_CONTROLS_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
- const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
+ const flows=state.flows.length?state.flows:(run?run.cases.map(c=>({...c,fixtures:[],steps:c.steps})):[]);
+ const live=flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
   return{id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,steps}});
- const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.ya?ml\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
+ const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
 function runTab(){
  if(!state.hasConfig)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'No tracegrove.config.yaml in this folder yet.'),
   h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
- if(state.compileError&&!state.flows.length)return[blocked(state.compileError)];
+ if(state.compileError&&!state.flows.length&&!ui.run)return[sourceBanner(),blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
  const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass').length;
  if(ui.sel===null){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
@@ -141,7 +145,7 @@ function runTab(){
  const hero=h('section',{style:'margin-bottom:28px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
    h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),h('h1',{style:'margin-top:6px'},headline)),
    h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)):
-    [ui.sel&&sc.length>1?h('button',{class:'btn ghost',on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',on:{click:()=>runNow('')}},'Run all')])),
+    [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError,on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
   run?h('div',{class:'stats'},h('div',{},h('b',{},held+' / '+ran.length),h('span',{class:'muted'},'scenarios held')),h('div',{},h('b',{},stepsHeld+' / '+allSteps.length),h('span',{class:'muted'},'steps held')),
    h('div',{},h('b',{},secs(new Date(run.finishedAt)-new Date(run.startedAt))),h('span',{class:'muted'},'wall time')),
    h('div',{},h('b',{class:run.bundleVerified?'c-pass':'c-warn'},run.bundleVerified?'✓':'–'),h('span',{class:'muted'},run.bundleVerified?'evidence bundle re-verified':'bundle not verified'))):null,
@@ -149,7 +153,7 @@ function runTab(){
  const tree=h('section',{class:'grow','aria-label':'Scenario tree'},h('div',{class:'rulehead'},h('span',{class:'label'},'Scenarios'),h('span',{class:'rule'}),h('span',{class:'small muted'},'step · interaction · time on the run clock · status')),
   h('div',{class:'tree'+(ui.running?' growing':'')},sc.map(s=>branch(s))));
  const side=h('div',{class:'side'},fixes(sc,run),detail(sc));
- return[hero,h('div',{class:'cols'},tree,side)]}
+ return[sourceBanner(),hero,h('div',{class:'cols'},tree,side)]}
 function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state==='pruned';const total=s.steps.reduce((a,x)=>a+(x.ms||0),0)||1;let at=0;
  return h('div',{class:'fade'},h('div',{class:'br'},h('span',{class:'twig'+(cut?' cut':'')},h('i')),
   h('button',{class:'node','data-case':s.id,'data-steps':s.steps.map(x=>x.id).join(' '),'aria-expanded':open?'true':'false',on:{click:()=>{ui.sel=s.id;ui.step=Math.max(0,s.steps.findIndex(x=>x.result==='fail'));render()}}},
@@ -182,12 +186,12 @@ function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
  return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},x.name),
-  h('p',{class:'mono small muted',style:'margin:0'},x.method+' '+x.path+' · as '+x.as+(x.ms!=null?' · '+x.ms+' ms':'')),
-  h('div',{class:'obs'},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
+  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:state.compileError?'Expectation not recorded in summary':'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
   bad&&s.failure?h('pre',{},s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed; its configured checks held.':'Run the scenario to observe this step.'),
   recording(s),
   h('div',{class:'row',style:'margin-top:16px'},h('span',{class:'mono small muted',style:'flex:1;overflow-wrap:anywhere'},s.file),
-   h('button',{class:'btn ghost sm',on:{click:()=>prune(s.file,false)}},'Prune'),h('button',{class:'btn sm',on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
+   h('button',{class:'btn ghost sm',on:{click:()=>prune(s.file,false)}},'Prune'),h('button',{class:'btn sm',disabled:!!state.compileError,on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
 let runWatch=null;
 function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
 /* Live progress comes from real run and agent events (/api/live), never from timers. */
@@ -199,8 +203,8 @@ function paintLive(){const l=ui.live;if(!l)return;const a=l.run;
  const hp=document.getElementById('heal-phase');if(hp&&l.heal.status==='running')hp.textContent=l.heal.phase+(l.heal.detail?' · '+l.heal.detail:'')}
 function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const l=await api('/api/live');ui.live=l;const a=l.run;if(ui.running&&a.status==='running')ui.running=a.label;paintLive();
   if(ui.running&&!ui.healing&&ui.agentPhase<0&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},400)}
-async function runNow(grep){ui.running='Compiling flows and starting the app';render();watchRun();
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
+async function runNow(grep){if(state.compileError){ui.error=state.compileError;render();return}ui.running='Compiling flows and starting the app';render();watchRun();
+ ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=r.cases.some(c=>c.caseId===ui.sel)?ui.sel:(r.cases[0]?.caseId||null);toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned '+file.split('/').pop(),{label:'Undo',run:()=>prune(file,!graft)});ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
@@ -251,7 +255,7 @@ function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detect
  const model=h('input',{id:'model','aria-label':'Model',value:s.source.model==='default'?'':(s.model||''),placeholder:DEFAULT_MODELS[s.provider]||'No agent selected',style:'flex:1;min-width:200px'});
  const opt=(v,title,note,ok)=>h('button',{'aria-pressed':provider===v?'true':'false',on:{click:e=>{provider=v;model.value='';model.placeholder=DEFAULT_MODELS[v]||'No agent selected';for(const b of e.currentTarget.parentNode.children)b.setAttribute('aria-pressed',b===e.currentTarget?'true':'false')}}},h('b',{style:'font-weight:500'},title),h('span',{class:'small '+(ok?'c-pass':'muted')},note));
  const cfg=state.config;
- return[h('div',{class:'cols'},h('section',{class:'grow card'},h('span',{class:'label'},'Agent under the hood'),h('h2',{style:'margin:6px 0 4px'},'Who drafts and repairs your flows'),
+ return[sourceSettings(),h('div',{class:'cols'},h('section',{class:'grow card'},h('span',{class:'label'},'Agent under the hood'),h('h2',{style:'margin:6px 0 4px'},'Who drafts and repairs your flows'),
    h('p',{class:'small muted',style:'margin:0 0 16px'},'Saved to .tracegrove/settings.json for you alone. agent: in tracegrove.config.yaml sets the team default; --agent and --model on the CLI override both.'),
    h('div',{class:'seg'},opt('claude','Claude Code',det.claude?'installed · '+DEFAULT_MODELS.claude:'not installed',!!det.claude),opt('codex','Codex',det.codex?'installed · '+DEFAULT_MODELS.codex:'not installed',!!det.codex),opt('none','None','discovery and templates only',false)),
    h('div',{class:'row',style:'margin-top:16px'},model,h('button',{class:'btn',on:{click:async()=>{try{state.agent=await api('/api/settings',{agent:{provider,model:model.value}});toast('Saved');render()}catch(e){toast(e.reasons?e.reasons[0].detail:e.error)}}}},'Save')),

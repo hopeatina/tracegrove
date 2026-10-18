@@ -9,6 +9,10 @@ import { compareTargets, evaluateAssertions, REDUCER_REF, reduceCell } from './r
 import { compileCase } from './compiler.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { videoBundlePath } from './bundlePaths.ts';
+import { targetFromComponentAttestations } from './targetObservation.ts';
+import { snapshotAttestationProblems } from './snapshotEvidence.ts';
+import { isInfrastructureStepFailure } from './errors.ts';
+import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -38,6 +42,7 @@ export function checkCellEvidence(input: {
   if (!fidelityCell) { problem('missing fidelity cell'); return; }
   const plan = parseAs(HostPlan, documents[refKey(cell.executionHostRef)], 'host plan');
   record(plan, cell.executionHostRef, 'host plan');
+  for (const message of repositorySelectionProblems(request, cell, plan, documents)) problem(message);
   record(r.environment, r.environment.ref, 'environment');
   if (digestOfValue(read('environment.json')).hex !== digestOfValue(r.environment).hex) problem('environment records disagree');
   if (digestOfValue(r.environment.expected).hex !== digestOfValue(cell.expectedTarget).hex) problem('expected identity differs from selection');
@@ -62,12 +67,17 @@ export function checkCellEvidence(input: {
   const attestations = host.attestations.map((a) => parseAs(IdentityAttestation, a, 'attestation'));
   for (const a of attestations) record(a, a.ref, 'attestation');
   const observed = r.environment.observed;
+  if (observed && digestOfValue(observed).hex !== digestOfValue(targetFromComponentAttestations(cell.expectedTarget, attestations, plan.launch, r.scope)).hex) {
+    problem('target differs from host observations');
+  }
   if (observed && r.environment.provenance.runtime === 'live') {
     for (const id of cell.expectedTarget.requiredComponents) {
       const attestation = attestations.find((a) => a.componentId === id);
       if (!attestation || attestation.issuer !== 'local_launcher' || attestation.trustPolicy !== 'launcher_computed_source_digest') { problem(`required identity ${id} lacks trusted attestation`); continue; }
       const identity = observed.components.find((c) => c.componentId === id)?.identity;
-      if (digestOfValue(identity ?? null).hex !== digestOfValue(attestation.identity).hex) problem(`identity ${id} differs from attestation`);
+      const sourceProblems = plan.launch?.componentId === id ? snapshotAttestationProblems(plan.launch, attestation, r.scope) : [];
+      if (identity !== null && identity !== undefined) for (const message of sourceProblems) problem(message);
+      if (!sourceProblems.length && digestOfValue(identity ?? null).hex !== digestOfValue(attestation.identity).hex) problem(`identity ${id} differs from attestation`);
     }
   }
   const boundaries = (read('boundaries.json') as unknown[]).map((b) => parseAs(BoundaryObservation, b, 'boundary'));
@@ -123,7 +133,7 @@ export function checkCellEvidence(input: {
     criticalCleanupConfirmed: r.cleanup.critical.every((k) => r.cleanup.confirmed.includes(k)),
     // A host that never started leaves every step not_run; its sealed host.failed event is the
     // evidence. It can only move a cell away from passed, never towards it.
-    infrastructureFailure: r.steps.some((s) => ['transport_failure', 'deadline_exceeded'].includes(s.reasonCode ?? ''))
+    infrastructureFailure: r.steps.some((s) => isInfrastructureStepFailure(s.reasonCode))
       || events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"') || line.includes('"kind":"browser.failed"')),
     blockedReasons: r.outcome === 'blocked' ? r.reasonCodes : [],
   });

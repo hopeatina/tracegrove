@@ -29,3 +29,105 @@ No fetch, checkout, model call or review approval occurs. Missing or multiple me
 Bounds: 32 repositories, 500 changed paths, 1 MiB per captured/cited blob, 4 MiB per full diff/tree listing/tree object, 8,192 trees per selected commit, 32 MiB of captured payload bytes and ten seconds per Git command. CLI input is at most 256 KiB. The artifact includes changed blobs and full diffs, not every source object: later citation reads require the selected objects in an authorized Git store. Full source-object transport remains separate work.
 
 The output is a `RevisionMatrix`, not a complete runtime `SourceSelection` or qualified source-to-target proof. Independent element/coverage checking, reviewed source admission, hosted lifecycle storage and execution wiring remain separate gates. Tests use real temporary repositories, including dirty/moved checkouts, bare and SHA-256 repositories, corrupt objects, denied/revoked scope, missing objects, oversized blobs, configured helpers and the actual source/built CLI.
+
+## Run selected revisions independently
+
+Materialize complete regular-file trees from the frozen resolution using an explicit
+authorized local repository mapping. Relative `--root` paths resolve beside the
+input JSON. Output directories must not exist, and their parent must already exist.
+
+```sh
+tracegrove source-materialize --input source.json --repository application --root . --side base --output ./base-snapshot
+tracegrove source-materialize --input source.json --repository application --root . --side head --output ./head-snapshot
+tracegrove test --config ./base-snapshot/source/tracegrove.config.yaml --source-snapshot ./base-snapshot/snapshot.json
+tracegrove test --config ./head-snapshot/source/tracegrove.config.yaml --source-snapshot ./head-snapshot/snapshot.json
+```
+
+Each output contains `source/` and a sealed `snapshot.json` with the resolution and
+repository references, exact commit, side, and every file's original Git mode,
+byte count and SHA-256 digest. `materializeGitSnapshot(input, authorize)` exposes
+the same operation through the SDK. Authorization runs before object reads and
+again before output allocation. No fetch, checkout, dependency installation, app
+execution, Git filters or hooks occur during materialization. Later `test` runs
+execute trusted project code and use the ordinary compiler and app identity checks.
+
+The reader validates the commit/tree closure and independently rehashes every blob,
+including unchanged files. It refuses an empty tree, symlinks, submodules, unsupported
+modes, nonportable names, case/Unicode aliases, more than 10,000 files, blobs over
+1 MiB, or more than 32 MiB of file bytes. These are complete-coverage limits: it
+never silently excludes a file to make a snapshot pass. A private output is created
+only after all object reads succeed; the manifest is written last, and write failure
+removes only the directory this operation exclusively created. Existing output is
+preserved. The host filesystem and Git executable remain trusted.
+
+The CLI regression test creates a real authorization bug and its fix in separate
+commits, freezes them, dirties the checkout and moves its branch. Separate CLI
+processes run the identical saved flow against both materialized revisions: the
+base fails the ownership assertion and the head passes. Both bundles are re-read
+and re-reduced, app digests match the snapshot's source bytes, and cleanup is
+confirmed. CI repeats this through the built distribution and retains both sealed
+bundles, source trees, snapshot manifests and resolution in `source-regression-proof`.
+Another process can verify those bundles or rerun either snapshot without discovery;
+the artifact README gives the exact commands. Locally, set
+`TRACEGROVE_SOURCE_PROOF_DIR` to a new directory when running
+`tests/cliGitSnapshot.test.ts` to retain the same proof.
+
+A snapshot is mutable after publication; its manifest describes the captured
+bytes. `test` and `compile` accept `--source-snapshot` for an explicit per-command
+binding. Compilation checks the manifest, local owner scope and every pinned file.
+The frozen launch plan includes that binding; the trusted supervisor checks the
+files again, copies only pinned inputs into its private owned workspace, and
+starts the app there. Untracked files cannot enter the launch copy. Post-plan drift
+in any pinned file, including files outside the entrypoint's source glob, blocks
+startup. The supervisor owns and removes the private copy after stop, startup
+failure or controlling-client disconnect.
+
+Pinned launches support the Node file, FastAPI module and canonical Django launch
+templates. Opaque eval/shell wrappers and entrypoints outside the snapshot are
+refused. The attestation binds the supervisor-computed source digest and snapshot
+reference; saved-bundle verification rechecks the exact file closure and manifest
+digests. Dependency installations, interpreter binaries and application environment
+remain separately supplied inputs; this is not a process sandbox or a complete
+dependency attestation. The CLI refuses snapshots from another local scope.
+
+New snapshots carry [Git object proofs](git-object-proof.md). The supervisor checks the
+actual private tree against blob/tree/commit object identities and records that fact.
+Metadata-only checks remain distinct from actual-file verification. A self-sealed
+manifest does not prove who resolved its commit, remote repository ownership or deployed
+identity. This is not a runtime `SourceSelection`. The host does not yet populate repository observations
+or promote qualification from this manifest. Authenticated resolver/admission
+policy, reviewed lifecycle execution and hosted activation remain separate work.
+
+## Keep scenarios in one workbench
+
+Application input can be selected independently of the config and saved flows.
+`app.root` is resolved inside the selected snapshot; flows, personas and config
+continue to come from the workbench. No team config rewrite is needed.
+
+```sh
+tracegrove settings --dir ./workbench --source-snapshot ./snapshots/head/snapshot.json
+tracegrove test --config ./workbench/tracegrove.config.yaml
+tracegrove settings --dir ./workbench --working-tree
+```
+
+The CLI snapshot path is relative to the calling directory, as with the existing
+one-run `test --source-snapshot` override. The saved path is relative to the
+workbench. An explicit one-run override takes precedence over the saved choice.
+Settings preserves the agent/model/budget preferences and rejects conflicting
+input switches before writing any preference.
+
+Grove's **Settings → Verification input** offers **Check snapshot** before
+**Use this snapshot**. Checking reads and validates bytes and the launch template;
+it launches no application and writes no compile output. Saving records the
+manifest's exact reference. Replacing the manifest or changing a pinned file
+blocks runs until reviewed again; there is no automatic fallback to working tree.
+**Use working tree** clears the local selection without deleting a snapshot.
+
+The Run page separates **Next run input** from **Recorded run request**. The latter
+is reconstructed from the frozen host plans in re-verified saved evidence, even
+after a preference change. Unreadable or inconsistent evidence shows unavailable,
+never the current default. A recorded request describes local inputs; it does
+not establish that an application successfully launched or grant hosted qualification.
+Discovery's branch selector only scans routes and does not change run input.
+Python dependencies may be supplied by the workbench's `.venv` or explicit
+`app.python`; neither dependencies nor environment are sealed by the source pin.

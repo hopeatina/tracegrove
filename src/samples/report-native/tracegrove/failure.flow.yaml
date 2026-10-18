@@ -1,0 +1,7 @@
+title: A native provider failure remains a failed job with no persisted report
+effects: { maxJobs: 1 }
+steps:
+  - job: { action: submit, queue: reports, requestKey: failure, payload: { title: Failed report, mode: fail } }
+    save: { jobId: jobId }
+  - job: { action: read, queue: reports, jobId: '{jobId}' }
+    expect: { json: { status: failed, output.report: null }, present: [workerId] }

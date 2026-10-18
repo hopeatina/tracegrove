@@ -12,4 +12,47 @@ Registration increments aggregate version and latest-round sequence without acti
 
 `invalidateScenario` requires a new immutable definition revision of the same scenario, advances the invalidation epoch, clears activation authority and moves coverage to `degraded`. It retains historical round records. Retired coverage cannot be resurrected through this operation. An observed product regression does not itself call semantic invalidation or remove its detecting case.
 
-Terminal campaign binding is available through [qualification result reduction](qualification-results.md), followed by [read-only replay assessment](replay-assessment.md) and [explicit activation](scenario-activation.md). Promotion, structural-validation transitions, hosted persistence and execution wiring remain open. Qualification/regression requests, including a trial carrying a qualification admission ref, remain blocked by the executor until the full lifecycle authority exists. A registration record is neither a passing round nor release coverage.
+Terminal campaign binding is available through [qualification result reduction](qualification-results.md), followed by [read-only replay assessment](replay-assessment.md) and [explicit activation](scenario-activation.md). [LocalScenarioStore](local-scenario-store.md) supplies durable local registration/invalidation and scoped lease-identity claims on the existing ledger, with required host authority callbacks. Promotion, structural-validation transitions and hosted persistence remain open. A registration record is neither a passing round nor release coverage.
+
+## Executing a registered round
+
+The SDK can prepare a new qualification request from an unchanged frozen trial or
+work-proof plan. This creates new sealed request, fidelity and fixture documents;
+it does not read, rewrite or promote trial receipts.
+
+```ts
+const owner = localQualificationExecutionOwner(store, authorizeEffects);
+const qualified = await prepareQualificationExecution(
+  frozenPlan, admission.ref, scope, ledger, owner,
+);
+const run = await executeBundle({
+  bundle: qualified, scope, ledger, stateDir, qualification: owner,
+});
+```
+
+The store must use this exact ledger and state directory. `authorizeEffects` is a
+trusted host capability checked before host start, fixture creation and each
+forward step. It must establish actual permission to affect the selected target;
+read and registration permission alone do not suffice. The store rechecks current
+definition, invalidation epoch, reviewed closure and physical leases around each
+authorization await. Cleanup remains available after forward permission is revoked.
+External authority synchronization and provider fencing remain host responsibilities.
+
+Every cell uses its registered execution and attempt IDs. A single durable claim
+binds the admission to the complete frozen request, independently of caller retry
+keys. Terminal redelivery returns the recorded summary without repeating effects.
+An incomplete claim, including a lost publication acknowledgement, requires
+reconciliation; it never automatically replays preallocated effects. Execution
+directories cannot overwrite existing evidence. The trusted controller must keep
+its ledger and evidence directory inaccessible to candidate processes.
+
+Pass resulting bundles to `reduceQualificationRound` with the persisted admission
+resolver and independent issuer authentication. Structural bundle verification
+alone does not establish an authentic qualification result. Local tests use real
+native HTTP effects and durable registration, with explicitly simulated host
+authorization, reviewed-source and physical-lease callbacks.
+
+There is no automatic CLI qualification owner. Qualification without an explicit
+runtime owner, a trial disguised with lifecycle refs, and activated regression
+requests remain refused. This SDK path does not activate coverage or prove hosted
+source, issuer, lease provisioning or release authority.

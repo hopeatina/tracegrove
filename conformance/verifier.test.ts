@@ -4,8 +4,9 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy } from './helpers.ts';
+import { dirname, join, resolve } from 'node:path';
+import ts from 'typescript';
+import { cleanupTemps, editFile, planSample, rematerializePayload, runSample, sampleCopy, sampleIdentityDigest } from './helpers.ts';
 import { Blocked, Conflict } from '../src/core/errors.ts';
 import { HostFrame, PluginFrame, FRAME_MAX_BYTES, refKey } from '../src/protocol/index.ts';
 import type { ExecutorHost, HostSession } from '../src/hosts/types.ts';
@@ -16,11 +17,24 @@ afterEach(cleanupTemps);
 
 describe('verifier.zero_orgx', () => {
   it('no core, protocol, adapter or host module imports OrgX, Supabase, Clerk or a provider SDK', () => {
-    const forbidden = /from ['"](@\/lib|@orgx|@useorgx|@supabase|@clerk|openai|@anthropic-ai|@trigger|inngest)/;
+    const forbidden = /^(@\/lib|@orgx|@useorgx|@supabase|@clerk|openai|@anthropic-ai|@trigger|inngest)/;
     const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []));
-    const files = walk(join(import.meta.dirname, '..', 'src'));
+    const root = join(import.meta.dirname, '..', 'src'); const optional = join(root, 'integrations', 'awr');
+    expect(walk(optional).length).toBeGreaterThan(0);
+    const files = walk(root).filter(file => !file.startsWith(`${optional}/`));
     expect(files.length).toBeGreaterThan(10);
-    for (const file of files) expect(readFileSync(file, 'utf8'), file).not.toMatch(forbidden);
+    for (const file of files) {
+      const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+      for (const statement of source.statements) {
+        if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+        const specifier = statement.moduleSpecifier.text;
+        expect(specifier, file).not.toMatch(forbidden);
+        expect(resolve(dirname(file), specifier), `${file}: optional AWR code must be dynamically loaded only on explicit use`).not.toContain(optional);
+      }
+    }
+    const pkg = JSON.parse(readFileSync(join(root, '..', 'package.json'), 'utf8'));
+    expect(pkg.dependencies['@useorgx/agent-work-receipt']).toBeUndefined();
+    expect(pkg.peerDependenciesMeta['@useorgx/agent-work-receipt'].optional).toBe(true);
   });
   it('the real sample runs and reruns from saved definitions with no inference and a complete local proof', async () => {
     const copy = sampleCopy();
@@ -115,8 +129,7 @@ describe('controlled product defect', () => {
       editFile(join(root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t); // identity pin now stale on purpose below
     });
     // Re-pin identity so the only difference is the behavior, not the digest.
-    const { sourceIdentityDigest } = await import('../src/hosts/local.ts');
-    const digest = sourceIdentityDigest(copy.root, ['app/app.mjs']).hex;
+    const digest = sampleIdentityDigest(copy.root).hex;
     editFile(join(copy.root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t.replace(/hex: "?[0-9a-f]{64}"?/, `hex: "${digest}"`));
     const bundle = planSample(copy.configPath);
     const summary = await runSample(bundle, copy.stateDir);
@@ -157,8 +170,7 @@ describe('verifier.operation_deadline', () => {
       editFile(join(root, 'verification', 'cases', 'notes.create.yaml'), (t) => t.replace(/timeoutMs: 5000/g, 'timeoutMs: 800'));
       editFile(join(root, 'verification', 'fixtures', 'existing-note.recipe.yaml'), (t) => t.replace(/    readback:\n      actionId: notes.read\/v1\n      predicate:\n        kind: all\n        predicates:\n          - \{ kind: status_equals, value: 200 \}\n          - \{ kind: json_path_equals, path: body.note.title, value: Existing note \}\n/, '    readback: null\n'));
     });
-    const { sourceIdentityDigest } = await import('../src/hosts/local.ts');
-    const digest = sourceIdentityDigest(copy.root, ['app/app.mjs']).hex;
+    const digest = sampleIdentityDigest(copy.root).hex;
     editFile(join(copy.root, 'verification', 'components', 'notes-api.profile.yaml'), (t) => t.replace(/hex: "?[0-9a-f]{64}"?/, `hex: "${digest}"`));
     rematerializePayload(copy.root);
     const bundle = planSample(copy.configPath);

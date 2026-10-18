@@ -139,6 +139,12 @@
       "const": "workflow.config/v1",
       "type": "string"
     },
+    "sourceSelectionRef": {
+      "maxLength": 400,
+      "minLength": 1,
+      "pattern": "^\\.\\/",
+      "type": "string"
+    },
     "sourceSetRef": {
       "anyOf": [
         {
