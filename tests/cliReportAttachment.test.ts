@@ -34,15 +34,17 @@ it('freezes work before execution, then independently prepares and inspects atta
     await awr.deliver(id, { import: async delivery => ({ ok: true, receipt_id: '00000000-0000-4000-8000-000000000002', external_receipt_id: delivery.receipt.receipt_id,
       schema_version: 'agent-work-receipt/v0.2', idempotent: false }) }); // Import admission is simulated, not live.
   } finally { ledger.close(); }
-  const targetFile = join(dir, 'target.json'); writeFileSync(targetFile, JSON.stringify({ entityType: 'task', entityId: work.workId }));
+  const target = { entityType: 'task', entityId: work.workId, workspaceId: '00000000-0000-4000-8000-000000000001', expectedUpdatedAt: '2026-10-18T01:00:00.123456Z' };
+  const targetFile = join(dir, 'target.json'); writeFileSync(targetFile, JSON.stringify(target));
   const prepared = cli(['report-prepare', '--sink', sinkDir, '--id', id, '--target', targetFile]); expect(prepared.status, prepared.stderr).toBe(0);
   const state = JSON.parse(prepared.stdout); expect(state.status).toBe('prepared'); expect(state.nativeAcceptance).toBe('not_requested');
-  expect(state.prepared.payload).toMatchObject({ entity_id: work.workId, entity_type: 'task', status: 'in_review' });
+  expect(state.prepared.payload).toMatchObject({ entity_id: work.workId, entity_type: 'task', status: 'in_review',
+    expected_scope: { workspace_id: target.workspaceId, expected_updated_at: target.expectedUpdatedAt } });
   expect(JSON.parse(cli(['report-inspect', '--sink', sinkDir, '--id', id]).stdout)).toEqual(state);
   const journal = readFileSync(join(sinkDir, 'ledger/journal.jsonl'), 'utf8');
   const missing = cli(['report-attach', '--sink', sinkDir, '--id', id]); expect(missing.status).toBe(3); expect(missing.stderr).toContain('protected environment');
   expect(readFileSync(join(sinkDir, 'ledger/journal.jsonl'), 'utf8')).toBe(journal);
-  writeFileSync(targetFile, JSON.stringify({ entityType: 'task', entityId: '00000000-0000-4000-8000-000000000004' }));
+  writeFileSync(targetFile, JSON.stringify({ ...target, entityId: '00000000-0000-4000-8000-000000000004' }));
   expect(cli(['report-prepare', '--sink', sinkDir, '--id', id, '--target', targetFile]).status).toBe(2);
   expect(readFileSync(join(sinkDir, 'ledger/journal.jsonl'), 'utf8')).toBe(journal);
 }, 60000);

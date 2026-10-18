@@ -33,7 +33,12 @@ export class LocalReportAttachmentOutbox {
   constructor(ledger: LocalLedger, private readonly sink: LocalResultSink, private readonly awr: LocalAwrOutbox, scope: Scope, private readonly authority: ReportAttachmentAuthority) {
     this.scope = ScopeSchema.parse(scope);
     this.journal = new LocalDeliveryJournal(ledger, this.scope, { prepared: 'workflow.report.prepared', attempted: 'workflow.report.attempted', acknowledged: 'workflow.report.attached' }, {
-      prepared: raw => PreparedReportAttachment.parse(raw), acknowledgement: raw => ReportAttachmentAcknowledgement.parse(raw), checkAcknowledgement: checkAck,
+      prepared: raw => {
+        if (raw && typeof raw === 'object' && 'schemaVersion' in raw && raw.schemaVersion === 'workflow.report-attachment/v1') {
+          throw new Conflict('Legacy attachment has no atomic work snapshot. Preserve its journal and reconcile with the original sender; it cannot be upgraded or resent as scoped evidence.');
+        }
+        return PreparedReportAttachment.parse(raw);
+      }, acknowledgement: raw => ReportAttachmentAcknowledgement.parse(raw), checkAcknowledgement: checkAck,
     });
   }
   private async authorize(intent: PreparedReportAttachment, action: 'prepare' | 'read' | 'attach') {
@@ -42,6 +47,7 @@ export class LocalReportAttachmentOutbox {
   async prepare(resultId: string, rawTarget: ReportWorkTarget): Promise<ReportAttachmentState> {
     const target = ReportWorkTarget.parse(rawTarget); const source = await this.awr.inspect(resultId);
     if (!source.acknowledgement) throw new Conflict('Receipt import must be acknowledged before report attachment');
+    if (target.workspaceId !== source.prepared.destination.workspaceId) throw new Conflict('Work snapshot belongs to another destination workspace');
     await this.authority.authorize(structuredClone(this.scope), structuredClone(source.prepared.destination), structuredClone(target), 'prepare');
     const result = await this.sink.get(resultId);
     if (!sameScope(result.receipt.scope, this.scope) || !sameRef(result.receipt.ref, source.prepared.resultRef)) throw new Conflict('Retained result belongs to another delivery scope or ref');
@@ -55,15 +61,16 @@ export class LocalReportAttachmentOutbox {
     const digest = receiptDigest(source); const hostedReceiptId = source.acknowledgement.receipt_id;
     const key = digestOfValue({ result: result.receipt.ref, delivery: source.prepared.ref, hostedReceiptId, target }).hex;
     const artifactId = `${key.slice(0, 8)}-${key.slice(8, 12)}-4${key.slice(13, 16)}-a${key.slice(17, 20)}-${key.slice(20, 32)}`;
-    const intent = PreparedReportAttachment.parse(freeze({ schemaVersion: 'workflow.report-attachment/v1' as const, ref: { id, revision: '1' },
+    const intent = PreparedReportAttachment.parse(freeze({ schemaVersion: 'workflow.report-attachment/v2' as const, ref: { id, revision: '1' },
       scope: this.scope, resultRef: result.receipt.ref, deliveryRef: source.prepared.ref, destination: source.prepared.destination, target,
       hostedReceiptId, receiptDigest: digest, idempotencyKey: `tracegrove-report-${key}`, preparedAt: nowIso(),
       payload: { artifact_id: artifactId, entity_type: target.entityType, entity_id: target.entityId,
+        expected_scope: { workspace_id: target.workspaceId, expected_updated_at: target.expectedUpdatedAt },
         name: `Workflow evidence: ${projection.campaignId}`, artifact_type: 'proof.link' as const,
         artifact_url: `${source.prepared.destination.origin}/work-ledger/receipts/${hostedReceiptId}`,
         description: `Retained workflow evidence. Product outcome: ${projection.productOutcome}. Imported evidence awaits review.`,
         preview_markdown: `Product outcome: **${projection.productOutcome}**\n\nPlanned lanes: ${projection.plannedLanes.join(', ')}.\n\nThis imported report does not approve or complete work.`,
-        status: 'in_review' as const, created_by_type: 'agent' as const, metadata: { tracegrove: { schemaVersion: 'workflow.report-attachment/v1' as const,
+        status: 'in_review' as const, created_by_type: 'agent' as const, metadata: { tracegrove: { schemaVersion: 'workflow.report-attachment/v2' as const,
           resultRef: result.receipt.ref, deliveryRef: source.prepared.ref, requestRef: projection.requestRef,
           hostedReceiptId, receiptDigest: digest, claim: 'external_unverified' as const, nativeAcceptance: 'not_requested' as const } } },
     }));

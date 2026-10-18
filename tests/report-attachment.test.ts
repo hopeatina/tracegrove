@@ -10,10 +10,12 @@ import { plan } from '../src/core/planner.ts';
 import { LocalLedger } from '../src/core/ledger.ts';
 import { LocalResultSink } from '../src/core/resultSink.ts';
 import { LocalAwrOutbox, LocalReportAttachmentOutbox, OrgxAwrHttpTransport, OrgxReportAttachmentHttpTransport,
-  type PreparedReportAttachment, type ReportAttachmentAuthority } from '../src/integrations/awr/index.ts';
+  PreparedReportAttachment, ReportWorkTarget, type ReportAttachmentAuthority } from '../src/integrations/awr/index.ts';
+import { Blocked, Conflict, InfrastructureFailure } from '../src/core/errors.ts';
 
 const dirs: string[] = []; const handles: LocalLedger[] = []; const servers: Server[] = [];
-const target = { entityType: 'task' as const, entityId: '00000000-0000-4000-8000-000000000003' };
+const target = { entityType: 'task' as const, entityId: '00000000-0000-4000-8000-000000000003',
+  workspaceId: '00000000-0000-4000-8000-000000000001', expectedUpdatedAt: '2026-10-18T01:00:00.123456Z' };
 const destination = { origin: 'https://orgx.example', workspaceId: '00000000-0000-4000-8000-000000000001' };
 const hostedId = '00000000-0000-4000-8000-000000000002';
 const authority: ReportAttachmentAuthority = { authorize: async () => {} }; // Consumer policy and native admission are simulated.
@@ -48,6 +50,7 @@ it('imports then attaches over real HTTP, recovering one attachment after a lost
   const store = open(); const retained = await result(store); const id = retained.receipt.ref.id;
   const imported = new Map<string, { receipt: unknown; receipt_id: string }>(); const artifacts = new Map<string, unknown>();
   const calls: Array<{ method: string; path: string; body: string }> = []; const postBodies: string[] = [];
+  let currentUpdatedAt = target.expectedUpdatedAt;
   const server = createServer(async (request, response) => {
     let body = ''; for await (const chunk of request) body += chunk;
     const url = new URL(request.url!, 'http://fixture.local'); calls.push({ method: request.method!, path: url.pathname, body });
@@ -63,8 +66,10 @@ it('imports then attaches over real HTTP, recovering one attachment after a lost
     if (request.method === 'POST' && url.pathname === '/api/v1/artifacts') {
       const input = JSON.parse(body); const key = String(request.headers['idempotency-key']); postBodies.push(body);
       expect(input.entity_id).toBe(target.entityId); expect(input.status).toBe('in_review'); expect(input.created_by_type).toBe('agent');
+      expect(input.expected_scope).toEqual({ workspace_id: target.workspaceId, expected_updated_at: target.expectedUpdatedAt });
       const prior = artifacts.get(key);
       if (prior) return send({ data: { ...(prior as Record<string, unknown>), status: 'eval_passed' }, meta: { duplicate: true }, extra_secret: 'must-not-persist' });
+      if (input.expected_scope.expected_updated_at !== currentUpdatedAt) { response.writeHead(409); response.end(); return; }
       artifacts.set(key, { id: input.artifact_id, workspace_id: destination.workspaceId, entity_type: input.entity_type,
         entity_id: input.entity_id, artifact_url: input.artifact_url, metadata: input.metadata, status: input.status });
       request.socket.destroy(); return;
@@ -80,6 +85,7 @@ it('imports then attaches over real HTTP, recovering one attachment after a lost
   const transport = new OrgxReportAttachmentHttpTransport(credential, fetcher);
   await expect(store.reports.deliver(id, transport)).rejects.toThrow('acknowledgement unavailable');
   expect((await store.reports.inspect(id)).status).toBe('acknowledgement_unknown');
+  currentUpdatedAt = '2026-10-18T02:00:00.000000Z'; // Historical replay keeps the original snapshot after work moves.
   store.ledger.close(); const reopened = open(store.dir);
   const attached = await reopened.reports.deliver(id, transport);
   expect(attached).toMatchObject({ status: 'attached', recordedArtifactStatus: 'eval_passed', attempts: 2, nativeAcceptance: 'not_requested', acknowledgement: { meta: { duplicate: true } } });
@@ -99,8 +105,58 @@ it('requires acknowledged import and the original frozen full work ID, and refus
   await expect(store.reports.prepare(id, { ...target, entityId: hostedId })).rejects.toThrow('frozen work binding');
   await store.reports.prepare(id, target);
   await expect(store.reports.prepare(id, { ...target, entityType: 'milestone' })).rejects.toThrow('another work target');
+  await expect(store.reports.prepare(id, { ...target, expectedUpdatedAt: '2026-10-18T02:00:00Z' })).rejects.toThrow('another work target');
+  await expect(store.reports.prepare(id, { ...target, workspaceId: hostedId })).rejects.toThrow('another destination workspace');
   const unbound = await result(store, false); await admit(store, unbound.receipt.ref.id);
   await expect(store.reports.prepare(unbound.receipt.ref.id, target)).rejects.toThrow('frozen work binding');
+});
+
+it('requires an exact native work snapshot and validates the frozen payload before using credentials', async () => {
+  const { expectedUpdatedAt: _timestamp, ...missingTimestamp } = target;
+  expect(ReportWorkTarget.safeParse(missingTimestamp).success).toBe(false);
+  expect(ReportWorkTarget.safeParse({ ...target, expectedUpdatedAt: 'not-a-timestamp' }).success).toBe(false);
+  expect(ReportWorkTarget.safeParse({ ...target, expectedUpdatedAt: '2026-10-18T01:00:00.123456+01:00' }).success).toBe(true);
+  const store = open(); const retained = await result(store); const id = retained.receipt.ref.id; await admit(store, id);
+  const intent = (await store.reports.prepare(id, target)).prepared;
+  let credentials = 0; const transport = new OrgxReportAttachmentHttpTransport(async () => { credentials++; return 'unused'; });
+  for (const payload of [
+    { ...intent.payload, expected_scope: { ...intent.payload.expected_scope, workspace_id: hostedId } },
+    { ...intent.payload, expected_scope: { ...intent.payload.expected_scope, expected_updated_at: '2026-10-18T02:00:00Z' } },
+    { ...intent.payload, entity_type: 'initiative' as const },
+  ]) await expect(transport.attach({ ...intent, payload })).rejects.toThrow('frozen work snapshot');
+  expect(credentials).toBe(0);
+  for (const entityType of ReportWorkTarget.shape.entityType.options) {
+    expect(PreparedReportAttachment.safeParse({ ...intent, target: { ...target, entityType }, payload: { ...intent.payload, entity_type: entityType } }).success).toBe(true);
+  }
+});
+
+it('preserves a rejected scope assertion and retry key without an unscoped fallback or refreshed timestamp', async () => {
+  const store = open(); const retained = await result(store); const id = retained.receipt.ref.id; const imported = await admit(store, id);
+  const intent = (await store.reports.prepare(id, target)).prepared;
+  const bodies: string[] = []; const keys: string[] = [];
+  const transport = new OrgxReportAttachmentHttpTransport(async () => 'private-token', async (_url, init) => {
+    bodies.push(String(init?.body)); keys.push(new Headers(init?.headers).get('idempotency-key')!);
+    return new Response('provider-secret-must-not-escape', { status: 409 });
+  });
+  const delivery = { readReceipt: async () => readback(imported), attach: transport.attach.bind(transport) };
+  for (let attempt = 0; attempt < 2; attempt++) await expect(store.reports.deliver(id, delivery)).rejects.toBeInstanceOf(Conflict);
+  expect(bodies).toEqual([JSON.stringify(intent.payload), JSON.stringify(intent.payload)]);
+  expect(keys).toEqual([intent.idempotencyKey, intent.idempotencyKey]);
+  expect(await store.reports.inspect(id)).toMatchObject({ attempts: 2, status: 'acknowledgement_unknown', prepared: intent });
+  for (const status of [400, 401, 403, 404, 422, 429, 503]) {
+    const denied = new OrgxReportAttachmentHttpTransport(async () => 'private-token', async () => new Response('provider-secret-must-not-escape', { status }));
+    await expect(denied.attach(intent)).rejects.toBeInstanceOf(status === 429 || status === 503 ? InfrastructureFailure : Blocked);
+    await expect(denied.attach(intent)).rejects.not.toThrow('provider-secret');
+  }
+});
+
+it('refuses legacy unscoped journals without replacing their intent or creating another artifact identity', async () => {
+  const store = open(); const retained = await result(store); const id = retained.receipt.ref.id; await admit(store, id);
+  const intent = (await store.reports.prepare(id, target)).prepared;
+  const legacy = open(); legacy.ledger.append(intent.ref.id, 0, 'workflow.report.prepared', { ...intent, schemaVersion: 'workflow.report-attachment/v1' });
+  const before = readFileSync(join(legacy.dir, 'ledger/journal.jsonl'), 'utf8');
+  await expect(legacy.reports.inspect(id)).rejects.toThrow('cannot be upgraded');
+  expect(readFileSync(join(legacy.dir, 'ledger/journal.jsonl'), 'utf8')).toBe(before);
 });
 
 it('refuses substituted hosted receipt content and revocation after readback before any artifact attempt', async () => {
