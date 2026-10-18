@@ -247,7 +247,10 @@ What exists and is exercised by tests:
 The local controller owns an exclusive ledger and accepts authenticated loopback commands
 for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
 execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
-campaign while preserving case digests and original request lineage.
+campaign while preserving case digests and original request lineage. Use
+`inspect --request` for static frozen-plan checks and `inspect --bundle` for independently
+verified evidence. [Inspection and export](docs/verified-bundles.md#inspect-and-hand-off-a-frozen-run)
+use sealed snapshots; lifecycle reruns require fresh owner registration.
 
 The POSIX local host uses a trusted supervisor with an IPC ownership channel. If
 the controller is killed, the supervisor terminates the application process group

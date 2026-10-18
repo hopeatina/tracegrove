@@ -4,7 +4,7 @@
  * the library API. Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive,
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
@@ -15,12 +15,16 @@ import { LocalResultSink } from '../core/resultSink.ts';
 import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
-import { verifyBundle } from '../core/bundle.ts';
+import { verifyBundle, VerifiedBundleSnapshot } from '../core/bundle.ts';
+import { readFrozenBundle } from '../core/frozenBundle.ts';
+import { inspectFrozenPlan } from '../core/planInspection.ts';
+import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
+import { exportVerifiedBundle } from '../core/bundleExport.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
+import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { writeSample } from './samples/write.ts';
@@ -92,6 +96,8 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   cases --config <workflow.yaml> [--id <id>] [--cursor <cursor>]
   rerun --request <request.json> --output <new.json>   freeze a fresh attempt on the same cases
   inspect --execution <id> --state-dir <dir> [--failed-step]
+  inspect --bundle <dir> [--failed-step]               inspect independently verified saved evidence
+  inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
@@ -377,16 +383,23 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'inspect': {
-      const stateDir = resolve(args.flags['state-dir']);
-      const executionId = args.flags['execution'];
-      const dir = join(stateDir, 'executions', executionId);
-      if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId, owner: 'operator', action: 'check the execution id and state dir' }]);
-      const campaign = parseAs(CampaignResult, JSON.parse(readFileSync(join(dir, 'campaign.json'), 'utf8')), 'campaign');
-      const cells = readdirSync(join(dir, 'cells')).map((name) => parseAs(ExecutionReceipt, JSON.parse(readFileSync(join(dir, 'cells', name, 'receipt.json'), 'utf8')), 'receipt'));
-      const failed = cells.flatMap((r) => r.steps.filter((s) => s.result !== 'completed').slice(0, 1).map((s) => ({ cell: r.selectionCellId, step: s.stepId, result: s.result, reason: s.reasonCode, output: s.output })));
-      if (args.flags['failed-step']) { out(args, { executionId, failed }, failed.length ? failed.map((f) => `${f.cell} step ${f.step}: ${f.result} (${f.reason ?? 'no reason'})\n${JSON.stringify(f.output, null, 2)}`).join('\n') : 'no failed step'); return 0; }
-      out(args, { executionId, outcome: campaign.outcome, coverage: campaign.coverage, cells: cells.map((r) => ({ cell: r.selectionCellId, outcome: r.outcome, reasonCodes: r.reasonCodes, steps: r.steps.map((s) => `${s.stepId}:${s.result}`), assertions: r.assertions.map((a) => `${a.assertionId}:${a.result}`) })) },
-        `${campaign.outcome.toUpperCase()} campaign ${campaign.campaignId}\n` + cells.map((r) => `  ${r.selectionCellId}: ${r.outcome} [${r.reasonCodes.join(', ') || 'no reasons'}]\n    steps: ${r.steps.map((s) => `${s.stepId}:${s.result}`).join(' ')}\n    assertions: ${r.assertions.map((a) => `${a.assertionId}:${a.result}`).join(' ')}`).join('\n'));
+      if (args.flags.request) {
+        const inspection = inspectFrozenPlan(readBundle(args.flags.request), localScope());
+        out(args, inspection, `${inspection.structural.toUpperCase()} frozen structure · ${inspection.cells.length} cell(s)\nexecution authority: ${inspection.executionAuthority}\n` +
+          inspection.blockers.map(b => `${b.code}: ${b.detail}`).join('\n'));
+        return inspection.structural === 'valid' ? 0 : 2;
+      }
+      const executionId = args.flags.execution ?? null;
+      const dir = args.flags.bundle ? resolve(args.flags.bundle) : join(resolve(args.flags['state-dir']!), 'executions', executionId!);
+      if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: dir, owner: 'operator', action: 'check the bundle or execution path' }]);
+      const snapshot = VerifiedBundleSnapshot.open(dir);
+      if (args.flags['failed-step']) {
+        const inspection = inspectFailedSteps(snapshot, executionId); const { failed } = inspection;
+        out(args, inspection, failed.length ? failed.map((f) => `${f.cell} step ${f.step}: ${f.result} (${f.reason ?? 'no reason'})\n${JSON.stringify(f.output, null, 2)}`).join('\n') : 'no failed step'); return 0;
+      }
+      const inspection = inspectExecution(snapshot, executionId);
+      out(args, inspection, `${inspection.outcome.toUpperCase()} campaign ${inspection.campaignId} · evidence verified\n` +
+        inspection.cells.map(r => `  ${r.cell}: ${r.outcome} [${r.reasonCodes.join(', ') || 'no reasons'}]\n    steps: ${r.steps.join(' ')}\n    assertions: ${r.assertions.join(' ')}`).join('\n'));
       return 0;
     }
 
@@ -396,11 +409,9 @@ async function main(argv: string[]): Promise<number> {
       const output = resolve(args.flags['output']);
       const dir = join(stateDir, 'executions', executionId);
       if (!existsSync(dir)) throw new Blocked([{ code: 'execution_not_found', detail: executionId }]);
-      mkdirSync(output, { recursive: true });
-      cpSync(dir, output, { recursive: true, filter: (src) => !src.includes(`${executionId}/host`) });
-      const verification = verifyBundle(output);
-      out(args, { output, verification }, `exported to ${output}; verification ${verification.ok ? 'ok' : `FAILED: ${verification.problems.join('; ')}`}`);
-      return verification.ok ? 0 : 2;
+      const exported = exportVerifiedBundle(VerifiedBundleSnapshot.open(dir), output);
+      out(args, exported, `exported verified evidence to ${output}; manifest ${exported.manifestDigest.hex}`);
+      return 0;
     }
 
     case 'verify-bundle': {
@@ -472,9 +483,7 @@ async function main(argv: string[]): Promise<number> {
 }
 
 function readBundle(path: string): FrozenBundle {
-  const bundle = JSON.parse(readFileSync(resolve(path), 'utf8')) as FrozenBundle;
-  if (bundle.schemaVersion !== 'workflow.frozen-request-bundle/v1') throw new Blocked([{ code: 'invalid_request_file', detail: path, owner: 'operator', action: 'pass the file written by plan' }]);
-  return bundle;
+  return readFrozenBundle(resolve(path));
 }
 
 main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {

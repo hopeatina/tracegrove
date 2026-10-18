@@ -23,21 +23,9 @@ import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 import type { LoadedProject } from './corpus.ts';
 import { newId } from './clock.ts';
 
-export type Blocker = { code: string; detail: string; owner: string; action: string; cellId: string | null };
-
-export type FrozenBundle = {
-  schemaVersion: 'workflow.frozen-request-bundle/v1';
-  projectRoot: string;
-  configPath: string;
-  profileName: string;
-  request: RunRequest | null;
-  blockers: Blocker[];
-  excludedCells: Array<{ cellKey: string; reason: string }>;
-  estimatedCostCents: number;
-  requirements: string[];
-  /** Every document the request's closure needs, keyed by refKey. */
-  documents: Record<string, unknown>;
-};
+import type { Blocker, FrozenBundle } from './frozenBundle.ts';
+export { FrozenBundle } from './frozenBundle.ts';
+export type { Blocker } from './frozenBundle.ts';
 
 export type PlanInput = { project: LoadedProject; profileName: string; scope: Scope; purpose?: RunRequest['purpose']; workBinding?: RunRequest['workBinding'] };
 

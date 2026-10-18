@@ -1,6 +1,10 @@
 export * from './protocol/index.ts';
 export { loadProject, localScope, CorpusStore, ProjectLoader } from './core/corpus.ts';
-export { plan, runnerCapabilitiesFor, type FrozenBundle, type Blocker } from './core/planner.ts';
+export { plan, runnerCapabilitiesFor, type Blocker } from './core/planner.ts';
+export { FrozenBundle, PlanBlocker, readFrozenBundle, FROZEN_BUNDLE_MAX_BYTES } from './core/frozenBundle.ts';
+export { FrozenPlanInspection, inspectFrozenPlan } from './core/planInspection.ts';
+export { ExecutionInspection, FailedStepInspection, inspectExecution, inspectFailedSteps } from './core/executionInspection.ts';
+export { exportVerifiedBundle } from './core/bundleExport.ts';
 export { executeBundle, EXIT_CODES, type RunSummary, type RunOptions } from './core/executor.ts';
 export { LocalLedger } from './core/ledger.ts';
 export { LocalDeliveryJournal, type DeliveryCodec, type DeliveryState } from './core/deliveryJournal.ts';

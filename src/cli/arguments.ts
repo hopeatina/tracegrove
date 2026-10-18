@@ -6,6 +6,7 @@ import { SampleName } from './samples/catalog.ts';
 const Text = z.string().min(1).max(8192);
 const Bool = z.boolean().optional();
 const common = { json: Bool, help: Bool };
+const ExecutionId = Text.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'execution ID must be one local path segment');
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
   init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
@@ -30,8 +31,11 @@ export const COMMAND_SCHEMAS = {
     surface: Text.optional(), text: Text.optional(), cursor: Text.optional(),
     limit: Text.regex(/^[1-9][0-9]{0,2}$/).refine(value => Number(value) <= 100, 'limit must be 1..100').optional() }).strict(),
   rerun: z.object({ ...common, request: Text, output: Text }).strict(),
-  inspect: z.object({ ...common, execution: Text, 'state-dir': Text, 'failed-step': Bool }).strict(),
-  export: z.object({ ...common, execution: Text, 'state-dir': Text, output: Text }).strict(),
+  inspect: z.object({ ...common, execution: ExecutionId.optional(), 'state-dir': Text.optional(), request: Text.optional(), bundle: Text.optional(), 'failed-step': Bool }).strict()
+    .refine(flags => flags.request ? !flags.execution && !flags['state-dir'] && !flags.bundle && !flags['failed-step']
+      : flags.bundle ? !flags.execution && !flags['state-dir'] : !!flags.execution && !!flags['state-dir'],
+    'choose --request, --bundle, or --execution with --state-dir; --failed-step is only for execution evidence'),
+  export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
