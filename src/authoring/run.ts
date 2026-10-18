@@ -27,7 +27,7 @@ export type CaseReport = {
 export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
   project: string; outcome: string; exitCode: number; startedAt: string; finishedAt: string;
-  executionId: string | null; sourceDigest: string; runDir: string; bundleVerified: boolean | null;
+  executionId: string | null; sourceDigest: string; runDir: string; stateDir?: string; bundleVerified: boolean | null;
   blockers: Array<{ code: string; detail: string; action: string }>;
   cases: CaseReport[];
   totals: { passed: number; failed: number; other: number };
@@ -54,12 +54,14 @@ function observedLine(output: unknown): string | null {
   if (!output || typeof output !== 'object') return null;
   const mcp = McpToolObservation.safeParse(output);
   if (mcp.success) return `MCP ${mcp.data.endpoint} ${mcp.data.tool} -> ${mcp.data.isError ? 'tool error' : 'result'} ${excerpt(mcp.data.structuredContent ?? mcp.data.content)}`;
+  const browser = BrowserObservation.safeParse(output);
+  if (browser.success) return browser.data.text === null ? `${browser.data.kind} -> ${browser.data.status ?? 'completed'}` : excerpt(browser.data.text);
   const o = output as { method?: string; url?: string; status?: number; body?: unknown; bodyText?: string | null };
   const path = o.url ? o.url.replace(/^https?:\/\/[^/]+/, '') : '';
   return `${o.method ?? ''} ${path} -> ${o.status ?? '?'} ${excerpt(o.body ?? o.bodyText ?? '')}`.trim();
 }
 
-function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined): CaseReport {
+export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined): CaseReport {
   const stepInfo = new Map((flow?.steps ?? []).map((s) => [s.id, s]));
   const steps: StepReport[] = receipt.steps.map((s) => {
     const info = stepInfo.get(s.stepId);
@@ -129,6 +131,7 @@ export function renderText(report: TestRunReport, root: string): string {
   }
   const t = report.totals;
   lines.push('', `${t.passed} passed, ${t.failed} failed${t.other ? `, ${t.other} other` : ''} · run ${relative(root, report.runDir) || report.runDir}${report.bundleVerified === false ? ' · BUNDLE INVALID' : ''}`);
+  if (report.executionId) lines.push(`execution ${report.executionId}${report.stateDir ? ` · state ${report.stateDir}` : ' · state directory not recorded'}`);
   return lines.join('\n');
 }
 
@@ -209,7 +212,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     schemaVersion: 'tracegrove.run-summary/v1',
     project: compiled.config.project, outcome, exitCode: summary?.exitCode ?? 2,
     startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
-    executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, bundleVerified,
+    executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, stateDir, bundleVerified,
     sourceBinding: compiled.sourceBinding,
     blockers: bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, action: b.action })),
     cases,

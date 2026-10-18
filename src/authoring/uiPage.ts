@@ -107,7 +107,7 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
 const TABS=['Run','Discover','Heal','History','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
-const ui={run:null,runName:null,sel:null,step:null,running:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
+const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw j;return j}
 function toast(text,action){for(const old of document.querySelectorAll('.toast'))old.remove();const t=h('div',{class:'toast fade',role:'status'},h('span',{},text),
@@ -122,19 +122,21 @@ const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;return d<60?'j
 function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>{tab=t;render()}}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
+async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
 function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
 
 ${SOURCE_CONTROLS_JS}
 /* ---------- Run: the bonsai ---------- */
-function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
- const flows=state.flows.length?state.flows:(run?run.cases.map(c=>({...c,fixtures:[],steps:c.steps})):[]);
- const live=flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
-  return{id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,steps}});
+function scenarios(){const run=ui.run;
+ // Saved observations belong to their recorded steps, never today's flow or array position.
+ if(run)return(run.cases||[]).map(c=>({id:c.caseId,title:c.title,file:c.file,reportedFile:c.reportedFile,reportedTitle:c.reportedTitle,fixtures:[],state:kind(c.outcome),ms:c.durationMs,failure:c.failure,
+  steps:c.steps.map(r=>({id:r.id,name:r.name,reportedName:r.reportedName,method:r.method,path:r.path,as:null,expect:null,expectation:'Checks recorded for this run',result:kind(r.result),status:r.status,observedText:r.observedText,ms:r.durationMs,reason:r.reason}))}));
+ const live=state.flows.map(f=>({id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:'none',ms:null,failure:null,
+  steps:f.steps.map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:'none',status:null,observedText:null,ms:null,reason:null}))}));
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
 function runTab(){
- if(!state.hasConfig)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'No tracegrove.config.yaml in this folder yet.'),
+ if(!state.hasConfig&&!ui.run)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'No tracegrove.config.yaml in this folder yet.'),
   h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
  if(state.compileError&&!state.flows.length&&!ui.run)return[sourceBanner(),blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
@@ -144,11 +146,13 @@ function runTab(){
  const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},state.runs.map(r=>h('option',{value:r.name,selected:r.name===ui.runName},ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
  const hero=h('section',{style:'margin-bottom:28px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
    h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),h('h1',{style:'margin-top:6px'},headline)),
-   h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)):
-    [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError,on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
+   h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
+    [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError||!state.flows.some(f=>f.caseId===ui.sel),on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!state.hasConfig||!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
   run?h('div',{class:'stats'},h('div',{},h('b',{},held+' / '+ran.length),h('span',{class:'muted'},'scenarios held')),h('div',{},h('b',{},stepsHeld+' / '+allSteps.length),h('span',{class:'muted'},'steps held')),
    h('div',{},h('b',{},secs(new Date(run.finishedAt)-new Date(run.startedAt))),h('span',{class:'muted'},'wall time')),
-   h('div',{},h('b',{class:run.bundleVerified?'c-pass':'c-warn'},run.bundleVerified?'✓':'–'),h('span',{class:'muted'},run.bundleVerified?'evidence bundle re-verified':'bundle not verified'))):null,
+   h('div',{},h('b',{class:run.bundleVerified?'c-pass':'c-warn'},run.bundleVerified?'✓':'–'),h('span',{class:'muted'},run.savedEvidence?(run.savedEvidence.status==='verified'?'saved evidence freshly verified':'saved evidence '+run.savedEvidence.status):(run.bundleVerified?'evidence verified at run completion':'bundle not verified')))):null,
+  run?h('p',{class:'small muted',role:'note'},'Showing recorded scenarios and steps. Rerun and Run all use the current configuration.'+(state.sourceDigest==null?' Current application source could not be resolved.':run.sourceDigest!==state.sourceDigest?' Application source differs from this recorded run.':'')):null,
+  run&&run.savedEvidence?h('p',{class:'small muted','aria-label':'Saved evidence status'},run.savedEvidence.message):null,
   state.compileError?h('div',{style:'margin-top:16px'},blocked(state.compileError)):null,ui.error?h('div',{style:'margin-top:16px'},blocked(ui.error)):null);
  const tree=h('section',{class:'grow','aria-label':'Scenario tree'},h('div',{class:'rulehead'},h('span',{class:'label'},'Scenarios'),h('span',{class:'rule'}),h('span',{class:'small muted'},'step · interaction · time on the run clock · status')),
   h('div',{class:'tree'+(ui.running?' growing':'')},sc.map(s=>branch(s))));
@@ -159,15 +163,15 @@ function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state=
   h('button',{class:'node','data-case':s.id,'data-steps':s.steps.map(x=>x.id).join(' '),'aria-expanded':open?'true':'false',on:{click:()=>{ui.sel=s.id;ui.step=Math.max(0,s.steps.findIndex(x=>x.result==='fail'));render()}}},
    h('span',{class:'dot '+s.state,'aria-hidden':'true'}),
    h('span',{class:'body'},h('span',{class:'row',style:'gap:4px 12px'},h('span',{class:'id',style:cut?'color:var(--muted)':''},s.id),h('span',{class:'state c-'+(cut?'none':s.state)},LABEL[s.state])),
-    h('span',{style:cut?'color:var(--ink3)':''},s.title),s.fixtures.length?h('span',{class:'small muted'},'given '+s.fixtures.join(', ')):null),
+    h('span',{style:cut?'color:var(--ink3)':''},s.title),s.reportedTitle&&s.reportedTitle!==s.title?h('span',{class:'small muted'},'Saved title (unsealed): '+s.reportedTitle):null,s.fixtures.length?h('span',{class:'small muted'},'given '+s.fixtures.join(', ')):null),
    h('span',{class:'pips','aria-label':s.steps.filter(x=>x.result==='pass').length+' of '+s.steps.length+' steps held'},s.steps.map(x=>h('i',{class:x.result}))),
    h('span',{class:'time'},secs(s.ms)))),
   open?h('div',{class:'twigs fade'},s.steps.map((x,j)=>{const left=at/total*100;at+=x.ms||0;return h('div',{class:'br'},h('span',{class:'twig'},h('i')),
-   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},x.name),h('span',{class:'req'},x.method+' '+x.path),
+   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},x.name,x.reportedName&&x.reportedName!==x.name?h('small',{class:'muted'},' · saved name (unsealed): '+x.reportedName):null),h('span',{class:'req'},x.method+' '+x.path),
     h('span',{class:'bar','aria-hidden':'true'},x.ms!=null?h('i',{class:x.result==='fail'?'fail':'',style:'left:'+left.toFixed(1)+'%;width:'+((x.ms||0)/total*100).toFixed(1)+'%'}):null),
     h('span',{class:'ms muted'},x.ms!=null?x.ms+' ms':''),h('span',{class:'res c-'+x.result},x.status!=null?x.status:x.result==='none'?'–':LABEL[x.result])))})):null)}
 function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.state==='warn')items.push({s,title:s.failure?s.failure.message:'Did not complete',where:s.failure?'step "'+s.failure.step+'"':s.file});
- if(run&&run.bundleVerified===false)items.push({s:null,title:'Exported evidence failed verification',where:'Inspect bundle-problems.txt before relying on this run.'});
+ if(run&&run.bundleVerified===false)items.push({s:null,title:run.savedEvidence?run.savedEvidence.message:'Exported evidence failed verification',where:'Preserve this run and inspect its evidence before relying on the historical result.'});
  for(const b of (run&&run.blockers)||[])items.push({s:null,title:b.code+': '+b.detail,where:b.action});
   return h('section',{'aria-label':'Needs a fix'},h('div',{class:'rulehead'},h('h2',{},'Needs a fix'),h('span',{class:'rule'}),h('span',{class:'small muted'},items.length?items.length+' open':''),
    items.length&&!ui.running?h('button',{class:'btn sm',title:'Fix setup and drifted tests, prove each fix by re-running; product bugs are reported, never hidden (h)',on:{click:()=>startHeal(false)}},'Heal'):null),
@@ -181,17 +185,19 @@ function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id
  const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id),
   on:{loadedmetadata:()=>{const at=ui.videoTimes[key];if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,Number.isFinite(player.duration)?player.duration:at);status.textContent='Recording loaded from verified evidence.'},timeupdate:()=>{ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
  return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
-function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];
+function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
  return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},x.name),
-  h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
-  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:state.compileError?'Expectation not recorded in summary':'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
-  bad&&s.failure?h('pre',{},s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed; its configured checks held.':'Run the scenario to observe this step.'),
+  x.reportedName&&x.reportedName!==x.name?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
+    h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
+
+  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
   recording(s),
-  h('div',{class:'row',style:'margin-top:16px'},h('span',{class:'mono small muted',style:'flex:1;overflow-wrap:anywhere'},s.file),
-   h('button',{class:'btn ghost sm',on:{click:()=>prune(s.file,false)}},'Prune'),h('button',{class:'btn sm',disabled:!!state.compileError,on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
+  h('div',{class:'row',style:'margin-top:16px'},h('span',{class:'mono small muted',style:'flex:1;overflow-wrap:anywhere'},s.reportedFile?'Saved flow (unsealed): '+s.reportedFile:s.file),
+   current?h('button',{class:'btn ghost sm',on:{click:()=>prune(current.file,false)}},ui.run?'Prune current flow':'Prune'):null,h('button',{class:'btn sm',disabled:!current||!!ui.running||!!state.compileError,on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
 let runWatch=null;
 function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
 /* Live progress comes from real run and agent events (/api/live), never from timers. */
@@ -201,32 +207,34 @@ function paintLive(){const l=ui.live;if(!l)return;const a=l.run;
  for(const n of document.querySelectorAll('[data-steps]'))n.classList.toggle('live',a.status==='running'&&!!a.stepId&&n.getAttribute('data-steps').split(' ').includes(a.stepId));
  const log=document.getElementById('agent-log');if(log){const lines=l.agent.lines.length?l.agent.lines:['Waiting for the agent to start'];if(log.childElementCount!==lines.length||log.lastChild.textContent!==lines[lines.length-1]){const stick=log.scrollTop+log.clientHeight>=log.scrollHeight-8;log.replaceChildren(...lines.map(x=>h('div',{},x)));if(stick)log.scrollTop=log.scrollHeight}}
  const hp=document.getElementById('heal-phase');if(hp&&l.heal.status==='running')hp.textContent=l.heal.phase+(l.heal.detail?' · '+l.heal.detail:'')}
-function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const l=await api('/api/live');ui.live=l;const a=l.run;if(ui.running&&a.status==='running')ui.running=a.label;paintLive();
+function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const [l,c]=await Promise.all([api('/api/live'),api('/api/run-control')]);const changed=ui.activeRunId!==c.runId||ui.cancelling!==c.cancelling;ui.activeRunId=c.runId;ui.cancelling=c.cancelling;ui.live=l;if(changed)render();const a=l.run;if(ui.running&&a.status==='running')ui.running=a.label;paintLive();
   if(ui.running&&!ui.healing&&ui.agentPhase<0&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},400)}
-async function runNow(grep){if(state.compileError){ui.error=state.compileError;render();return}ui.running='Compiling flows and starting the app';render();watchRun();
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=r.cases.some(c=>c.caseId===ui.sel)?ui.sel:(r.cases[0]?.caseId||null);toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
+async function cancelRun(){const runId=ui.activeRunId;if(!runId||ui.cancelling)return;ui.cancelling=true;render();try{const r=await api('/api/cancel',{runId});toast((r.operation==='heal'?'Heal':r.operation==='draft'?'Draft':'Run')+' settled: '+r.outcome+'; inspect saved records')}catch(e){ui.error=e;render()}}
+async function runNow(grep){if(state.compileError){ui.error=state.compileError;render();return}if(ui.running)return;ui.running='Compiling flows and starting the app';render();watchRun();
+ ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false;ui.activeRunId=null;ui.cancelling=false}await load()}
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned '+file.split('/').pop(),{label:'Undo',run:()=>prune(file,!graft)});ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
-function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;
+function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;const available=!!(name&&state.agent.detected[a.provider]);
  const sources=[{v:'',label:'working tree',note:'uncommitted files included'}].concat(g.branches.map(b=>({v:b,label:b,note:b===g.current?'checked out':b===g.base?'base':''})));
  const src=h('section',{class:'side',style:'flex:1 1 260px;max-width:340px'},h('div',{},h('span',{class:'label'},'Source'),h('div',{class:'src',style:'margin-top:10px'},
    (g.isRepo?sources:sources.slice(0,1)).map(s=>h('button',{'aria-pressed':ui.source===s.v?'true':'false',on:{click:()=>{ui.source=s.v;scan()}}},h('span',{class:'dot s '+(ui.source===s.v?'pass':'none')}),h('span',{style:'flex:1;min-width:0;display:flex;flex-direction:column;padding:6px 0'},h('span',{style:'overflow-wrap:anywhere'},s.label),s.note?h('span',{class:'small muted',style:'font-family:var(--sans)'},s.note):null)))),
    g.isRepo?h('p',{class:'small muted'},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):h('p',{class:'small muted'},'Not a git repo, so only the working tree.')));
  const d=ui.disc;
- const reach=h('section',{class:'grow'},h('div',{class:'rulehead'},h('span',{class:'label'},'Reachability'),h('span',{class:'rule'}),d?h('span',{class:'small muted'},d.routes.length+' routes · '+d.uncovered+' unreached'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
-  !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?h('div',{},d.routes.map(r=>routeRow(r))):h('p',{class:'muted'},'No routes found. Discovery reads FastAPI decorators, Django path() and Express routers.'),
+ const reach=h('section',{class:'grow'},h('div',{class:'rulehead'},h('span',{class:'label'},'Static routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted'},d.routes.length+' recognized routes · '+d.uncovered+' without a flow'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
+  h('p',{class:'small muted'},'Partial static inventory for FastAPI, Django and Express. Other routes may be missing; this is not execution coverage.'),
+  !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?h('div',{},d.routes.map(r=>routeRow(r))):h('p',{class:'muted'},'No supported routes recognized. Other routing styles, including Next.js, are not scanned.'),
   ui.draft?draftCard():null);
  const intent=h('section',{class:'side',style:'flex:1 1 340px'},h('div',{class:'card'},h('span',{class:'label'},'Intent'),h('h2',{style:'margin:6px 0 4px'},'What should be true after this change?'),
-  h('p',{class:'small muted',style:'margin:0 0 12px'},name?name+' ('+(a.model||'CLI default')+') reads the code, writes flows into tracegrove/discovered/, and tracegrove checks them before you see them.':'Pick Claude Code or Codex in Settings to draft with an agent.'),
+  h('p',{id:'agent-readiness',class:'small muted',style:'margin:0 0 12px'},name?(available?name+' ('+(a.model||'CLI default')+') reads the code, writes flows into tracegrove/discovered/, and tracegrove checks them before you see them.':name+' is not installed. Choose an installed provider in Settings, or None for templates. Executable detection does not establish sign-in.'):'Choose an installed provider in Settings, or use route templates without an agent.'),
   h('textarea',{id:'intent',placeholder:'After Alice revokes a share, Bob can no longer read the note.','aria-label':'Intent'},ui.intent||''),
-  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',disabled:!name||ui.agentPhase>=0,on:{click:agentDraft}},name?'Draft with '+name:'Draft'),h('button',{class:'btn ghost',on:{click:()=>{tab='Settings';render()}}},'Settings')),
+  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn','aria-describedby':'agent-readiness',disabled:!available||ui.agentPhase>=0,on:{click:agentDraft}},name?'Draft with '+name:'Draft'),h('button',{class:'btn ghost',on:{click:()=>{tab='Settings';render()}}},'Settings')),
   ui.agentPhase>=0?h('div',{class:'fade'},h('p',{class:'row small muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),name+' is working; tracegrove checks every file it writes'),
    h('div',{class:'log',id:'agent-log','aria-live':'polite'},(ui.live&&ui.live.agent.task==='draft'&&ui.live.agent.lines.length?ui.live.agent.lines:['Waiting for the agent to start']).map(x=>h('div',{},x)))):null,
   ui.agent?agentResult():null));
  return[h('div',{class:'cols'},src,reach,intent)]}
 function routeRow(r){const covered=r.coveredBy.length>0;return h('div',{class:'route fade'},h('span',{class:'dot s '+(covered?'pass':'fail'),'aria-hidden':'true'}),
- h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,h('div',{class:'small '+(covered?'muted':'c-fail')},covered?r.coveredBy.join(', '):'unreached')),
+ h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,h('div',{class:'small '+(covered?'muted':'c-fail')},covered?r.coveredBy.join(', '):'no matching flow')),
  h('span',{class:'where mono small muted',style:'overflow-wrap:anywhere'},r.file+':'+r.line),covered?h('span'):h('button',{class:'btn ghost sm',on:{click:()=>draftOne(r)}},'Draft'))}
 function draftCard(){const d=ui.draft;return h('div',{class:'card fade',style:'margin-top:16px'},h('span',{class:'label'},'Draft'),h('h2',{class:'mono',style:'font-size:14px;margin:6px 0 12px'},'discovered/'+d.file),h('pre',{},d.yaml),
  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',on:{click:async()=>{try{const s=await api('/api/draft',{method:d.route.method,path:d.route.path,save:true});ui.draft=null;toast('Saved '+s.saved.split('/').slice(-3).join('/')+'. Fill the TODOs.');await load();scan()}catch(e){toast(e.error||'Could not save')}}}},'Plant it'),h('button',{class:'btn ghost',on:{click:()=>{ui.draft=null;render()}}},'Discard')))}
@@ -240,7 +248,7 @@ function agentResult(){const r=ui.agent;if(r.error)return h('div',{style:'margin
   r.agent.files.length?h('div',{style:'margin-top:8px'},r.agent.files.map(f=>h('div',{class:'row',style:'justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)'},h('span',{class:'mono small',style:'overflow-wrap:anywhere'},f),h('button',{class:'btn ghost sm',on:{click:()=>prune(f,false)}},'Prune')))):null,
   c.ok?null:c.issues.map(x=>h('p',{class:'small'},h('span',{class:'c-fail'},x.detail),h('br'),h('span',{class:'muted'},'Fix: '+x.action))),
   r.agent.output?h('details',{style:'margin-top:8px'},h('summary',{class:'small muted'},'What the agent said'),h('pre',{style:'margin-top:8px'},r.agent.output)):null,
-  ok&&r.agent.files.length?h('button',{class:'btn',style:'margin-top:12px',on:{click:()=>{tab='Run';ui.sel=null;render();runNow('discovered')}}},'Run the new scenarios'):null)}
+  ok&&r.agent.files.length?h('button',{class:'btn',style:'margin-top:12px',disabled:!!ui.running,on:{click:()=>{tab='Run';ui.sel=null;render();runNow('discovered')}}},'Run the new scenarios'):null)}
 
 /* ---------- History: one case or the whole set ---------- */
 function historyTab(){const runs=state.runs.slice(0,24);if(!runs.length)return[h('div',{class:'card'},h('h2',{},'No runs yet'),h('p',{class:'muted'},'Every run is kept under .tracegrove/runs/ with its evidence bundle.'))];
@@ -270,13 +278,13 @@ function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detect
 
 /* ---------- Heal: diagnose, repair, prove, undo ---------- */
 const KIND={setup:['setup','p-warn'],authoring:['authoring','p-warn'],test_drift:['test drift','p-info'],product_bug:['product bug','p-fail'],assertion:['failing','p-fail'],evidence:['evidence','p-warn'],infrastructure:['infrastructure','p-warn']};
-const HEAL_TITLE={healthy:'Nothing to heal. Every scenario holds.',healed:'Healed. Every fix was proven by a re-run.',partly_healed:'Partly healed. Some findings still need you.',product_bugs:'Found product bugs. The tests stay red on purpose.',needs_human:'Needs you. Nothing was safe to fix automatically.'};
+const HEAL_TITLE={cancelled:'Heal cancelled',healthy:'Nothing to heal. Every scenario holds.',healed:'Healed. Every fix was proven by a re-run.',partly_healed:'Partly healed. Some findings still need you.',product_bugs:'Found product bugs. The tests stay red on purpose.',needs_human:'Needs you. Nothing was safe to fix automatically.'};
 function diffView(text){return h('div',{class:'diff'},text.split('\n').slice(2).map(l=>h('div',{class:l[0]==='+'?'add':l[0]==='-'?'del':'ctx'},l||' ')))}
 function healTab(){const r=ui.heal;const a=state.agent.settings;const name=a.provider==='claude'?'Claude Code':a.provider==='codex'?'Codex':null;const installed=name&&state.agent.detected[a.provider];
  const hero=h('section',{style:'margin-bottom:24px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
   h('div',{style:'max-width:760px'},h('span',{class:'label'},'Self-healing'),h('h1',{style:'margin-top:6px'},ui.healing?'Healing the grove':r?HEAL_TITLE[r.outcome]:'Fix what broke, prove it, keep only what holds.'),
-   h('p',{class:'muted',style:'margin:8px 0 0'},'Setup mistakes are fixed in the config. Failing checks go to '+(installed?name+' ('+(a.model||'default')+')':'the agent')+', which must call each one test drift or a product bug. Drift is repaired and re-run; bugs are reported and the test stays red. Nothing is kept unless a re-run passes, and every kept change can be undone.')),
-  ui.healing?null:h('div',{class:'row'},h('button',{class:'btn ghost',on:{click:()=>startHeal(true)}},'Preview'),h('button',{class:'btn',on:{click:()=>startHeal(false)}},'Heal now'))),
+   h('p',{class:'muted',style:'margin:8px 0 0'},'Setup mistakes are fixed in the config. Failing checks go to '+(installed?name+' ('+(a.model||'default')+')':'the agent')+', which must call each one test drift or a product bug. Drift is repaired and re-run; bugs are reported and the test stays red. Inspect the saved diff: agent judgments do not prove intended product behavior. Undo skips files changed afterward.')),
+  ui.healing?(ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for heal to settle':'Cancel heal'):null):h('div',{class:'row'},h('button',{class:'btn ghost',on:{click:()=>startHeal(true)}},'Preview'),h('button',{class:'btn',on:{click:()=>startHeal(false)}},'Heal now'))),
   ui.healing?h('div',{class:'card fade',style:'margin-top:18px'},h('p',{class:'row',style:'margin:0'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'heal-phase',role:'status','aria-live':'polite'},ui.live&&ui.live.heal.status==='running'?ui.live.heal.phase+(ui.live.heal.detail?' · '+ui.live.heal.detail:''):'Starting')),
    h('div',{class:'log',id:'agent-log','aria-label':'What the agent is doing'},(ui.live&&ui.live.agent.task==='heal'&&ui.live.agent.lines.length?ui.live.agent.lines:['The agent joins only if a check fails after setup is sound']).map(x=>h('div',{},x)))):null,
   !installed&&!ui.healing?h('p',{class:'small muted'},'No agent available: setup fixes still run. ',h('button',{class:'btn ghost sm',on:{click:()=>{tab='Settings';render()}}},'Choose an agent')):null,

@@ -8,6 +8,7 @@ import { materializeGitSnapshot } from '../src/core/gitSnapshot.ts';
 import { compileProject, loadAuthoringConfig } from '../src/authoring/compile.ts';
 import { previewVerificationSource, saveVerificationSource } from '../src/authoring/verificationSource.ts';
 import { readLocalSettings, writeLocalSettings } from '../src/authoring/localSettings.ts';
+import { readSavedRun } from '../src/authoring/savedRun.ts';
 import { readRunSource } from '../src/authoring/runSource.ts';
 import { runTests } from '../src/authoring/run.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
@@ -35,6 +36,9 @@ it('previews without writes or launches, saves an exact ref, and uses shared sce
   const { report } = await runTests({ configPath: p.configPath, grep: 'notes.list' });
   expect(report.outcome, JSON.stringify(report.blockers)).toBe('passed');
   expect(report.sourceBinding).toEqual(candidate.binding);
+  const saved = readSavedRun(p.root, report.runDir.split('/').at(-1)!);
+  expect(saved.savedEvidence.status).toBe('verified');
+  expect(readRunSource(saved.runDir, saved)).toMatchObject({ sourceChecked: true, sourceBinding: candidate.binding, bundleVerified: true });
   expect(readFileSync(p.configPath, 'utf8')).toBe(original);
   expect(readLocalSettings(p.root).agent).toEqual({ provider: 'none', maxBudgetUsd: 0.25 });
   expect(readRunSource(report.runDir, { ...report, sourceBinding: { kind: 'working_tree' } })).toMatchObject({ sourceChecked: true, sourceBinding: candidate.binding });

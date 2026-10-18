@@ -220,7 +220,7 @@ async function main(argv: string[]): Promise<number> {
           const healed = await heal({ dir: compiled.root, report, signal: controller.signal, onProgress: (phase, detail) => live.update(`${phase}${detail ? ` · ${detail}` : ''}`), onAgentActivity: (line) => live.update(`agent · ${line.replaceAll(`${compiled.root}/`, '')}`) });
           live.done();
           out(args, { report, heal: healed }, renderHeal(healed, compiled.root, p));
-          return healed.after.exitCode;
+          return healed.exitCode;
         }
         out(args, report, renderTree(report, compiled.root, p));
         return report.exitCode;
@@ -245,7 +245,14 @@ async function main(argv: string[]): Promise<number> {
       if (port !== null && !/^\d{1,5}$/.test(port)) throw new Blocked([{ code: 'invalid_port', detail: port, owner: 'operator', action: 'pass --port <number>, or leave it out for a free port' }]);
       const server = await startUi({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch') ?? null, ...(port ? { port: Number(port) } : {}) });
       process.stdout.write(`tracegrove ui on ${server.url}\n(loopback only; Ctrl+C to stop)\n`);
-      await new Promise<void>((done) => { const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); void server.close().then(done); }; process.on('SIGINT', stop); process.on('SIGTERM', stop); });
+      await new Promise<void>((done, fail) => {
+        let stopping = false;
+        const stop = () => { if (stopping) return; stopping = true;
+          process.stderr.write('Stopping UI; waiting for the owned verification to settle. Inspect saved receipts for cleanup status.\n');
+          const unlisten = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); };
+          void server.close().then(() => { unlisten(); done(); }, error => { unlisten(); fail(error); }); };
+        process.on('SIGINT', stop); process.on('SIGTERM', stop);
+      });
       return 0;
     }
 

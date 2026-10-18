@@ -143,3 +143,33 @@ left intact. Capturing before the producer disappears still permits export after
 The library exports the `FrozenBundle`, `FrozenPlanInspection`, `ExecutionInspection`
 and `FailedStepInspection` Zod schemas with the corresponding reader/inspection
 functions. These local projections are not new execution authority or outcome records.
+
+
+## Runner compatibility
+
+A frozen runner profile is evidence of the selected configuration, not permission to
+substitute the verifier's current runner identity. `verify-bundle --json` and failed verified
+exports may include `diagnostics` with schema `tracegrove.runner-compatibility/v1`:
+
+- `runner_profile_missing`: no valid, self-digest-checked profile reproduces the requested runner kind.
+- `runner_capability_revision_unsupported`: a valid matching profile is present, but this verifier
+  cannot reproduce the requested capability revision.
+- `runner_capability_digest_mismatch`: the kind and revision are supported, but the exact capability
+  digest cannot be reproduced from the frozen profiles. Investigate the producer/profile mismatch.
+
+The diagnostic includes the exact `requestedRunner` ref and up to 32 matching valid profiles with
+`reproducedRunner` refs. It always says `verification: "not_completed"`; it never grants a historical
+outcome. Unsupported evidence still returns `ok: false`, `outcome: null`, and CLI exit 2. Other
+integrity failures retain their own errors and need not produce a compatibility diagnostic.
+
+Preserve the original bytes and manifest. Do not edit or reseal references, choose a runner by
+step names, or replace a requested revision merely because the case uses a subset of its operations.
+For historical inspection, use the producer's recorded compatible verifier and pinned dependency
+closure. An npm version alone may be insufficient for an unpublished build; retain its source commit
+and package integrity too. To qualify a current runtime, perform a new authorized execution, preserving
+both attempts and their distinct identities. This is a new qualification, not a migration of old proof.
+
+For example, a valid browser profile captured by an unreleased verifier with capability revision
+`0.3.0` cannot be reproduced by a verifier that implements only `0.1.0`. That is an unsupported reader
+boundary, not proof that the profile is absent or that either workflow passed now. These diagnostics
+do not add historical runner implementations, alter accepted evidence, or grant replay authority.

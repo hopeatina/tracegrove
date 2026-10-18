@@ -81,7 +81,7 @@ export function renderTree(report: TestRunReport, root: string, p: Paint): strin
 
 export function renderHeal(report: HealReport, root: string, p: Paint): string {
   const tone = report.outcome === 'healed' || report.outcome === 'healthy' ? p.moss : report.outcome === 'product_bugs' ? p.red : p.amber;
-  const title: Record<HealReport['outcome'], string> = { healthy: 'Nothing to heal: every flow passes', healed: 'Healed: every fix was proven by a re-run', partly_healed: 'Partly healed', product_bugs: 'Product bugs found: the tests stay red on purpose', needs_human: 'Needs you: nothing safe to fix automatically' };
+  const title: Record<HealReport['outcome'], string> = { healthy: 'Nothing to heal: every flow passes', healed: 'Healed: every fix was proven by a re-run', partly_healed: 'Partly healed', product_bugs: 'Product bugs found: the tests stay red on purpose', needs_human: 'Needs you: nothing safe to fix automatically', cancelled: 'Heal cancelled: inspect the saved changes and run receipts' };
   const lines = [`${p.moss('tracegrove heal')} ${p.dim(`· ${report.id}`)}`, tone(p.bold(title[report.outcome])), ''];
   const kindLabel: Record<string, string> = { setup: 'setup', authoring: 'authoring', test_drift: 'test drift', product_bug: 'PRODUCT BUG', assertion: 'failing', evidence: 'evidence', infrastructure: 'infrastructure' };
   for (const f of report.findings) {

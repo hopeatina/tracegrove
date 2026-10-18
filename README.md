@@ -121,6 +121,12 @@ For recorded local recovery state, use `recovery-status --state-dir <owned-state
 It reports a bounded read-only checkpoint and historical evidence; it never clears ownership,
 recovers locks or admits a retry. See [local recovery inspection](docs/local-execution-recovery.md#read-only-recovery-inspection).
 `verify-bundle` and UI recording playback inspect saved evidence; a new `test` performs new actions.
+New `test` reports include `executionId` and the actual `stateDir` for recovery and export.
+The UI Cancel run button targets the current operation and waits for settlement. Closing the
+UI requests cancellation before returning; inspect saved receipts for cleanup status. Saved-run
+results and recordings are freshly checked against sealed evidence, while names and flow paths
+remain unsealed annotations. Historical steps are never relabeled using current flow positions.
+
 Credentials belong in the environment's authorized resolver. Never put real credentials in
 flows, `app.env`, launch args, profiles or artifacts. The sample issues temporary synthetic persona
 tokens in memory; execution permissions remain the host's separate authority.
@@ -239,25 +245,33 @@ Heal reads the latest failure and sorts every problem into one of a few kinds, t
 | **Failing check** | Asks the agent to read the handlers and recent changes and call each failure **test drift** (the app changed on purpose; update the flow) or a **product bug** (the app is wrong; leave the flow alone). |
 | **Evidence** or **infrastructure** | Never repaired; explained, with the run folder to read. |
 
-The guarantees that make it safe to run unattended:
+Repair safeguards and their limits:
 
-- **Nothing is kept unless a re-run passes.** Every config edit and every agent edit is re-run;
-  edits under which the case still fails are reverted on the spot.
+- **Drift edits need an explicit verdict and a passing case.** A successful agent must provide
+  one matching drift verdict before an edit is admitted. Missing, malformed, conflicting or
+  foreign verdicts are rejected. Candidate flow edits must compile and pass their case;
+  setup fixes must clear their setup check. Other failures stay reported.
 - **Product bugs stay red.** A case the agent calls a product bug keeps its failing test, the heal
   exits 1, and the report says what is wrong in one sentence.
-- **Tests cannot be weakened.** An agent edit is rejected if it deletes a step, renames one, checks
-  less than before, or flips an expected success into an expected failure (or back), for example
-  `403` to `200`. Edits outside the failing flows, to app code or new files are undone.
-- **Everything is reversible.** Kept changes are backed up under `.tracegrove/heals/<id>/` next to
-  `report.json` (schema `tracegrove.heal/v1`); `heal --undo <id>` restores them and refuses if a
-  file changed again since.
+- **Mechanical guards reject deleted steps, renamed steps, fewer checks and success/denial
+  flips**, for example `403` to `200`. These guards and an agent verdict do not prove intended
+  product behavior or semantic equivalence: inspect the saved diff. Watched edits outside the
+  failing flows and newly discovered files are restored or removed; this is not an agent sandbox.
+- **Undo preserves subsequent edits.** Kept changes have backups and complete file hashes under
+  `.tracegrove/heals/<id>/` next to `report.json` (schema `tracegrove.heal/v1`). Undo restores only
+  the exact recorded healed file. Changed files, altered backups and old reports without these
+  bindings require manual undo. Heal and undo share a local lock; keep other editors and tools
+  idle because they do not participate in it.
+- **Cancellation waits for the owned operation.** The UI cancels by operation ID and stops new
+  mutations during shutdown. Agent exit precedes rollback of unretained heal edits. Inspect the
+  saved report and run receipts for retained setup fixes and cleanup status.
 - **Comments survive.** Config edits go through a YAML document model, so your comments and
   formatting stay put.
 
 In the UI, **Heal** (or `h`) runs the same thing with the agent's progress streaming in, then
 shows findings, each kept change as a diff, and **Undo all**.
 
-![tracegrove ui Heal tab: a product bug reported with the test kept red, a drifted test fixed and verified, and the kept change shown as a diff with Undo all](docs/images/ui-heal.png)
+The Heal tab ships inside the CLI. The optional repository illustration `docs/images/ui-heal.png` is excluded from the npm package; no UI behavior depends on it.
 
 ## The grove: `tracegrove ui`
 
