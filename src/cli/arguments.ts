@@ -41,9 +41,10 @@ export const COMMAND_SCHEMAS = {
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
   usage: z.object({ ...common, 'state-dir': Text }).strict(),
-  'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text,
+  'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text.optional(), into: Text.optional(),
     'artifact-root': Text.optional(), producer: Text.optional(), 'producer-version': Text.optional() }).strict()
-    .refine(flags => !!flags.producer === !!flags['producer-version'], 'provide both producer name and version'),
+    .refine(flags => !!flags.producer === !!flags['producer-version'], 'provide both producer name and version')
+    .refine(flags => !!flags.output !== !!flags.into, 'select either output or into'),
   observations: z.object({ ...common, archive: Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),

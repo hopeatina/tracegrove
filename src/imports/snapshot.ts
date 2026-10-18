@@ -14,6 +14,8 @@ const Producer = z.object({ name: z.string().min(1).max(8192), version: z.string
 const Options = z.object({ file: z.string().min(1), format: NativeReportFormat, scope: ScopeSchema,
   artifactRoot: z.string().min(1).optional(), producer: Producer.optional(), expectedSourceDigest: DigestSchema.optional() }).strict();
 export type NativeObservationOptions = z.infer<typeof Options>;
+const BytesOptions = Options.omit({ file: true, artifactRoot: true });
+export type NativeObservationBytesOptions = z.infer<typeof BytesOptions>;
 const CAPTURE = Symbol('captured native report');
 function normalize(bytes: Buffer, format: NativeReportFormat): NativeProjection {
   return format === 'playwright_json' ? normalizePlaywright(bytes) : normalizeJunit(bytes);
@@ -74,18 +76,26 @@ export class NativeObservationSnapshot {
       const options = Options.parse(input), path = resolve(options.file); requireRealDirectory(dirname(path));
       if (options.artifactRoot) requireRealDirectory(resolve(options.artifactRoot));
       const source = readBoundedFile(path, IMPORT_LIMITS.reportBytes);
-      if (options.expectedSourceDigest && !sameDigest(digestOfBytes(source), options.expectedSourceDigest)) throw new Error('source changed');
-      const base = normalize(source, options.format), artifacts = new Map<string, Buffer>(), paths = new Map<string, Buffer>(); let size = source.length;
-      const attachments = base.attachments.map(raw => {
-        const value = capture(raw, options, paths);
-        if (value.bytes) { size += value.bytes.length; if (size > IMPORT_LIMITS.totalBytes) throw new Error('native import byte limit'); }
-        if (value.bytes && value.attachment.digest && !artifacts.has(value.attachment.digest.hex)) {
-          artifacts.set(value.attachment.digest.hex, value.bytes);
-        }
-        return value.attachment;
-      });
-      return new NativeObservationSnapshot(CAPTURE, { report: complete(base, source, options, attachments), source, artifacts });
+      return this.capture(source, options);
     } catch { throw new NativeObservationError('native_report_invalid'); }
+  }
+  /** Uploaded bytes never grant file-path access. Only attachments embedded in the report can be captured. */
+  static fromBytes(bytes: Uint8Array, input: NativeObservationBytesOptions): NativeObservationSnapshot {
+    try {
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength > IMPORT_LIMITS.reportBytes) throw new Error('native source size');
+      return this.capture(Buffer.from(bytes), { ...BytesOptions.parse(input), file: 'native-report' });
+    } catch { throw new NativeObservationError('native_report_invalid'); }
+  }
+  private static capture(source: Buffer, options: NativeObservationOptions): NativeObservationSnapshot {
+    if (options.expectedSourceDigest && !sameDigest(digestOfBytes(source), options.expectedSourceDigest)) throw new Error('source changed');
+    const base = normalize(source, options.format), artifacts = new Map<string, Buffer>(), paths = new Map<string, Buffer>(); let size = source.length;
+    const attachments = base.attachments.map(raw => {
+      const value = capture(raw, options, paths);
+      if (value.bytes) { size += value.bytes.length; if (size > IMPORT_LIMITS.totalBytes) throw new Error('native import byte limit'); }
+      if (value.bytes && value.attachment.digest && !artifacts.has(value.attachment.digest.hex)) artifacts.set(value.attachment.digest.hex, value.bytes);
+      return value.attachment;
+    });
+    return new NativeObservationSnapshot(CAPTURE, { report: complete(base, source, options, attachments), source, artifacts });
   }
   /** Archive reader supplies captured bytes only. Reparse/rederive to reject edited normalized outcomes. */
   static restore(reportValue: unknown, source: Buffer, read: (digest: Digest, bytes: number) => Buffer): NativeObservationSnapshot {

@@ -48,6 +48,7 @@ import { runActivity } from '../authoring/activity.ts';
 import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
 import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
 import { readSavedRun } from '../authoring/runSource.ts';
+import { retainNativeImport } from '../authoring/nativeImports.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -118,7 +119,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
   usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
-  import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>
+  import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
        [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
        [--producer <name> --producer-version <v>]      declare missing producer metadata explicitly
   observations --archive <dir>                        recheck imported bytes and show producer-reported attempts
@@ -442,7 +443,7 @@ async function main(argv: string[]): Promise<number> {
       const captured = NativeObservationSnapshot.open({ file: args.flags.input, format: args.flags.format, scope: localScope(),
         ...(args.flags['artifact-root'] ? { artifactRoot: args.flags['artifact-root'] } : {}),
         ...(args.flags.producer ? { producer: { name: args.flags.producer, version: args.flags['producer-version']! } } : {}) });
-      const report = exportImportedObservations(captured, args.flags.output).report;
+      const report = args.flags.into ? retainNativeImport(args.flags.into, captured).report : exportImportedObservations(captured, args.flags.output!).report;
       out(args, report, `Imported native observations · ${report.observations.length} reported observation(s)\n` +
         `${report.attachments.filter(a => a.state === 'captured').length} captured attachment(s); ${report.warnings.length} limitation(s).\n` +
         'Issuer not authenticated; qualification and verification not evaluated. No execution was started.');

@@ -27,6 +27,7 @@ import { readSavedRun } from './runSource.ts';
 import { SavedRunName } from './runReport.ts';
 import { isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -142,6 +143,14 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
         return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, activeRunId: active?.id ?? null, cancelling: active?.cancelling ?? false, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+      }
+      if (url.pathname === '/api/imports' || url.pathname.startsWith('/api/imports/')) {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return send(403, { error: 'unexpected origin' });
+        const reply = await nativeImportsReply(req, url, { root: dir, canWrite: () => !closing && !active,
+          readBytes: async maximum => { pendingBodies.set(req, res); try { return await readNativeUpload(req, maximum); } finally { pendingBodies.delete(req); } } });
+        if (!Buffer.isBuffer(reply.body)) return send(reply.status, reply.body);
+        if (!res.writableEnded && !res.destroyed) { res.writeHead(reply.status, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...reply.headers }); res.end(reply.body); }
+        return;
       }
       if (req.method === 'POST' && url.pathname === '/api/source/preview') {
         const body = await readBody(req, res);

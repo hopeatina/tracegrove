@@ -79,6 +79,32 @@ Exceeded bounds block; records are never silently truncated. XML DTDs, external
 entities, malformed XML and unsupported encodings are rejected. No custom XML
 parser, external entity resolver or remote media downloader is installed.
 
+## Inspect in Grove
+
+Use `tracegrove ui --dir <project>` and open **Imports** to upload a report or
+inspect retained native archives. Uploads have an 8 MiB limit, capture inline
+attachments, and never read report-supplied local paths. The SDK equivalent is
+`NativeObservationSnapshot.fromBytes(bytes, { format, scope })`.
+
+To capture local traces and media, choose an explicit owned artifact root:
+
+```sh
+tracegrove import-observations --format playwright_json --input report.json \
+  --artifact-root ./test-results --into .
+```
+
+`--into <project>` and `--output <new-archive>` are mutually exclusive. Managed
+imports live under `.tracegrove/imports/<report-digest>`. An identical capture
+rechecks existing bytes; it never overwrites a damaged archive. The collection
+blocks above 500 entries rather than hiding older records. Directory listings
+are metadata only; opening an entry rederives observations from the source bytes.
+
+The view supports filtering by title, kind, suite or outcome, keyboard `j`/`k`
+selection, reloadable named-import links, and pagination without dropping records.
+Source and captured attachments download as opaque files after fresh archive
+inspection. A changed or unreadable archive clears the displayed facts. Imports
+never start a test, heal, qualification or scenario activation.
+
 ## Observation versus verification
 
 Exit 0 means capture/readback succeeded, including when the native producer failed.

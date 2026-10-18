@@ -15,3 +15,4 @@ export { previewVerificationSource, saveVerificationSource, savedVerificationSou
 export { StepReport, CaseReport, TestRunReport, SavedRunName } from './runReport.ts';
 export { readSavedRun, readRunSource, CheckedRunReport } from './runSource.ts';
 export { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+export { NativeImportName, NativeImportEntry, listNativeImports, readNativeImport, retainNativeImport } from './nativeImports.ts';
