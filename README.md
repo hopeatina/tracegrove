@@ -308,6 +308,12 @@ after the producer's directory is gone. The [result sink](docs/result-sink.md)
 preserves failed and mocked outcomes, rejects conflicting deliveries, and never
 treats storage acceptance as issuer authentication, qualification, or activation.
 
+The optional [AWR delivery adapter](docs/awr-delivery.md) freezes a redacted report
+and destination in that same ledger. `awr-prepare`, `awr-inspect`, and `awr-deliver`
+separate preparation from authenticated import, retain failed product verdicts,
+and retry the original key after a lost acknowledgement without rerunning tests.
+Imported evidence remains unverified; native work acceptance is a separate gate.
+
 The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
 fixtures and independent readback, and verifies recordings in the portable bundle.
 Browser short flows run through `tracegrove test`; Grove plays receipt-bound recordings

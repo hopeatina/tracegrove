@@ -91,6 +91,11 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
+  awr-prepare --sink <dir> --id <result-id> --destination <json>
+                                                       freeze a redacted AWR export and exact destination; no network
+  awr-inspect --sink <dir> --id <result-id>              show saved delivery and acknowledgement state
+  awr-deliver --sink <dir> --id <result-id> [--credential-env <name>]
+                                                       retry the frozen import; default secret env TRACEGROVE_ORGX_TOKEN
   results --sink <dir> [--id <record-id>]               list receipts; --id re-verifies its retained archive
           [--limit 1..100] [--cursor <opaque>]           bounded, snapshot-stable pages; issuer remains unverified
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
@@ -394,6 +399,16 @@ async function main(argv: string[]): Promise<number> {
       return verification.ok ? 0 : 2;
     }
 
+    case 'awr-prepare':
+    case 'awr-inspect':
+    case 'awr-deliver': {
+      const { runAwrCommand } = await import('../integrations/awr/cli.ts').catch(() => {
+        throw new Conflict('AWR integration unavailable; install the optional peer @useorgx/agent-work-receipt@0.3.0');
+      });
+      const state = await runAwrCommand(args.command, args.flags);
+      out(args, state, `${state.status}: ${state.prepared.ref.id}\nAttempts: ${state.attempts}; target verdict is in the saved receipt.\nImported evidence remains unverified; native acceptance and outcomes are separate.`);
+      return 0;
+    }
     case 'result-ingest':
     case 'results': {
       if (args.command === 'results' && args.flags.id && (args.flags.cursor !== undefined || args.flags.limit !== undefined)) throw new Conflict('Choose --id or pagination options, not both');
