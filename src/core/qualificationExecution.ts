@@ -5,9 +5,10 @@ import { checkAdmission } from './localScenarioState.ts';
 import type { LocalLedger } from './ledger.ts';
 import type { LocalScenarioStore } from './localScenarioStore.ts';
 import { Conflict } from './errors.ts';
+import { ApprovedPlanReview, validateApprovedPlanReview, validatePromotedCases } from './sourcePromotion.ts';
 
 export const QualificationExecutionContext = z.object({ admission: QualificationRoundAdmission, definition: ScenarioDefinition,
-  selection: SelectionManifest, matrix: SelectionManifest }).strict();
+  selection: SelectionManifest, matrix: SelectionManifest, sourceReview: ApprovedPlanReview.optional() }).strict();
 export type QualificationExecutionContext = z.infer<typeof QualificationExecutionContext>;
 export interface QualificationExecutionOwner {
   resolve(ref: Ref, scope: Scope, ledger: LocalLedger): Promise<unknown>;
@@ -24,6 +25,13 @@ export function validateQualificationExecution(request: RunRequest, selection: S
     if (!verifySelfDigest(document) || !sameScope(document.scope, request.requestedScope)) throw new Conflict('qualification document seal or scope mismatch');
   }
   checkAdmission({ definitions: [definition], selections: [matrix, context.selection] }, admission);
+  if (definition.sourcePlanRef) {
+    if (!context.sourceReview) throw new Conflict('source-backed qualification needs current review owner evidence');
+    const approved = context.sourceReview;
+    validateApprovedPlanReview(approved, { id: approved.projection.id, scope: definition.scope,
+      expectedEditRevision: approved.projection.editRevision, expectedSourcePlanRef: definition.sourcePlanRef }, definition.reviewRef);
+    validatePromotedCases(definition, approved);
+  } else if (context.sourceReview) throw new Conflict('unbound source review in qualification context');
   if (admission.attempts.some(a => [a.executionId, a.attemptId].some(id => !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id) || id === '.' || id === '..'))) throw new Conflict('qualification allocation IDs must be safe local path segments');
   const nullableEqual = (a: Ref | null, b: Ref | null) => a === null ? b === null : b !== null && sameRef(a, b);
   const unique = (values: string[]) => new Set(values).size === values.length;

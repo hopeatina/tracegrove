@@ -9,22 +9,28 @@ import { localScope } from '../../src/core/corpus.ts';
 import { validatePlanSources, type SourceAnalysisPorts } from '../../src/core/source-analysis.ts';
 import { editPlan, reviewPlan } from '../../src/core/review.ts';
 import { ChangeModel, QualificationPolicy, RevisionMatrix, SourcePlan, ScenarioDefinition, ScenarioPromotionIntent, digestOfBytes, freeze, refKey, type Ref } from '../../src/protocol/index.ts';
+import { pinnedProjectFixture } from './pinnedProject.ts';
+import { GitSourceReader, resolveGitSources } from '../../src/core/gitSources.ts';
 
 const ref = (id: string): Ref => ({ id, revision: '1', digest: digestOfBytes(id) });
 /** Actual immutable Git bytes and a bounded TypeScript AST route oracle; authentication/coverage policy remain simulated. */
-export async function reviewedPromotionFixture(track: (ledger: LocalLedger) => void) {
+export async function reviewedPromotionFixture(track: (ledger: LocalLedger) => void, options: { pinnedSource?: boolean; independentReviewResolution?: boolean } = {}) {
+  const pinned = options.pinnedSource ? await pinnedProjectFixture('sha1', 'create-read-delete') : null;
+  const independent = pinned && options.independentReviewResolution ? await resolveGitSources({ scope: localScope(), repositories: [pinned.selected] }, async () => {}) : null;
   const qualificationPolicy = QualificationPolicy.parse(freeze({ schemaVersion: 'workflow.qualification-policy/v1', ref: { id: 'promotion-qualification-policy', revision: '1' },
-    scope: localScope(), requiredLevel: 'environment', minimumIndependentRounds: 2 }));
-  const f = await registeredQualificationFixture(track, qualificationPolicy.ref);
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: resolve(f.planned.projectRoot, '..') });
-  git('init', '--quiet'); git('add', 'app/app.mjs', 'app/http.mjs');
-  git('-c', 'user.name=Conformance', '-c', 'user.email=conformance@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '-m', 'Immutable notes source');
+    scope: localScope(), requiredLevel: pinned ? 'revision' : 'environment', minimumIndependentRounds: 2 }));
+  const f = await registeredQualificationFixture(track, qualificationPolicy.ref, 'native-real', pinned?.bundle);
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: pinned?.root ?? resolve(f.planned.projectRoot, '..') });
+  if (!pinned) {
+    git('init', '--quiet'); git('add', 'app/app.mjs', 'app/http.mjs');
+    git('-c', 'user.name=Conformance', '-c', 'user.email=conformance@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '-m', 'Immutable notes source');
+  }
   const head = git('rev-parse', 'HEAD').toString().trim(); const bytes = git('show', `${head}:app/app.mjs`);
-  const repositoryRef = ref('sample-repository'); const gap = ref('unresolved-provider-gap');
+  const repositoryRef = pinned?.repositoryRef ?? ref('sample-repository'); const gap = ref('unresolved-provider-gap');
   const citation = freeze({ ref: { id: 'app-citation', revision: '1' }, repositoryRef, resolvedCommit: head, path: 'app/app.mjs',
     fileDigest: digestOfBytes(bytes), lineStart: 1, lineEnd: bytes.toString().trimEnd().split('\n').length,
     excerptDigest: digestOfBytes(bytes), symbol: null });
-  const matrix = RevisionMatrix.parse(freeze({ schemaVersion: 'workflow.revisions/v1', ref: { id: 'source-matrix', revision: '1' }, scope: f.scope,
+  const matrix = independent?.matrix ?? pinned?.resolution.matrix ?? RevisionMatrix.parse(freeze({ schemaVersion: 'workflow.revisions/v1', ref: { id: 'source-matrix', revision: '1' }, scope: f.scope,
     repositories: [{ repositoryRef, requestedRef: 'HEAD', requestedBaseRef: 'HEAD', headCommit: head, baseCommit: head,
       mergeBaseCommit: head, mergeBaseAbsentReason: null, diffRef: { ...ref('source-diff'), digest: digestOfBytes(git('diff', head, head)) },
       changedFileRefs: [], resolverRef: ref('fixture-git-resolver') }], resolvedAt: '2026-10-18T00:00:00Z' }));
@@ -39,9 +45,9 @@ export async function reviewedPromotionFixture(track: (ledger: LocalLedger) => v
       { id: 'provider', sourceElementIds: [], caseRef: ref('blocked-provider-case'), disposition: 'blocked', reasonRefs: [gap], capabilityRefs: [] }],
     validFlowRefs: [], withheldFlows: [{ flowRef: ref('withheld-provider-flow'), reasonRefs: [gap] }], invalidFlows: [], coverageObligationRefs: [ref('notes-coverage')], gapRefs: [gap] }));
   const documents = new Map([matrix, model, citation].map(d => [refKey(d.ref), d] as [string, unknown]));
-  const source: SourceAnalysisPorts = { authorize: async () => {}, resolveDocument: async r => documents.get(refKey(r)),
-    readFile: async (_scope, c) => ({ repositoryRef, resolvedCommit: c.resolvedCommit, path: c.path, bytes: git('show', `${c.resolvedCommit}:${c.path}`) }),
-    readDiff: async (_scope, selected) => git('diff', selected.baseCommit, selected.headCommit), verifyRevisionPolicy: async () => {},
+  const reader = new GitSourceReader(matrix, [{ repositoryRef, root: pinned?.root ?? resolve(f.planned.projectRoot, '..') }], async () => {});
+  const source: SourceAnalysisPorts = { authorize: (scope, repo) => reader.authorize(scope, repo), resolveDocument: async r => documents.get(refKey(r)),
+    readFile: (scope, c) => reader.readFile(scope, c), readDiff: (scope, selected) => reader.readDiff(scope, selected), verifyRevisionPolicy: async () => {},
     verifyElement: async () => {
       const file = ts.createSourceFile('app.mjs', git('show', `${head}:app/app.mjs`).toString(), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
       let post = false;
@@ -58,8 +64,8 @@ export async function reviewedPromotionFixture(track: (ledger: LocalLedger) => v
   const token = { id: 'editable-source', scope: f.scope, expectedEditRevision: 1, expectedSourcePlanRef: plan.ref };
   const approved = await reviewPlan(review.ports(), token, 'approved', []);
   const definition = ScenarioDefinition.parse(freeze({ ...f.definition, ref: { id: 'reviewed-scenario', revision: '1' }, sourcePlanRef: plan.ref, reviewRef: approved.ref }));
-  const store = new LocalScenarioStore(f.ledger, 'promoted-entry', f.scope, { authorize: async () => {}, validateStateLeases: async () => {},
-    validateDefinition: async d => { const snapshot = await review.definitionSnapshot(f.ledger, d); snapshot.assertCurrent(); } });
+  const store = new LocalScenarioStore(f.ledger, 'promoted-entry', f.scope, { reviewStore: review, authorize: async () => {}, validateStateLeases: async () => {},
+    validateDefinition: async () => {} });
   const selections = await Promise.all([f.definition.qualificationMatrixRef, f.admission.selectionManifestRef].map(r => f.store.resolveSelection(r, f.scope)));
   const intent = ScenarioPromotionIntent.parse({ scenarioId: 'promoted-entry', definitionRef: definition.ref, reviewToken: token,
     selectionManifestRefs: selections.map(s => s.ref), idempotencyKey: 'promote-reviewed-source' });
@@ -69,5 +75,5 @@ export async function reviewedPromotionFixture(track: (ledger: LocalLedger) => v
   const edit = async () => { const next = SourcePlan.parse(freeze({ ...plan, ref: { id: plan.ref.id, revision: '2' } }));
     await review.stage(next); await editPlan(review.ports(), token, next.ref); return next; };
   return { ...f, store, review, reviewAuthority, plan, gap, approved, token, definition, selections, intent, controls, authority,
-    ports: store.promotionPorts(review, authority), edit, head, sourceBytes: bytes, git, qualificationPolicy };
+    ports: store.promotionPorts(review, authority), edit, head, sourceBytes: bytes, git, qualificationPolicy, pinned };
 }

@@ -94,7 +94,7 @@ export class LocalReviewStore {
   }
   /** Requires current review authority but creates no review or approval. The runtime fence is never serialized. */
   async approvedSnapshot(ledger: LocalLedger, input: PlanRevisionToken, expectedReview: Ref): Promise<ApprovedPlanSnapshot> {
-    if (ledger !== this.ledger) throw new Conflict('promotion must use the review owner ledger');
+    if (ledger !== this.ledger) throw new Conflict('source-backed lifecycle must use the review owner ledger');
     const token = PlanRevisionToken.parse(input); const reviewRef = RefSchema.parse(expectedReview); this.scoped(token.id, token.scope);
     await this.authority.authorize(structuredClone(this.scope), 'review');
     const { version, state } = this.current();
@@ -104,7 +104,7 @@ export class LocalReviewStore {
     if (!plan || !review || review.decision !== 'approved' || !validation) throw new Conflict('promotion requires a current approved review and persisted source validation');
     const documents = validateApprovedPlanReview({ storageVersion: version, projection: state.projection, plan, review, validation }, token, reviewRef);
     return { documents: structuredClone(documents), assertCurrent: () => {
-      if (this.current().version !== version) throw new Conflict('approved review changed during promotion');
+      if (this.current().version !== version) throw new Conflict('approved review changed before the lifecycle write');
     } };
   }
   /** Compose with the scenario host's other definition checks; an edited/rejected plan cannot remain current approval. */

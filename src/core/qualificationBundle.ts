@@ -23,6 +23,13 @@ export async function prepareQualificationExecution(bundle: FrozenBundle, admiss
   const fidelity = FidelityPlan.parse(freeze({ ...sourceFidelity, ref: { id: `qualification-fidelity-${suffix}`, revision: '1' }, selectionManifestRef: selection.ref }));
   const documents = structuredClone(bundle.documents);
   for (const document of [admission, definition, selection, context.matrix, fidelity]) documents[refKey(document.ref)] = document;
+  if (context.sourceReview) {
+    for (const document of [context.sourceReview.plan, context.sourceReview.review, context.sourceReview.validation]) {
+      const key = refKey(document.ref);
+      if (documents[key] && digestOfValue(documents[key]).hex !== digestOfValue(document).hex) throw new Conflict('qualification source evidence conflicts with its owning review');
+      documents[key] = structuredClone(document);
+    }
+  }
   let fixtureRef: Ref | null = null;
   if (base.fixturePlanRef) {
     const source = CampaignFixturePlan.parse(documents[refKey(base.fixturePlanRef)]);

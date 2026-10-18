@@ -43,17 +43,25 @@ registry's existing 100-scenario bound applies. Older journals have no promotion
 
 ## Current review checks after promotion
 
-Compose the review guard with the host's other definition checks:
+Bind the current review owner once when constructing a source-backed local scenario store:
 
 ```ts
-validateDefinition: async definition => {
-  const reviewed = await reviews.definitionSnapshot(ledger, definition);
-  await validateReplayPolicyAndTarget(definition);
-  reviewed.assertCurrent();
-}
+const scenarios = new LocalScenarioStore(ledger, scenarioId, scope, {
+  reviewStore: reviews,
+  authorize,
+  validateDefinition: validateReplayPolicyAndTarget,
+  validateStateLeases,
+});
 ```
 
-An edit clears the current plan review. This guard then refuses later structural,
+`reviewStore` is required when a definition names a source plan. It must own the same
+ledger. The store checks its exact current approved review and independently validated
+runnable cases in addition to the host's replay/target/policy checks. Initialize,
+structural validation, round registration and activation hold its synchronous version
+fence through their last awaited authorization and assert it immediately before the
+registry write. An edit during that await publishes no transition.
+
+An edit clears the current plan review. These guards then refuse later structural,
 qualification and activation admission against the old review. Use `invalidateScenario`
 with a replacement definition to advance its epoch and clear activation. Historical
 promotion retries return the original receipt without renewing approval or altering
@@ -66,8 +74,31 @@ revocation and provider fencing with the controller. Local hashes and receipts d
 establish a hosted issuer or deployed revision. Source-bound activation still requires
 independent runtime revision proof; source inspection alone cannot grant it.
 
+## Execute the reviewed revision
+
+Use the compiler's `--source-snapshot` and `--source-repository-role` options to bind
+the complete resolver-head snapshot before selecting, reviewing and promoting cases.
+The approved source plan must name that exact resolver matrix. A different matrix
+ref is rejected even when its commits happen to match. Component-only source runs
+can still execute, but cannot establish revision qualification.
+
+`prepareQualificationExecution` reads current source review evidence through the
+scenario owner and carries copies of the sealed plan, approved review and source
+validation into the frozen execution documents. It leaves the original trial plan
+unchanged. Each effect authorization resolves current owner state again, including
+after awaited effect permission. The controller never obtains approval from the
+copied documents.
+
+Preflight and saved-bundle checks use `validateReviewedSourceDocuments` to check seals,
+scope, plan/review/validation links and the selected matrix. The same pure schema is
+shared with promotion. Saved evidence proves the recorded relationships; the owning
+review store determines current approval. Historical bundles remain readable after
+an edit, while new execution and activation require current authority.
+
 Tests compose immutable Git reads, an actual bounded TypeScript AST predicate, source
-validation, durable review, promotion, structural validation and native execution.
+validation, durable review, promotion, structural validation, two independently admitted
+native revision rounds and atomic activation, including reopen recovery and source-edit
+races at the final structural, registration and activation boundaries.
 Authentication, coverage policy, physical leases and issuer authority are explicitly
 simulated. The AST oracle proves a declared POST branch only. These proofs do not
 establish full semantic coverage, a deployed source tuple or hosted qualification.

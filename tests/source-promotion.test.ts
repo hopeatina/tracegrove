@@ -25,8 +25,8 @@ const ref = (id: string): Ref => ({ id, revision: '1', digest: digestOfBytes(id)
 function reopen(f: Awaited<ReturnType<typeof fixture>>) {
   f.ledger.close(); const ledger = LocalLedger.open(f.root); ledgers.push(ledger);
   const review = new LocalReviewStore(ledger, 'editable-source', f.scope, f.reviewAuthority);
-  const store = new LocalScenarioStore(ledger, 'promoted-entry', f.scope, { authorize: async () => {}, validateStateLeases: async () => {},
-    validateDefinition: async d => { (await review.definitionSnapshot(ledger, d)).assertCurrent(); } });
+  const store = new LocalScenarioStore(ledger, 'promoted-entry', f.scope, { reviewStore: review, authorize: async () => {}, validateStateLeases: async () => {},
+    validateDefinition: async () => {} });
   return { ledger, review, store, ports: store.promotionPorts(review, f.authority) };
 }
 it('promotes current real Git/AST-backed review and retains gaps in one proposed registry record without effects', async () => {

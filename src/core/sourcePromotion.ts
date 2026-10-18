@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import { IdString, PlanEditProjection, PlanReview, PlanRevisionToken, PlanSourceValidation, PositiveInt, RefSchema,
-  ScenarioDefinition, ScenarioPromotion, ScenarioPromotionIntent, SelectionManifest, SourcePlan,
+import { IdString, PlanEditProjection, PlanRevisionToken, PositiveInt, RefSchema,
+  ScenarioDefinition, ScenarioPromotion, ScenarioPromotionIntent, SelectionManifest,
   digestOfValue, freeze, refKey, sameRef, sameScope, verifySelfDigest, type Digest, type Ref, type Scope } from '../protocol/index.ts';
 import { validateQualificationMatrix, validateQualificationSelection, validateScenarioDefinition } from './scenario.ts';
 import { Conflict } from './errors.ts';
 import { nowIso } from './clock.ts';
+import { ReviewedSourceDocuments, validateReviewedSourceDocuments } from './sourceReviewEvidence.ts';
 
 export const PromotionActor = z.object({ actorId: IdString, policyRef: RefSchema }).strict();
-export const ApprovedPlanReview = z.object({ storageVersion: PositiveInt, projection: PlanEditProjection,
-  plan: SourcePlan, review: PlanReview, validation: PlanSourceValidation }).strict();
+export const ApprovedPlanReview = ReviewedSourceDocuments.extend({ storageVersion: PositiveInt, projection: PlanEditProjection }).strict();
 export type ApprovedPlanReview = z.infer<typeof ApprovedPlanReview>;
 export interface ApprovedPlanSnapshot { documents: ApprovedPlanReview; assertCurrent(): void }
 export interface ScenarioPromotionPorts {
@@ -27,17 +27,14 @@ export function normalizePromotionIntent(raw: ScenarioPromotionIntent): Scenario
 }
 export function validateApprovedPlanReview(raw: unknown, token: PlanRevisionToken, reviewRef: Ref): ApprovedPlanReview {
   const approved = ApprovedPlanReview.parse(raw); const { projection: p, plan, review, validation } = approved;
-  if ([plan, review, validation].some(d => !verifySelfDigest(d) || !sameScope(d.scope, token.scope)) ||
-      p.id !== token.id || !sameScope(p.scope, token.scope) || p.editRevision !== token.expectedEditRevision ||
+  validateReviewedSourceDocuments({ plan, review, validation }, token.scope);
+  if (p.id !== token.id || !sameScope(p.scope, token.scope) || p.editRevision !== token.expectedEditRevision ||
       !sameRef(p.sourcePlanRef, token.expectedSourcePlanRef) || !sameRef(plan.ref, p.sourcePlanRef) || !p.currentReviewRef ||
       !sameRef(p.currentReviewRef, review.ref) || !sameRef(review.ref, reviewRef) || review.decision !== 'approved' ||
-      review.editRevision !== p.editRevision || !sameRef(review.sourcePlanRef, plan.ref) ||
-      !sameRef(validation.sourcePlanRef, plan.ref) || !sameRef(validation.changeModelRef, plan.changeModelRef) ||
-      !sameRef(validation.revisionMatrixRef, plan.revisionMatrixRef) || !sameRef(validation.policyRef, review.policyRef) ||
-      !review.reasonRefs.some(r => sameRef(r, validation.ref))) throw new Conflict('promotion requires the exact current approved review and persisted source validation');
+      review.editRevision !== p.editRevision) throw new Conflict('promotion requires the exact current approved review and persisted source validation');
   return approved;
 }
-export function validatePromotedCases(definition: ScenarioDefinition, approved: ApprovedPlanReview): void {
+export function validatePromotedCases(definition: ScenarioDefinition, approved: ReviewedSourceDocuments): void {
   const { plan, validation } = approved;
   if (!definition.sourcePlanRef || !sameRef(definition.sourcePlanRef, plan.ref) || !sameRef(definition.reviewRef, approved.review.ref) ||
       plan.disposition !== 'scenario_set' || new Set(plan.candidates.map(c => c.id)).size !== plan.candidates.length) throw new Conflict('scenario does not bind an approved source scenario set');

@@ -1,6 +1,7 @@
-import { GitSourceSnapshot, HostPlan, RevisionMatrix, SourcePlan, SourceSelection, digestOfValue, refKey, sameRef, sameScope,
+import { GitSourceSnapshot, HostPlan, PlanReview, PlanSourceValidation, RevisionMatrix, SourcePlan, SourceSelection, digestOfValue, refKey, sameRef, sameScope,
   verifySelfDigest, type Ref, type RunRequest, type SelectionManifest } from '../protocol/index.ts';
 import { snapshotRepository, snapshotRevision } from './snapshotRepository.ts';
+import { validateReviewedSourceDocuments } from './sourceReviewEvidence.ts';
 
 /** Frozen source closure, shared by preflight, saved evidence and revision assessment. No effects. */
 export function repositorySelectionProblems(request: RunRequest, cell: SelectionManifest['cells'][number], host: HostPlan,
@@ -35,6 +36,12 @@ export function repositorySelectionProblems(request: RunRequest, cell: Selection
     if (request.sourcePlanRef) {
       const plan = read(SourcePlan, request.sourcePlanRef);
       if (!sameScope(plan.scope, source.scope) || !sameRef(plan.revisionMatrixRef, matrix.ref)) throw new Error('reviewed source plan selects a different revision matrix');
+      if (!request.reviewRef) throw new Error('source-backed repository binding requires its approved review');
+      const review = read(PlanReview, request.reviewRef);
+      const validationRef = [...review.reasonRefs].reverse().find(ref => PlanSourceValidation.safeParse(documents[refKey(ref)]).success);
+      if (!validationRef) throw new Error('source-backed repository binding requires persisted source validation');
+      const validation = read(PlanSourceValidation, validationRef);
+      validateReviewedSourceDocuments({ plan, review, validation }, source.scope);
     }
     return [];
   } catch (error) { return [`repository source binding invalid: ${(error as Error).message}`]; }

@@ -1,10 +1,11 @@
-import { IdString, ScenarioProjection, ScenarioRevisionToken, ScenarioStructuralValidation,
-  digestOfValue, sameScope, verifySelfDigest } from '../protocol/index.ts';
+import { IdString, ScenarioProjection, ScenarioRevisionToken, ScenarioStructuralValidation, SourceSelection,
+  digestOfValue, refKey, sameScope, verifySelfDigest } from '../protocol/index.ts';
 import { StructuralActor, deriveScenarioStructure, structuralIntent, type ScenarioStructurePorts } from './scenarioStructure.ts';
 import { storedDefinition, storedSelection } from './localScenarioState.ts';
 import { validateScenarioSnapshot } from './scenario.ts';
 import type { LocalScenarioOwner } from './localScenarioOwner.ts';
 import { Conflict } from './errors.ts';
+import { validateReviewedSourceSelection } from './sourceReviewEvidence.ts';
 
 export type LocalScenarioStructureAuthority = Pick<ScenarioStructurePorts, 'authorizeValidation'>;
 export function localScenarioStructurePorts(owner: LocalScenarioOwner, authority: LocalScenarioStructureAuthority): ScenarioStructurePorts {
@@ -27,13 +28,16 @@ export function localScenarioStructurePorts(owner: LocalScenarioOwner, authority
       if (entry.structuralValidations.some(v => v.ref.id === validation.ref.id)) return false;
       validateScenarioSnapshot({ projection: entry.projection, admissions: entry.admissions }, token);
       const definition = storedDefinition(entry, token.expectedDefinitionRef);
-      await owner.readPorts.validateDefinition(structuredClone(definition));
+      const reviewed = await owner.checkDefinition(definition);
+      if (reviewed && bundle.request?.sourceSelectionRef) validateReviewedSourceSelection(reviewed.documents,
+        SourceSelection.parse(bundle.documents[refKey(bundle.request.sourceSelectionRef)]));
       const intent = structuralIntent(token, bundle);
       const actor = StructuralActor.parse(await authority.authorizeValidation(structuredClone(owner.scope), structuredClone(intent.digest)));
       const expected = deriveScenarioStructure(token, entry.projection, definition,
         storedSelection(entry, definition.qualificationMatrixRef), bundle, actor, validation.validatedAt);
       if (digestOfValue(expected.validation).hex !== digestOfValue(validation).hex || digestOfValue(expected.next).hex !== digestOfValue(next).hex) throw new Conflict('structural validation differs from compiled closure or current authority');
       if (owner.current().version !== version) return false;
+      reviewed?.assertCurrent();
       entry.projection = next; entry.structuralValidations.push(validation);
       owner.write(version, state, 'workflow.scenario.structure-validated');
       return true;

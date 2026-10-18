@@ -1,13 +1,10 @@
 import { afterEach, expect, it } from 'vitest';
-import { cpSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanupGitRepositories, gitFixture } from './fixtures/git.ts';
+import { cleanupGitRepositories } from './fixtures/git.ts';
 import { cleanupTemps, runSample } from '../conformance/helpers.ts';
 import { compileProject } from '../src/authoring/compile.ts';
-import { loadProject, localScope } from '../src/core/corpus.ts';
-import { plan } from '../src/core/planner.ts';
-import { resolveGitSources } from '../src/core/gitSources.ts';
-import { materializeGitSnapshot } from '../src/core/gitSnapshot.ts';
+import { localScope } from '../src/core/corpus.ts';
 import { readVerifiedBundle, verifyBundle } from '../src/core/bundle.ts';
 import { prepareFrozenCells } from '../src/core/executionPreparation.ts';
 import { repositorySelectionProblems } from '../src/core/repositorySelectionEvidence.ts';
@@ -15,28 +12,11 @@ import { snapshotRepository, snapshotSourceSelection } from '../src/core/snapsho
 import { activateScenario } from '../src/core/scenarioActivation.ts';
 import { registeredReplayFixture } from './fixtures/registeredReplay.ts';
 import { LocalLedger } from '../src/core/ledger.ts';
-import { HostPlan, RevisionMatrix, RunRequest, SelectionManifest, SourcePlan, SourceSelection, digestOfBytes, freeze, refKey } from '../src/protocol/index.ts';
+import { pinnedProjectFixture as fixture } from './fixtures/pinnedProject.ts';
+import { RevisionMatrix, RunRequest, SourcePlan, SourceSelection, digestOfBytes, freeze, refKey } from '../src/protocol/index.ts';
 
 const ledgers: LocalLedger[] = [];
 afterEach(() => { for (const ledger of ledgers.splice(0)) ledger.close(); cleanupTemps(); cleanupGitRepositories(); });
-
-async function fixture(format: 'sha1' | 'sha256' = 'sha1') {
-  const git = gitFixture('app', format);
-  cpSync(join(import.meta.dirname, '../src/samples/notes-api'), git.root, { recursive: true });
-  writeFileSync(join(git.root, 'package-lock.json'), '{"lockfileVersion":3}\n');
-  git.git('add', '.'); git.git('commit', '--quiet', '-m', 'Application and lockfile');
-  const resolution = await resolveGitSources({ scope: localScope(), repositories: [{ ...git.selected, head: 'main' }] }, async () => {});
-  const materialized = await materializeGitSnapshot({ resolution, repositoryRef: git.repositoryRef, side: 'head', root: git.root, output: join(git.root, 'pin') }, async () => {});
-  const configPath = join(materialized.sourceDir, 'tracegrove.config.yaml');
-  const compiled = compileProject(configPath, { sourceSnapshot: materialized.manifestPath, sourceRepositoryRole: 'application', grep: 'notes.list' });
-  const bundle = plan({ project: loadProject(compiled.workflowConfigPath), profileName: 'real', scope: localScope() });
-  expect(bundle.blockers).toEqual([]); expect(bundle.request).not.toBeNull();
-  const request = bundle.request!;
-  const selection = SelectionManifest.parse(bundle.documents[refKey(request.selectionManifestRef)]);
-  const cell = selection.cells[0]!;
-  const host = HostPlan.parse(bundle.documents[refKey(cell.executionHostRef)]);
-  return { ...git, ...materialized, resolution, configPath, compiled, bundle, request, cell, host, pin: host.launch!.sourceSnapshot! };
-}
 
 for (const format of ['sha1', 'sha256'] as const) it(`observes the actual ${format} repository without a Git checkout or claimed remote`, async () => {
   const f = await fixture(format);

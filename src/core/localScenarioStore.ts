@@ -11,8 +11,11 @@ import { localScenarioStructurePorts, type LocalScenarioStructureAuthority } fro
 import type { LocalScenarioOwner } from './localScenarioOwner.ts';
 import type { LocalReviewStore } from './localReviewStore.ts';
 import { localScenarioPromotionPorts, type LocalScenarioPromotionAuthority } from './localScenarioPromotion.ts';
+import type { ApprovedPlanSnapshot } from './sourcePromotion.ts';
 
 export interface LocalScenarioAuthority {
+  /** Required for source-derived definitions. The same-ledger owner supplies current evidence and a synchronous fence. */
+  reviewStore?: LocalReviewStore;
   authorize(scope: Scope, action: 'initialize' | 'stage' | 'read' | 'register_round' | 'invalidate'): Promise<void>;
   /** Authenticated host checks promotion/structural validation and the complete reviewed definition closure. */
   validateDefinition(definition: ScenarioDefinition): Promise<void>;
@@ -47,6 +50,12 @@ export class LocalScenarioStore {
   private write(version: number, state: LocalScenarioState, event: string): void {
     this.ledger.append(this.aggregate, version, event, checkLocalScenarioState(state, this.scope));
   }
+  private async checkDefinition(definition: ScenarioDefinition): Promise<ApprovedPlanSnapshot | null> {
+    await this.authority.validateDefinition(structuredClone(definition));
+    if (!definition.sourcePlanRef) return null;
+    if (!this.authority.reviewStore) throw new Conflict('source-backed scenarios require their current review owner');
+    return this.authority.reviewStore.definitionSnapshot(this.ledger, structuredClone(definition));
+  }
   async initialize(raw: unknown, selections: unknown[]): Promise<void> {
     return this.initializeState(raw, selections, 'validating');
   }
@@ -60,13 +69,14 @@ export class LocalScenarioStore {
     const uniqueSelections: SelectionManifest[] = [];
     for (const selection of parsed) appendImmutable(uniqueSelections, selection);
     await this.authority.authorize(structuredClone(this.scope), 'initialize');
-    await this.authority.validateDefinition(structuredClone(definition));
+    const reviewed = await this.checkDefinition(definition);
     await this.authority.authorize(structuredClone(this.scope), 'initialize');
     const { version, state } = this.current();
     if (state.scenarios.some(item => item.projection.id === this.id)) throw new Conflict('local scenario is already initialized');
     const projection = ScenarioProjection.parse({ id: this.id, scope: this.scope, aggregateVersion: 1, definitionRef: definition.ref,
       state: initialState, invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
     state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], structuralValidations: [], promotion: null });
+    reviewed?.assertCurrent();
     this.write(version, state, 'workflow.scenario.initialized');
   }
   async stage(raw: unknown, selections: unknown[] = []): Promise<void> {
@@ -104,12 +114,13 @@ export class LocalScenarioStore {
     if (!admission || !['validating', 'active'].includes(entry.projection.state) ||
         !sameRef(admission.scenarioRef, entry.projection.definitionRef) || admission.invalidationEpoch !== entry.projection.invalidationEpoch) throw new Conflict('qualification registration is missing, invalidated or not executable');
     const definition = storedDefinition(entry, admission.scenarioRef);
-    await this.authority.validateDefinition(structuredClone(definition));
+    const reviewed = await this.checkDefinition(definition);
     await this.authority.validateStateLeases(structuredClone(admission));
     await this.authority.authorize(structuredClone(this.scope), 'read');
     if (this.current().version !== version) throw new Conflict('qualification authority changed during execution admission');
+    reviewed?.assertCurrent();
     return structuredClone({ admission, definition, selection: storedSelection(entry, admission.selectionManifestRef),
-      matrix: storedSelection(entry, admission.qualificationMatrixRef) });
+      matrix: storedSelection(entry, admission.qualificationMatrixRef), ...(reviewed ? { sourceReview: reviewed.documents } : {}) });
   }
   private async commit(expected: number, raw: ScenarioProjection, rawAdmission: QualificationRoundAdmission | null): Promise<boolean> {
     const next = ScenarioProjection.parse(raw); this.scoped(next.id, next.scope);
@@ -136,10 +147,11 @@ export class LocalScenarioStore {
     }
     if (digestOfValue(next).hex !== digestOfValue(allowed).hex) throw new Conflict('scenario commit attempts an unauthorized projection transition');
     entry.projection = next; checkLocalScenarioState(state, this.scope);
-    await this.authority.validateDefinition(structuredClone(definition));
+    const reviewed = await this.checkDefinition(definition);
     if (admission) await this.authority.validateStateLeases(structuredClone(admission));
     await this.authority.authorize(structuredClone(this.scope), action);
     if (this.current().version !== version) return false;
+    reviewed?.assertCurrent();
     this.write(version, state, admission ? 'workflow.scenario.round-registered' : 'workflow.scenario.invalidated');
     return true;
   }
@@ -149,13 +161,14 @@ export class LocalScenarioStore {
       resolveSelection: (ref, scope) => this.resolveSelection(ref, scope),
       validateDefinition: async definition => {
         this.scopedDocument(definition); await this.authority.authorize(structuredClone(this.scope), 'read');
-        await this.authority.validateDefinition(structuredClone(definition));
+        (await this.checkDefinition(definition))?.assertCurrent();
       },
       compareAndSwap: (version, projection, admission) => this.commit(version, projection, admission) };
   }
   private owner(): LocalScenarioOwner {
     return { id: this.id, scope: structuredClone(this.scope), ledger: this.ledger, readPorts: this.ports(),
       authorizeRead: async scope => { this.scoped(this.id, scope); await this.authority.authorize(structuredClone(scope), 'read'); },
+      checkDefinition: definition => this.checkDefinition(definition),
       current: () => this.current(), entry: state => this.entry(state), write: (version, state, event) => this.write(version, state, event),
     };
   }

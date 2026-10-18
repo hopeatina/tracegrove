@@ -29,6 +29,13 @@ permissive default:
   from a caller-generated UUID. The host remains responsible for synchronizing its
   external authority and physical lease checks with its controller.
 
+Source-derived definitions additionally require `reviewStore: reviews`, the
+`LocalReviewStore` that owns the same ledger. Its current approved source snapshot
+and synchronous fence are composed with the three host methods. Do not substitute a
+serialized approval object or a callback that only checks the review before an await.
+The fence is checked again immediately before registry writes. Qualification context
+also carries its sealed plan, review and validation into the execution bundle.
+
 Repeated identical input documents are stored once, including when the selected
 round is the qualification matrix itself. Different bytes under the same immutable
 document identity are refused.

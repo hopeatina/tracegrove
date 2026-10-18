@@ -42,11 +42,14 @@ export function localScenarioActivationPorts(owner: LocalScenarioOwner, results:
         throw error;
       }
       if (digestOfValue(report).hex !== digestOfValue(submitted).hex) throw new Conflict('activation selected evidence changed before commit');
+      const definition = storedDefinition(entry, entry.projection.definitionRef);
+      const reviewed = await owner.checkDefinition(definition);
       const actor = ActivationActor.parse(await ports.authorizeActivation(structuredClone(owner.scope), digestOfValue(intent)));
-      const expected = deriveScenarioActivation(intent, entry.projection, storedDefinition(entry, entry.projection.definitionRef), report, actor, activation.activatedAt);
+      const expected = deriveScenarioActivation(intent, entry.projection, definition, report, actor, activation.activatedAt);
       if (digestOfValue(next).hex !== digestOfValue(expected.next).hex || digestOfValue(activation).hex !== digestOfValue(expected.activation).hex) throw new Conflict('activation actor, intent, assessments or projection differ from current authority');
       if (owner.current().version !== version) return false;
       evidence.assertCurrent(); // Synchronous with the single journal append below.
+      reviewed?.assertCurrent();
       entry.projection = next; entry.activations.push({ activation, report });
       owner.write(version, state, 'workflow.scenario.activated');
       return true;
