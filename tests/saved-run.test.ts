@@ -6,6 +6,8 @@ import { runTests, resolveRun } from '../src/authoring/run.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { runCli } from './fixtures/cli.ts';
+import { projectStatus } from '../src/authoring/status.ts';
+import { paint, renderStatus, renderTree, runNext } from '../src/cli/render.ts';
 
 const servers: UiServer[] = [];
 afterEach(async () => { for (const server of servers.splice(0)) await server.close(); cleanupTemps(); });
@@ -39,10 +41,16 @@ it('reconstructs failed cases, steps, totals, source and identity from evidence 
   expect(readFileSync(join(f.report.runDir, 'summary.json'), 'utf8')).toBe(raw); // Inspection does not repair or rewrite producer metadata.
   const shown = runCli(['show', '--config', f.configPath, '--run', basename(f.report.runDir)]);
   expect(shown.status, shown.stderr).toBe(0); expect(JSON.parse(shown.stdout).outcome).toBe('assertion_failed');
+  const status = projectStatus(f.root);
+  expect(status.latestRun).toMatchObject({ outcome: 'assertion_failed', evidenceStatus: 'verified', totals: { passed: 0, failed: 1, other: 0 } });
+  expect(status.next[0]!.command).toBe('tracegrove heal');
+  const home = runCli(['status', '--dir', f.root]);
+  expect(home.status, home.stderr).toBe(0); expect(home.stdout).not.toContain('999 passed');
 });
 it('recovers recorded results when summary metadata is missing, malformed or oversized', async () => {
   const f = await nativeRun(); const path = join(f.report.runDir, 'summary.json');
   unlinkSync(path); expect(readSavedRun(f.report.runDir)).toMatchObject({ outcome: 'passed', evidenceStatus: 'verified' });
+  expect(projectStatus(f.root).latestRun).toMatchObject({ outcome: 'passed', evidenceStatus: 'verified' });
   writeFileSync(path, 'private malformed display value'); expect(readSavedRun(f.report.runDir).outcome).toBe('passed');
   truncateSync(path, 16 * 1024 * 1024 + 1); expect(readSavedRun(f.report.runDir).outcome).toBe('passed');
   const shown = runCli(['show', '--config', f.configPath, '--run', basename(f.report.runDir)]); expect(shown.status, shown.stderr).toBe(0);
@@ -56,6 +64,14 @@ it('clears passing metrics and exits nonzero when evidence changes after a succe
     totals: { passed: 0, failed: 0, other: 0 } });
   const shown = runCli(['show', '--config', f.configPath, '--run', basename(f.report.runDir)]); expect(shown.status).toBe(2);
   expect(JSON.parse(shown.stdout)).toMatchObject({ outcome: 'inconclusive', cases: [] });
+  const status = projectStatus(f.root);
+  expect(status.latestRun).toMatchObject({ outcome: 'inconclusive', evidenceStatus: 'invalid', totals: { passed: 0, failed: 0, other: 0 } });
+  expect(status.next[0]!.command).toContain('tracegrove show --run');
+  const text = renderStatus(status, paint({ isTTY: false } as NodeJS.WriteStream));
+  expect(text).toContain('results unavailable'); expect(text).not.toContain('0 passed'); expect(text).not.toContain('NaN');
+  const detail = renderTree(checked, f.root, paint({ isTTY: false } as NodeJS.WriteStream));
+  expect(detail).toContain('results unavailable'); expect(detail).not.toContain('0 passed');
+  expect(runNext(checked).some(action => action.command === 'tracegrove heal')).toBe(false);
 });
 it('keeps good history readable while a neighboring record is malformed or missing metadata', async () => {
   const f = await nativeRun(); const runs = join(f.root, '.tracegrove/runs'); const broken = join(runs, 'z-unavailable');

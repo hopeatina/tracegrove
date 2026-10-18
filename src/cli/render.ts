@@ -3,7 +3,7 @@
  * steps are leaves, only failing branches unfold), the heal report, the status home screen and
  * a one-line live progress indicator. Colour only on a TTY without NO_COLOR.
  */
-import { relative } from 'node:path';
+import { basename, relative } from 'node:path';
 import type { TestRunReport, CaseReport } from '../authoring/run.ts';
 import type { HealReport } from '../authoring/heal.ts';
 import { ageOf, type NextAction, type ProjectStatus } from '../authoring/status.ts';
@@ -59,6 +59,7 @@ export function nextLines(p: Paint, next: NextAction[], max = 3): string[] {
 }
 
 export function runNext(report: TestRunReport): NextAction[] {
+  if (report.bundleVerified === false) return [{ command: `tracegrove show --run ${basename(report.runDir)} --json`, why: 'inspect or restore the saved evidence before relying on results or attempting repairs' }];
   if (report.outcome === 'passed') return [{ command: 'tracegrove ui', why: 'browse the run, its evidence and video' }];
   const startup = report.cases.some((c) => c.failure?.step === '(app startup)') || report.blockers.length > 0;
   return [
@@ -72,7 +73,7 @@ export function renderTree(report: TestRunReport, root: string, p: Paint): strin
   for (const b of report.blockers) lines.push(`${p.dim('├─')} ${p.amber('!')} ${p.bold(b.code)}  ${b.detail}`, `${p.dim('│')}     ${p.dim(`fix: ${b.action}`)}`);
   report.cases.forEach((c, i) => lines.push(...caseLines(p, c, i === report.cases.length - 1)));
   const t = report.totals;
-  const tally = `${p.moss(`${t.passed} passed`)}, ${t.failed ? p.red(`${t.failed} failed`) : `${t.failed} failed`}${t.other ? `, ${p.amber(`${t.other} other`)}` : ''}`;
+  const tally = report.bundleVerified === false ? p.amber('results unavailable') : `${p.moss(`${t.passed} passed`)}, ${t.failed ? p.red(`${t.failed} failed`) : `${t.failed} failed`}${t.other ? `, ${p.amber(`${t.other} other`)}` : ''}`;
   lines.push('', `${tally} ${p.dim('·')} run ${relative(root, report.runDir) || report.runDir}${report.bundleVerified === false ? ` ${p.red('· BUNDLE INVALID')}` : ''}`);
   const next = nextLines(p, runNext(report), 2);
   if (next.length) lines.push(...next);
@@ -115,7 +116,8 @@ export function renderStatus(s: ProjectStatus, p: Paint): string {
   if (!s.config.found) return [`${p.moss('tracegrove')} ${p.dim('· no tracegrove.config.yaml here or above')}`, '', ...nextLines(p, s.next), '', p.dim('tracegrove --help for every command')].join('\n');
   const run = s.latestRun;
   const runLine = run
-    ? `${run.outcome === 'passed' ? p.moss('●') : run.outcome === 'assertion_failed' ? p.red('●') : p.amber('●')} last run ${p.bold(LABEL[run.outcome]?.toLowerCase() ?? run.outcome)}  ${run.totals.passed} passed, ${run.totals.failed} failed${run.totals.other ? `, ${run.totals.other} other` : ''}  ${p.dim(ageOf(run.finishedAt))}`
+    ? run.evidenceStatus === 'invalid' ? `${p.amber('●')} last run ${p.amber('evidence unavailable')} · results unavailable`
+      : `${run.outcome === 'passed' ? p.moss('●') : run.outcome === 'assertion_failed' ? p.red('●') : p.amber('●')} last run ${p.bold(LABEL[run.outcome]?.toLowerCase() ?? run.outcome)}  ${run.totals.passed} passed, ${run.totals.failed} failed${run.totals.other ? `, ${run.totals.other} other` : ''}  ${p.dim(ageOf(run.finishedAt))}`
     : `${p.dim('○')} no runs yet`;
   const lines = [
     `${p.moss('tracegrove')} ${p.dim('·')} ${p.bold(s.config.project ?? '?')} ${p.dim(`· ${s.config.adapter ?? '?'} · ${s.root}`)}`,

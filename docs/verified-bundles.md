@@ -176,7 +176,7 @@ do not add historical runner implementations, alter accepted evidence, or grant 
 
 ## Saved run reports and workbench history
 
-`readSavedRun(runDirectory)` is the shared read path for `show`, workbench history,
+`readSavedRun(runDirectory)` is the shared read path for `show`, `status`, the CLI home screen, workbench history,
 run details and a completed run's API response. `summary.json` supplies optional local
 file hints, never product outcomes. The reader captures and verifies the evidence,
 then reconstructs project and execution identity, recorded timestamps, cases, steps,
