@@ -7,6 +7,7 @@
  */
 import { SOURCE_CONTROLS_JS } from './uiSourceControls.ts';
 import { NATIVE_IMPORTS_JS } from './uiNativeImports.ts';
+import { WORKFLOW_MAP_JS } from './uiWorkflowMap.ts';
 import { COMPARISON_CSS, COMPARISON_JS } from './uiComparison.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -110,7 +111,7 @@ ${COMPARISON_CSS}
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','Heal','History','Compare','Imports','Settings'];
+const TABS=['Run','Discover','Heal','History','Compare','Imports','Map','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
 const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
@@ -133,6 +134,7 @@ function page(...nodes){document.getElementById('main').replaceChildren(...nodes
 ${SOURCE_CONTROLS_JS}
 ${COMPARISON_JS}
 ${NATIVE_IMPORTS_JS}
+${WORKFLOW_MAP_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
@@ -352,17 +354,17 @@ function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=a
 function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to '+TABS.length,'switch tab'],['?','this list'],['esc','close']];
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade card',role:'dialog','aria-modal':'true','aria-label':'Keyboard shortcuts',style:'padding:20px'},h('h2',{},'Keyboard'),
   h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)]))));document.body.append(palette)}
-function moveSel(d){if(tab==='Imports'){moveNative(d);return}if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
+function moveSel(d){if(tab==='Map'){mapMove(d);return}if(tab==='Imports'){moveNative(d);return}if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
  const el=document.querySelector('[data-case="'+CSS.escape(n.id)+'"]');if(el){el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'})}}
 document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement&&document.activeElement.tagName||'');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palette?closeOverlay():openPalette();return}
  if(e.key==='Escape'&&palette){closeOverlay();return}
  if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/'){e.preventDefault();openPalette()}else if(e.key==='?'){shortcuts()}else if(e.key==='j'){moveSel(1)}else if(e.key==='k'){moveSel(-1)}
- else if(tab!=='Imports'&&e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(tab!=='Imports'&&e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(tab!=='Imports'&&e.key==='h'&&!ui.running){startHeal(false)}
+ else if(!['Imports','Map'].includes(tab)&&e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(!['Imports','Map'].includes(tab)&&e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(!['Imports','Map'].includes(tab)&&e.key==='h'&&!ui.running){startHeal(false)}
  else if(/^[1-9]$/.test(e.key)&&Number(e.key)<=TABS.length){openTab(TABS[Number(e.key)-1])}});
 document.getElementById('palbtn').addEventListener('click',openPalette);
 
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Compare:comparisonTab,Imports:nativeImportsTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

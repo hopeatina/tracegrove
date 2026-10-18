@@ -21,6 +21,7 @@ import { readFrozenBundle } from '../core/frozenBundle.ts';
 import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
 import { compareReplays } from '../core/replayComparison.ts';
+import { WorkflowKnowledgeSnapshot } from '../core/workflowKnowledge.ts';
 import { inspectAttemptInventory } from '../core/attemptInventory.ts';
 import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
@@ -118,6 +119,9 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
+  workflow-map --bundle <bundle> [--cell <cell>]       derive cited recorded navigation, prerequisites and coverage
+  workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
+       [--route <path> --case <id> --workflow <id> --surface <surface> --tag <tag> --limit <1..100> --cursor <cursor>]
   usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
   import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
        [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
@@ -466,6 +470,23 @@ async function main(argv: string[]): Promise<number> {
       return report.exitCode;
     }
 
+    case 'workflow-map': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle)));
+      const report=args.flags.cell?snapshot.get(args.flags.cell):snapshot.report;
+      out(args,report,`Recorded workflow knowledge · ${snapshot.report.workflows.length} selection(s)\n`+
+        'Declared routes and landmarks are distinct from recorded observations. Revalidate at execution; no authority or qualification granted.');
+      return 0;
+    }
+    case 'workflows': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle))),flags=args.flags;
+      const page=snapshot.search({...(flags.text?{text:flags.text}:{}),...(flags.case?{caseId:flags.case}:{}),...(flags.workflow?{workflowId:flags.workflow}:{}),
+        ...(flags.route?{route:flags.route}:{}),...(flags.surface?{surface:flags.surface}:{}),...(flags.tag?{tag:flags.tag}:{}),
+        ...(flags.limit?{limit:Number(flags.limit)}:{}),...(flags.cursor?{cursor:flags.cursor}:{})});
+      out(args,page,`Recorded workflow lookup · ${page.results.length} of ${page.total}\n`+
+        page.results.map(w=>`${w.selectionCellId} · ${w.caseRef.id} · ${w.receipt?.outcome??'receipt unavailable'}\n  ${w.purpose}`).join('\n')+
+        (page.cursor?`\nNext cursor: ${page.cursor}`:'')+'\nRecorded evidence only; revalidate landmarks and authority at execution.');
+      return 0;
+    }
     case 'compare': {
       let baseline: VerifiedBundleSnapshot, candidate: VerifiedBundleSnapshot;
       try {

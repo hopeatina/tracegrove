@@ -32,6 +32,8 @@
             "export",
             "verify-bundle",
             "compare",
+            "workflow-map",
+            "workflows",
             "usage",
             "import-observations",
             "observations",

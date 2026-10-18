@@ -28,6 +28,7 @@ import { SavedRunName } from './runReport.ts';
 import { isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
 import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
+import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -266,6 +267,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
             ...(req.headers.range ? { 'content-range': `bytes ${range.start}-${range.end}/${bytes.length}` } : {}) });
           res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
         } catch { return send(409, { error: 'Recording is unavailable or its evidence failed verification.' }); }
+      }
+      if (req.method === 'GET' && ['/api/workflow-map','/api/workflows'].includes(url.pathname)) {
+        const reply=savedWorkflowKnowledge(dir,url);return send(reply.status,reply.body);
       }
       if (req.method === 'GET' && url.pathname === '/api/compare') {
         const pair = SavedRunPair.safeParse(Object.fromEntries(url.searchParams));

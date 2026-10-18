@@ -14,6 +14,7 @@ export { signCleanupFollowup, verifyCleanupFollowup, cleanupExpectationDigest, t
 export { CoordinationSnapshotSchema, CoordinationCommandSchema, transitionCoordination, commitCoordination, type CoordinationSnapshot, type CoordinationCommand, type CoordinationFence, type CoordinationStore } from './core/coordination.ts';
 export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
+export { WorkflowKnowledgeSnapshot, WORKFLOW_KNOWLEDGE_LIMITS } from './core/workflowKnowledge.ts';
 export { createRerun } from './core/rerun.ts';
 export { compareReplays } from './core/replayComparison.ts';
 export { inspectAttemptInventory, ATTEMPT_INVENTORY_LIMIT } from './core/attemptInventory.ts';

@@ -40,6 +40,10 @@ export const COMMAND_SCHEMAS = {
   export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
+  'workflow-map': z.object({...common,bundle:Text,cell:IdString.optional()}).strict(),
+  workflows: z.object({...common,bundle:Text,text:Text.max(256).optional(),case:IdString.optional(),workflow:IdString.optional(),
+    route:Text.max(4096).startsWith('/').optional(),surface:z.enum(['ui','api','job','integration','hybrid']).optional(),tag:IdString.optional(),cursor:Text.max(1024).optional(),
+    limit:Text.regex(/^[1-9][0-9]{0,2}$/).refine(value=>Number(value)<=100,'limit must be 1..100').optional()}).strict(),
   usage: z.object({ ...common, 'state-dir': Text }).strict(),
   'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text.optional(), into: Text.optional(),
     'artifact-root': Text.optional(), producer: Text.optional(), 'producer-version': Text.optional() }).strict()
