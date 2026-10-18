@@ -97,8 +97,13 @@ describe('heal: repairs against the real app', () => {
     const bin = temp();
     // Stands in for Claude Code: fixes the drift, also tries to "fix" the auth failure (must be rejected), touches app code (must be restored).
     writeFileSync(join(bin, 'claude'), `#!/bin/sh
-sed -i 's/notes: 1/items: 1/; s/"notes\\[0\\].title"/"items[0].title"/; s/notes: 0/items: 0/' tracegrove/notes/list.flow.yaml
-sed -i 's/status: 403, absent: \\[note\\]/status: 200, absent: [note]/' tracegrove/notes/create-read-delete.flow.yaml
+node <<'REPAIR'
+const fs = require('node:fs');
+const list = 'tracegrove/notes/list.flow.yaml';
+fs.writeFileSync(list, fs.readFileSync(list, 'utf8').replaceAll('notes: 1', 'items: 1').replaceAll('"notes[0].title"', '"items[0].title"').replaceAll('notes: 0', 'items: 0'));
+const denied = 'tracegrove/notes/create-read-delete.flow.yaml';
+fs.writeFileSync(denied, fs.readFileSync(denied, 'utf8').replace('status: 403, absent: [note]', 'status: 200, absent: [note]'));
+REPAIR
 echo '// agent was here' >> app/app.mjs
 echo 'scratch' > notes.txt
 echo 'Looked at the handlers.'
