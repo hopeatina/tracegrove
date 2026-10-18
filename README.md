@@ -303,7 +303,7 @@ tracegrove does not ship a model. It drives the coding agent you already use, he
 
 | Provider | Command it runs | Default model |
 | --- | --- | --- |
-| `claude` (default) | `claude -p … --model claude-haiku-4-5 --output-format stream-json --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-4-5` |
+| `claude` (default) | `claude -p … --model claude-haiku-5-5 --output-format stream-json --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-5-5` |
 | `codex` | `codex exec --sandbox workspace-write --model gpt-6-luna` | `gpt-6-luna` |
 | `none` | nothing; discovery and templates only | |
 
@@ -327,7 +327,7 @@ Where the choice comes from, highest first:
    ```yaml
    agent:
      provider: claude      # claude | codex | none
-     model: claude-haiku-4-5  # optional
+     model: claude-haiku-5-5  # optional
      maxBudgetUsd: 0.50    # optional spend cap per draft (Claude Code)
    ```
 4. The explicit low-cost defaults above. No inherited CLI model or silent provider fallback.

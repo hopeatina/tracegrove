@@ -16,7 +16,7 @@ import type { Discovery } from './discover.ts';
 
 export const SETTINGS_FILE = 'settings.json';
 /** Explicit low-cost defaults from workspace policy; never inherit the CLI's production model. */
-export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-4-5', codex: 'gpt-6-luna', none: null };
+export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-5-5', codex: 'gpt-6-luna', none: null };
 
 export const LocalSettings = z.object({
   agent: z.object({
@@ -27,7 +27,7 @@ export const LocalSettings = z.object({
 }).strict();
 export type LocalSettings = z.infer<typeof LocalSettings>;
 
-/** Claude Code takes dashed ids (claude-haiku-4-5); a dotted version is a common typo, not a different model. */
+/** Claude Code takes dashed ids (claude-haiku-5-5); a dotted version is a common typo, not a different model. */
 export function normalizeModel(provider: AgentProvider, model: string | null): string | null {
   if (provider !== 'claude' || model === null) return model;
   return /^claude-[a-z]+-\d+\.\d+$/.test(model) ? model.replace(/\.(\d+)$/, '-$1') : model;
