@@ -17,6 +17,11 @@ from the same snapshot that passed complete evidence reduction; the source is
 not reopened during copy. Binary artifacts retain their exact bytes. Unsealed
 files, including accidental scratch files, are not imported.
 
+SDK consumers that authenticated an earlier snapshot can pass
+`sink.ingest(bundleDir, { expectedManifestDigest })`. A mismatch is refused before
+archiving or publishing a campaign receipt. This binds retention to the authenticated
+bytes without treating the digest itself as issuer authentication.
+
 The receipt records the actual retained outcome, exact campaign/request/selection
 and fidelity-plan refs, planned fidelity lanes, manifest digest, receipt count,
 and acceptance time. A failed, cancelled, blocked, or mocked result never becomes

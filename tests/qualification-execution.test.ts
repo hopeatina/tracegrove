@@ -1,55 +1,26 @@
+import { registeredQualificationFixture } from './fixtures/registeredQualification.ts';
 import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanupTemps, planSample, sampleCopy } from '../conformance/helpers.ts';
+import { cleanupTemps } from '../conformance/helpers.ts';
 import { LocalLedger } from '../src/core/ledger.ts';
 import { LocalScenarioStore } from '../src/core/localScenarioStore.ts';
-import { registerQualificationRound, invalidateScenario } from '../src/core/scenario.ts';
+import { invalidateScenario } from '../src/core/scenario.ts';
 import { prepareQualificationExecution } from '../src/core/qualificationBundle.ts';
 import { localQualificationExecutionOwner, QualificationExecutionContext, validateQualificationExecution } from '../src/core/qualificationExecution.ts';
 import { executeBundle } from '../src/core/executor.ts';
 import { readVerifiedBundle } from '../src/core/bundle.ts';
 import { reduceQualificationRound } from '../src/core/qualification.ts';
-import { CampaignFixturePlan, FidelityPlan, RunRequest, ScenarioDefinition, SelectionManifest,
+import { ScenarioDefinition, SelectionManifest,
   digestOfBytes, freeze, refKey, type Ref } from '../src/protocol/index.ts';
 import { LocalProcessHost } from '../src/hosts/local.ts';
 
 const roots: string[] = []; const ledgers: LocalLedger[] = [];
 afterEach(() => { for (const ledger of ledgers.splice(0)) ledger.close(); cleanupTemps(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const ref = (id: string): Ref => ({ id, revision: '1', digest: digestOfBytes(id) });
-async function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'tracegrove-qualified-execution-')); roots.push(root);
-  const ledger = LocalLedger.open(root); ledgers.push(ledger);
-  const base = planSample(sampleCopy().configPath, 'native-real');
-  const previous = SelectionManifest.parse(base.documents[refKey(base.request!.selectionManifestRef)]);
-  const secondId = `${previous.cells[0]!.selectionCellId}.second`;
-  const selection = SelectionManifest.parse(freeze({ ...previous, ref: { id: 'two-cell-selection', revision: '1' }, cells: [...previous.cells, { ...previous.cells[0]!, selectionCellId: secondId }] }));
-  const oldFidelity = FidelityPlan.parse(base.documents[refKey(base.request!.fidelityPlanRef)]);
-  const fidelity = FidelityPlan.parse(freeze({ ...oldFidelity, ref: { id: 'two-cell-fidelity', revision: '1' }, selectionManifestRef: selection.ref,
-    cells: [...oldFidelity.cells, { ...oldFidelity.cells[0]!, selectionCellId: secondId }] }));
-  const oldFixtures = CampaignFixturePlan.parse(base.documents[refKey(base.request!.fixturePlanRef!)]);
-  const fixtures = CampaignFixturePlan.parse(freeze({ ...oldFixtures, ref: { id: 'two-cell-fixtures', revision: '1' }, selectionManifestRef: selection.ref,
-    cells: [...oldFixtures.cells, { ...oldFixtures.cells[0]!, selectionCellId: secondId }] }));
-  const request = RunRequest.parse(freeze({ ...base.request!, selectionManifestRef: selection.ref, fidelityPlanRef: fidelity.ref, fixturePlanRef: fixtures.ref }));
-  const documents = { ...base.documents }; for (const document of [selection, fidelity, fixtures, request]) documents[refKey(document.ref)] = document;
-  const planned = { ...base, request, documents };
-  const matrix = SelectionManifest.parse(freeze({ ...selection, ref: { id: 'qualification-matrix', revision: '1' }, policyRef: ref('policy') }));
-  const selected = SelectionManifest.parse(freeze({ ...matrix, ref: { id: 'registered-selection', revision: '1' } }));
-  const definition = ScenarioDefinition.parse(freeze({ schemaVersion: 'workflow.scenario/v1', ref: { id: 'scenario', revision: '1' }, scope: selected.scope,
-    sourcePlanRef: null, reviewRef: ref('review'), caseRefs: request.caseRefs, replayContractRef: ref('contract'),
-    qualificationPolicyRef: matrix.policyRef, qualificationMatrixRef: matrix.ref, qualificationTargetProfileRef: ref('target') }));
-  // Authentication, reviewed source and physical lease checks are controlled host-policy fixtures.
-  const store = new LocalScenarioStore(ledger, 'entry', selected.scope, { authorize: async () => {}, validateDefinition: async () => {}, validateStateLeases: async () => {} });
-  await store.initialize(definition, [matrix, selected]);
-  const token = { id: 'entry', scope: selected.scope, expectedAggregateVersion: 1, expectedDefinitionRef: definition.ref, expectedInvalidationEpoch: 0, expectedLatestRoundSequence: 0 };
-  const admission = await registerQualificationRound(store.ports(), token, { selectionManifestRef: selected.ref, stateLeaseRefs: [ref('reserved-local-state')] });
-  const owner = localQualificationExecutionOwner(store, async () => {});
-  const unchanged = structuredClone(planned);
-  const bundle = await prepareQualificationExecution(planned, admission.ref, selected.scope, ledger, owner);
-  expect(planned).toEqual(unchanged);
-  return { root, ledger, store, admission, definition, owner, bundle, planned, scope: selected.scope };
-}
+const fixture = () => registeredQualificationFixture(ledger => ledgers.push(ledger));
+
 it('executes real native cells with their registered identities and reduces terminal evidence against persisted admission', async () => {
   const f = await fixture(); const run = await executeBundle({ bundle: f.bundle, ledger: f.ledger, stateDir: f.root, scope: f.scope, qualification: f.owner });
   expect(run.outcome).toBe('passed'); const saved = readVerifiedBundle(run.executionDir);

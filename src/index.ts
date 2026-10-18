@@ -17,6 +17,7 @@ export { LocalScenarioStore, type LocalScenarioAuthority } from './core/localSce
 export { prepareQualificationExecution } from './core/qualificationBundle.ts';
 export { QualificationExecutionContext, localQualificationExecutionOwner, type QualificationExecutionOwner } from './core/qualificationExecution.ts';
 export { reduceQualificationRound, type QualificationResultPorts } from './core/qualification.ts';
+export { LocalQualificationResults, type LocalQualificationResultAuthority, type RetainedQualificationRound } from './core/localQualificationResults.ts';
 export { assessScenarioReplay, type ReplayAssessmentPorts } from './core/replayAssessment.ts';
 export { activateScenario, type ScenarioActivationPorts } from './core/scenarioActivation.ts';
 export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
@@ -25,7 +26,7 @@ export { resolveGitSources, GitSourceReader, GIT_RESOLVER_REF, type GitSourceAut
 export { materializeGitSnapshot } from './core/gitSnapshot.ts';
 export { readGitSnapshotManifest, readGitSnapshotTree } from './source/snapshotTree.ts';
 export { verifyBundle, readVerifiedBundle, readVerifiedVideo, VerifiedBundleSnapshot, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
-export { LocalResultSink, type ResultSink, type ResultSinkAuthority, type RetainedResult, type ResultPage } from './core/resultSink.ts';
+export { LocalResultSink, type ResultSink, type ResultSinkAuthority, type RetainedResult, type ResultPage, type ResultIngestOptions } from './core/resultSink.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';
 export { materializeLogicalPayload } from './core/generators.ts';

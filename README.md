@@ -293,6 +293,8 @@ it does not qualify or activate coverage. See [registration contract](docs/quali
 `reduceQualificationRound` binds an entire verified terminal campaign to the registered
 cell/attempt allocations, retaining failed and mock evidence without granting a live
 proof level. See [terminal result contract](docs/qualification-results.md) for the host authority boundary.
+`LocalQualificationResults` retains those complete rounds through the existing immutable
+result sink and supplies a durable replay-assessment index, with fresh issuer checks on reads.
 `assessScenarioReplay` derives readiness from authenticated complete rounds, retains pending
 and failed history, requires at least two independent live campaigns and checks the latest
 admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.

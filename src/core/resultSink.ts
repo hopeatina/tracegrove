@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import { FidelityPlan, IdString, ResultIngestReceipt, ScopeSchema, digestOfValue, freeze, refKey, sameDigest, sameRef, sameScope, verifySelfDigest, type Scope } from '../protocol/index.ts';
+import { DigestSchema, FidelityPlan, IdString, ResultIngestReceipt, ScopeSchema, digestOfValue, freeze, refKey, sameDigest, sameRef, sameScope, verifySelfDigest, type Digest, type Scope } from '../protocol/index.ts';
 import { VerifiedBundleSnapshot, type BundleVerification, type VerifiedBundleRecords } from './bundle.ts';
 import { LocalBundleArchive } from './bundleArchive.ts';
 import { LocalLedger } from './ledger.ts';
@@ -15,8 +15,9 @@ function plannedLanes(records: VerifiedBundleRecords) {
 export type ResultSinkAuthority = { authorize(scope: Scope, action: 'ingest' | 'read'): Promise<void> };
 export type RetainedResult = { receipt: ResultIngestReceipt; bundleDir: string; verification: BundleVerification & { ok: true } };
 export type ResultPage = { records: ResultIngestReceipt[]; snapshotVersion: number; nextCursor: string | null; archiveStatus: 'not_checked' };
+export type ResultIngestOptions = { expectedManifestDigest?: Digest };
 export interface ResultSink {
-  ingest(bundleDir: string): Promise<RetainedResult & { replayed: boolean }>;
+  ingest(bundleDir: string, options?: ResultIngestOptions): Promise<RetainedResult & { replayed: boolean }>;
   get(id: string): Promise<RetainedResult>;
   list(options?: { cursor?: string; limit?: number }): Promise<ResultPage>;
 }
@@ -50,9 +51,11 @@ export class LocalResultSink implements ResultSink {
         records.campaign.outcome !== receipt.retainedOutcome || records.receipts.length !== receipt.receiptCount) throw new Conflict('Retained bundle differs from its indexed receipt');
     return { receipt: structuredClone(receipt), bundleDir: this.archive.path(receipt.manifestDigest), verification: records.verification };
   }
-  async ingest(bundleDir: string): Promise<RetainedResult & { replayed: boolean }> {
+  async ingest(bundleDir: string, options: ResultIngestOptions = {}): Promise<RetainedResult & { replayed: boolean }> {
+    const expected = options.expectedManifestDigest === undefined ? null : DigestSchema.parse(options.expectedManifestDigest);
     await this.authority.authorize(structuredClone(this.scope), 'ingest');
     const snapshot = VerifiedBundleSnapshot.open(bundleDir); const records = snapshot.records;
+    if (expected && !sameDigest(expected, snapshot.manifestDigest)) throw new Conflict('Bundle differs from the expected manifest digest');
     if (!sameScope(records.request.requestedScope, this.scope)) throw new Conflict('Bundle belongs to another result scope');
     await this.authority.authorize(structuredClone(this.scope), 'ingest');
     // No async gap between the fresh authority check, durable object write, and fenced publication.
