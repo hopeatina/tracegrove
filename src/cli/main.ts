@@ -22,6 +22,8 @@ import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
 import { compareReplays } from '../core/replayComparison.ts';
 import { WorkflowKnowledgeSnapshot } from '../core/workflowKnowledge.ts';
+import { inspectPersonaPools } from '../core/coordination.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
 import { inspectAttemptInventory } from '../core/attemptInventory.ts';
 import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
@@ -123,6 +125,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
        [--route <path> --case <id> --workflow <id> --surface <surface> --tag <tag> --limit <1..100> --cursor <cursor>]
   usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
+  pools --snapshot <json> [--pool <id>]                inspect recorded persona pool availability; no reservation or credentials
   import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
        [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
        [--producer <name> --producer-version <v>]      declare missing producer metadata explicitly
@@ -470,6 +473,13 @@ async function main(argv: string[]): Promise<number> {
       return report.exitCode;
     }
 
+    case 'pools': {
+      const report=inspectPersonaPools(JSON.parse(readBoundedFile(resolve(args.flags.snapshot),8*1024*1024).toString('utf8')));
+      if(args.flags.pool)report.pools=report.pools.filter(p=>p.poolRef.id===args.flags.pool);
+      out(args,report,`Recorded persona pools · ${report.pools.length}\n`+report.pools.map(p=>`${p.poolRef.id}: ${p.unreleased}/${p.maxConcurrent} unreleased · ${p.members.length} members`).join('\n')+
+        `\n${report.reservedCents}/${report.budgetCents} cents retained reservation budget.\nSupplied snapshot only; lease time not evaluated. No reservation or credential was issued.`);
+      return 0;
+    }
     case 'workflow-map': {
       const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle)));
       const report=args.flags.cell?snapshot.get(args.flags.cell):snapshot.report;

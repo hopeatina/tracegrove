@@ -5,19 +5,80 @@
   "description": "tracegrove: behaviour tests against your real app, drafted by Claude Code or Codex, sealed as re-verifiable evidence.",
   "license": "Apache-2.0",
   "type": "module",
-  "engines": { "node": ">=22.22.0 <23" },
-  "bin": { "tracegrove": "./dist/cli/main.js", "workflow-verify": "./dist/cli/main.js" },
+  "engines": {
+    "node": ">=22.22.0 <23"
+  },
+  "bin": {
+    "tracegrove": "./dist/cli/main.js",
+    "workflow-verify": "./dist/cli/main.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./imports": { "types": "./dist/imports/index.d.ts", "default": "./dist/imports/index.js" },
-    "./integrations/awr": { "types": "./dist/integrations/awr/index.d.ts", "default": "./dist/integrations/awr/index.js" },
-    "./authoring": { "types": "./dist/authoring/index.d.ts", "default": "./dist/authoring/index.js" },
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./protocol": { "types": "./dist/protocol/index.d.ts", "default": "./dist/protocol/index.js" },
-    "./coordination": { "types": "./dist/core/coordination.d.ts", "default": "./dist/core/coordination.js" }
+    "./imports": {
+      "types": "./dist/imports/index.d.ts",
+      "default": "./dist/imports/index.js"
+    },
+    "./integrations/awr": {
+      "types": "./dist/integrations/awr/index.d.ts",
+      "default": "./dist/integrations/awr/index.js"
+    },
+    "./authoring": {
+      "types": "./dist/authoring/index.d.ts",
+      "default": "./dist/authoring/index.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
+    },
+    "./coordination": {
+      "types": "./dist/core/coordination.d.ts",
+      "default": "./dist/core/coordination.js"
+    }
   },
-  "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/source-promotion.md", "docs/git-source-resolution.md", "docs/git-object-proof.md", "docs/local-review-store.md", "docs/local-scenario-store.md", "docs/local-execution-recovery.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/replay-comparison.md", "docs/attempt-usage.md", "docs/attempt-inventory.md", "docs/scenario-activation.md", "docs/native-observation-import.md", "docs/workflow-knowledge.md", "docs/scenario-structure.md", "docs/verified-bundles.md", "docs/developer-ux.md", "docs/architecture.md", "docs/browser-driver.md", "docs/portable-environments.md", "docs/examples/portable-environments", "docs/native-jobs.md", "docs/result-sink.md", "docs/awr-delivery.md", "docs/work-report-attachment.md", "docs/mcp-driver.md", "conformance/coordination-vectors.json", "LICENSE", "README.md", "docs/images/ui-run.png"],
+  "files": [
+    "dist",
+    "schema",
+    "samples",
+    "docs/cleanup-followups.md",
+    "docs/source-review.md",
+    "docs/source-promotion.md",
+    "docs/git-source-resolution.md",
+    "docs/git-object-proof.md",
+    "docs/local-review-store.md",
+    "docs/local-scenario-store.md",
+    "docs/local-execution-recovery.md",
+    "docs/qualification-registration.md",
+    "docs/qualification-results.md",
+    "docs/replay-assessment.md",
+    "docs/replay-comparison.md",
+    "docs/attempt-usage.md",
+    "docs/attempt-inventory.md",
+    "docs/scenario-activation.md",
+    "docs/native-observation-import.md",
+    "docs/workflow-knowledge.md",
+    "docs/scenario-structure.md",
+    "docs/verified-bundles.md",
+    "docs/developer-ux.md",
+    "docs/architecture.md",
+    "docs/browser-driver.md",
+    "docs/portable-environments.md",
+    "docs/examples/portable-environments",
+    "docs/native-jobs.md",
+    "docs/result-sink.md",
+    "docs/awr-delivery.md",
+    "docs/work-report-attachment.md",
+    "docs/mcp-driver.md",
+    "conformance/coordination-vectors.json",
+    "LICENSE",
+    "README.md",
+    "docs/images/ui-run.png",
+    "docs/persona-pools.md"
+  ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.container.json --noEmit",
@@ -36,8 +97,18 @@
     "yaml": "2.9.1",
     "zod": "4.6.5"
   },
-  "peerDependencies": { "@modelcontextprotocol/sdk": "1.32.1", "@useorgx/agent-work-receipt": "0.3.0" },
-  "peerDependenciesMeta": { "@modelcontextprotocol/sdk": { "optional": true }, "@useorgx/agent-work-receipt": { "optional": true } },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@useorgx/agent-work-receipt": "0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@useorgx/agent-work-receipt": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
     "@useorgx/agent-work-receipt": "0.3.0",

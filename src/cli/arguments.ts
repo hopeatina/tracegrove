@@ -45,6 +45,7 @@ export const COMMAND_SCHEMAS = {
     route:Text.max(4096).startsWith('/').optional(),surface:z.enum(['ui','api','job','integration','hybrid']).optional(),tag:IdString.optional(),cursor:Text.max(1024).optional(),
     limit:Text.regex(/^[1-9][0-9]{0,2}$/).refine(value=>Number(value)<=100,'limit must be 1..100').optional()}).strict(),
   usage: z.object({ ...common, 'state-dir': Text }).strict(),
+  pools:z.object({...common,snapshot:Text,pool:IdString.optional()}).strict(),
   'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text.optional(), into: Text.optional(),
     'artifact-root': Text.optional(), producer: Text.optional(), 'producer-version': Text.optional() }).strict()
     .refine(flags => !!flags.producer === !!flags['producer-version'], 'provide both producer name and version')

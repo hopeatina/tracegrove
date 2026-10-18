@@ -6,6 +6,7 @@ import { AttemptInventoryReport } from './schemas/attemptInventory.ts';
 import { RegressionAdmission } from './schemas/regression.ts';
 import { ImportedObservations } from './schemas/importedObservations.ts';
 import { WorkflowKnowledge, WorkflowKnowledgePage } from './schemas/workflowKnowledge.ts';
+import { PersonaPoolDefinition, PersonaPoolStatus } from './schemas/personaPool.ts';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
 import * as P from './schemas/portableEnvironment.ts';
@@ -36,6 +37,7 @@ export * from './schemas/attemptInventory.ts';
 export * from './schemas/regression.ts';
 export * from './schemas/importedObservations.ts';
 export * from './schemas/workflowKnowledge.ts';
+export * from './schemas/personaPool.ts';
 export * from './schemas/capabilityLifecycle.ts';
 export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
@@ -59,6 +61,8 @@ export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
+  'workflow.persona-pool/v1':PersonaPoolDefinition,
+  'tracegrove.persona-pool-status/v1':PersonaPoolStatus,
   'tracegrove.workflow-knowledge/v1': WorkflowKnowledge,
   'tracegrove.workflow-knowledge-page/v1': WorkflowKnowledgePage,
   'tracegrove.imported-observations/v1': ImportedObservations,
