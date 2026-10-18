@@ -472,8 +472,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       media.push({ digest: artifact.ref.digest.hex, bytes }); mediaArtifacts.push({ ...artifact, retentionPolicyRef: spec.capture.retentionPolicyRef });
       log.emit('browser.video.collected', null, { ref: artifact.ref, byteCount: artifact.byteCount });
     }
-  } catch {
-    infrastructureFailure = true; log.emit('browser.failed', null, { code: 'browser_evidence_collection_failed' });
+  } catch (error) {
+    // Preserve bounded driver facts without serializing arbitrary exception messages.
+    const cause = error instanceof BrowserStepError && ['video_final_frame_unavailable', 'video_empty', 'browser_network_metadata_limit'].includes(error.code) ? error.code : null;
+    const phase = error instanceof BrowserStepError && ['capture', 'frame', 'flush'].includes(error.phase ?? '') ? error.phase : null;
+    infrastructureFailure = true; log.emit('browser.failed', null, { code: 'browser_evidence_collection_failed', cause, phase });
   }
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----

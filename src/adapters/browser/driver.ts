@@ -88,7 +88,10 @@ export class BrowserDriver {
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();
       const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
-      await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: { width: 1280, height: 720 },
+      // Keep mobile pixels at their native size; VP9's chroma grid needs even dimensions.
+      const viewport = input.viewport ?? { width: 1280, height: 720 };
+      const videoSize = { width: Math.ceil(viewport.width / 2) * 2, height: Math.ceil(viewport.height / 2) * 2 };
+      await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: videoSize,
         onFrame: frame => { driver.latestFrameAt = frame.timestamp; driver.onFrame?.(frame.timestamp); },
       });
       signal.throwIfAborted();

@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,9 @@ import { executeBundle } from '../src/core/executor.ts';
 import { LocalLedger } from '../src/core/ledger.ts';
 import { verifyBundle } from '../src/core/bundle.ts';
 import { resealBundle } from '../conformance/helpers.ts';
+
+import { CaseBrowserSession } from '../src/adapters/browser/session.ts';
+import { BrowserStepError } from '../src/adapters/browser/driver.ts';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -82,4 +85,30 @@ it('retains the completed DOM observation when its expectation never holds', asy
     expect(receipt.artifacts.some(artifact => artifact.mediaType === 'video/webm')).toBe(true);
     expect(verifyBundle(result.executionDir)).toMatchObject({ ok: true, outcome: 'assertion_failed' });
   } finally { ledger.close(); }
+});
+
+
+it.each(['known', 'arbitrary'] as const)('preserves safe capture diagnostics for %s errors while withholding video acceptance', async kind => {
+  const { root, configPath } = browserProject();
+  const original = CaseBrowserSession.prototype.collectVideo;
+  const spy = vi.spyOn(CaseBrowserSession.prototype, 'collectVideo').mockImplementation(async function(this: CaseBrowserSession, deadline) {
+    await original.call(this, deadline); // Real recording and disposal; simulate only its final reported failure.
+    if (kind === 'known') throw new BrowserStepError('video_final_frame_unavailable', 'frame');
+    throw new Error('secret-capture-error-do-not-persist');
+  });
+  const bundle = plan({ project: loadProject(configPath), profileName: 'native-real', scope: localScope() });
+  const stateDir = join(root, '.state'); const ledger = LocalLedger.open(stateDir);
+  try {
+    const result = await executeBundle({ bundle, stateDir, ledger, scope: localScope() });
+    expect(result.outcome).toBe('infrastructure_failed');
+    const receipt = result.receipts[0]!;
+    expect(receipt.artifacts.some(a => a.mediaType === 'video/webm')).toBe(false);
+    expect(receipt.cleanup.confirmed).toContain('host.process');
+    const cell = receipt.selectionCellId.replace(/[^A-Za-z0-9._-]/g, '_');
+    const events = readFileSync(join(result.executionDir, 'cells', cell, 'events.jsonl'), 'utf8');
+    const failure = events.trim().split('\n').map(line => JSON.parse(line)).find(event => event.kind === 'browser.failed');
+    expect(failure.redactedPayload).toEqual({ code: 'browser_evidence_collection_failed', cause: kind === 'known' ? 'video_final_frame_unavailable' : null, phase: kind === 'known' ? 'frame' : null });
+    expect(events).not.toContain('secret-capture-error-do-not-persist');
+    expect(verifyBundle(result.executionDir)).toMatchObject({ ok: true, outcome: 'infrastructure_failed' });
+  } finally { spy.mockRestore(); ledger.close(); }
 });
