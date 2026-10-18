@@ -9,7 +9,9 @@ const common = { json: Bool, help: Bool };
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
   init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
-  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool }).strict(),
+  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, heal: Bool }).strict(),
+  status: z.object({ ...common, dir: Text.optional() }).strict(),
+  heal: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-agent': Bool, 'dry-run': Bool, undo: Text.optional() }).strict(),
   list: z.object({ ...common, config: Text.optional() }).strict(),
   compile: z.object({ ...common, config: Text.optional() }).strict(),
   show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),

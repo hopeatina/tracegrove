@@ -7,3 +7,5 @@ export { startUi, type UiServer } from './ui.ts';
 export { buildAgentCommand, buildDraftPrompt, detectAgents, readLocalSettings, resolveAgentSettings, runAgent, writeLocalSettings, DEFAULT_MODELS, type AgentSettings, type AgentRunResult } from './agent.ts';
 export { checkProject, discoverProject, draftWithAgent, type CheckResult, type DraftResult } from './workspace.ts';
 export { RunActivity, runActivity } from './activity.ts';
+export { heal, undoHeal, listHeals, classify, guardFlowEdit, type HealReport, type HealFinding, type HealChange, type HealOptions } from './heal.ts';
+export { projectStatus, projectRoot, type ProjectStatus, type NextAction } from './status.ts';

@@ -26,12 +26,16 @@ import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
 import { resolveSourceFiles } from './source.ts';
 import { compileProject, findConfig } from '../authoring/compile.ts';
-import { renderText, resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
+import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
+import { heal, undoHeal } from '../authoring/heal.ts';
+import { projectRoot, projectStatus } from '../authoring/status.ts';
+import { runActivity } from '../authoring/activity.ts';
+import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -58,8 +62,14 @@ function samplesDir(): string {
 const HELP = `tracegrove <command> [--flags]
 
 Everyday commands (read tracegrove.config.yaml, found by walking up from the current folder):
+  (no command)                                         where this project stands and what to run next
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+       [--heal]                                        on failure, heal and re-run (see heal)
+  heal [--dir <dir>] [--no-agent] [--dry-run]          fix setup and drifted tests, prove each fix by re-running, keep only
+       [--agent claude|codex] [--model <m>]            what passes; product bugs are reported, never hidden
+  heal --undo <id|latest>                              put back every change a heal kept
+  status [--dir <dir>] [--json]                        project health plus ordered next commands (for people and agents)
   list [--json]                                        list flows with their ids, tags and steps
   show [--run latest|<name>] [--json]                  print a run's summary
   compile [--json]                                     write the derived v1 corpus to .tracegrove/compiled/
@@ -98,7 +108,38 @@ Exit codes: 0 pass, 1 assertion failure, 2 blocked/inconclusive, 3 infrastructur
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
-    case 'help': process.stdout.write(`${HELP}\n`); return 0;
+    case 'help': {
+      // Bare `tracegrove` inside a project is a home screen; --help (or no project) is the reference.
+      if (argv.length === 0 && projectRoot('.')) { process.stdout.write(`${renderStatus(projectStatus('.'), paint())}\n`); return 0; }
+      process.stdout.write(`${HELP}\n`); return 0;
+    }
+
+    case 'status': {
+      const status = projectStatus(flag(args, 'dir') ?? '.');
+      out(args, status, renderStatus(status, paint()));
+      return 0;
+    }
+
+    case 'heal': {
+      const dir = projectRoot(flag(args, 'dir') ?? '.') ?? resolve(flag(args, 'dir') ?? '.');
+      const undo = flag(args, 'undo');
+      if (undo !== null) {
+        const result = undoHeal(dir, undo);
+        out(args, result, `${result.restored.length ? `restored:\n${result.restored.map((f) => `  ${f}`).join('\n')}` : 'nothing restored'}${result.skipped.length ? `\nskipped:\n${result.skipped.map((s) => `  ${s.file}: ${s.why}`).join('\n')}` : ''}\nnext: tracegrove test`);
+        return result.skipped.length ? 2 : 0;
+      }
+      const controller = new AbortController();
+      const onSignal = () => controller.abort(new Error('user_cancelled'));
+      process.on('SIGINT', onSignal);
+      const live = args.flags.json ? { update: () => {}, done: () => {} } : progressLine();
+      try {
+        const report = await heal({ dir, agent: args.flags['no-agent'] !== true, dryRun: args.flags['dry-run'] === true, overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
+          onProgress: (phase, detail) => live.update(`${phase}${detail ? ` · ${detail}` : ''}`), onAgentActivity: (line) => live.update(`agent · ${line.replaceAll(`${dir}/`, '')}`) });
+        live.done();
+        out(args, report, renderHeal(report, dir, paint()));
+        return report.exitCode;
+      } finally { live.done(); process.off('SIGINT', onSignal); }
+    }
     case 'source-resolve': {
       const result = await resolveSourceFiles(args.flags.input, args.flags.output);
       out(args, result.summary, result.text);
@@ -129,13 +170,28 @@ async function main(argv: string[]): Promise<number> {
       const controller = new AbortController();
       const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
       process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
+      const live = args.flags.json || args.flags.jsonl ? { update: () => {}, done: () => {} } : progressLine();
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
+        live.update('Compiling flows and starting the app');
         const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, signal: controller.signal,
-          ...(args.flags.jsonl ? { onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => { process.stdout.write(`${JSON.stringify(event)}\n`); } } : {}) });
-        out(args, report, renderText(report, compiled.root));
+          onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
+            if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
+            else live.update(runActivity(event).label);
+          } });
+        live.done();
+        const p = paint();
+        if (args.flags.heal && report.exitCode !== 0 && report.exitCode !== 4) {
+          if (!args.flags.json) process.stdout.write(`${renderTree(report, compiled.root, p)}\n\n`);
+          const healed = await heal({ dir: compiled.root, report, signal: controller.signal, onProgress: (phase, detail) => live.update(`${phase}${detail ? ` · ${detail}` : ''}`), onAgentActivity: (line) => live.update(`agent · ${line.replaceAll(`${compiled.root}/`, '')}`) });
+          live.done();
+          out(args, { report, heal: healed }, renderHeal(healed, compiled.root, p));
+          return healed.after.exitCode;
+        }
+        out(args, report, renderTree(report, compiled.root, p));
         return report.exitCode;
       } finally {
+        live.done();
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
       }
     }
@@ -146,7 +202,7 @@ async function main(argv: string[]): Promise<number> {
       const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
       if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
       const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
-      out(args, report, renderText(report, root));
+      out(args, report, renderTree(report, root, paint()));
       return 0;
     }
 
@@ -191,13 +247,16 @@ async function main(argv: string[]): Promise<number> {
       const controller = new AbortController();
       const onSignal = () => controller.abort(new Error('user_cancelled'));
       process.on('SIGINT', onSignal);
+      const live = args.flags.json ? { update: () => {}, done: () => {} } : progressLine();
+      live.update('Discovering routes and briefing the agent');
       try {
         const result = await draftWithAgent({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch'), intent: flag(args, 'intent'), overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
-          ...(args.flags.json ? {} : { onOutput: () => { process.stderr.write('.'); } }) });
+          ...(args.flags.json ? {} : { onActivity: (line: string) => live.update(`agent · ${line.replaceAll(`${resolve(flag(args, 'dir') ?? '.')}/`, '')}`) }) });
+        live.done();
         const { agent, check } = result;
         out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written:\n${agent.files.map((f) => `  ${f}`).join('\n') || '  (none)'}\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\nnext: tracegrove test --grep discovered`);
         return agent.exitCode === 0 && check.ok ? 0 : 2;
-      } finally { process.off('SIGINT', onSignal); }
+      } finally { live.done(); process.off('SIGINT', onSignal); }
     }
 
     case 'sample-config': {

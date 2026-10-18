@@ -6,7 +6,9 @@ tracegrove starts your real FastAPI, Django or Node app, walks it through scenar
 short YAML files, checks every effect with an independent read, cleans up what it created, and
 seals the whole run into a bundle that `verify-bundle` can re-derive byte for byte. Claude Code
 or Codex can draft the scenarios from your routes and your intent, with explicit low-cost defaults,
-and tracegrove re-checks everything they write before you see it.
+and tracegrove re-checks everything they write before you see it. When a run breaks, `tracegrove heal`
+fixes setup mistakes and drifted tests, proves every fix with a re-run, and reports real product
+bugs instead of editing them away.
 
 ![tracegrove ui: a run shown as a tree of scenarios, each step with its request, timing and status](docs/images/ui-run.png)
 
@@ -146,7 +148,14 @@ re-verifiable evidence bundle.
 ```text
 npx --no-install tracegrove init          # detects FastAPI / Django / Node, writes tracegrove.config.yaml + an example flow
 npx --no-install tracegrove test          # compile, plan, run, verify; results in .tracegrove/runs/latest/
+npx --no-install tracegrove heal          # something broke? fix what is safe, prove it, report the rest
+npx --no-install tracegrove               # inside a project: where things stand and what to run next
 ```
+
+`tracegrove test` prints the run as a small tree: passing scenarios stay folded, failing ones unfold
+to the step that broke with what was expected and what came back, followed by the next command
+worth running. On a terminal it shows a live line of what is happening (starting the app, which
+step, cleanup) and uses colour unless `NO_COLOR` is set.
 
 ```yaml
 # tracegrove.config.yaml
@@ -210,6 +219,46 @@ Runnable samples: `src/samples/notes-api` (Node), `src/samples/fastapi-notes`,
 `src/samples/django-notes`. `tracegrove compile` writes the derived v1 corpus to
 `.tracegrove/compiled/` if you want to inspect it or drop to the low-level commands.
 
+## Self-healing: `tracegrove heal`
+
+```text
+npx --no-install tracegrove heal                 # diagnose, repair, re-run, keep only what passes
+npx --no-install tracegrove heal --dry-run       # show what it would change; change nothing
+npx --no-install tracegrove heal --no-agent      # setup fixes only, no coding agent
+npx --no-install tracegrove heal --undo latest   # put back every change the last heal kept
+npx --no-install tracegrove test --heal          # run, and heal if anything fails
+```
+
+Heal reads the latest failure and sorts every problem into one of a few kinds, then acts on each:
+
+| Finding | What heal does |
+| --- | --- |
+| **Setup**: the app never answered its health check | Finds GET routes and string literals in your source that look like health endpoints (`/health`, `/healthz`, `/ready`, …), tries them one at a time in `tracegrove.config.yaml`, and keeps the first one under which the app actually starts. |
+| **Setup**: the Python interpreter is missing or lacks the framework | Tries `.venv`, `venv` and `PATH` interpreters that can import FastAPI and uvicorn (or Django) and keeps the one tracegrove recognizes. |
+| **Authoring**: a flow does not compile | Hands the `check` issues to your coding agent, limited to the named files. |
+| **Failing check** | Asks the agent to read the handlers and recent changes and call each failure **test drift** (the app changed on purpose; update the flow) or a **product bug** (the app is wrong; leave the flow alone). |
+| **Evidence** or **infrastructure** | Never repaired; explained, with the run folder to read. |
+
+The guarantees that make it safe to run unattended:
+
+- **Nothing is kept unless a re-run passes.** Every config edit and every agent edit is re-run;
+  edits under which the case still fails are reverted on the spot.
+- **Product bugs stay red.** A case the agent calls a product bug keeps its failing test, the heal
+  exits 1, and the report says what is wrong in one sentence.
+- **Tests cannot be weakened.** An agent edit is rejected if it deletes a step, renames one, checks
+  less than before, or flips an expected success into an expected failure (or back), for example
+  `403` to `200`. Edits outside the failing flows, to app code or new files are undone.
+- **Everything is reversible.** Kept changes are backed up under `.tracegrove/heals/<id>/` next to
+  `report.json` (schema `tracegrove.heal/v1`); `heal --undo <id>` restores them and refuses if a
+  file changed again since.
+- **Comments survive.** Config edits go through a YAML document model, so your comments and
+  formatting stay put.
+
+In the UI, **Heal** (or `h`) runs the same thing with the agent's progress streaming in, then
+shows findings, each kept change as a diff, and **Undo all**.
+
+![tracegrove ui Heal tab: a product bug reported with the test kept red, a drifted test fixed and verified, and the kept change shown as a diff with Undo all](docs/images/ui-heal.png)
+
 ## The grove: `tracegrove ui`
 
 ```text
@@ -227,11 +276,20 @@ dark, down to phone width:
 - **Discover.** Pick the working tree or any git branch (read with `git show`, nothing is checked
   out). Routes from FastAPI decorators, Django `path()` and Express-style routers are listed with
   the flows that reach them, changed-on-this-branch first. Draft a skeleton for one route, or write
-  what should be true in **Intent** and press **Draft with Claude**: the agent's work shows as named
-  phases, and its flows arrive already checked, with **Run the new scenarios** one click away.
+  what should be true in **Intent** and press **Draft with Claude**: what the agent reads, edits
+  and says streams in live, and its flows arrive already checked, with **Run the new scenarios**
+  one click away.
+- **Heal.** Diagnose and repair with one button, watch the agent work, review every kept change as
+  a diff, see product bugs called out, and undo any heal. Earlier heals stay listed.
 - **History.** A grid with one column per run and one row per scenario, so a single case's record
   and the whole set read at a glance. Any cell opens that run at that scenario.
 - **Settings.** Choose Claude Code, Codex or none, and the model. Installed CLIs are detected.
+
+While a run is going, the step being executed pulses in the tree and the header says what is
+happening, from real run events rather than a timer. **⌘K** (or **Ctrl K**, or `/`) opens a command
+palette for every action, scenario and branch; `j`/`k` move through scenarios, `r` reruns the
+selected one, `R` runs all, `h` heals, `1`–`5` switch tabs and `?` lists the keys. Pruning and
+healing both offer **Undo** in the confirmation.
 
 **Pruning is a rename.** Prune a scenario and its file becomes `*.flow.yaml.pruned`: the compiler
 skips it, the tree shows it as a dashed branch, and **Graft back** restores it. Nothing is deleted.
@@ -245,13 +303,17 @@ tracegrove does not ship a model. It drives the coding agent you already use, he
 
 | Provider | Command it runs | Default model |
 | --- | --- | --- |
-| `claude` (default) | `claude -p … --model claude-haiku-4.5 --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-4.5` |
+| `claude` (default) | `claude -p … --model claude-haiku-5-5 --output-format stream-json --permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash(tracegrove check/list/discover)` | `claude-haiku-5-5` |
 | `codex` | `codex exec --sandbox workspace-write --model gpt-6-luna` | `gpt-6-luna` |
 | `none` | nothing; discovery and templates only | |
 
 The agent gets the discovery report, your intent, the naming conventions, an existing flow as an
 example, the persona names and the JSON Schemas. Its instructions request drafts under
 `tracegrove/discovered/` and read-only checks; its CLI permissions remain the execution boundary.
+Its stream of events is shown live in the terminal and the UI. If Claude Code rejects the
+configured model id, tracegrove retries once with the `haiku` alias and records that in the
+result (a dotted id such as `claude-haiku-4.5` is corrected to `claude-haiku-4-5` up front). The
+agent runs as its own session even when tracegrove is itself driven from inside Claude Code.
 After it exits, tracegrove lists changed flow files and compiles the project. Compilation is
 not independent confirmation of the developer's intent. A configured `maxBudgetUsd` is
 supported by the Claude adapter; Codex blocks that setting until enforced accounting exists.
@@ -265,25 +327,28 @@ Where the choice comes from, highest first:
    ```yaml
    agent:
      provider: claude      # claude | codex | none
-     model: claude-haiku-4.5  # optional
+     model: claude-haiku-5-5  # optional
      maxBudgetUsd: 0.50    # optional spend cap per draft (Claude Code)
    ```
 4. The explicit low-cost defaults above. No inherited CLI model or silent provider fallback.
 
 ### Commands built for agents
 
-Every one takes `--json`, and none starts your app:
+Every one takes `--json`; the first five never start your app:
 
 ```text
+tracegrove status                    # where things stand plus an ordered `next` list of commands and why
 tracegrove discover [--branch <b>]   # routes vs. flows that reach them; changed files first
 tracegrove check                     # compile only; exit 0 when clean, 2 with file:path-located issues
 tracegrove list                      # flows with ids, tags and steps
 tracegrove draft --intent "<what should be true>" [--agent claude|codex] [--model <m>]
 tracegrove settings [--agent …] [--model …]
+tracegrove heal [--dry-run] [--no-agent]   # runs the suite; returns findings, kept diffs and `next`
 ```
 
-So any agent, including one you run yourself, can loop: `discover` → write flows → `check` →
-`test` → read `.tracegrove/runs/latest/summary.json`.
+So any agent, including one you run yourself, can loop: `status` → `discover` → write flows →
+`check` → `test` → `heal` → follow `next`. `tracegrove init` writes `tracegrove/AGENTS.md` with
+these conventions and the loop, so Claude Code, Codex or Cursor pick them up from the repo.
 
 ## How it fits together
 

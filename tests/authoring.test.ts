@@ -191,7 +191,7 @@ describe('init and sources', () => {
     writeFileSync(join(root, 'package.json'), JSON.stringify({ main: 'server.js' }));
     writeFileSync(join(root, 'server.js'), '');
     const result = initProject(root);
-    expect(result.files.map((f) => f.slice(root.length + 1))).toEqual(['tracegrove.config.yaml', 'tracegrove/health.flow.yaml', '.gitignore']);
+    expect(result.files.map((f) => f.slice(root.length + 1))).toEqual(['tracegrove.config.yaml', 'tracegrove/health.flow.yaml', 'tracegrove/AGENTS.md', '.gitignore']);
     expect(readFileSync(join(root, '.gitignore'), 'utf8')).toBe('.tracegrove/\n');
     expect(compileProject(join(root, 'tracegrove.config.yaml')).flows.map((f) => f.caseId)).toEqual(['health']);
     expect(blockedCodes(() => initProject(root))[0]).toMatch(/^config_exists/);

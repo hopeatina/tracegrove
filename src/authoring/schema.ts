@@ -46,7 +46,7 @@ export const AuthoringConfig = z.object({
     .describe('Callers. The first one is the default `as:` for every step.'),
   agent: z.object({
     provider: z.enum(AGENT_PROVIDERS).default('claude').describe('Coding agent that drafts and repairs flows: claude (Claude Code CLI), codex (Codex CLI) or none.'),
-    model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.'),
+    model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-5-5 for claude; gpt-6-luna for codex.'),
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
   defaults: z.object({

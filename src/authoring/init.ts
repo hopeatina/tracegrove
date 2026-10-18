@@ -71,6 +71,28 @@ app.use((req, _res, next) => { req.user = tokens[(req.headers.authorization ?? '
   command: `Read TRACEGROVE_TOKENS (JSON {token: subject}) and treat "Authorization: Bearer <token>" as that subject.`,
 };
 
+/** Written next to the flows so any coding agent (Claude Code, Codex, Cursor) learns the loop. */
+export const AGENTS_GUIDE = `# tracegrove: notes for coding agents
+
+This folder holds behaviour tests that tracegrove runs against the real app.
+
+- One behaviour per file: \`<area>/<behavior>.flow.yaml\` (kebab-case). The case id is \`<area>.<behavior>\`.
+- Steps: \`- name: ...\` plus one verb key (\`GET: /notes/{noteId}\`), optional \`json\`, \`as: <persona>\`,
+  \`expect\` (a status, or \`{ status, json: {dot.path: value}, present, absent, count }\`), \`save: { var: dot.path }\`.
+- Personas are declared in ../tracegrove.config.yaml; \`as: none\` is an unauthenticated caller.
+
+The loop (every command takes --json and prints machine-readable \`next\` actions):
+
+1. \`tracegrove status --json\`   where things stand and what to run next
+2. \`tracegrove check --json\`    compile only; fix every issue it lists (file, step, fix)
+3. \`tracegrove test --json\`     run against the real app; read \`cases[].failure\`
+4. \`tracegrove heal --json\`     fixes setup, repairs drifted tests, keeps only fixes a re-run proves;
+                                  \`heal --undo latest\` reverts them
+
+Rules: never weaken a test to make it pass. If the app is wrong (a denial now succeeds, data is lost,
+a 5xx), leave the flow red and report the bug. Never delete steps or expectations.
+`;
+
 export function initProject(root: string, options: { force?: boolean } = {}): { files: string[]; detection: Detection; snippet: string } {
   const configPath = join(root, CONFIG_FILE);
   if (existsSync(configPath) && !options.force) throw new Blocked([{ code: 'config_exists', detail: configPath, owner: 'operator', action: 'edit it, or rerun with --force to overwrite' }]);
@@ -88,6 +110,8 @@ export function initProject(root: string, options: { force?: boolean } = {}): { 
   const flowPath = join(flowDir, 'health.flow.yaml');
   const files = [configPath];
   if (!existsSync(flowPath)) { writeFileSync(flowPath, flow); files.push(flowPath); }
+  const agents = join(flowDir, 'AGENTS.md');
+  if (!existsSync(agents)) { writeFileSync(agents, AGENTS_GUIDE); files.push(agents); }
   const gitignore = join(root, '.gitignore');
   if (!read(gitignore).split('\n').some((line) => line.trim() === `${STATE_DIR}/` || line.trim() === STATE_DIR)) {
     appendFileSync(gitignore, `${read(gitignore) && !read(gitignore).endsWith('\n') ? '\n' : ''}${STATE_DIR}/\n`);

@@ -1,6 +1,8 @@
 /**
  * The single page served by `tracegrove ui`, in the Grove design: a bonsai of scenarios (trunk,
- * branches, step twigs), pruning as a reversible rename, and agent work shown as named phases.
+ * branches, step twigs), pruning as a reversible rename, live progress from real run and agent
+ * events, self-healing with reviewable diffs and undo, a command palette (Cmd/Ctrl+K) and keyboard
+ * navigation.
  * No build step and no framework; every string reaches the DOM through textContent.
  */
 export const UI_HTML = String.raw`<!doctype html>
@@ -68,7 +70,7 @@ pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:1
 .growing .dot{animation:breathe 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.25;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}@keyframes breathe{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 5px var(--moss-bg)}}
 .fade{animation:fade .24s ease-out both}@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.think i,.growing .dot,.fade{animation:none}}
+@media (prefers-reduced-motion:reduce){.think i,.growing .dot,.fade,.live .dot{animation:none}}
 .phases{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}.phases li{display:flex;gap:10px;align-items:center}.phases .ok{color:var(--moss);width:12px}.phases .wait{color:var(--muted);width:12px}
 .src{display:flex;flex-direction:column;gap:4px}.src button{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid transparent;background:none;text-align:left;font:13px/18px var(--mono)}
 .src button[aria-pressed=true]{background:var(--paper);border-color:var(--line2)}.src button:hover{background:var(--paper)}
@@ -78,21 +80,36 @@ pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:1
 .scroll{overflow-x:auto}.seg{display:flex;flex-wrap:wrap;gap:8px}.seg button{flex:1 1 160px;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--paper);display:flex;flex-direction:column;gap:2px}
 .seg button[aria-pressed=true]{border-color:var(--moss);box-shadow:inset 0 0 0 1px var(--moss)}
 table.kv{border-collapse:collapse;width:100%}table.kv th,table.kv td{text-align:left;padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}table.kv th{width:38%;padding-right:12px;font-weight:500;color:var(--ink3)}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--forest);color:var(--on-forest);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:var(--forest);color:var(--on-forest);padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;max-width:92vw}
+.toast .act{background:none;border:0;color:var(--on-forest);text-decoration:underline;font-weight:600;min-height:28px;padding:0}
+.pal-back{position:fixed;inset:0;background:rgba(18,20,18,.34);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:20}
+.pal{width:min(640px,92vw);background:var(--paper);border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.2);overflow:hidden}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;min-height:54px;font-size:16px;padding:0 18px;outline:none}
+.pal ul{list-style:none;margin:0;padding:6px;max-height:52vh;overflow:auto}.pal li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;min-height:44px}
+.pal li[aria-selected=true]{background:var(--sel)}.pal .grp{font:500 11px/16px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);width:76px;flex:none}.pal .hint{margin-left:auto;color:var(--muted);font-size:13px}
+.pal .foot{display:flex;gap:16px;padding:8px 14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;flex-wrap:wrap}
+kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--ink3);background:var(--stone)}
+.kbtn{display:inline-flex;gap:8px;align-items:center;min-height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink3);font-size:13px}
+.log{max-height:280px;overflow:auto;font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:10px 12px;margin-top:12px}.log div{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink3)}.log div:last-child{color:var(--ink)}
+.diff{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:8px 0;overflow-x:auto;margin-top:8px}.diff div{padding:0 12px;white-space:pre}.diff .add{background:var(--moss-bg);color:var(--moss)}.diff .del{background:var(--verm-bg);color:var(--verm-ink)}.diff .ctx{color:var(--ink3)}
+.finding{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--paper)}
+.step.live,.node.live{box-shadow:inset 3px 0 0 var(--moss);background:var(--paper)}.live .dot{animation:breathe 1.1s ease-in-out infinite}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;margin-top:12px}
 @media (max-width:720px){header{padding:12px 16px}.page{padding:20px 16px 40px}.ctx{margin-left:0;width:100%}h1{font-size:23px;line-height:30px}
  .step{grid-template-columns:8px 1fr 48px;}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:1fr}}
 </style></head><body>
 <header><span class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="color:var(--moss)"><path d="M12 21V11"/><path d="M12 14c-3 0-5-2-6-4"/><path d="M12 11c2.5 0 4.5-1.5 5.5-3.5"/><circle cx="6" cy="9" r="2.2"/><circle cx="17.8" cy="7.2" r="2.2"/><circle cx="12" cy="6" r="2.6"/><path d="M8 21h8"/></svg>tracegrove</span>
-<nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span></header>
+<nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','History','Settings'];
+const TABS=['Run','Discover','Heal','History','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
-const ui={run:null,runName:null,sel:null,step:null,running:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{}};
+const ui={run:null,runName:null,sel:null,step:null,running:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw j;return j}
-function toast(text){const t=h('div',{class:'toast fade',role:'status'},text);document.body.append(t);setTimeout(()=>t.remove(),2600)}
+function toast(text,action){for(const old of document.querySelectorAll('.toast'))old.remove();const t=h('div',{class:'toast fade',role:'status'},h('span',{},text),
+ action?h('button',{class:'act',on:{click:async()=>{t.remove();await action.run()}}},action.label):null);document.body.append(t);setTimeout(()=>t.remove(),action?7000:2800)}
 function blocked(e){return h('div',{class:'card fade'},h('div',{class:'row'},h('span',{class:'pill p-fail'},'blocked'),h('h2',{},'Fix this first')),
  ...(e.reasons||[{code:'error',detail:e.error||String(e),action:''}]).map(r=>h('div',{style:'margin-top:12px'},h('div',{class:'mono small'},r.code),h('div',{},r.detail),r.action?h('div',{class:'muted small'},'Fix: '+r.action):null)))}
 const OUT={passed:'pass',assertion_failed:'fail',failed:'fail',completed:'pass',blocked:'warn',inconclusive:'warn',infrastructure_failed:'warn',cancelled:'warn',skipped:'none'};
@@ -103,12 +120,12 @@ const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;return d<60?'j
 function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>{tab=t;render()}}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
-function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat())}
+async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
+function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
 
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
- const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
+ const live=state.flows.map(f=>{const c=byId.get(f.caseId);const steps=f.steps.map((s,i)=>{const r=c?(c.steps.find(x=>x.id===s.id)||c.steps[i]):null;return{id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:r?kind(r.result):'none',status:r?r.status:null,observedText:r?r.observedText:null,ms:r?r.durationMs:null,reason:r?r.reason:null}});
   return{id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.ya?ml\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
@@ -135,22 +152,23 @@ function runTab(){
  return[hero,h('div',{class:'cols'},tree,side)]}
 function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state==='pruned';const total=s.steps.reduce((a,x)=>a+(x.ms||0),0)||1;let at=0;
  return h('div',{class:'fade'},h('div',{class:'br'},h('span',{class:'twig'+(cut?' cut':'')},h('i')),
-  h('button',{class:'node','aria-expanded':open?'true':'false',on:{click:()=>{ui.sel=s.id;ui.step=Math.max(0,s.steps.findIndex(x=>x.result==='fail'));render()}}},
+  h('button',{class:'node','data-case':s.id,'data-steps':s.steps.map(x=>x.id).join(' '),'aria-expanded':open?'true':'false',on:{click:()=>{ui.sel=s.id;ui.step=Math.max(0,s.steps.findIndex(x=>x.result==='fail'));render()}}},
    h('span',{class:'dot '+s.state,'aria-hidden':'true'}),
    h('span',{class:'body'},h('span',{class:'row',style:'gap:4px 12px'},h('span',{class:'id',style:cut?'color:var(--muted)':''},s.id),h('span',{class:'state c-'+(cut?'none':s.state)},LABEL[s.state])),
     h('span',{style:cut?'color:var(--ink3)':''},s.title),s.fixtures.length?h('span',{class:'small muted'},'given '+s.fixtures.join(', ')):null),
    h('span',{class:'pips','aria-label':s.steps.filter(x=>x.result==='pass').length+' of '+s.steps.length+' steps held'},s.steps.map(x=>h('i',{class:x.result}))),
    h('span',{class:'time'},secs(s.ms)))),
   open?h('div',{class:'twigs fade'},s.steps.map((x,j)=>{const left=at/total*100;at+=x.ms||0;return h('div',{class:'br'},h('span',{class:'twig'},h('i')),
-   h('button',{class:'step','aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},x.name),h('span',{class:'req'},x.method+' '+x.path),
+   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},x.name),h('span',{class:'req'},x.method+' '+x.path),
     h('span',{class:'bar','aria-hidden':'true'},x.ms!=null?h('i',{class:x.result==='fail'?'fail':'',style:'left:'+left.toFixed(1)+'%;width:'+((x.ms||0)/total*100).toFixed(1)+'%'}):null),
     h('span',{class:'ms muted'},x.ms!=null?x.ms+' ms':''),h('span',{class:'res c-'+x.result},x.status!=null?x.status:x.result==='none'?'–':LABEL[x.result])))})):null)}
 function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.state==='warn')items.push({s,title:s.failure?s.failure.message:'Did not complete',where:s.failure?'step "'+s.failure.step+'"':s.file});
  if(run&&run.bundleVerified===false)items.push({s:null,title:'Exported evidence failed verification',where:'Inspect bundle-problems.txt before relying on this run.'});
  for(const b of (run&&run.blockers)||[])items.push({s:null,title:b.code+': '+b.detail,where:b.action});
- return h('section',{'aria-label':'Needs a fix'},h('div',{class:'rulehead'},h('h2',{},'Needs a fix'),h('span',{class:'rule'}),h('span',{class:'small muted'},items.length?items.length+' open':'')),
+  return h('section',{'aria-label':'Needs a fix'},h('div',{class:'rulehead'},h('h2',{},'Needs a fix'),h('span',{class:'rule'}),h('span',{class:'small muted'},items.length?items.length+' open':''),
+   items.length&&!ui.running?h('button',{class:'btn sm',title:'Fix setup and drifted tests, prove each fix by re-running; product bugs are reported, never hidden (h)',on:{click:()=>startHeal(false)}},'Heal'):null),
   items.length?h('div',{style:'display:flex;flex-direction:column;gap:8px'},items.map(it=>h('button',{class:'fix','aria-pressed':it.s&&ui.sel===it.s.id?'true':'false',on:{click:()=>{if(!it.s)return;ui.sel=it.s.id;ui.step=Math.max(0,it.s.steps.findIndex(x=>x.result!=='pass'));render()}}},
-   h('span',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(it.s&&it.s.state==='fail'?'p-fail':'p-warn')},it.s&&it.s.state==='fail'?'bug':'blocked'),h('span',{class:'mono small'},it.s?it.s.id:'run')),h('span',{},it.title),h('span',{class:'small muted'},it.where)))):
+   h('span',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(it.s&&it.s.state==='fail'?'p-fail':'p-warn')},it.s&&it.s.state==='fail'?'failed':'blocked'),h('span',{class:'mono small'},it.s?it.s.id:'run')),h('span',{},it.title),h('span',{class:'small muted'},it.where)))):
   h('p',{class:'muted'},run?'Nothing. Every scenario that ran held.':'Run the grove and failures land here, ordered as they occurred.'))}
 function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id);const v=c&&(c.videos||[]).find(v=>v.mediaType==='video/webm'&&/^[a-f0-9]{64}$/.test(v.digest));if(!v||!ui.runName)return null;
  const status=h('p',{class:'small muted',role:'status'},'Checking the recording evidence…');
@@ -172,13 +190,20 @@ function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=
    h('button',{class:'btn ghost sm',on:{click:()=>prune(s.file,false)}},'Prune'),h('button',{class:'btn sm',on:{click:()=>runNow(s.id)}},s.state==='none'?'Run':'Rerun')))}
 let runWatch=null;
 function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
-function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const a=await api('/api/activity');if(ui.running&&a.status==='running'){ui.running=a.label;const el=document.getElementById('run-activity');if(el)el.textContent=a.label}else if(ui.running&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},500)}
-async function runNow(grep){ui.running='Planning and running; awaiting verified evidence';render();watchRun();
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.outcome)}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
-async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned. Graft it back any time.');ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
+/* Live progress comes from real run and agent events (/api/live), never from timers. */
+function paintLive(){const l=ui.live;if(!l)return;const a=l.run;
+ const el=document.getElementById('run-activity');if(el&&a.status==='running')el.textContent=a.label;
+ for(const n of document.querySelectorAll('[data-step]'))n.classList.toggle('live',a.status==='running'&&!!a.stepId&&n.getAttribute('data-step')===a.stepId);
+ for(const n of document.querySelectorAll('[data-steps]'))n.classList.toggle('live',a.status==='running'&&!!a.stepId&&n.getAttribute('data-steps').split(' ').includes(a.stepId));
+ const log=document.getElementById('agent-log');if(log){const lines=l.agent.lines.length?l.agent.lines:['Waiting for the agent to start'];if(log.childElementCount!==lines.length||log.lastChild.textContent!==lines[lines.length-1]){const stick=log.scrollTop+log.clientHeight>=log.scrollHeight-8;log.replaceChildren(...lines.map(x=>h('div',{},x)));if(stick)log.scrollTop=log.scrollHeight}}
+ const hp=document.getElementById('heal-phase');if(hp&&l.heal.status==='running')hp.textContent=l.heal.phase+(l.heal.detail?' · '+l.heal.detail:'')}
+function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInterval(async()=>{if(polling)return;polling=true;try{const l=await api('/api/live');ui.live=l;const a=l.run;if(ui.running&&a.status==='running')ui.running=a.label;paintLive();
+  if(ui.running&&!ui.healing&&ui.agentPhase<0&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},400)}
+async function runNow(grep){ui.running='Compiling flows and starting the app';render();watchRun();
+ ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false}await load()}
+async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned '+file.split('/').pop(),{label:'Undo',run:()=>prune(file,!graft)});ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
-const AGENT_PHASES=['Drafting and checking; awaiting the agent result'];
 function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;
  const sources=[{v:'',label:'working tree',note:'uncommitted files included'}].concat(g.branches.map(b=>({v:b,label:b,note:b===g.current?'checked out':b===g.base?'base':''})));
  const src=h('section',{class:'side',style:'flex:1 1 260px;max-width:340px'},h('div',{},h('span',{class:'label'},'Source'),h('div',{class:'src',style:'margin-top:10px'},
@@ -192,7 +217,8 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
   h('p',{class:'small muted',style:'margin:0 0 12px'},name?name+' ('+(a.model||'CLI default')+') reads the code, writes flows into tracegrove/discovered/, and tracegrove checks them before you see them.':'Pick Claude Code or Codex in Settings to draft with an agent.'),
   h('textarea',{id:'intent',placeholder:'After Alice revokes a share, Bob can no longer read the note.','aria-label':'Intent'},ui.intent||''),
   h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',disabled:!name||ui.agentPhase>=0,on:{click:agentDraft}},name?'Draft with '+name:'Draft'),h('button',{class:'btn ghost',on:{click:()=>{tab='Settings';render()}}},'Settings')),
-  ui.agentPhase>=0?h('ul',{class:'phases fade','aria-live':'polite'},AGENT_PHASES.map((p,i)=>h('li',{},i<ui.agentPhase?h('span',{class:'ok'},'✓'):i===ui.agentPhase?h('span',{class:'think'},h('i'),h('i'),h('i')):h('span',{class:'wait'},'○'),h('span',{class:i>ui.agentPhase?'muted':''},p)))):null,
+  ui.agentPhase>=0?h('div',{class:'fade'},h('p',{class:'row small muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),name+' is working; tracegrove checks every file it writes'),
+   h('div',{class:'log',id:'agent-log','aria-live':'polite'},(ui.live&&ui.live.agent.task==='draft'&&ui.live.agent.lines.length?ui.live.agent.lines:['Waiting for the agent to start']).map(x=>h('div',{},x)))):null,
   ui.agent?agentResult():null));
  return[h('div',{class:'cols'},src,reach,intent)]}
 function routeRow(r){const covered=r.coveredBy.length>0;return h('div',{class:'route fade'},h('span',{class:'dot s '+(covered?'pass':'fail'),'aria-hidden':'true'}),
@@ -202,8 +228,9 @@ function draftCard(){const d=ui.draft;return h('div',{class:'card fade',style:'m
  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',on:{click:async()=>{try{const s=await api('/api/draft',{method:d.route.method,path:d.route.path,save:true});ui.draft=null;toast('Saved '+s.saved.split('/').slice(-3).join('/')+'. Fill the TODOs.');await load();scan()}catch(e){toast(e.error||'Could not save')}}}},'Plant it'),h('button',{class:'btn ghost',on:{click:()=>{ui.draft=null;render()}}},'Discard')))}
 async function draftOne(r){try{const d=await api('/api/draft',{method:r.method,path:r.path});ui.draft={...d,route:r};render()}catch(e){toast(e.error||'Could not draft')}}
 async function scan(){ui.scanning=true;ui.disc=null;ui.draft=null;render();try{ui.disc=await api('/api/discover?branch='+encodeURIComponent(ui.source||''))}catch(e){ui.scanning=false;page(blocked(e));return}ui.scanning=false;if(tab==='Discover')render()}
-async function agentDraft(){ui.intent=document.getElementById('intent').value;ui.agent=null;ui.agentPhase=0;render();
- try{ui.agent=await api('/api/agent-draft',{intent:ui.intent,branch:ui.source})}catch(e){ui.agent={error:e}}finally{ui.agentPhase=-1}await load();if(ui.disc)scan()}
+async function agentDraft(){const box=document.getElementById('intent');if(box)ui.intent=box.value;ui.agent=null;ui.agentPhase=0;ui.live=null;render();watchRun();
+ try{ui.agent=await api('/api/agent-draft',{intent:ui.intent||'',branch:ui.source})}catch(e){ui.agent={error:e}}finally{ui.agentPhase=-1;stopRunWatch()}await load();if(ui.disc)scan();
+ if(ui.agent&&ui.agent.agent)toast(ui.agent.agent.files.length+' flow file(s) drafted'+(ui.agent.check.ok?' and checked':'; check found issues'))}
 function agentResult(){const r=ui.agent;if(r.error)return h('div',{style:'margin-top:16px'},blocked(r.error));const c=r.check;const ok=c.ok&&r.agent.exitCode===0;
  return h('div',{class:'fade',style:'margin-top:16px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(ok?'p-pass':'p-fail')},ok?'checked':'needs fixes'),h('span',{class:'small muted'},r.agent.files.length+' flow file(s) from '+r.agent.provider+(r.agent.model?' · '+r.agent.model:''))),
   r.agent.files.length?h('div',{style:'margin-top:8px'},r.agent.files.map(f=>h('div',{class:'row',style:'justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)'},h('span',{class:'mono small',style:'overflow-wrap:anywhere'},f),h('button',{class:'btn ghost sm',on:{click:()=>prune(f,false)}},'Prune')))):null,
@@ -237,6 +264,82 @@ function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detect
    h('tr',{},h('th',{},'Source digest'),h('td',{class:'mono small'},state.sourceDigest?state.sourceDigest.slice(0,16)+' · '+state.sourceFiles+' files':'–')))):h('p',{class:'muted'},'No config yet. Initialize from the Run tab.'),
    h('p',{class:'small muted mono',style:'overflow-wrap:anywhere'},state.dir)))]}
 
-function render(){header();if(!state)return;const views={Run:runTab,Discover:discoverTab,History:historyTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+/* ---------- Heal: diagnose, repair, prove, undo ---------- */
+const KIND={setup:['setup','p-warn'],authoring:['authoring','p-warn'],test_drift:['test drift','p-info'],product_bug:['product bug','p-fail'],assertion:['failing','p-fail'],evidence:['evidence','p-warn'],infrastructure:['infrastructure','p-warn']};
+const HEAL_TITLE={healthy:'Nothing to heal. Every scenario holds.',healed:'Healed. Every fix was proven by a re-run.',partly_healed:'Partly healed. Some findings still need you.',product_bugs:'Found product bugs. The tests stay red on purpose.',needs_human:'Needs you. Nothing was safe to fix automatically.'};
+function diffView(text){return h('div',{class:'diff'},text.split('\n').slice(2).map(l=>h('div',{class:l[0]==='+'?'add':l[0]==='-'?'del':'ctx'},l||' ')))}
+function healTab(){const r=ui.heal;const a=state.agent.settings;const name=a.provider==='claude'?'Claude Code':a.provider==='codex'?'Codex':null;const installed=name&&state.agent.detected[a.provider];
+ const hero=h('section',{style:'margin-bottom:24px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
+  h('div',{style:'max-width:760px'},h('span',{class:'label'},'Self-healing'),h('h1',{style:'margin-top:6px'},ui.healing?'Healing the grove':r?HEAL_TITLE[r.outcome]:'Fix what broke, prove it, keep only what holds.'),
+   h('p',{class:'muted',style:'margin:8px 0 0'},'Setup mistakes are fixed in the config. Failing checks go to '+(installed?name+' ('+(a.model||'default')+')':'the agent')+', which must call each one test drift or a product bug. Drift is repaired and re-run; bugs are reported and the test stays red. Nothing is kept unless a re-run passes, and every kept change can be undone.')),
+  ui.healing?null:h('div',{class:'row'},h('button',{class:'btn ghost',on:{click:()=>startHeal(true)}},'Preview'),h('button',{class:'btn',on:{click:()=>startHeal(false)}},'Heal now'))),
+  ui.healing?h('div',{class:'card fade',style:'margin-top:18px'},h('p',{class:'row',style:'margin:0'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'heal-phase',role:'status','aria-live':'polite'},ui.live&&ui.live.heal.status==='running'?ui.live.heal.phase+(ui.live.heal.detail?' · '+ui.live.heal.detail:''):'Starting')),
+   h('div',{class:'log',id:'agent-log','aria-label':'What the agent is doing'},(ui.live&&ui.live.agent.task==='heal'&&ui.live.agent.lines.length?ui.live.agent.lines:['The agent joins only if a check fails after setup is sound']).map(x=>h('div',{},x)))):null,
+  !installed&&!ui.healing?h('p',{class:'small muted'},'No agent available: setup fixes still run. ',h('button',{class:'btn ghost sm',on:{click:()=>{tab='Settings';render()}}},'Choose an agent')):null,
+  ui.healError?h('div',{style:'margin-top:16px'},blocked(ui.healError)):null);
+ if(!r||ui.healing)return[hero,pastHeals()];
+ const kept=r.changes.filter(c=>c.status==='kept');const other=r.changes.filter(c=>c.status!=='kept');const b=r.before.totals,af=r.after.totals;
+ const findings=h('section',{class:'grow'},h('div',{class:'rulehead'},h('span',{class:'label'},'Findings'),h('span',{class:'rule'}),h('span',{class:'small muted'},r.findings.length+' · '+r.id)),
+  r.findings.length?h('div',{style:'display:flex;flex-direction:column;gap:8px'},r.findings.map(f=>{const k=KIND[f.kind]||[f.kind,'p-none'];return h('div',{class:'finding fade'},
+   h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(f.status==='fixed'?'p-pass':k[1])},f.status==='fixed'?'fixed':k[0]),h('span',{class:'mono small'},f.caseId||f.file||'project'),f.step?h('span',{class:'small muted'},'· '+f.step):null),
+   h('span',{},f.detail.split('\n')[0]),h('span',{class:'small muted'},f.status==='fixed'?'Fixed and verified.':f.fix),
+   f.caseId?h('div',{class:'row'},h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=f.caseId;ui.step=null;render()}}},'Open scenario')):null)})):h('p',{class:'muted'},'Nothing to fix.'));
+ const changes=h('div',{class:'side'},h('section',{class:'card'},h('div',{class:'rulehead'},h('h2',{},'Kept changes'),h('span',{class:'rule'}),kept.length?h('button',{class:'btn ghost sm',on:{click:()=>undoHeal(r.id)}},'Undo all'):null),
+   kept.length?kept.map(c=>h('div',{style:'margin-top:10px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill p-pass'},c.by),h('span',{class:'mono small',style:'overflow-wrap:anywhere'},c.file)),h('div',{class:'small muted',style:'margin-top:4px'},c.reason+(c.note?' · '+c.note:'')),diffView(c.diff))):h('p',{class:'muted small'},'No file was changed.'),
+   b&&af?h('p',{class:'small muted',style:'margin-top:14px'},'Before: '+b.passed+' passed, '+b.failed+' failed, '+b.other+' other. After: '+af.passed+' passed, '+af.failed+' failed, '+af.other+' other.'):null),
+  other.length?h('details',{class:'card'},h('summary',{class:'small'},other.length+' tried and not kept'),other.map(c=>h('div',{style:'margin-top:10px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill p-none'},c.status),h('span',{class:'mono small'},c.file)),h('div',{class:'small muted'},c.note||c.reason),diffView(c.diff)))):null,
+  r.agent?h('details',{class:'card'},h('summary',{class:'small'},'What '+r.agent.provider+(r.agent.model?' ('+r.agent.model+')':'')+' concluded'),r.agent.verdicts.map(v=>h('p',{class:'small'},h('b',{class:'mono',style:'font-weight:500'},v.caseId),': '+v.verdict.replace('_',' ')+'. '+v.reason)),r.agent.summary?h('pre',{style:'margin-top:8px'},r.agent.summary):null):null,
+  r.next.length?h('section',{class:'card'},h('span',{class:'label'},'Next'),r.next.map(n=>h('div',{style:'margin-top:8px'},h('code',{class:'small'},n.command),h('div',{class:'small muted'},n.why)))):null);
+ return[hero,h('div',{class:'cols'},findings,changes),pastHeals()]}
+function pastHeals(){const list=ui.heals.filter(x=>!ui.heal||x.id!==ui.heal.id);if(!list.length)return null;
+ return h('section',{style:'margin-top:28px'},h('div',{class:'rulehead'},h('span',{class:'label'},'Earlier heals'),h('span',{class:'rule'})),
+  list.slice(0,8).map(x=>h('div',{class:'route'},h('span',{class:'dot s '+(x.outcome==='healed'||x.outcome==='healthy'?'pass':x.outcome==='product_bugs'?'fail':'warn')}),h('span',{},HEAL_TITLE[x.outcome]),h('span',{class:'where mono small muted'},x.id),h('button',{class:'btn ghost sm',on:{click:()=>{ui.heal=x;render()}}},'Open'))))}
+async function startHeal(dryRun){if(ui.healing||ui.running)return;tab='Heal';ui.healing=true;ui.healError=null;ui.running='Healing';ui.live=null;render();watchRun();
+ try{ui.heal=await api('/api/heal',{dryRun});const kept=ui.heal.changes.filter(c=>c.status==='kept').length;
+  const bugs=ui.heal.findings.filter(f=>f.kind==='product_bug').length;
+  toast(dryRun?'Preview ready: nothing was changed':(kept?kept+' verified fix'+(kept===1?'':'es')+' kept':'No file changed')+(bugs?'; '+bugs+' product bug'+(bugs===1?'':'s')+' reported':''),kept&&!dryRun?{label:'Undo',run:()=>undoHeal(ui.heal.id)}:null)}
+ catch(e){ui.healError=e}finally{ui.healing=false;ui.running=false;stopRunWatch()}ui.runName=null;ui.run=null;await load()}
+async function undoHeal(id){try{const r=await api('/api/heal/undo',{id});toast(r.restored.length?'Restored '+r.restored.join(', '):r.skipped.length?r.skipped[0].file+': '+r.skipped[0].why:'Nothing to restore');ui.runName=null;ui.run=null;await load()}catch(e){toast(e.reasons?e.reasons[0].detail:e.error||'Could not undo')}}
+
+/* ---------- Command palette and keyboard ---------- */
+function commands(){const list=[];const add=(grp,label,run,hint)=>list.push({grp,label,run,hint:hint||''});
+ add('Run','Run all scenarios',()=>{tab='Run';render();runNow('')},'R');
+ if(ui.sel)add('Run','Rerun '+ui.sel,()=>{tab='Run';render();runNow(ui.sel)},'r');
+ add('Heal','Heal now',()=>startHeal(false),'h');add('Heal','Preview a heal (changes nothing)',()=>startHeal(true));
+ if(ui.heal&&ui.heal.changes.some(c=>c.status==='kept'))add('Heal','Undo heal '+ui.heal.id,()=>undoHeal(ui.heal.id));
+ if(state&&state.agent.settings.provider!=='none')add('Agent','Draft flows for uncovered routes',()=>{tab='Discover';render();agentDraft()});
+ for(const t of TABS)add('Go','Open '+t,()=>{tab=t;render()},String(TABS.indexOf(t)+1));
+ for(const f of (state?state.flows:[]))add('Scenario',f.caseId,()=>{tab='Run';ui.sel=f.caseId;ui.step=null;render()},f.title);
+ if(state&&state.git.isRepo)for(const b of state.git.branches)add('Branch','Discover on '+b,()=>{tab='Discover';ui.source=b;render();scan()});
+ for(const f of (state?state.flows:[]))add('Prune','Prune '+f.caseId,()=>prune(f.file,false));
+ add('Help','Keyboard shortcuts',shortcuts,'?');return list}
+function fuzzy(q,text){q=q.toLowerCase();text=text.toLowerCase();if(!q)return 1;if(text.includes(q))return 3-text.indexOf(q)/1000;let i=0;for(const ch of text)if(ch===q[i])i++;return i===q.length?1:0}
+let palette=null;
+function closeOverlay(){if(palette){palette.remove();palette=null}}
+function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=all;
+ const input=h('input',{type:'text',placeholder:'Type a command, a scenario or a branch','aria-label':'Command',role:'combobox','aria-expanded':'true','aria-controls':'pal-list',autocomplete:'off'});
+ const list=h('ul',{id:'pal-list',role:'listbox'});
+ const draw=()=>{list.replaceChildren(...shown.slice(0,60).map((c,i)=>h('li',{role:'option','aria-selected':i===sel?'true':'false',on:{mousemove:()=>{if(sel!==i){sel=i;draw()}},click:()=>pick(i)}},h('span',{class:'grp'},c.grp),h('span',{},c.label),c.hint?h('span',{class:'hint'},c.hint):null)));const on=list.children[sel];if(on)on.scrollIntoView({block:'nearest'})};
+ const pick=i=>{const c=shown[i];closeOverlay();if(c)c.run()};
+ input.addEventListener('input',()=>{const q=input.value.trim();shown=all.map(c=>({c,s:Math.max(fuzzy(q,c.label),fuzzy(q,c.grp+' '+c.label)*.9)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).map(x=>x.c);sel=0;draw()});
+ input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,shown.length-1);draw()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);draw()}else if(e.key==='Enter'){e.preventDefault();pick(sel)}else if(e.key==='Escape'){closeOverlay()}});
+ palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade',role:'dialog','aria-modal':'true','aria-label':'Command palette'},input,list,
+  h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'))));
+ document.body.append(palette);draw();input.focus()}
+function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to 5','switch tab'],['?','this list'],['esc','close']];
+ palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade card',role:'dialog','aria-modal':'true','aria-label':'Keyboard shortcuts',style:'padding:20px'},h('h2',{},'Keyboard'),
+  h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)]))));document.body.append(palette)}
+function moveSel(d){if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
+ const el=document.querySelector('[data-case="'+CSS.escape(n.id)+'"]');if(el){el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'})}}
+document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement&&document.activeElement.tagName||'');
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palette?closeOverlay():openPalette();return}
+ if(e.key==='Escape'&&palette){closeOverlay();return}
+ if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
+ if(e.key==='/'){e.preventDefault();openPalette()}else if(e.key==='?'){shortcuts()}else if(e.key==='j'){moveSel(1)}else if(e.key==='k'){moveSel(-1)}
+ else if(e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(e.key==='h'&&!ui.running){startHeal(false)}
+ else if(/^[1-5]$/.test(e.key)){tab=TABS[Number(e.key)-1];render()}});
+document.getElementById('palbtn').addEventListener('click',openPalette);
+
+function render(){header();if(!state)return;const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;
