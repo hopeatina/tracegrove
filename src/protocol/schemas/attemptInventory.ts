@@ -4,7 +4,7 @@ import { Outcome } from './execution.ts';
 import { RecoveryStatusReport } from './recoveryStatus.ts';
 
 export const AttemptInventoryRow = z.object({ admissionSequence: z.number().int().positive().safe(), executionId: IdString.nullable(),
-  attemptId: IdString.nullable(), kind: z.enum(['ordinary', 'qualification', 'unknown']), recordedPhase: RecoveryStatusReport.shape.recordedPhase,
+  attemptId: IdString.nullable(), kind: z.enum(['ordinary', 'qualification', 'regression', 'unknown']), recordedPhase: RecoveryStatusReport.shape.recordedPhase,
   status: z.enum(['finalized', 'sealed_unfinalized', 'admission_invalid', 'duplicate_admission', 'binding_invalid', 'bundle_unavailable', 'bundle_invalid', 'unsupported_aggregate']),
   manifestDigest: DigestSchema.nullable(), outcome: Outcome.nullable(), receiptCount: z.number().int().nonnegative(),
   unresolvedResources: z.number().int().nonnegative().nullable(),

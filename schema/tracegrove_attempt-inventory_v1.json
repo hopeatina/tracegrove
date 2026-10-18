@@ -167,6 +167,7 @@
             "enum": [
               "ordinary",
               "qualification",
+              "regression",
               "unknown"
             ],
             "type": "string"

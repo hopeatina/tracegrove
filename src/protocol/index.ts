@@ -3,6 +3,7 @@ import { CliErrorReport } from './schemas/cli.ts';
 import { RecoveryStatusReport } from './schemas/recoveryStatus.ts';
 import { ReplayComparison } from './schemas/replayComparison.ts';
 import { AttemptInventoryReport } from './schemas/attemptInventory.ts';
+import { RegressionAdmission } from './schemas/regression.ts';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
 import * as P from './schemas/portableEnvironment.ts';
@@ -30,6 +31,7 @@ export * from './schemas/cli.ts';
 export * from './schemas/recoveryStatus.ts';
 export * from './schemas/replayComparison.ts';
 export * from './schemas/attemptInventory.ts';
+export * from './schemas/regression.ts';
 export * from './schemas/capabilityLifecycle.ts';
 export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
@@ -53,6 +55,7 @@ export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
+  'workflow.regression-admission/v1': RegressionAdmission,
   'workflow.result-ingest/v1': ResultIngestReceipt,
   'workflow.evidence-projection/v1': WorkflowEvidenceProjection,
   'workflow.config/v1': WorkflowConfig,

@@ -27,6 +27,9 @@ export type { LocalScenarioActivationAuthority } from './core/localScenarioActiv
 export { validateScenarioStructure, type ScenarioStructurePorts } from './core/scenarioStructure.ts';
 export type { LocalScenarioStructureAuthority } from './core/localScenarioStructure.ts';
 export { prepareQualificationExecution } from './core/qualificationBundle.ts';
+export { prepareRegressionExecution } from './core/regressionBundle.ts';
+export { RegressionExecutionContext, type RegressionExecutionOwner } from './core/regressionExecution.ts';
+export type { LocalScenarioRegressionAuthority } from './core/localScenarioRegression.ts';
 export { QualificationExecutionContext, localQualificationExecutionOwner, type QualificationExecutionOwner } from './core/qualificationExecution.ts';
 export { reduceQualificationRound, type QualificationResultPorts } from './core/qualification.ts';
 export { LocalQualificationResults, type LocalQualificationResultAuthority, type RetainedQualificationRound } from './core/localQualificationResults.ts';

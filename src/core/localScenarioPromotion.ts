@@ -35,7 +35,7 @@ export function localScenarioPromotionPorts(owner: Owner, review: LocalReviewSto
       state.scenarios.push({ projection: ScenarioProjection.parse({ id: owner.id, scope: owner.scope, aggregateVersion: 1,
         definitionRef: expected.definition.ref, state: 'proposed', invalidationEpoch: 0, latestRoundSequence: 0,
         qualificationRoundRefs: [], activationDecisionRef: null }), definitions: [expected.definition], selections: expected.selections,
-        admissions: [], activations: [], structuralValidations: [], promotion: { receipt, approved: approved.documents } });
+        admissions: [], activations: [], regressionAdmissions: [], structuralValidations: [], promotion: { receipt, approved: approved.documents } });
       owner.write(version, state, 'workflow.scenario.promoted'); return true;
     },
   };

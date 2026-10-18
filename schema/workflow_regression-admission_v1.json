@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "activationRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "campaignId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "intent": {
+      "additionalProperties": false,
+      "properties": {
+        "idempotencyKey": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "selectionManifestRef": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "additionalProperties": false,
+              "properties": {
+                "algorithm": {
+                  "const": "sha256",
+                  "type": "string"
+                },
+                "hex": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "algorithm",
+                "hex"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "snapshot": {
+          "additionalProperties": false,
+          "properties": {
+            "expectedAggregateVersion": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "expectedDefinitionRef": {
+              "additionalProperties": false,
+              "properties": {
+                "digest": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "algorithm": {
+                      "const": "sha256",
+                      "type": "string"
+                    },
+                    "hex": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "algorithm",
+                    "hex"
+                  ],
+                  "type": "object"
+                },
+                "id": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "digest"
+              ],
+              "type": "object"
+            },
+            "expectedInvalidationEpoch": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "expectedLatestRoundSequence": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "id": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            "scope": {
+              "additionalProperties": false,
+              "properties": {
+                "ownerId": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "tenantId": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "visibility": {
+                  "enum": [
+                    "public",
+                    "owner_private",
+                    "tenant_private"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ownerId",
+                "tenantId",
+                "visibility"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "id",
+            "scope",
+            "expectedAggregateVersion",
+            "expectedDefinitionRef",
+            "expectedInvalidationEpoch",
+            "expectedLatestRoundSequence"
+          ],
+          "type": "object"
+        },
+        "stateLeaseRefs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "digest": {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "revision": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "snapshot",
+        "selectionManifestRef",
+        "stateLeaseRefs",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "ref": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "const": "sha256",
+              "type": "string"
+            },
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "algorithm",
+            "hex"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "workflow.regression-admission/v1",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "tenantId": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "owner_private",
+            "tenant_private"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "tenantId",
+        "visibility"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "ref",
+    "scope",
+    "intent",
+    "activationRef",
+    "campaignId"
+  ],
+  "type": "object"
+}

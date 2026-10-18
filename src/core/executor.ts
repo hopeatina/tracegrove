@@ -26,6 +26,7 @@ import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
 import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
 import { checkCommittedExecutionBinding } from './executionReadback.ts';
 import { requireRealDirectory, syncDirectory } from './atomicFiles.ts';
+import { authorizeRegressionExecution, type RegressionExecutionOwner } from './regressionExecution.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { applyTemplateDeep } from './compiler.ts';
 import { Deadline } from './deadline.ts';
@@ -57,6 +58,7 @@ export type RunOptions = {
   onEvent?: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => void;
   hosts?: { local?: ExecutorHost; mock?: ExecutorHost };
   qualification?: QualificationExecutionOwner;
+  regression?: RegressionExecutionOwner;
 };
 
 function ownerFor(scope: Scope): string {
@@ -89,18 +91,24 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   const { bundle, stateDir, ledger, scope } = options;
   const signal = options.signal ?? new AbortController().signal;
   const request = checkedFrozenRequest(bundle, scope);
-  if ((request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) &&
-      !(request.purpose === 'qualification' && options.qualification)) {
-    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'qualification requires an authenticated runtime owner; source trials and activated regression admission are unavailable' }]);
+  if ((request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef || request.regressionAdmissionRef) &&
+      !(request.purpose === 'qualification' && options.qualification) && !(request.purpose === 'regression' && options.regression)) {
+    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'qualification and activated regression require their authenticated runtime owner; source trials are unavailable' }]);
   }
   const { docs, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, prepared } = prepareFrozenCells(bundle, scope, request);
 
   // Idempotent admission: the same frozen key reconciles the existing execution.
   const qualification = options.qualification && request.purpose === 'qualification'
     ? await authorizeQualificationExecution(options.qualification, request, selection, ledger, null) : null;
+  const regression = options.regression && request.purpose === 'regression'
+    ? await authorizeRegressionExecution(options.regression, request, selection, ledger, null) : null;
   if (qualification && resolve(join(stateDir, 'ledger')) !== resolve(ledger.dir)) throw new Conflict('qualification state directory must belong to the registration owner ledger');
+  if (regression && resolve(join(stateDir, 'ledger')) !== resolve(ledger.dir)) throw new Conflict('regression state directory must belong to the registration owner ledger');
   const idemAggregate = qualification ? `qualification-execution:${qualification.admission.ref.digest.hex}` : `idempotency:${request.idempotencyKey}`;
   const existing = ledger.current(idemAggregate);
+  const regressionExecutionId = regression ? `regression_exec_${regression.admission.ref.digest.hex}` : null;
+  if (regressionExecutionId && !existing && ledger.current(`execution:${regressionExecutionId}`))
+    throw new Conflict('regression admission already exists without its index; preserve and reconcile it instead of replaying effects');
   let predecessor: Ref | null = null;
   let attemptNumber = 1;
   if (existing) {
@@ -123,6 +131,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
       return checkedSummary();
     }
     if (!state || state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state?.type ?? 'missing execution state'}); redelivery reconciles, it does not start another attempt`);
+    if (regression) throw new Conflict('interrupted regression needs owned-state reconciliation and a fresh registered run; effects were not replayed');
     assertInterruptedOwnershipResolved(ledger, binding);
     if (hasCommittedManifest(join(stateDir, 'executions', executionId))) {
       const recovered = checkedSummary();
@@ -138,20 +147,21 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   }
   if (request.limits.costCeilingCents < bundle.estimatedCostCents) throw new Blocked([{ code: 'insufficient_budget_headroom', detail: `estimate ${bundle.estimatedCostCents} > ceiling ${request.limits.costCeilingCents}` }]);
 
-  const executionId = qualification?.admission.attempts[0]!.executionId ?? newId('exec');
-  const attemptId = qualification?.admission.attempts[0]!.attemptId ?? newId('attempt');
+  const executionId = qualification?.admission.attempts[0]!.executionId ?? regressionExecutionId ?? newId('exec');
+  const attemptId = qualification?.admission.attempts[0]!.attemptId ?? (regression ? `regression_attempt_${regression.admission.ref.digest.hex}` : newId('attempt'));
   if (qualification && ledger.current(`execution:${executionId}`)) throw new Conflict('qualification allocation was already claimed; reconcile its execution');
   const generation = 1;
   const executionDir = join(stateDir, 'executions', executionId);
   mkdirSync(join(stateDir, 'executions'), { recursive: true });
-  mkdirSync(executionDir, { recursive: !qualification });
+  mkdirSync(executionDir, { recursive: !qualification && !regression });
   const executionAggregate = qualification ? idemAggregate : `execution:${executionId}`;
   const reservation = parseAs(BudgetReservation, freeze({
     schemaVersion: 'workflow.budget-reservation/v1' as const, ref: { id: `${executionId}.reservation`, revision: '1' }, scope,
     campaignId: request.campaignId, executionId, attemptId, actionCents: request.limits.costCeilingCents, cleanupCents: 0, uncertainCents: 0, state: 'reserved' as const, reservedAt: nowIso(),
   }), 'budget reservation');
   ledger.append(executionAggregate, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, executionId, attemptId, generation, attemptNumber, reservation: reservation.ref,
-    ...(qualification ? { stateDir: resolve(stateDir), qualificationRoundRef: qualification.admission.ref } : {}) });
+    ...(qualification ? { stateDir: resolve(stateDir), qualificationRoundRef: qualification.admission.ref } : {}),
+    ...(regression ? { regressionAdmissionRef: regression.admission.ref } : {}) });
   if (!qualification) ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
   const ownership = new ExecutionOwnership(ledger, { executionId, attemptId, generation, campaignId: request.campaignId, requestDigest: request.ref.digest.hex, scope });
   ownership.initialize();
@@ -166,6 +176,9 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     const beforeEffect = qualification && options.qualification ? async () => {
       try { await authorizeQualificationExecution(options.qualification!, request, selection, ledger, item.cell.selectionCellId); }
       catch { throw new HttpStepError('qualification_authority_unavailable', 'Qualification registration, source, state or effect authority is no longer current'); }
+    } : regression && options.regression ? async () => {
+      try { await authorizeRegressionExecution(options.regression!, request, selection, ledger, item.cell.selectionCellId); }
+      catch { throw new HttpStepError('regression_authority_unavailable', 'Active scenario, source, state or effect authority is no longer current'); }
     } : undefined;
     const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope,
       executionId: allocation?.executionId ?? executionId, attemptId: allocation?.attemptId ?? attemptId,
@@ -199,6 +212,15 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const startedAt = nowIso();
   const cellDeadline = ctx.campaignDeadline.child(spec.limits.deadlineMs);
   const blockedReasons: string[] = [];
+  const beforeEffect = async () => {
+    try { await ctx.beforeEffect?.(); }
+    catch (error) {
+      if (error instanceof HttpStepError && ['qualification_authority_unavailable', 'regression_authority_unavailable'].includes(error.code)) {
+        blockedReasons.push(error.code); log.emit('effect.authority_unavailable', null, { code: error.code });
+      }
+      throw error;
+    }
+  };
   const stepObservations: StepObservation[] = [];
   let session: HostSession | null = null;
   let fixtureManifest: FixtureManifest | null = null;
@@ -219,7 +241,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const host = hostPlan.adapter === 'mock_loopback' ? ctx.hosts.mock : ctx.hosts.local;
   const mockResponses = hostPlan.mockResponsesRef ? ctx.docs.get<MockResponses>(MockResponses, hostPlan.mockResponsesRef, 'mock responses') : null;
   try {
-    if (ctx.beforeEffect) await ctx.beforeEffect();
+    await beforeEffect();
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
@@ -295,7 +317,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const allocatingEvent = log.emit('fixture.allocating', null, { entityKey, actionId: action.actionId, effectKey: `${attemptId}:${entityKey}` });
       try {
         if (action.effect !== 'create') throw new HttpStepError('fixture_ownership_unavailable', 'only a registered create action can allocate an owned fixture');
-        if (ctx.beforeEffect) await ctx.beforeEffect();
+        await beforeEffect();
         ctx.ownership.reserve(`fixture:${cell.selectionCellId}:${entityKey}`, 'fixture', cell.selectionCellId, recipe.ref);
         uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
@@ -382,7 +404,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
       let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation;
-      if (ctx.beforeEffect) await ctx.beforeEffect();
+      await beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {

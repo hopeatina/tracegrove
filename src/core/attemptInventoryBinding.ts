@@ -11,7 +11,7 @@ import type { LedgerReadView, JournalEntry } from './ledgerRecords.ts';
 
 export const RecordedAdmission = z.object({ executionId: IdString.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/), attemptId: IdString,
   requestDigest: z.string().regex(/^[a-f0-9]{64}$/), generation: z.number().int().positive(), attemptNumber: z.number().int().positive(),
-  qualificationRoundRef: RefSchema.optional() });
+  qualificationRoundRef: RefSchema.optional(), regressionAdmissionRef: RefSchema.optional() });
 export class AttemptReadError extends Error {
   constructor(readonly status: AttemptInventoryRow['status'], readonly unresolvedResources: number | null = null) { super(status); }
 }
@@ -48,6 +48,8 @@ export function readAdmittedAttempt(view: LedgerReadView, entry: JournalEntry, s
       // Effectful recovery keeps using the unmodified current-index validator.
       const historical: LedgerReadView = { current: id => id === key ? bound ?? null : view.current(id), history: id => view.history(id) };
       checkCommittedExecutionBinding(historical, records, { ...expected, attemptNumber: a.attemptNumber });
+      if (a.regressionAdmissionRef && (records.request.purpose !== 'regression' || !records.request.regressionAdmissionRef ||
+          !sameRef(a.regressionAdmissionRef, records.request.regressionAdmissionRef))) throw new Error('regression binding');
     }
     else {
       const request = records.request;

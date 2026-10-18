@@ -35,7 +35,7 @@ export function validateQualificationExecution(request: RunRequest, selection: S
   if (admission.attempts.some(a => [a.executionId, a.attemptId].some(id => !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id) || id === '.' || id === '..'))) throw new Conflict('qualification allocation IDs must be safe local path segments');
   const nullableEqual = (a: Ref | null, b: Ref | null) => a === null ? b === null : b !== null && sameRef(a, b);
   const unique = (values: string[]) => new Set(values).size === values.length;
-  if (request.purpose !== 'qualification' || !request.qualificationRoundRef || !sameRef(request.qualificationRoundRef, admission.ref) ||
+  if (request.purpose !== 'qualification' || request.regressionAdmissionRef || !request.qualificationRoundRef || !sameRef(request.qualificationRoundRef, admission.ref) ||
       request.campaignId !== admission.campaignId || request.scenarioRefs.length !== 1 || !sameRef(request.scenarioRefs[0]!, definition.ref) ||
       !nullableEqual(request.sourcePlanRef, definition.sourcePlanRef) || !nullableEqual(request.reviewRef, definition.reviewRef) ||
       !sameRef(request.selectionManifestRef, selection.ref) || !sameRef(selection.ref, context.selection.ref) || !sameRef(selection.ref, admission.selectionManifestRef) ||

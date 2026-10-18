@@ -123,6 +123,7 @@ export const RunRequest = z.object({
   reviewRef: RefSchema.nullable(),
   scenarioRefs: refList(),
   qualificationRoundRef: RefSchema.nullable(),
+  regressionAdmissionRef: RefSchema.optional(),
   effectiveConfigRef: RefSchema,
   sourceSelectionRef: RefSchema.nullable(),
   executionHostRef: RefSchema.nullable(),

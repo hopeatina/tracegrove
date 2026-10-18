@@ -29,7 +29,7 @@ export function inspectAttemptInventory(options: { stateDir: string; scope: Scop
       const parsed = RecordedAdmission.safeParse(entry.data);
       const row: AttemptInventoryRow = { admissionSequence: entry.seq, executionId: parsed.success ? parsed.data.executionId : null,
         attemptId: parsed.success ? parsed.data.attemptId : null,
-        kind: entry.aggregateId.startsWith('execution:') ? 'ordinary' : entry.aggregateId.startsWith('qualification-execution:') ? 'qualification' : 'unknown',
+        kind: parsed.success && parsed.data.regressionAdmissionRef ? 'regression' : entry.aggregateId.startsWith('execution:') ? 'ordinary' : entry.aggregateId.startsWith('qualification-execution:') ? 'qualification' : 'unknown',
         recordedPhase: null, status: 'admission_invalid',
         manifestDigest: null, outcome: null, receiptCount: 0, unresolvedResources: null, cells: null };
       const phase = view.current(entry.aggregateId)?.type;
@@ -38,6 +38,7 @@ export function inspectAttemptInventory(options: { stateDir: string; scope: Scop
       try {
         if (parsed.success && ids.filter(id => id === parsed.data.executionId).length > 1) throw new AttemptReadError('duplicate_admission');
         const checked = readAdmittedAttempt(view, entry, options.stateDir, report.scope);
+        if (checked.records.request.purpose === 'regression') row.kind = 'regression';
         row.status = checked.phase === 'finalized' ? 'finalized' : 'sealed_unfinalized';
         row.manifestDigest = checked.records.manifestDigest; row.outcome = checked.records.campaign.outcome;
         row.receiptCount = checked.records.receipts.length; row.unresolvedResources = checked.unresolvedResources;
