@@ -110,6 +110,7 @@ export function plan(input: PlanInput): FrozenBundle {
     const id = cellId(spec.ref.id, persona.ref.id);
     if (!applicable) { excludedCells.push({ cellKey: id, reason: `suite entry applies only to profiles ${suiteEntry?.profiles?.join(', ')}` }); continue; }
     const cellBlock = (code: string, detail: string, owner = 'case author', action = 'revise the case or choose a compatible profile') => blockers.push({ code, detail, owner, action, cellId: id });
+    if (spec.steps.some(step => step.kind.startsWith('job.')) && (hostPlan.adapter !== 'local_process' || hostPlan.launch?.nativeJobs !== 'node_ipc/v1')) cellBlock('native_job_host_unavailable', 'Native jobs require an explicitly enabled local Node IPC host');
 
     if (!spec.environmentClasses.includes(profile.class)) cellBlock('environment_class_not_applicable', `${spec.ref.id} does not apply to ${profile.class}`);
     const binding = corpus.getAs(SurfaceBinding, spec.surfaceBindingRef);

@@ -23,7 +23,7 @@ const JobOutput = z.object({ body: z.object({ job: z.object({ status: z.string()
 it('qualifies persisted worker completion, duplicate delivery, cancellation and failure over the ordinary HTTP oracle', async () => {
   const { root } = project();
   const compiled = compileProject(join(root, 'tracegrove.config.yaml'));
-  expect(compiled.sourceFiles).toEqual(['app/http.mjs', 'app/jobs-api.mjs', 'app/store.mjs', 'app/worker.mjs']);
+  expect(compiled.sourceFiles).toEqual(['app/http.mjs', 'app/jobs-api.mjs', 'app/native-bridge.mjs', 'app/store.mjs', 'app/worker.mjs']);
   const loaded = loadProject(compiled.workflowConfigPath);
   expect(loaded.suiteCases.map(entry => loaded.corpus.getAs(CaseSpec, entry.ref).effects.maxJobs)).toEqual([1, 1, 1]);
   const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml') });

@@ -11,7 +11,7 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
@@ -62,8 +62,9 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     const info = stepInfo.get(s.stepId);
     const output = s.output as { status?: number } | null;
     const browser = BrowserObservation.safeParse(s.output);
-    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: output?.status ?? null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
-      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : {}) };
+    const job = NativeJobObservation.safeParse(s.output);
+    return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
+      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action} ${job.data.status} · ${excerpt(job.data.output, 500)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');

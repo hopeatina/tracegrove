@@ -2,7 +2,8 @@ import { createServer } from 'node:http';
 import { fork } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { JobStore } from './store.mjs';
+import { JobStore, validJobInput } from './store.mjs';
+import { nativeBridge } from './native-bridge.mjs';
 import { send, readBody } from './http.mjs';
 
 const dir = process.env.REPORTS_DIR;
@@ -15,7 +16,8 @@ const worker = fork(new URL('./worker.mjs', import.meta.url), [join(dir, 'report
   env: { REPORTS_TEST_DROP_REPORT: process.env.REPORTS_TEST_DROP_REPORT ?? '0' },
 });
 let ready = false;
-worker.on('message', message => { if (message?.type === 'ready') ready = true; });
+const nativeReady = nativeBridge(store, tokens, () => ready);
+worker.on('message', message => { if (message?.type === 'ready') { ready = true; nativeReady(); } });
 worker.on('exit', () => { ready = false; });
 const view = job => ({ id: job.id, requestKey: job.request_key, title: job.title, mode: job.mode,
   status: job.status, workerPid: job.worker_pid, apiPid: process.pid });
@@ -31,9 +33,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/jobs' && req.method === 'POST') {
       if (!ready) return send(res, 503, { error: 'worker_unavailable' });
       const body = await readBody(req);
-      if (typeof body.requestKey !== 'string' || !body.requestKey || body.requestKey.length > 100 ||
-          typeof body.title !== 'string' || !body.title || body.title.length > 200 ||
-          !['succeed', 'fail', 'hold'].includes(body.mode)) return send(res, 400, { error: 'invalid_job' });
+      if (!validJobInput(body)) return send(res, 400, { error: 'invalid_job' });
       const result = store.submit(owner, body);
       if (result.conflict) return send(res, 409, { error: 'idempotency_conflict' });
       return send(res, result.duplicate ? 200 : 202, { job: view(result.job), deduplicated: result.duplicate });

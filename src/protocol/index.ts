@@ -9,6 +9,7 @@ import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts'
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
 import { GitSourceRequest, GitSourceResolution, GitSourceSnapshot } from './schemas/gitSources.ts';
 import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
+import { NativeJobAction, NativeJobObservation, NativeJobRequest, NativeJobResponse, NativeJobReady } from './schemas/nativeJob.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
   ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
@@ -25,6 +26,7 @@ export * from './schemas/review.ts';
 export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
 export * from './schemas/browser.ts';
+export * from './schemas/nativeJob.ts';
 export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
@@ -84,6 +86,11 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'workflow.native-job-action/v1': NativeJobAction,
+  'workflow.native-job-observation/v1': NativeJobObservation,
+  'workflow.native-job-request/v1': NativeJobRequest,
+  'workflow.native-job-response/v1': NativeJobResponse,
+  'workflow.native-job-ready/v1': NativeJobReady,
   'workflow.browser-command/v1': BrowserCommand,
   'workflow.browser-locator/v1': BrowserLocator,
   'workflow.browser-observation/v1': BrowserObservation,

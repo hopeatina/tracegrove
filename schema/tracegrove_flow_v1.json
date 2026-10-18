@@ -30,6 +30,40 @@
           "type": "object"
         }
       ]
+    },
+    "__schema1": {
+      "anyOf": [
+        {
+          "maxLength": 64000,
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "maxItems": 5000,
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "propertyNames": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -584,6 +618,182 @@
             },
             "required": [
               "browser"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "as": {
+                "type": "string"
+              },
+              "expect": {
+                "anyOf": [
+                  {
+                    "maximum": 599,
+                    "minimum": 100,
+                    "type": "integer"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "absent": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "count": {
+                        "additionalProperties": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "json": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "description": "Dot paths into the response body and their exact values.",
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "present": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "status": {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "job": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "action": {
+                        "const": "submit",
+                        "type": "string"
+                      },
+                      "payload": {
+                        "$ref": "#/$defs/__schema1"
+                      },
+                      "queue": {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "type": "string"
+                      },
+                      "requestKey": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "queue",
+                      "requestKey",
+                      "payload"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "action": {
+                        "const": "read",
+                        "type": "string"
+                      },
+                      "jobId": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "queue": {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "queue",
+                      "jobId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "action": {
+                        "const": "cancel",
+                        "type": "string"
+                      },
+                      "jobId": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "queue": {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "queue",
+                      "jobId"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "name": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "save": {
+                "additionalProperties": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "timeoutMs": {
+                "exclusiveMinimum": 0,
+                "maximum": 120000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "job"
             ],
             "type": "object"
           }

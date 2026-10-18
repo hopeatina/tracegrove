@@ -1,0 +1,22 @@
+title: Native submission deduplicates and an independent native read observes persisted worker output
+effects: { maxJobs: 3 }
+steps:
+  - name: submit report
+    job: { action: submit, queue: reports, requestKey: completion, payload: { title: Native report, mode: succeed } }
+    save: { jobId: jobId }
+    expect: { present: [jobId] }
+  - name: duplicate delivery
+    job: { action: submit, queue: reports, requestKey: completion, payload: { title: Native report, mode: succeed } }
+    expect: { json: { output.totalJobs: 1 } }
+  - name: conflicting delivery
+    job: { action: submit, queue: reports, requestKey: completion, payload: { title: Changed report, mode: succeed } }
+    expect: { json: { status: conflict } }
+  - name: another persona cannot read the job
+    as: intruder
+    job: { action: read, queue: reports, jobId: '{jobId}' }
+    expect: { json: { status: forbidden } }
+  - name: independent persisted output
+    job: { action: read, queue: reports, jobId: '{jobId}' }
+    expect:
+      json: { status: succeeded, output.report.content: 'Report: Native report', output.totalJobs: 1 }
+      present: [workerId]

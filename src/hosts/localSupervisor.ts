@@ -6,9 +6,10 @@ import { readGitSnapshotTree, writeGitSnapshotTree } from '../source/snapshotTre
 import { sourceIdentityDigest } from './sourceIdentity.ts';
 import type { LaunchRecipe } from '../protocol/schemas/definitions.ts';
 import { pinnedArguments } from './pinnedArguments.ts';
+import { NativeJobRequest, MAX_NATIVE_JOB_MESSAGE_BYTES } from '../protocol/schemas/nativeJob.ts';
 
 type Launch = { command: string; args: string[]; cwd: string; env: Record<string, string>; workspaceDir: string;
-  sourceSnapshot?: LaunchRecipe['sourceSnapshot']; identitySourceFiles: string[]; runtimeFamily: 'node' | 'python' };
+  sourceSnapshot?: LaunchRecipe['sourceSnapshot']; nativeJobs?: LaunchRecipe['nativeJobs']; identitySourceFiles: string[]; runtimeFamily: 'node' | 'python' };
 let app: ChildProcess | null = null;
 let workspaceDir: string | null = null;
 let stopping = false;
@@ -39,6 +40,12 @@ async function stop(): Promise<void> {
 process.once('disconnect', () => { void stop(); });
 process.once('SIGTERM', () => { void stop(); });
 process.once('SIGINT', () => { void stop(); });
+process.on('message', (message: unknown) => {
+  const wrapper = message as { kind?: string; request?: unknown } | null;
+  if (wrapper?.kind !== 'host.job_request' || stopping || !app?.connected) return;
+  const parsed = NativeJobRequest.safeParse(wrapper.request);
+  if (parsed.success && Buffer.byteLength(JSON.stringify(parsed.data)) <= MAX_NATIVE_JOB_MESSAGE_BYTES) app.send(parsed.data);
+});
 process.once('message', (message: Launch) => {
   if (stopping || !process.connected) return;
   workspaceDir = message.workspaceDir;
@@ -67,7 +74,12 @@ process.once('message', (message: Launch) => {
   if (stopping || !process.connected) { void stop(); return; }
   app = spawn(message.command, args, {
     cwd, env: message.env, detached: process.platform !== 'win32',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: message.nativeJobs ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+  });
+  if (message.nativeJobs) app.on('message', (payload: unknown) => {
+    const kind = (payload as { kind?: unknown } | null)?.kind;
+    if (!stopping && process.connected && (kind === 'tracegrove.job.ready' || kind === 'tracegrove.job.response') &&
+        Buffer.byteLength(JSON.stringify(payload)) <= MAX_NATIVE_JOB_MESSAGE_BYTES) process.send?.({ kind: 'host.job', message: payload });
   });
   app.stdout?.pipe(process.stdout);
   app.stderr?.pipe(process.stderr);

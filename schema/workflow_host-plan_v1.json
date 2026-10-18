@@ -114,6 +114,10 @@
               "maxItems": 32,
               "type": "array"
             },
+            "nativeJobs": {
+              "const": "node_ipc/v1",
+              "type": "string"
+            },
             "portEnv": {
               "maxLength": 64,
               "minLength": 1,

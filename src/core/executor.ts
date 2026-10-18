@@ -9,12 +9,13 @@ import { join } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
-  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, Persona, RoutingDecision, SeedRecipe,
+  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities,
+  type TargetTuple, type VariableSource, type BrowserObservation, type NativeJobObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
-import { HttpDriver, HttpStepError, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
+import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
+import { NativeJobError } from '../adapters/job/driver.ts';
 import { BrowserStepError } from '../adapters/browser/driver.ts';
 import { CaseBrowserSession } from '../adapters/browser/session.ts';
 import { LocalProcessHost } from '../hosts/local.ts';
@@ -24,9 +25,9 @@ import { LocalArtifactStore } from './artifacts.ts';
 import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
 import { writeExecutionBundle } from './bundle.ts';
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
-import { compileCase, type CompiledCase } from './compiler.ts';
+import { compileCase, applyTemplateDeep, type CompiledCase } from './compiler.ts';
 import { Deadline } from './deadline.ts';
-import { Blocked, Conflict, InfrastructureFailure } from './errors.ts';
+import { Blocked, Conflict, InfrastructureFailure, isInfrastructureStepFailure } from './errors.ts';
 import { EventLog } from './events.ts';
 import type { LocalLedger } from './ledger.ts';
 import type { FrozenBundle } from './planner.ts';
@@ -381,7 +382,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation | BrowserObservation;
+      let observation: HttpObservation | BrowserObservation | NativeJobObservation;
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
@@ -394,6 +395,14 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'observe') {
         observation = await driver!.observe({ origin, method: step.readback.method, path: step.readback.path, auth: step.readback.auth, variables, deadline, signal }, step.predicate, step.pollIntervalMs);
         captured[stepId] = captureValues(observation, step.captures);
+      } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
+        if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
+        const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));
+        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session.credentials) });
+        observation = step.kind === 'job.observe' && command.action === 'read'
+          ? await session.nativeJobs.observe(command, credential, step.predicate, step.pollIntervalMs, deadline, signal)
+          : await session.nativeJobs.request(command, credential, deadline, signal);
+        captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'ui.navigate' || step.kind === 'ui.action' || step.kind === 'ui.observe') {
         if (authRecipe.credentialName && !session?.credentials.get(authRecipe.credentialName)) throw new HttpStepError('missing_persona_credential', 'browser persona credential was not issued');
         observation = await browser.execute(step, variables, deadline, signal);
@@ -404,11 +413,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const finished = log.emit('step.finished', stepId, { result: 'completed', observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
       stepObservations.push({ stepId, result: 'completed', reasonCode: null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
     } catch (error) {
-      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError ? error.code : 'transport_failure';
+      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError || error instanceof NativeJobError ? error.code : 'transport_failure';
       const code = rawCode === 'browser_cancelled' ? 'cancelled' : rawCode;
       const finished = log.emit('step.finished', stepId, { result: code === 'cancelled' ? 'cancelled' : 'failed', reason: code, message: String((error as Error).message) });
       if (code === 'cancelled' || code === 'browser_cancelled') cancelled = true;
-      else if (code === 'transport_failure' || code === 'deadline_exceeded') infrastructureFailure = true;
+      else if (isInfrastructureStepFailure(code)) infrastructureFailure = true;
       stepObservations.push({ stepId, result: code === 'cancelled' ? 'cancelled' : 'failed', reasonCode: code, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: null, output: null, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: 0 } });
       halted = true;
     }

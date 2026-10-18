@@ -17,6 +17,7 @@ import { AuthoringConfig, Fixture, Flow, HTTP_VERBS, type Expect, type FlowStep,
 import { compileBrowserStep } from './browser.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
+import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
 import { applicationLaunch } from './appLaunch.ts';
@@ -229,7 +230,10 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
   if (selected.length === 0) fail('no_flows_selected', `no flow matches${options.grep ? ` --grep ${options.grep}` : ''}${options.tags?.length ? ` --tag ${options.tags.join(',')}` : ''}`, 'run tracegrove list to see flow ids and tags');
   const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
-  const runner = hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const hasJobs = selected.some(({ flow }) => flow.steps.some(step => 'job' in step));
+  if (hasJobs && hasBrowser) fail('mixed_native_browser_unqualified', 'Native job and browser runners are not qualified together', 'run separate flows with --grep');
+  if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
+  const runner = hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
   // ---- attested source identity ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
@@ -278,14 +282,15 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       issuedCredentials: personas.map((name) => ({ name: `${name}_token`, subject: config.personas[name]!.subject })),
       portMode: 'assigned', runtime: launch.runtime,
       ...(sourceSnapshot ? { sourceSnapshot } : {}),
+      ...(hasJobs ? { nativeJobs: config.app.nativeJobs } : {}),
     },
     mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: 'fresh_directory_and_port', networkRules: ['loopback_only'],
-    requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
+    requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000, cleanupReserveMs: 10_000,
   });
-  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: hasBrowser ? 'browser' : 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
-  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: hasBrowser ? 'web' : 'http_api', protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
-  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: hasBrowser ? 'web' : 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
+  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
+  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api', protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
+  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
   const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass: 'local', readbackOracleRef: null, interceptorRef: null });
   write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: [boundary('application'), boundary('storage')] });
   const stage = { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 };
@@ -327,13 +332,28 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const label = 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      const label = 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
       const where = `${rel} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
       const inputs: Record<string, Json> = {};
       const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
+      if ('job' in step) {
+        if (statusOf(step.expect) !== null) fail('native_job_http_expectation', where, 'use expect.json for native job facts');
+        const command = bindTemplates(step.job as Json, scope, inputs, where);
+        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const predicate = predicateFor(step.expect);
+        if (step.job.action === 'read' && !predicate) fail('native_job_read_expectation', where, 'add expect.json to bound native readback polling');
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: step.job.action === 'read' ? 'job.observe' : step.job.action === 'cancel' ? 'job.cancel' : 'job.submit', command, auth, captures, timeoutMs, inputs, retry: { attempts: 1 },
+          ...(step.job.action === 'read' ? { predicate, pollIntervalMs: 50 } : {}) });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: ['isolated_candidate'], stepId: id,
+          oracle: { name: predicate ? 'job.observation' : 'step.result', version: '1' }, predicate: predicate ?? { kind: 'step_result', value: 'completed' }, coverageTags: flow.tags });
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: 'JOB', path: `${step.job.action} ${step.job.queue}`, as: step.as ?? defaultPersona, expectStatus: null, expectation: predicate ? 'Configured native job facts' : 'Native operation completes' });
+        return;
+      }
       if ('browser' in step) {
         const browser = compileBrowserStep({ step, id, timeoutMs, inputs, bind: value => bindTemplates(value, scope, inputs, where) });
         steps.push(browser.step);
@@ -419,7 +439,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       requiredBoundaries: [{ boundaryId: 'application', mode: 'real' }, { boundaryId: 'storage', mode: 'real' }],
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
-      effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null },
+      effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
+        ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
       capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
       baselineRef: null, generation: null,

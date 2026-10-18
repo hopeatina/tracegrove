@@ -1,0 +1,11 @@
+title: Native cancellation waits for a real worker acknowledgement
+effects: { maxJobs: 1 }
+steps:
+  - job: { action: submit, queue: reports, requestKey: cancellation, payload: { title: Held report, mode: hold } }
+    save: { jobId: jobId }
+  - job: { action: read, queue: reports, jobId: '{jobId}' }
+    expect: { json: { status: running } }
+  - job: { action: cancel, queue: reports, jobId: '{jobId}' }
+    expect: { present: [jobId] }
+  - job: { action: read, queue: reports, jobId: '{jobId}' }
+    expect: { json: { status: cancelled, output.report: null }, present: [workerId] }

@@ -1,6 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
+export function validJobInput(input) {
+  return typeof input.requestKey === 'string' && !!input.requestKey && input.requestKey.length <= 100 &&
+    typeof input.title === 'string' && !!input.title && input.title.length <= 200 && ['succeed', 'fail', 'hold'].includes(input.mode);
+}
+
 /** Example application storage, separate from Tracegrove's authority and ledger. */
 export class JobStore {
   constructor(path) {

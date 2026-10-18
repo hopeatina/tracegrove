@@ -213,7 +213,7 @@ What the adapters cover now and what's next:
 | App launch | node, fastapi, django, any command; free port, data dir, per-persona tokens | `app.setup` commands (alembic, prisma, knex) |
 | Seeding | Fixtures created through the app's API, read back, deleted with confirmed absence | SQL seeding, repo seed commands (factory_boy, Prisma seed), snapshots |
 | Databases | SQLite via `TRACEGROVE_DATA_DIR` | `db: postgres` per-run database with `DATABASE_URL`, DB-state oracles, Redis/Mongo services |
-| Async jobs | Real separate-worker SQLite sample: HTTP polling, persisted output, idempotency, cancellation, owner isolation | `components:` for independently supervised Celery/RQ/BullMQ workers, broker services, native job-state observe |
+| Async jobs | Separate-worker SQLite samples through HTTP or native Node IPC: persisted output, idempotency, cancellation, owner isolation | Independently supervised/attested Celery/RQ/BullMQ workers and broker services; hosted provider qualification |
 | Third parties | Whole-app mock host for the contract lane (low-level corpus only) | Outbound interceptor (stub/record/pass-through per provider), record and replay, email/webhook capture |
 | Data pipelines | None | `job` surface for dbt/Airflow/Dagster runs, table oracles (row counts, schema, golden files), DuckDB first |
 | Browser | Typed short flows and low-level corpus, authenticated local personas, DOM/API assertions, sealed video and Grove playback | Staging qualification, trace/redaction collectors and controller-death cleanup |
@@ -335,8 +335,11 @@ and persisted SQLite queue. Completion requires an independent output readback;
 accepting a submission alone cannot pass. Its controlled missing-output defect
 produces a sealed failed attempt. No model calls or external accounts are used.
 For low-level commands, use the config path printed by sample generation.
-This qualifies local HTTP job behavior; native `job.submit`, hosted providers,
-independent worker attestation and crash recovery remain open.
+For native `job.submit`, `job.observe`, and `job.cancel`, generate
+`sample-config --sample report-native --output ./native-reports` instead.
+The [native job bridge](docs/native-jobs.md) uses the same application, worker,
+and storage with typed Node IPC requests and job observations. Hosted providers,
+independent worker attestation and distributed crash recovery remain open.
 
 ## Checks
 

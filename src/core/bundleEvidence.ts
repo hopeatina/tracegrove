@@ -11,6 +11,7 @@ import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { videoBundlePath } from './bundlePaths.ts';
 import { targetFromComponentAttestations } from './targetObservation.ts';
 import { snapshotAttestationProblems } from './snapshotEvidence.ts';
+import { isInfrastructureStepFailure } from './errors.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -130,7 +131,7 @@ export function checkCellEvidence(input: {
     criticalCleanupConfirmed: r.cleanup.critical.every((k) => r.cleanup.confirmed.includes(k)),
     // A host that never started leaves every step not_run; its sealed host.failed event is the
     // evidence. It can only move a cell away from passed, never towards it.
-    infrastructureFailure: r.steps.some((s) => ['transport_failure', 'deadline_exceeded'].includes(s.reasonCode ?? ''))
+    infrastructureFailure: r.steps.some((s) => isInfrastructureStepFailure(s.reasonCode))
       || events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"') || line.includes('"kind":"browser.failed"')),
     blockedReasons: r.outcome === 'blocked' ? r.reasonCodes : [],
   });

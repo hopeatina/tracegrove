@@ -4,7 +4,7 @@
  * evidence by itself and nothing bypasses the planner, executor or reducer.
  */
 import { z } from 'zod';
-import { ActionEnvelope, BrowserCommand, Persona, HexSha256 } from '../protocol/index.ts';
+import { ActionEnvelope, BrowserCommand, NativeJobAction, Persona, HexSha256 } from '../protocol/index.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -25,6 +25,7 @@ export const AuthoringConfig = z.object({
   testDir: z.string().default('tracegrove').describe('Folder holding *.flow.yaml and fixtures/, relative to this file.'),
   app: z.object({
     adapter: z.enum(ADAPTERS).describe('Launch preset: node, fastapi, django or command.'),
+    nativeJobs: z.literal('node_ipc/v1').optional().describe('Opt in to the application-owned native Node job bridge.'),
     root: z.string().default('.').describe('App directory relative to this file; the launch cwd.'),
     entry: z.string().optional().describe('node: script path; fastapi: module:app; django: folder containing manage.py.'),
     run: z.string().optional().describe('command adapter: shell command that starts the app on $PORT.'),
@@ -93,7 +94,10 @@ export const BrowserFlowStep = z.object({
   timeoutMs: z.number().int().positive().max(120_000).optional(),
 }).strict();
 export type BrowserFlowStep = z.infer<typeof BrowserFlowStep>;
-export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep]);
+export const JobFlowStep = z.object({ name: z.string().min(1).max(120).optional(), job: NativeJobAction,
+  as: z.string().optional(), expect: Expect.optional(), save: z.record(Name, DotPath).optional(),
+  timeoutMs: z.number().int().positive().max(120_000).optional() }).strict();
+export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep]);
 export type FlowStep = z.infer<typeof FlowStep>;
 
 export const Flow = z.object({

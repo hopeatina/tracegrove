@@ -26,6 +26,9 @@ export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDU
 export { materializeLogicalPayload } from './core/generators.ts';
 export { Blocked, Conflict, InfrastructureFailure } from './core/errors.ts';
 export { HTTP_RUNNER_CAPABILITIES } from './adapters/http/capabilities.ts';
+export { NATIVE_JOB_RUNNER_CAPABILITIES } from './adapters/job/capabilities.ts';
+export { NativeJobDriver, NativeJobError } from './adapters/job/driver.ts';
+export type { NativeJobSession } from './adapters/job/types.ts';
 export { BrowserDriver, BrowserStepError } from './adapters/browser/driver.ts';
 export { LocalProcessHost, sourceIdentityDigest } from './hosts/local.ts';
 export { MockLoopbackHost } from './hosts/mock.ts';

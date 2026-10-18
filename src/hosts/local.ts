@@ -15,6 +15,7 @@ import { isoPlusMs, nowIso } from '../core/clock.ts';
 import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
 import { observeApplicationRuntime } from './runtime.ts';
 import { SnapshotLaunchObservation, SnapshotLaunchFailure, identityFromEntries, sourceIdentityDigest } from './sourceIdentity.ts';
+import { NativeJobDriver } from '../adapters/job/driver.ts';
 export { sourceIdentityDigest } from './sourceIdentity.ts';
 
 export function buildCapabilityObservation(input: { hostPlanRef: HostLease['hostPlanRef']; leaseRef: HostLease['ref'] | null; scope: HostStartContext['scope']; executionId: string; supported: string[]; unsupported: string[] }): HostCapabilityObservation {
@@ -90,6 +91,7 @@ export class LocalProcessHost implements ExecutorHost {
     let identity = sourceIdentityDigest(cwd, launch.identitySourceFiles);
     let observedSnapshotRef: SnapshotLaunchObservation['snapshotRef'] | undefined;
     const runtime = await observeApplicationRuntime(launch.command, cwd, process.env.PATH ?? '', context.signal);
+    if (launch.nativeJobs && runtime.family !== 'node') throw new Blocked([{ code: 'native_job_runtime_unsupported', detail: 'The native job bridge requires a Node application' }]);
     const dataDir = join(context.workspaceDir, 'data');
     mkdirSync(dataDir, { recursive: true });
     const credentials = new Map<string, string>();
@@ -108,11 +110,12 @@ export class LocalProcessHost implements ExecutorHost {
     const values = { port: String(assignedPort), dataDir };
     const launchEnv = assigned ? Object.fromEntries(Object.entries(launch.env).map(([k, v]) => [k, substitute(v, values)])) : launch.env;
     const launchArgs = assigned ? launch.args.map((arg) => substitute(arg, values)) : launch.args;
-    const env: Record<string, string> = { ...launchEnv, PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
+    const env: Record<string, string> = { ...launchEnv, ...(launch.nativeJobs ? { TRACEGROVE_NATIVE_JOBS: launch.nativeJobs } : {}), PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
     const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js';
     const child: ChildProcess = fork(new URL(`./localSupervisor.${extension}`, import.meta.url), [], {
       cwd, env: { PATH: process.env.PATH ?? '' }, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
+    const nativeJobs = launch.nativeJobs ? new NativeJobDriver(child) : undefined;
     let ownedCleanupConfirmed = false;
     child.on('message', (message: unknown) => {
       if (message && typeof message === 'object' && 'kind' in message && message.kind === 'host.cleaned') ownedCleanupConfirmed = true;
@@ -133,9 +136,10 @@ export class LocalProcessHost implements ExecutorHost {
       child.on('message', onMessage); child.once('exit', exited); child.once('error', exited);
     }) : null;
     sourceObservation?.catch(() => undefined);
-    const sourceLaunch: Pick<LaunchRecipe, 'sourceSnapshot'> = launch.sourceSnapshot ? {
+    const sourceLaunch: Pick<LaunchRecipe, 'sourceSnapshot' | 'nativeJobs'> = launch.sourceSnapshot ? {
       sourceSnapshot: { ...launch.sourceSnapshot, root: resolve(context.projectRoot, launch.sourceSnapshot.root) },
     } : {};
+    if (launch.nativeJobs) sourceLaunch.nativeJobs = launch.nativeJobs;
     // Candidate output may contain credentials. Drain it without exporting it as proof; keep a
     // short, secret-redacted tail only to explain a startup failure.
     let stderrTail = '';
@@ -178,7 +182,8 @@ export class LocalProcessHost implements ExecutorHost {
     ready.catch(() => undefined);
     let healthBody: unknown;
     try {
-      const [health, source] = await Promise.all([exitedEarly ? Promise.race([ready, exitedEarly]) : ready, sourceObservation]);
+      const [health, source] = await Promise.all([exitedEarly ? Promise.race([ready, exitedEarly]) : ready, sourceObservation,
+        nativeJobs?.waitReady(Deadline.in(launch.readiness.timeoutMs), context.signal)]);
       healthBody = health;
       if (source) { identity = source.identity; observedSnapshotRef = source.snapshotRef; }
     }
@@ -203,7 +208,7 @@ export class LocalProcessHost implements ExecutorHost {
     }), 'identity attestation');
     const observation = buildCapabilityObservation({
       hostPlanRef: context.hostPlan.ref, leaseRef: lease.ref, scope: context.scope, executionId: context.executionId,
-      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence'],
+      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence', ...(nativeJobs ? ['native_job'] : [])],
       unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
     });
     let stopResult: Promise<{ confirmed: boolean; detail: string }> | null = null;
@@ -215,6 +220,7 @@ export class LocalProcessHost implements ExecutorHost {
         { entityKey: 'host.workspace', physicalId: context.workspaceDir, boundaryId: 'storage' },
       ],
       dataDir,
+      ...(nativeJobs ? { nativeJobs } : {}),
       stop(reason: string) {
         if (stopResult) return stopResult;
         stopResult = (async () => {
