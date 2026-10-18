@@ -22,6 +22,7 @@ import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
 import { compareReplays } from '../core/replayComparison.ts';
 import { inspectAttemptInventory } from '../core/attemptInventory.ts';
+import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
@@ -117,6 +118,10 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
   compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
   usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
+  import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>
+       [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
+       [--producer <name> --producer-version <v>]      declare missing producer metadata explicitly
+  observations --archive <dir>                        recheck imported bytes and show producer-reported attempts
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
   awr-prepare --sink <dir> --id <result-id> --destination <json>
                                                        freeze a redacted AWR export and exact destination; no network
@@ -433,6 +438,23 @@ async function main(argv: string[]): Promise<number> {
       }
     }
 
+    case 'import-observations': {
+      const captured = NativeObservationSnapshot.open({ file: args.flags.input, format: args.flags.format, scope: localScope(),
+        ...(args.flags['artifact-root'] ? { artifactRoot: args.flags['artifact-root'] } : {}),
+        ...(args.flags.producer ? { producer: { name: args.flags.producer, version: args.flags['producer-version']! } } : {}) });
+      const report = exportImportedObservations(captured, args.flags.output).report;
+      out(args, report, `Imported native observations · ${report.observations.length} reported observation(s)\n` +
+        `${report.attachments.filter(a => a.state === 'captured').length} captured attachment(s); ${report.warnings.length} limitation(s).\n` +
+        'Issuer not authenticated; qualification and verification not evaluated. No execution was started.');
+      return 0;
+    }
+    case 'observations': {
+      const report = readImportedObservations(args.flags.archive).report;
+      const counts = Object.fromEntries([...new Set(report.observations.map(a => a.outcome))].map(status => [status, report.observations.filter(a => a.outcome === status).length]));
+      out(args, report, `Imported native observations · ${report.format}\nProducer-reported observations: ${JSON.stringify(counts)}\n` +
+        `Limitations: ${report.warnings.join(', ') || 'none recorded'}\nIssuer not authenticated; qualification and verification not evaluated.`);
+      return 0;
+    }
     case 'usage': {
       const report = inspectAttemptInventory({ stateDir: args.flags['state-dir'], scope: localScope() });
       const rows = report.attempts.map(row => `  ${row.executionId ?? `admission #${row.admissionSequence}`} · ${row.kind} · ${row.status}${row.outcome ? ` · ${row.outcome}` : ''}`);

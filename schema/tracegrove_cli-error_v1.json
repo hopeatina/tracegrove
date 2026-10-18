@@ -33,6 +33,8 @@
             "verify-bundle",
             "compare",
             "usage",
+            "import-observations",
+            "observations",
             "result-ingest",
             "results",
             "awr-prepare",
@@ -115,7 +117,10 @@
               "input_unavailable",
               "access_denied",
               "infrastructure_failure",
-              "unexpected_failure"
+              "unexpected_failure",
+              "native_report_invalid",
+              "native_archive_invalid",
+              "native_output_conflict"
             ],
             "type": "string"
           },

@@ -2,6 +2,7 @@
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { CliErrorReport, SchemaViolation } from '../protocol/index.ts';
 import { COMMAND_SCHEMAS } from './arguments.ts';
+import { NativeObservationError } from '../imports/errors.ts';
 
 type Reason = CliErrorReport['reasons'][number];
 const reason = (code: Reason['code'], message: string, recovery: string): Reason => ({ code, message, recovery });
@@ -43,6 +44,10 @@ export function cliErrorReport(error: unknown, command: string | undefined): Cli
       ? blockedReasons[item.code as Reason['code']]! : prerequisite);
     if (!reasons.length) reasons = [prerequisite];
     omittedReasonCount = Math.max(0, error.reasons.length - 32);
+  } else if (error instanceof NativeObservationError) {
+    errorClass = error.code === 'native_output_conflict' ? 'conflict' : 'invalid_input'; exitCode = 2;
+    const diagnostic = NativeObservationError.diagnostic(error.code);
+    reasons = [reason(error.code, diagnostic.message, diagnostic.recovery)];
   } else if (error instanceof Conflict) {
     errorClass = 'conflict'; exitCode = 2;
     reasons = [reason('state_conflict', 'The operation conflicts with existing state or ownership.', 'Inspect the owned state and reconcile the interrupted operation; do not break locks or replay uncertain effects.')];

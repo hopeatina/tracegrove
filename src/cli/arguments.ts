@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CliCommandName, IdString, RunRequest } from '../protocol/index.ts';
+import { CliCommandName, IdString, NativeReportFormat, RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { SampleName } from './samples/catalog.ts';
 
@@ -41,6 +41,10 @@ export const COMMAND_SCHEMAS = {
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
   compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
   usage: z.object({ ...common, 'state-dir': Text }).strict(),
+  'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text,
+    'artifact-root': Text.optional(), producer: Text.optional(), 'producer-version': Text.optional() }).strict()
+    .refine(flags => !!flags.producer === !!flags['producer-version'], 'provide both producer name and version'),
+  observations: z.object({ ...common, archive: Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
   'awr-prepare': z.object({ ...common, sink: Text, id: IdString, destination: Text }).strict(),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NativeObservationErrorCode } from './importedObservations.ts';
 
 /** Public top-level failures only. No exception text, arguments, paths, stacks or candidate output. */
 export const CliErrorCode = z.enum([
@@ -9,11 +10,12 @@ export const CliErrorCode = z.enum([
   'run_not_found', 'execution_not_found', 'invalid_request_file', 'invalid_port',
   'prerequisite_unavailable', 'state_conflict', 'invalid_document', 'invalid_json',
   'input_unavailable', 'access_denied', 'infrastructure_failure', 'unexpected_failure',
+  ...NativeObservationErrorCode.options,
 ]);
 const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512), recovery: z.string().min(1).max(512) }).strict();
 export const CliCommandName = z.enum(['help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
   'settings', 'sample-config', 'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
-  'rerun', 'inspect', 'export', 'verify-bundle', 'compare', 'usage', 'result-ingest', 'results', 'awr-prepare', 'awr-inspect', 'awr-deliver',
+  'rerun', 'inspect', 'export', 'verify-bundle', 'compare', 'usage', 'import-observations', 'observations', 'result-ingest', 'results', 'awr-prepare', 'awr-inspect', 'awr-deliver',
   'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve', 'recovery-status', 'source-materialize', 'schema']);
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
