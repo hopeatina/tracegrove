@@ -19,7 +19,7 @@
   "files": ["dist", "schema", "samples", "docs/cleanup-followups.md", "docs/source-review.md", "docs/git-source-resolution.md", "docs/local-review-store.md", "docs/qualification-registration.md", "docs/qualification-results.md", "docs/replay-assessment.md", "docs/scenario-activation.md", "docs/verified-bundles.md", "docs/developer-ux.md", "docs/architecture.md", "docs/browser-driver.md", "docs/native-jobs.md", "docs/result-sink.md", "docs/awr-delivery.md", "docs/work-report-attachment.md", "docs/mcp-driver.md", "conformance/coordination-vectors.json", "LICENSE", "README.md", "docs/images/ui-run.png"],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.container.json --noEmit",
     "test": "vitest run",
     "test:conformance": "vitest run conformance/",
     "test:django": "vitest run --config vitest.django.config.ts",
