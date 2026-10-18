@@ -24,8 +24,6 @@ export const AwrAcknowledgement = z.object({
   schema_version: z.literal('agent-work-receipt/v0.2'), idempotent: z.boolean(),
 }).strip();
 export type AwrAcknowledgement = z.infer<typeof AwrAcknowledgement>;
-export const AwrDeliveryAttempt = z.object({ attempt: z.number().int().positive().max(1000), startedAt: IsoDateTime }).strict();
-export const AwrDeliveryAccepted = z.object({ acknowledgement: AwrAcknowledgement, acknowledgedAt: IsoDateTime }).strict();
 // Exercise the core bounded JSON contract before an envelope can enter a journal.
 export function checkedAwrDocument(value: unknown): AgentWorkReceipt {
   JsonValue.parse(value);

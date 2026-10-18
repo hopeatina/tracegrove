@@ -2,8 +2,10 @@
 
 This optional adapter exports a retained result as redacted AWR v0.2 and saves
 an immutable delivery intent in the existing local ledger. Delivery uses OrgX's
-existing workspace-scoped AWR importer. It does not execute a campaign, attach a
-report to native work, complete work, qualify scenarios, or observe native outcomes.
+existing workspace-scoped AWR importer. Import does not execute a campaign,
+complete work, qualify scenarios, or observe native outcomes. The separate
+[work-report attachment stage](work-report-attachment.md) links the imported
+report to its original work target and preserves its own retry state.
 
 Install the optional peer only when using this integration:
 

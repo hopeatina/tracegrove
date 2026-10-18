@@ -17,9 +17,10 @@ import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { checkCleanupFiles } from './cleanup.ts';
+import { readConfigurationJson } from './jsonFile.ts';
 import { parseArgs, type Args } from './arguments.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, parseAs, refKey, type Ref } from '../protocol/index.ts';
+import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, HostPlan, ExecutionReceipt, CampaignResult, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { writeSample } from './samples/write.ts';
@@ -82,6 +83,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   validate --config <workflow.yaml>                    validate schemas, references and digests
   doctor --config <workflow.yaml> [--profile <name>]   report tools, identity pins and capabilities (no effects)
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
+       [--work-binding <json>]                        freeze an existing work ID and requirement refs before execution
   seed --request <request.json> --preview              show planned fixture resources and cleanup (no effects)
   run --request <request.json> [--jsonl]               admit and execute the frozen request
   controller --state-dir <dir> --project-root <dir>    own the local ledger; CLI runs delegate
@@ -96,6 +98,11 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   awr-inspect --sink <dir> --id <result-id>              show saved delivery and acknowledgement state
   awr-deliver --sink <dir> --id <result-id> [--credential-env <name>]
                                                        retry the frozen import; default secret env TRACEGROVE_ORGX_TOKEN
+  report-prepare --sink <dir> --id <result-id> --target <json>
+                                                       freeze attachment to the exact bound work; no network
+  report-inspect --sink <dir> --id <result-id>           inspect independent attachment acknowledgement state
+  report-attach --sink <dir> --id <result-id> [--credential-env <name>]
+                                                       recheck the imported receipt, then attach it in review; no completion
   results --sink <dir> [--id <record-id>]               list receipts; --id re-verifies its retained archive
           [--limit 1..100] [--cursor <opaque>]           bounded, snapshot-stable pages; issuer remains unverified
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
@@ -303,7 +310,8 @@ async function main(argv: string[]): Promise<number> {
       const project = loadProject(args.flags['config']);
       const profileName = flag(args, 'profile') ?? project.config.defaultProfile;
       const output = resolve(args.flags['output']);
-      const bundle = plan({ project, profileName, scope: localScope(), purpose: args.flags.purpose ?? 'trial' });
+      const workBinding = args.flags['work-binding'] ? RunRequest.shape.workBinding.parse(readConfigurationJson(args.flags['work-binding'], 262144)) : null;
+      const bundle = plan({ project, profileName, scope: localScope(), purpose: args.flags.purpose ?? 'trial', workBinding });
       mkdirSync(dirname(output), { recursive: true });
       writeFileSync(output, `${JSON.stringify(bundle, null, 2)}\n`);
       const summary = { output, profile: profileName, requestDigest: bundle.request?.ref.digest.hex ?? null, idempotencyKey: bundle.request?.idempotencyKey ?? null, cells: bundle.request?.caseRefs.length ?? 0, excluded: bundle.excludedCells, blockers: bundle.blockers, estimatedCostCents: bundle.estimatedCostCents, requirements: bundle.requirements };
@@ -401,7 +409,10 @@ async function main(argv: string[]): Promise<number> {
 
     case 'awr-prepare':
     case 'awr-inspect':
-    case 'awr-deliver': {
+    case 'awr-deliver':
+    case 'report-prepare':
+    case 'report-inspect':
+    case 'report-attach': {
       const { runAwrCommand } = await import('../integrations/awr/cli.ts').catch(() => {
         throw new Conflict('AWR integration unavailable; install the optional peer @useorgx/agent-work-receipt@0.3.0');
       });

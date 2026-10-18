@@ -313,6 +313,9 @@ and destination in that same ledger. `awr-prepare`, `awr-inspect`, and `awr-deli
 separate preparation from authenticated import, retain failed product verdicts,
 and retry the original key after a lost acknowledgement without rerunning tests.
 Imported evidence remains unverified; native work acceptance is a separate gate.
+The [work-report attachment stage](docs/work-report-attachment.md) links an imported
+report to its original frozen work binding, rechecks hosted receipt identity, and
+recovers lost attachment acknowledgements independently of import or execution.
 
 The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
 fixtures and independent readback, and verifies recordings in the portable bundle.

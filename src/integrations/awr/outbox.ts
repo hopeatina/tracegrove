@@ -1,10 +1,11 @@
 import { canonicalizeAgentWorkJson, verifyAgentWorkReceiptIntegrity } from '@useorgx/agent-work-receipt';
 import { LocalLedger } from '../../core/ledger.ts';
+import { LocalDeliveryJournal } from '../../core/deliveryJournal.ts';
 import { LocalResultSink } from '../../core/resultSink.ts';
 import { Conflict } from '../../core/errors.ts';
 import { nowIso } from '../../core/clock.ts';
-import { ScopeSchema, digestOfValue, freeze, sameDigest, sameRef, sameScope, verifySelfDigest, type Scope } from '../../protocol/index.ts';
-import { AwrAcknowledgement, AwrDeliveryAccepted, AwrDeliveryAttempt, AwrDestination, PreparedAwrDelivery, checkedAwrDocument } from './contracts.ts';
+import { ScopeSchema, digestOfValue, freeze, sameDigest, sameRef, sameScope, type Scope } from '../../protocol/index.ts';
+import { AwrAcknowledgement, AwrDestination, PreparedAwrDelivery, checkedAwrDocument } from './contracts.ts';
 import { projectAwr } from './projection.ts';
 
 export interface AwrDeliveryAuthority { authorize(scope: Scope, destination: AwrDestination, action: 'prepare' | 'read' | 'deliver'): Promise<void> }
@@ -14,26 +15,21 @@ const identity = (scope: Scope, resultId: string) => `awr-delivery-${digestOfVal
 
 /** Durable immutable intent plus idempotent network reconciliation. Never invokes execution. */
 export class LocalAwrOutbox {
-  private readonly inFlight = new Set<string>();
   private readonly scope: Scope;
-  constructor(private readonly ledger: LocalLedger, private readonly sink: LocalResultSink, scope: Scope, private readonly authority: AwrDeliveryAuthority) { this.scope = ScopeSchema.parse(scope); }
+  private readonly journal: LocalDeliveryJournal<PreparedAwrDelivery, AwrAcknowledgement>;
+  constructor(ledger: LocalLedger, private readonly sink: LocalResultSink, scope: Scope, private readonly authority: AwrDeliveryAuthority) {
+    this.scope = ScopeSchema.parse(scope);
+    this.journal = new LocalDeliveryJournal(ledger, this.scope,
+      { prepared: 'workflow.awr.prepared', attempted: 'workflow.awr.attempted', acknowledged: 'workflow.awr.imported' }, {
+        prepared: raw => { const intent = PreparedAwrDelivery.parse(raw); checkedAwrDocument(intent.receipt); return intent; },
+        acknowledgement: raw => AwrAcknowledgement.parse(raw),
+        checkAcknowledgement: (prepared, ack) => { if (ack.external_receipt_id !== prepared.receipt.receipt_id) throw new Conflict('Delivery response belongs to another receipt'); },
+      });
+  }
   private load(resultId: string): AwrDeliveryState | null {
-    const entries = this.ledger.history(identity(this.scope, resultId));
-    if (!entries.length) return null;
-    const prepared = PreparedAwrDelivery.parse(entries[0]!.data);
-    if (entries[0]!.type !== 'workflow.awr.prepared' || prepared.ref.id !== identity(this.scope, resultId) || prepared.resultRef.id !== resultId ||
-        !sameScope(prepared.scope, this.scope) || !verifySelfDigest(prepared)) throw new Conflict('Delivery intent is inconsistent or foreign');
-    checkedAwrDocument(prepared.receipt);
-    let attempts = 0; let acknowledgement: AwrAcknowledgement | null = null;
-    for (const entry of entries.slice(1)) {
-      if (acknowledgement) throw new Conflict('Delivery history changed after acknowledgement');
-      if (entry.type === 'workflow.awr.attempted') {
-        const attempt = AwrDeliveryAttempt.parse(entry.data); if (attempt.attempt !== ++attempts) throw new Conflict('Delivery attempt sequence is inconsistent');
-      } else if (entry.type === 'workflow.awr.imported' && attempts > 0) {
-        acknowledgement = AwrDeliveryAccepted.parse(entry.data).acknowledgement;
-        if (acknowledgement.external_receipt_id !== prepared.receipt.receipt_id) throw new Conflict('Delivery acknowledgement refers to another receipt');
-      } else throw new Conflict('Unexpected delivery journal entry');
-    }
+    const state = this.journal.read(identity(this.scope, resultId)); if (!state) return null;
+    const { prepared, attempts, acknowledgement } = state;
+    if (prepared.resultRef.id !== resultId) throw new Conflict('Delivery intent refers to another retained result');
     return { prepared, attempts, acknowledgement, status: acknowledgement ? 'imported_unverified' : attempts ? 'acknowledgement_unknown' : 'prepared' };
   }
   async prepare(resultId: string, destination: AwrDestination): Promise<AwrDeliveryState> {
@@ -51,7 +47,7 @@ export class LocalAwrOutbox {
       destination, receipt, preparedAt, idempotencyKey: `tracegrove-awr-${digestOfValue({ receipt: canonicalizeAgentWorkJson(receipt), destination }).hex}` }));
     await this.authority.authorize(structuredClone(this.scope), structuredClone(destination), 'prepare');
     if (this.load(resultId)) return this.prepare(resultId, destination);
-    this.ledger.append(prepared.ref.id, 0, 'workflow.awr.prepared', prepared);
+    this.journal.prepare(prepared);
     return this.load(resultId)!;
   }
   async inspect(resultId: string): Promise<AwrDeliveryState> {
@@ -60,9 +56,7 @@ export class LocalAwrOutbox {
     return state;
   }
   async deliver(resultId: string, transport: AwrTransport): Promise<AwrDeliveryState> {
-    if (this.inFlight.has(resultId)) throw new Conflict('Delivery is already in flight');
-    this.inFlight.add(resultId);
-    try {
+    return this.journal.whileIdle(identity(this.scope, resultId), async () => {
       let state = await this.inspect(resultId);
       await this.authority.authorize(structuredClone(this.scope), structuredClone(state.prepared.destination), 'deliver');
       if (state.acknowledgement) return state;
@@ -72,12 +66,10 @@ export class LocalAwrOutbox {
       if (integrity.content_hash.state !== 'verified') throw new Conflict('Prepared AWR content hash differs');
       await this.authority.authorize(structuredClone(this.scope), structuredClone(state.prepared.destination), 'deliver');
       state = this.load(resultId)!;
-      if (state.attempts >= 1000) throw new Conflict('Delivery retry limit reached; evidence and intent remain retained');
-      this.ledger.append(state.prepared.ref.id, 1 + state.attempts, 'workflow.awr.attempted', AwrDeliveryAttempt.parse({ attempt: state.attempts + 1, startedAt: nowIso() }));
-      const acknowledgement = AwrAcknowledgement.parse(await transport.import(structuredClone(state.prepared)));
-      if (acknowledgement.external_receipt_id !== state.prepared.receipt.receipt_id) throw new Conflict('Delivery response belongs to another receipt');
-      this.ledger.append(state.prepared.ref.id, 2 + state.attempts, 'workflow.awr.imported', AwrDeliveryAccepted.parse({ acknowledgement, acknowledgedAt: nowIso() }));
+      const attempt = this.journal.attempt(state.prepared.ref.id);
+      const acknowledgement = await transport.import(structuredClone(state.prepared));
+      this.journal.acknowledge(state.prepared.ref.id, attempt.version, acknowledgement);
       return this.load(resultId)!;
-    } finally { this.inFlight.delete(resultId); }
+    });
   }
 }

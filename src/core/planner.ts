@@ -36,7 +36,7 @@ export type FrozenBundle = {
   documents: Record<string, unknown>;
 };
 
-export type PlanInput = { project: LoadedProject; profileName: string; scope: Scope; purpose?: RunRequest['purpose'] };
+export type PlanInput = { project: LoadedProject; profileName: string; scope: Scope; purpose?: RunRequest['purpose']; workBinding?: RunRequest['workBinding'] };
 
 function cellId(caseId: string, personaId: string): string {
   return `${caseId}__${personaId}`.replace(/[^A-Za-z0-9._:/-]/g, '_');
@@ -44,6 +44,7 @@ function cellId(caseId: string, personaId: string): string {
 
 export function plan(input: PlanInput): FrozenBundle {
   const { project, profileName, scope } = input;
+  const workBinding = RunRequest.shape.workBinding.parse(input.workBinding ?? null);
   const corpus = project.corpus;
   const blockers: Blocker[] = [];
   const documents: Record<string, unknown> = {};
@@ -229,7 +230,7 @@ export function plan(input: PlanInput): FrozenBundle {
       environmentRef: environmentPlan.ref,
       expectedTarget,
       selectionManifestRef: selection.ref,
-      workBinding: null,
+      workBinding,
       limits: { deadlineMs: profile.budget.deadlineMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: profile.budget.costCeilingCents, maxBrowserActions: 0, maxArtifactBytes: 64 * 1024 * 1024, diagnosticRetries: 0, concurrencyGroup: project.config.project },
       replayOf: null,
     }), 'run request');
