@@ -18,7 +18,8 @@ import type { FrozenBundle } from './planner.ts';
 import { REDUCER_REF, evaluateAssertions, reduceCampaign, reduceCell } from './reducer.ts';
 import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
-import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
+import { frozenRunnerCapabilities, RunnerCompatibilityError, type RunnerCompatibilityDiagnostic } from './runnerCapabilities.ts';
+export type { RunnerCompatibilityDiagnostic } from './runnerCapabilities.ts';
 import { cellBundleName, videoBundlePath } from './bundlePaths.ts';
 import { Conflict } from './errors.ts';
 
@@ -141,14 +142,14 @@ function writeBundlePayloads(input: { dir: string; cell?: CellRecords; bundle?: 
   return Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-export type BundleVerification = { ok: boolean; problems: string[]; outcome: CampaignResult['outcome'] | null; receipts: number };
+export type BundleVerification = { ok: boolean; problems: string[]; outcome: CampaignResult['outcome'] | null; receipts: number; diagnostics?: RunnerCompatibilityDiagnostic[] };
 export type VerifiedBundleRecords = { verification: BundleVerification & { ok: true }; manifestDigest: Digest;
   request: RunRequest; selection: SelectionManifest; campaign: CampaignResult; receipts: ExecutionReceipt[]; documents: Record<string, unknown> };
 type Inspection = { verification: BundleVerification; records: Omit<VerifiedBundleRecords, 'verification'> | null };
 
 export function verifyBundle(dir: string): BundleVerification {
   try { return verifyBundleRecords(dir).verification; }
-  catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 }; }
+  catch (error) { return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0, ...(error instanceof RunnerCompatibilityError ? { diagnostics: [error.diagnostic] } : {}) }; }
 }
 
 /**
@@ -164,7 +165,7 @@ export function exportVerifiedBundle(source: string, output: string): BundleVeri
     snapshot = new BundleSnapshot(source);
     verification = verifySnapshot(snapshot).verification;
   } catch (error) {
-    return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0 };
+    return { ok: false, problems: [error instanceof Error ? error.message : 'invalid bundle'], outcome: null, receipts: 0, ...(error instanceof RunnerCompatibilityError ? { diagnostics: [error.diagnostic] } : {}) };
   }
   if (!verification.ok) return verification;
   const destination = resolve(output);
