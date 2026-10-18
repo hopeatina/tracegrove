@@ -145,8 +145,7 @@ Doctor/check, both real notes scenarios, independent API readbacks, stranger 403
 anonymous 401 and deletion 404 assertions passed. Original and copied evidence bundles verified
 with two receipts and no problems. Fixture/process/workspace cleanup was confirmed, with independent
 readback finding both owned process entries and workspaces absent. The private receipt and run are
-retained in the saved cloud environment under `/workspace/tracegrove-readme-review-3894ed6/`;
-they are not shipped in npm. One stale “any command” table claim was corrected after review.
+retained privately in the saved cloud environment; they are not shipped in npm. One stale “any command” table claim was corrected after review.
 The canonical executed quickstart is unchanged by that documentation correction.
 
 The automated README journey separately passed using the existing build/dependencies. Its first
