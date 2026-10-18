@@ -73,7 +73,7 @@ it('cancels only the identified owned run and waits for verified cleanup, includ
   expect(cancellations[0]!.status).toBe(200); expect([200, 409]).toContain(cancellations[1]!.status);
   const result = await run; expect(result.status).toBe(200); assertCleanup(result.body, control, 'cancelled');
   const saved = await (await fetch(ui.url + 'api/runs/' + result.body.runDir.split('/').at(-1))).json();
-  expect(saved.savedEvidence.status).toBe('verified'); expect(saved.stateDir).toBe(result.body.stateDir);
+  expect(saved.evidenceStatus).toBe('verified'); expect(saved.stateDir).toBe(result.body.stateDir);
   expect(readFileSync(join(control, 'starts'), 'utf8').trim().split('\n')).toHaveLength(1);
   expect(cancellations[0]!.body.executionId).toBe(result.body.executionId);
   expect(cancellations[0]!.body.cleanup).toContain('cancellation alone does not confirm cleanup');
@@ -113,7 +113,7 @@ it('cancels through the real browser button and retains a readable 375px result'
     void result.catch(() => {}); // The original promise is awaited below; cleanup may close it after an earlier assertion fails.
     await page.getByRole('button', { name: 'Run all', exact: true }).click(); await active(ui, control);
     await expect.poll(() => page.getByRole('button', { name: 'Cancel run', exact: true }).count()).toBe(1);
-    expect(await page.getByRole('complementary', { name: 'Step detail' }).getByRole('button', { name: 'Run', exact: true }).isDisabled()).toBe(true);
+    expect(await page.getByRole('complementary', { name: 'Step detail' }).getByRole('button', { name: 'Run current flow', exact: true }).isDisabled()).toBe(true);
     const evidence = join(process.cwd(), 'artifacts/qa/ui-cancellation'); mkdirSync(evidence, { recursive: true });
     await page.screenshot({ path: join(evidence, 'active-375.png'), fullPage: true, animations: 'disabled' });
     await page.getByRole('button', { name: 'Cancel run', exact: true }).click(); const report = await (await result).json(); assertCleanup(report, control, 'cancelled');

@@ -177,10 +177,15 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
   let bundleVerified: boolean | null = null;
   if (summary) {
     const target = join(runDir, 'bundle');
-    const publication = exportVerifiedBundle(summary.executionDir, target);
-    const verification = publication.ok ? verifyBundle(target) : publication;
-    bundleVerified = verification.ok;
-    if (!verification.ok) writeFileSync(join(runDir, 'bundle-problems.txt'), `${verification.problems.join('\n')}\n`);
+    try {
+      const publication = exportVerifiedBundle(summary.executionDir, target);
+      const verification = publication.ok ? verifyBundle(target) : publication;
+      bundleVerified = verification.ok;
+      if (!verification.ok) writeFileSync(join(runDir, 'bundle-problems.txt'), `${verification.problems.join('\n')}\n`);
+    } catch {
+      bundleVerified = false;
+      writeFileSync(join(runDir, 'bundle-problems.txt'), 'Evidence publication failed; preserve and inspect the original execution and publication state before retrying.\n');
+    }
   }
   if (bundleVerified === false && outcome === 'passed') {
     outcome = 'inconclusive';

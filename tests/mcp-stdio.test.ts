@@ -42,7 +42,10 @@ it('pins the actual registry SDK and captures negotiated native stdio messages w
   await expect(verifyCapabilityStream(captured.transcript, captured.operation, captured.readArtifact)).resolves.toMatchObject({ evidenceVerdict: 'admissible', verificationVerdict: 'not_evaluated' });
   writeFileSync(join(fixture.root, 'typed-evidence.json'), JSON.stringify({ ...captured, blobs: undefined, readArtifact: undefined }, null, 2));
   const serverInfo = JSON.parse(readFileSync(join(fixture.root, 'server-pid.json'), 'utf8'));
-  expect(serverInfo.environmentKeys).toEqual(['FIXTURE_ROOT', 'HOME', 'PATH', 'TMPDIR']);
+  // macOS adds its text-encoding key to this native child even with an explicit env.
+  // Keep the fixture's allowlist exact on every other platform.
+  const platformKeys = process.platform === 'darwin' ? ['__CF_USER_TEXT_ENCODING'] : [];
+  expect(serverInfo.environmentKeys).toEqual(['FIXTURE_ROOT', 'HOME', 'PATH', 'TMPDIR', ...platformKeys].sort());
 });
 
 it('keeps a tool rejection distinct from a JSON-RPC method error', async () => {

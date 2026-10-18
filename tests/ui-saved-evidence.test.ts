@@ -51,7 +51,7 @@ it.each(['verified', 'missing', 'invalid', 'mismatch'] as const)('reconstructs %
     expect(media.status).toBe(mode === 'verified' || mode === 'mismatch' ? 200 : 409);
     if (mode === 'verified') {
       expect(report.cases[0].steps[0].name).toBe(first.cases[0]!.steps[0]!.id.replaceAll('_', ' '));
-      expect(report.cases[0].steps[0].expectStatus).toBe(first.cases[0]!.steps[0]!.expectStatus);
+      expect(report.cases[0].steps[0].expectStatus).toBeNull(); // UI navigation has no frozen HTTP status contract.
       expect(report.cases[0].file).toBe(first.cases[0]!.file);
     }
   } finally { await ui.close(); }
