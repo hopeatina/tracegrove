@@ -16,7 +16,8 @@ export class SnapshotSource {
   bind(cwd: string, compiledDir: string): GitSnapshotBinding {
     const within = relative(this.root, cwd);
     if (within.startsWith('..') || isAbsolute(within)) throw new Blocked([{ code: 'snapshot_app_outside_root', detail: 'app.root must be inside the materialized source tree' }]);
-    readGitSnapshotTree(this.snapshot, this.root);
+    try { readGitSnapshotTree(this.snapshot, this.root); }
+    catch (error) { throw new Blocked([{ code: 'snapshot_source_changed', detail: `Selected snapshot files are missing, unreadable, or differ from the manifest: ${(error as Error).message}`, action: 'restore the pinned files or materialize and review a new snapshot in Settings' }]); }
     return { snapshot: this.snapshot, root: relative(compiledDir, this.root).split(sep).join('/') || '.', cwd: within.split(sep).join('/') || '.' };
   }
 }

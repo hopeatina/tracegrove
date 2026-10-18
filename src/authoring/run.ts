@@ -15,6 +15,7 @@ import { BrowserObservation, type ExecutionReceipt } from '../protocol/index.ts'
 import { runVideos } from './media.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
+import type { VerificationSourceBinding } from './sourceSelection.ts';
 
 export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
@@ -29,9 +30,15 @@ export type TestRunReport = {
   blockers: Array<{ code: string; detail: string; action: string }>;
   cases: CaseReport[];
   totals: { passed: number; failed: number; other: number };
+  sourceBinding?: VerificationSourceBinding | null;
 };
 
 const OUTCOME_LABEL: Record<string, string> = { passed: 'pass', assertion_failed: 'fail', blocked: 'blocked', infrastructure_failed: 'error', inconclusive: 'inconclusive', cancelled: 'cancelled' };
+
+function sourceLabel(source: TestRunReport['sourceBinding']): string {
+  if (!source) return 'not recorded';
+  return source.kind === 'working_tree' ? 'working tree' : `local snapshot ${source.commit} · ${source.files} files · sha256:${source.ref.digest.hex}`;
+}
 
 function stamp(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-');
@@ -104,7 +111,7 @@ export function renderJunit(report: TestRunReport): string {
 }
 
 export function renderText(report: TestRunReport, root: string): string {
-  const lines = [`tracegrove · ${report.project} · app sha ${report.sourceDigest.slice(0, 12)}`, ''];
+  const lines = [`tracegrove · ${report.project} · app sha ${report.sourceDigest.slice(0, 12)}`, `input request: ${sourceLabel(report.sourceBinding)}`, ''];
   for (const b of report.blockers) lines.push(`  BLOCKED  ${b.code}: ${b.detail}`, `           fix: ${b.action}`);
   for (const c of report.cases) {
     const label = (OUTCOME_LABEL[c.outcome] ?? c.outcome).toUpperCase().padEnd(7);
@@ -122,6 +129,7 @@ export function renderText(report: TestRunReport, root: string): string {
 
 export function renderMarkdown(report: TestRunReport): string {
   const lines = [`# tracegrove run: ${report.outcome}`, '', `- Project: \`${report.project}\``, `- Started: ${report.startedAt}`, `- App source digest: \`${report.sourceDigest}\``, `- Execution: \`${report.executionId ?? 'none'}\``, `- Evidence bundle verified: ${report.bundleVerified === null ? 'n/a' : report.bundleVerified ? 'yes' : '**no**'}`, ''];
+  lines.push(`Input request: ${sourceLabel(report.sourceBinding)}`, '');
   if (report.blockers.length) {
     lines.push('## Blocked', '', ...report.blockers.map((b) => `- **${b.code}**: ${b.detail}. Fix: ${b.action}`), '');
   }
@@ -197,6 +205,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     project: compiled.config.project, outcome, exitCode: summary?.exitCode ?? 2,
     startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
     executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, bundleVerified,
+    sourceBinding: compiled.sourceBinding,
     blockers: bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, action: b.action })),
     cases,
     totals: { passed: cases.filter((c) => c.outcome === 'passed').length, failed: cases.filter((c) => c.outcome === 'assertion_failed').length, other: cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length },

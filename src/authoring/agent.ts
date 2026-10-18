@@ -6,7 +6,7 @@
  * tracegrove compiles drafts afterwards; that check does not establish their intended behavior.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -14,41 +14,13 @@ import { Blocked } from '../core/errors.ts';
 import { AGENT_PROVIDERS, type AgentProvider, type AuthoringConfig } from './schema.ts';
 import type { Discovery } from './discover.ts';
 
-export const SETTINGS_FILE = 'settings.json';
+import { readLocalSettings } from './localSettings.ts';
+export { SETTINGS_FILE, LocalSettings, settingsPath, readLocalSettings, writeLocalSettings } from './localSettings.ts';
 /** Explicit low-cost defaults from workspace policy; never inherit the CLI's production model. */
 export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-4.5', codex: 'gpt-6-luna', none: null };
 
-export const LocalSettings = z.object({
-  agent: z.object({
-    provider: z.enum(AGENT_PROVIDERS).optional(),
-    model: z.string().min(1).max(120).optional(),
-    maxBudgetUsd: z.number().positive().max(100).optional(),
-  }).strict().optional(),
-}).strict();
-export type LocalSettings = z.infer<typeof LocalSettings>;
-
 export type AgentSettings = { provider: AgentProvider; model: string | null; maxBudgetUsd: number | null; source: Record<'provider' | 'model', 'flag' | 'settings' | 'config' | 'default'> };
 export type AgentOverrides = { provider?: string | null | undefined; model?: string | null | undefined };
-
-export function settingsPath(root: string): string {
-  return join(root, '.tracegrove', SETTINGS_FILE);
-}
-
-export function readLocalSettings(root: string): LocalSettings {
-  const file = settingsPath(root);
-  if (!existsSync(file)) return {};
-  const parsed = LocalSettings.safeParse(JSON.parse(readFileSync(file, 'utf8')));
-  if (!parsed.success) throw new Blocked(parsed.error.issues.map((issue) => ({ code: 'invalid_settings', detail: `${file}${issue.path.length ? ` at ${issue.path.join('.')}` : ''}: ${issue.message}`, owner: 'operator', action: `fix or delete ${file}` })));
-  return parsed.data;
-}
-
-export function writeLocalSettings(root: string, next: unknown): LocalSettings {
-  const parsed = LocalSettings.safeParse(next);
-  if (!parsed.success) throw new Blocked(parsed.error.issues.map((issue) => ({ code: 'invalid_settings', detail: `${issue.path.join('.') || 'settings'}: ${issue.message}`, owner: 'operator', action: 'send { agent: { provider, model } }' })));
-  mkdirSync(join(root, '.tracegrove'), { recursive: true });
-  writeFileSync(settingsPath(root), `${JSON.stringify(parsed.data, null, 2)}\n`);
-  return parsed.data;
-}
 
 /** Precedence: CLI flag, then .tracegrove/settings.json (per developer), then the config, then defaults. */
 export function resolveAgentSettings(root: string, config: AuthoringConfig | null, overrides: AgentOverrides = {}): AgentSettings {

@@ -17,7 +17,7 @@ export const COMMAND_SCHEMAS = {
   discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional() }).strict(),
   check: z.object({ ...common, dir: Text.optional() }).strict(),
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
-  settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
+  settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   doctor: z.object({ ...common, config: Text, profile: Text.optional() }).strict(),

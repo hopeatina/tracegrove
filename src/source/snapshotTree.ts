@@ -9,7 +9,9 @@ import { assertSnapshotPaths } from './snapshotPaths.ts';
 export type SnapshotFile = { path: string; mode: '100644' | '100755'; bytes: Buffer };
 
 export function readGitSnapshotManifest(path: string): GitSourceSnapshot {
-  const snapshot = GitSourceSnapshot.parse(JSON.parse(readBoundedFile(path, 32 * 1024 * 1024).toString('utf8')));
+  let snapshot: GitSourceSnapshot;
+  try { snapshot = GitSourceSnapshot.parse(JSON.parse(readBoundedFile(path, 32 * 1024 * 1024).toString('utf8'))); }
+  catch { throw new Conflict('Choose a bounded, regular source snapshot manifest with valid metadata'); }
   if (!verifySelfDigest(snapshot)) throw new Conflict('Git snapshot manifest digest mismatch');
   return snapshot;
 }

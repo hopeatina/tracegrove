@@ -8,3 +8,5 @@ export { buildAgentCommand, buildDraftPrompt, detectAgents, readLocalSettings, r
 export { checkProject, discoverProject, draftWithAgent, type CheckResult, type DraftResult } from './workspace.ts';
 export { RunActivity, runActivity } from './activity.ts';
 export { defineConfig, flow, fixture } from './typed.ts';
+export { VerificationSourceSelection, VerificationSourceBinding } from './sourceSelection.ts';
+export { previewVerificationSource, saveVerificationSource, savedVerificationSource } from './verificationSource.ts';

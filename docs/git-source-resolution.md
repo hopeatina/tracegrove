@@ -95,3 +95,37 @@ identity or a runtime `SourceSelection`. A self-sealed manifest does not prove
 who resolved its commit. The host does not yet populate repository observations
 or promote qualification from this manifest. Authenticated resolver/admission
 policy, reviewed lifecycle execution and hosted activation remain separate work.
+
+## Keep scenarios in one workbench
+
+Application input can be selected independently of the config and saved flows.
+`app.root` is resolved inside the selected snapshot; flows, personas and config
+continue to come from the workbench. No team config rewrite is needed.
+
+```sh
+tracegrove settings --dir ./workbench --source-snapshot ./snapshots/head/snapshot.json
+tracegrove test --config ./workbench/tracegrove.config.yaml
+tracegrove settings --dir ./workbench --working-tree
+```
+
+The CLI snapshot path is relative to the calling directory, as with the existing
+one-run `test --source-snapshot` override. The saved path is relative to the
+workbench. An explicit one-run override takes precedence over the saved choice.
+Settings preserves the agent/model/budget preferences and rejects conflicting
+input switches before writing any preference.
+
+Grove's **Settings → Verification input** offers **Check snapshot** before
+**Use this snapshot**. Checking reads and validates bytes and the launch template;
+it launches no application and writes no compile output. Saving records the
+manifest's exact reference. Replacing the manifest or changing a pinned file
+blocks runs until reviewed again; there is no automatic fallback to working tree.
+**Use working tree** clears the local selection without deleting a snapshot.
+
+The Run page separates **Next run input** from **Recorded run request**. The latter
+is reconstructed from the frozen host plans in re-verified saved evidence, even
+after a preference change. Unreadable or inconsistent evidence shows unavailable,
+never the current default. A recorded request describes local inputs; it does
+not establish that an application successfully launched or grant hosted qualification.
+Discovery's branch selector only scans routes and does not change run input.
+Python dependencies may be supplied by the workbench's `.venv` or explicit
+`app.python`; neither dependencies nor environment are sealed by the source pin.

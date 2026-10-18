@@ -32,6 +32,7 @@ import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
+import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -71,7 +72,8 @@ Agent-friendly commands (every one takes --json and never starts the app):
   check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
-  settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
+  settings [--agent claude|codex|none] [--model <m>]   show or save local agent preferences
+           [--source-snapshot <snapshot.json> | --working-tree]  save the next run's input; never edits team config
   (test/list/compile take --config <tracegrove.config.yaml|tracegrove.config.ts>)
 
 Low-level corpus commands (the strict workflow.*/v1 files):
@@ -180,16 +182,25 @@ async function main(argv: string[]): Promise<number> {
     case 'settings': {
       const dir = resolve(flag(args, 'dir') ?? '.');
       const provider = flag(args, 'agent'); const model = flag(args, 'model');
-      if (provider !== null || model !== null) {
+      const snapshot = flag(args, 'source-snapshot');
+      const workingTree = args.flags['working-tree'] === true;
+      if (snapshot !== null && workingTree) throw new Conflict('Choose --source-snapshot or --working-tree, not both');
+      if (provider !== null || model !== null || snapshot !== null || workingTree) {
         const current = readLocalSettings(dir);
         const agent = { ...current.agent };
         if (provider !== null && provider !== agent.provider && model === null) delete agent.model;
-        writeLocalSettings(dir, { ...current, agent: { ...agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } });
+        const source = snapshot !== null ? previewVerificationSource(dir, resolve(snapshot), loadAuthoringConfig(findConfig(dir))).selection
+          : workingTree ? { kind: 'working_tree' as const } : null;
+        writeLocalSettings(dir, { ...current,
+          ...(provider !== null || model !== null ? { agent: { ...agent, ...(provider !== null ? { provider } : {}), ...(model !== null ? { model } : {}) } } : {}),
+          ...(source ? { verification: { source } } : {}),
+        });
       }
       let config = null; try { config = loadAuthoringConfig(findConfig(dir)); } catch { config = null; }
       const settings = resolveAgentSettings(dir, config);
       const detected = detectAgents();
-      out(args, { settings, detected }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}`);
+      const verificationSource = savedVerificationSource(dir);
+      out(args, { settings, detected, verificationSource }, `agent: ${settings.provider} (from ${settings.source.provider})\nmodel: ${settings.model ?? 'CLI default'} (from ${settings.source.model})\nclaude: ${detected.claude ?? 'not installed'}\ncodex: ${detected.codex ?? 'not installed'}\nverification input: ${verificationSource.kind === 'snapshot' ? verificationSource.path + ' (pinned local snapshot)' : 'working tree'}`);
       return 0;
     }
 

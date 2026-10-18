@@ -20,6 +20,8 @@ import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, 
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
+import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
+import { readRunSource } from './runSource.ts';
 
 export type UiServer = { url: string; port: number; close: () => Promise<void> };
 
@@ -88,6 +90,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
     return { settings: resolveAgentSettings(dir, config), detected: detectAgents(), drafting };
   };
+  const sourceInfo = (result: CompileResult | null, error: ReturnType<typeof errorBody> | null) => ({
+    selection: savedVerificationSource(dir), binding: result?.sourceBinding ?? null,
+    status: error ? 'blocked' : 'ready', error,
+  });
 
   const handle = async (req: IncomingMessage, res: ServerResponse, port: number) => {
     const send = (status: number, body: unknown, type = 'application/json') => {
@@ -106,7 +112,18 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const { result, error } = compiled();
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
-        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo() });
+        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/source/preview') {
+        const body = await readJson(req);
+        if (typeof body.path !== 'string' || !body.path.trim() || body.path.length > 8192) return send(400, { error: 'Enter a snapshot manifest path.' });
+        return send(200, previewVerificationSource(dir, body.path.trim(), loadAuthoringConfig(configPath())));
+      }
+      if (req.method === 'POST' && url.pathname === '/api/source') {
+        const body = await readJson(req);
+        saveVerificationSource(dir, body.source, loadAuthoringConfig(configPath()));
+        const { result, error } = compiled();
+        return send(200, sourceInfo(result, error));
       }
       if (req.method === 'POST' && url.pathname === '/api/prune') {
         const body = await readJson(req);
@@ -158,7 +175,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!/^[A-Za-z0-9_.:-]+$/.test(name)) return send(400, { error: 'bad run name' });
         const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
-        return existsSync(file) ? send(200, JSON.parse(readFileSync(file, 'utf8'))) : send(404, { error: 'run not found' });
+        return existsSync(file) ? send(200, readRunSource(dirname(file), JSON.parse(readFileSync(file, 'utf8')) as TestRunReport)) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
         if (running) return send(409, { error: 'a run is already in progress' });
@@ -170,7 +187,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         try {
           const { report } = await job;
           activity = { status: 'finished', event: null, stepId: null, label: `Run finished: ${report.outcome}`, observedAt: report.finishedAt };
-          return send(200, report);
+          return send(200, readRunSource(report.runDir, report));
         } catch (error) {
           activity = { status: 'failed', event: null, stepId: null, label: 'Run could not be completed', observedAt: new Date().toISOString() };
           throw error;

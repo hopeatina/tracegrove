@@ -8,7 +8,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml, stringify } from 'yaml';
 import type { z } from 'zod';
 import { Blocked } from '../core/errors.ts';
-import { AUTHORING_SCOPE, ProjectLoader, localScope } from '../core/corpus.ts';
+import { AUTHORING_SCOPE, ProjectLoader } from '../core/corpus.ts';
 import { materializeLogicalPayload } from '../core/generators.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntimeSync } from '../hosts/runtime.ts';
@@ -19,8 +19,9 @@ import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
-import { djangoBootstrap } from '../hosts/launchTemplates.ts';
-import { SnapshotSource } from './snapshotSource.ts';
+import { applicationLaunch } from './appLaunch.ts';
+import { describeSnapshot, resolveVerificationSource } from './verificationSource.ts';
+import type { VerificationSourceBinding } from './sourceSelection.ts';
 
 export const CONFIG_FILE = 'tracegrove.config.yaml';
 export const CONFIG_FILES = [CONFIG_FILE, 'tracegrove.config.ts'] as const;
@@ -40,6 +41,7 @@ export type CompileResult = {
   flows: CompiledFlowInfo[];
   sourceDigest: string;
   sourceFiles: string[];
+  sourceBinding: VerificationSourceBinding;
 };
 export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined };
 
@@ -187,30 +189,6 @@ function firstSegment(path: string): string {
 
 type FixtureUse = { alias: string; name: string; fixture: Fixture };
 
-function launchFor(config: AuthoringConfig, root: string, appRoot: string): { cwd: string; command: string; args: string[]; runtime: string } {
-  const app = config.app;
-  // A python path with a slash is relative to the config file; a bare name is looked up on PATH.
-  const configured = app.python && app.python.includes('/') ? resolve(root, app.python) : app.python;
-  const python = configured ?? (existsSync(join(appRoot, '.venv', 'bin', 'python')) ? join(appRoot, '.venv', 'bin', 'python') : 'python3');
-  switch (app.adapter) {
-    case 'node':
-      if (!app.entry) fail('missing_entry', 'app.entry is required for adapter node (e.g. src/server.js)', 'set app.entry');
-      return { cwd: appRoot, command: process.execPath, args: [app.entry], runtime: `node${process.versions.node.split('.')[0]}` };
-    case 'fastapi':
-      if (!app.entry) fail('missing_entry', 'app.entry is required for adapter fastapi (module:app, e.g. app.main:app)', 'set app.entry');
-      return { cwd: appRoot, command: python, args: ['-m', 'uvicorn', app.entry, '--host', '127.0.0.1', '--port', '{port}'], runtime: 'python' };
-    case 'django': {
-      const dir = resolve(appRoot, app.entry ?? '.');
-      if (!existsSync(join(dir, 'manage.py'))) fail('missing_manage_py', `no manage.py in ${relative(appRoot, dir) || '.'}`, 'set app.entry to the folder containing manage.py');
-      const bootstrap = djangoBootstrap('{port}');
-      return { cwd: dir, command: python, args: ['-c', bootstrap], runtime: 'python' };
-    }
-    case 'command':
-      if (!app.run) fail('missing_run', 'app.run is required for adapter command (e.g. "npm start")', 'set app.run');
-      return { cwd: appRoot, command: 'sh', args: ['-c', `exec ${app.run}`], runtime: 'command' };
-  }
-}
-
 function write(dir: string, rel: string, doc: Json): void {
   const abs = join(dir, rel);
   mkdirSync(dirname(abs), { recursive: true });
@@ -219,10 +197,10 @@ function write(dir: string, rel: string, doc: Json): void {
 
 export function compileProject(configPath: string, options: CompileOptions = {}): CompileResult {
   const root = dirname(resolve(configPath));
-  const snapshotSource = options.sourceSnapshot ? new SnapshotSource(resolve(root, options.sourceSnapshot), localScope()) : null;
+  const snapshotSource = resolveVerificationSource(root, options.sourceSnapshot);
   const config = loadAuthoringConfig(resolve(configPath));
   const testDir = resolve(root, config.testDir);
-  const appRoot = resolve(root, config.app.root);
+  const appRoot = resolve(snapshotSource?.root ?? root, config.app.root);
   const compiledDir = join(root, STATE_DIR, 'compiled');
   const personas = Object.keys(config.personas);
   const defaultPersona = personas[0]!;
@@ -255,7 +233,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
 
   // ---- attested source identity ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
-  const launch = launchFor(config, root, appRoot);
+  const launch = applicationLaunch(config, root, appRoot);
   const launchCwd = launch.cwd;
   const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir);
   if (config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
@@ -455,5 +433,6 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     executionHostRef: './host.yaml', intelligencePolicyRef: './policy.yaml',
     profiles: { [PROFILE]: { class: 'isolated_candidate', environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
   });
-  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles };
+  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles,
+    sourceBinding: snapshotSource ? describeSnapshot(snapshotSource.snapshot) : { kind: 'working_tree' } };
 }
