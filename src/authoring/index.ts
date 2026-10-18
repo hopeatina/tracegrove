@@ -14,3 +14,4 @@ export { VerificationSourceSelection, VerificationSourceBinding } from './source
 export { previewVerificationSource, saveVerificationSource, savedVerificationSource } from './verificationSource.ts';
 export { StepReport, CaseReport, TestRunReport, SavedRunName } from './runReport.ts';
 export { readSavedRun, readRunSource, CheckedRunReport } from './runSource.ts';
+export { compareSavedRuns, SavedRunPair } from './runComparison.ts';

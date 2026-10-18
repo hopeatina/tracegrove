@@ -37,3 +37,23 @@ Invalid evidence or incompatible scopes exit 2 and produce no comparison. The st
 `tracegrove.replay-comparison/v1` schema is exported with the protocol JSON Schemas.
 The report is scoped to the two provided bundles; it is not an all-attempt history,
 provider invoice, cost/performance benchmark, current review or activation decision.
+
+## Compare in the local workbench
+
+Run `tracegrove ui` and open **Compare**, or use **Open Compare** in the command
+palette (`Ctrl+K` / `Cmd+K`). Choose a named baseline and candidate, then select
+**Compare runs**. **Swap runs** reverses the pair. The URL retains both names so
+reloading captures fresh evidence for the same pair. Two retained runs are needed;
+the moving `latest` alias is not an input.
+
+The workbench uses the same snapshot comparison as the SDK and CLI. Each row shows
+both recorded outcomes, target digests and receipt references. Contract and context
+changes remain explicit, with complete coverage and exclusions on both sides.
+**Inspect baseline** and **Inspect candidate** open the recorded step detail;
+current source configuration is not needed to compare retained evidence.
+
+Changing either selection clears the previous report. Unavailable evidence and
+connection failures also clear it; retry with **Compare runs**. An older response
+cannot replace a newer selection. This view never starts an execution or changes
+the ledger. Its read-only `GET /api/compare?baseline=<name>&candidate=<name>` endpoint
+accepts exactly those two fields and returns the strict replay comparison report.

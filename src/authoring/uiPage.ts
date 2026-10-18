@@ -6,6 +6,7 @@
  * No build step and no framework; every string reaches the DOM through textContent.
  */
 import { SOURCE_CONTROLS_JS } from './uiSourceControls.ts';
+import { COMPARISON_CSS, COMPARISON_JS } from './uiComparison.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>tracegrove</title>
@@ -100,13 +101,14 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 .keys{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;margin-top:12px}
 @media (max-width:720px){header{padding:12px 16px}.page{padding:20px 16px 40px}.ctx{margin-left:0;width:100%}h1{font-size:23px;line-height:30px}
  .step{grid-template-columns:8px 1fr 48px;}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:minmax(0,1fr)}}
+${COMPARISON_CSS}
 </style></head><body>
 <header><span class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="color:var(--moss)"><path d="M12 21V11"/><path d="M12 14c-3 0-5-2-6-4"/><path d="M12 11c2.5 0 4.5-1.5 5.5-3.5"/><circle cx="6" cy="9" r="2.2"/><circle cx="17.8" cy="7.2" r="2.2"/><circle cx="12" cy="6" r="2.6"/><path d="M8 21h8"/></svg>tracegrove</span>
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','Heal','History','Settings'];
+const TABS=['Run','Discover','Heal','History','Compare','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
 const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
@@ -120,13 +122,14 @@ const LABEL={pass:'held',fail:'failed',warn:'blocked',none:'not run',pruned:'pru
 const kind=o=>OUT[o]||'none';
 const secs=ms=>ms==null?'':!Number.isFinite(ms)?'unavailable':ms<1000?ms+' ms':(ms/1000).toFixed(1)+' s';
 const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;if(!Number.isFinite(d))return 'time unavailable';return d<60?'just now':d<3600?Math.round(d/60)+' min ago':d<86400?Math.round(d/3600)+' h ago':new Date(iso).toLocaleDateString()};
-function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>{tab=t;render()}}},t)));
+function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>openTab(t)}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
 async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
 function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
 
 ${SOURCE_CONTROLS_JS}
+${COMPARISON_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
@@ -325,7 +328,7 @@ function commands(){const list=[];const add=(grp,label,run,hint)=>list.push({grp
  add('Heal','Heal now',()=>startHeal(false),'h');add('Heal','Preview a heal (changes nothing)',()=>startHeal(true));
  if(ui.heal&&ui.heal.changes.some(c=>c.status==='kept'))add('Heal','Undo heal '+ui.heal.id,()=>undoHeal(ui.heal.id));
  if(state&&state.agent.settings.provider!=='none')add('Agent','Draft flows for uncovered routes',()=>{tab='Discover';render();agentDraft()});
- for(const t of TABS)add('Go','Open '+t,()=>{tab=t;render()},String(TABS.indexOf(t)+1));
+ for(const t of TABS)add('Go','Open '+t,()=>openTab(t),String(TABS.indexOf(t)+1));
  for(const f of (state?state.flows:[]))add('Scenario',f.caseId,()=>{tab='Run';ui.sel=f.caseId;ui.step=null;render()},f.title);
  if(state&&state.git.isRepo)for(const b of state.git.branches)add('Branch','Discover on '+b,()=>{tab='Discover';ui.source=b;render();scan()});
  for(const f of (state?state.flows:[]))add('Prune','Prune '+f.caseId,()=>prune(f.file,false));
@@ -343,7 +346,7 @@ function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=a
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade',role:'dialog','aria-modal':'true','aria-label':'Command palette'},input,list,
   h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'))));
  document.body.append(palette);draw();input.focus()}
-function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to 5','switch tab'],['?','this list'],['esc','close']];
+function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to '+TABS.length,'switch tab'],['?','this list'],['esc','close']];
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade card',role:'dialog','aria-modal':'true','aria-label':'Keyboard shortcuts',style:'padding:20px'},h('h2',{},'Keyboard'),
   h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)]))));document.body.append(palette)}
 function moveSel(d){if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
@@ -354,9 +357,9 @@ document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/
  if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/'){e.preventDefault();openPalette()}else if(e.key==='?'){shortcuts()}else if(e.key==='j'){moveSel(1)}else if(e.key==='k'){moveSel(-1)}
  else if(e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(e.key==='h'&&!ui.running){startHeal(false)}
- else if(/^[1-5]$/.test(e.key)){tab=TABS[Number(e.key)-1];render()}});
+ else if(/^[1-9]$/.test(e.key)&&Number(e.key)<=TABS.length){openTab(TABS[Number(e.key)-1])}});
 document.getElementById('palbtn').addEventListener('click',openPalette);
 
-function render(){header();if(!state)return;const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function render(){header();if(!state)return;syncComparisonLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Compare:comparisonTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

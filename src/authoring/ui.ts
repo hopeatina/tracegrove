@@ -26,6 +26,7 @@ import { previewVerificationSource, savedVerificationSource, saveVerificationSou
 import { readSavedRun } from './runSource.ts';
 import { SavedRunName } from './runReport.ts';
 import { isRunDirectory } from './runLocation.ts';
+import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -256,6 +257,13 @@ export async function startUi(options: { dir: string; branch?: string | null; po
             ...(req.headers.range ? { 'content-range': `bytes ${range.start}-${range.end}/${bytes.length}` } : {}) });
           res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
         } catch { return send(409, { error: 'Recording is unavailable or its evidence failed verification.' }); }
+      }
+      if (req.method === 'GET' && url.pathname === '/api/compare') {
+        const pair = SavedRunPair.safeParse(Object.fromEntries(url.searchParams));
+        if (!pair.success || url.searchParams.getAll('baseline').length !== 1 || url.searchParams.getAll('candidate').length !== 1)
+          return send(400, { error: 'Select one named baseline and one named candidate.' });
+        try { return send(200, compareSavedRuns(dir, pair.data)); }
+        catch { return send(409, { error: 'Comparison unavailable. Re-check both retained evidence bundles; no recorded result is available for this comparison.' }); }
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));

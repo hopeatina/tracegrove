@@ -1,41 +1,21 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parse, stringify } from 'yaml';
-import { sampleCopy, cleanupTemps, runSample } from '../conformance/helpers.ts';
-import { runTests, type TestRunReport } from '../src/authoring/run.ts';
+import { cleanupTemps } from '../conformance/helpers.ts';
+import type { TestRunReport } from '../src/authoring/run.ts';
 import { compareReplays } from '../src/core/replayComparison.ts';
 import { VerifiedBundleSnapshot } from '../src/core/bundle.ts';
 import { ReplayComparison } from '../src/protocol/index.ts';
 import { runCli } from './fixtures/cli.ts';
 import { parseArgs } from '../src/cli/arguments.ts';
-import { loadProject, localScope } from '../src/core/corpus.ts';
-import { plan } from '../src/core/planner.ts';
+import { comparisonRunsFixture } from './fixtures/comparisonRuns.ts';
 
 let passed: TestRunReport, failed: TestRunReport, edited: TestRunReport, contextChanged: TestRunReport, expanded: TestRunReport;
 let foreign: VerifiedBundleSnapshot;
 const captured = (report: TestRunReport) => VerifiedBundleSnapshot.open(join(report.runDir, 'bundle'));
 beforeAll(async () => {
-  const { root } = sampleCopy(); const control = join(root, 'controlled-status');
-  const app = join(root, 'app/app.mjs'); const original = readFileSync(app, 'utf8');
-  const changed = original.replace('return send(res, 200, { notes });', "return send(res, existsSync(process.env.TEST_CONTROL) ? 299 : 200, { notes });");
-  expect(changed).not.toBe(original); writeFileSync(app, changed);
-  const configPath = join(root, 'tracegrove.config.yaml'); const config = parse(readFileSync(configPath, 'utf8'));
-  config.app.env.TEST_CONTROL = control; writeFileSync(configPath, stringify(config));
-  passed = (await runTests({ configPath, grep: 'notes.list' })).report; expect(passed.outcome).toBe('passed');
-  writeFileSync(control, 'controlled failure');
-  failed = (await runTests({ configPath, grep: 'notes.list' })).report; expect(failed.outcome).toBe('assertion_failed');
-  const flow = join(root, 'tracegrove/notes/list.flow.yaml'); const prior = readFileSync(flow, 'utf8');
-  const weaker = prior.replaceAll('status: 200', 'status: 299'); expect(weaker).not.toBe(prior); writeFileSync(flow, weaker);
-  edited = (await runTests({ configPath, grep: 'notes.list' })).report; expect(edited.outcome).toBe('passed');
-  writeFileSync(flow, prior); unlinkSync(control);
-  expanded = (await runTests({ configPath })).report; expect(expanded.outcome).toBe('passed');
-  config.app.env.NOTES_BUILD = 'different-context'; writeFileSync(configPath, stringify(config));
-  const contextual = await runTests({ configPath, grep: 'notes.list' }); contextChanged = contextual.report; expect(contextChanged.outcome).toBe('passed');
-  const scope = { ...localScope(), ownerId: 'other-comparison-owner' };
-  const foreignRun = await runSample(plan({ project: loadProject(contextual.compiled.workflowConfigPath), profileName: 'real', scope }), join(root, 'foreign-state'), { scope });
-  expect(foreignRun.outcome).toBe('passed'); foreign = VerifiedBundleSnapshot.open(foreignRun.executionDir);
-  expect([passed, failed, edited, expanded, contextChanged].every(report => report.bundleVerified)).toBe(true);
+  const f = await comparisonRunsFixture(true);
+  ({ passed, failed, edited, expanded, contextChanged } = f); foreign = f.foreign!;
 }, 60000);
 afterAll(cleanupTemps);
 
