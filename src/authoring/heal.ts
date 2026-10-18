@@ -8,9 +8,9 @@
  * `tracegrove heal --undo <id>` restores it.
  */
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { delimiter, dirname, join, relative, resolve } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml, parseDocument } from 'yaml';
 import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, STATE_DIR, compileProject, loadAuthoringConfig } from './compile.ts';
@@ -18,6 +18,7 @@ import { runTests, type CaseReport, type TestRunReport } from './run.ts';
 import { checkProject, discoverProject, type CheckIssue } from './workspace.ts';
 import { detectAgents, resolveAgentSettings, runAgent, tracegroveCommand, type AgentOverrides } from './agent.ts';
 import type { AuthoringConfig } from './schema.ts';
+import { requireRealDirectory, syncDirectory, writeExclusiveDurable } from '../core/atomicFiles.ts';
 
 export type FindingKind = 'setup' | 'authoring' | 'test_drift' | 'product_bug' | 'assertion' | 'evidence' | 'infrastructure';
 export type HealFinding = {
@@ -33,13 +34,15 @@ export type HealSnapshot = { outcome: string; exitCode: number; runDir: string |
 export type HealReport = {
   schemaVersion: 'tracegrove.heal/v1';
   id: string; root: string; startedAt: string; finishedAt: string;
-  outcome: 'healthy' | 'healed' | 'partly_healed' | 'product_bugs' | 'needs_human';
+  outcome: 'healthy' | 'healed' | 'partly_healed' | 'product_bugs' | 'needs_human' | 'cancelled';
   exitCode: number;
   before: HealSnapshot; after: HealSnapshot;
   findings: HealFinding[]; changes: HealChange[];
   agent: { provider: string; model: string | null; exitCode: number; verdicts: HealVerdict[]; summary: string } | null;
   next: Array<{ command: string; why: string }>;
   reportPath: string;
+  /** Complete retained file images; old reports without these cannot authorize automatic undo. */
+  fileBindings?: Array<{ file: string; beforeSha256: string; afterSha256: string }>;
 };
 export type HealOptions = {
   dir: string;
@@ -62,6 +65,19 @@ const HEALTH_WORDS = /^\/(?:api\/)?(?:health|healthz|healthcheck|ready|readyz|re
 function stamp(date: Date): string { return date.toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-'); }
 function sha(text: string): string { return createHash('sha256').update(text).digest('hex'); }
 function readText(path: string): string | null { try { return readFileSync(path, 'utf8'); } catch { return null; } }
+
+/** Cooperative heal/undo ownership only; not a fence against arbitrary external editors. */
+function acquireMutation(root: string): () => void {
+  const state = join(root, STATE_DIR); mkdirSync(state, { recursive: true }); requireRealDirectory(state);
+  const lock = join(state, 'heal-mutation.lock');
+  try { mkdirSync(lock, { mode: 0o700 }); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    throw new Blocked([{ code: 'heal_mutation_in_progress', detail: lock, action: 'wait for the owning heal/undo; if it exited, preserve the lock and inspect its edits before manual recovery' }]);
+  }
+  writeFileSync(join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+  return () => rmSync(lock, { recursive: true });
+}
 
 /** A small line diff (LCS) good enough for config and flow files. */
 export function lineDiff(before: string, after: string, name: string): string {
@@ -274,6 +290,25 @@ export function parseVerdicts(output: string): HealVerdict[] {
   } catch { return []; }
 }
 
+function editAdmission(output: string, knownCases: Set<string>): { verdicts: HealVerdict[]; problem: string | null } {
+  const last = output.trim().split('\n').at(-1) ?? '';
+  const reject = () => ({ verdicts: [], problem: 'a final, valid verdict with unique known case IDs is required' });
+  if (!last.startsWith(`${VERDICT_TAG} `)) return reject();
+  try {
+    const value = JSON.parse(last.slice(VERDICT_TAG.length + 1)) as { cases?: unknown };
+    if (!Array.isArray(value.cases) || value.cases.length === 0) return reject();
+    const seen = new Set<string>(); const verdicts: HealVerdict[] = [];
+    for (const entry of value.cases) {
+      if (!entry || typeof entry !== 'object') return reject();
+      const candidate = entry as Partial<HealVerdict>;
+      if (typeof candidate.caseId !== 'string' || !knownCases.has(candidate.caseId) || seen.has(candidate.caseId)
+        || !['test_drift', 'product_bug', 'unsure'].includes(String(candidate.verdict)) || typeof candidate.reason !== 'string') return reject();
+      seen.add(candidate.caseId); verdicts.push({ caseId: candidate.caseId, verdict: candidate.verdict!, reason: candidate.reason.slice(0, 400) });
+    }
+    return { verdicts, problem: null };
+  } catch { return reject(); }
+}
+
 export function buildHealPrompt(input: { root: string; failing: CaseReport[]; issues: CheckIssue[]; tracegrove?: string[] }): string {
   const tg = (input.tracegrove ?? tracegroveCommand()).join(' ');
   const cases = input.failing.map((c) => {
@@ -315,8 +350,21 @@ async function healWithAgent(ctx: Ctx, input: { failing: CaseReport[]; issues: C
   const before = snapshot(watched);
   const existed = new Set(walkFiles(ctx.root, () => true));
   ctx.progress('Asking the agent', `${settings.provider}${settings.model ? ` · ${settings.model}` : ''}: ${input.failing.length} failing case(s), ${input.issues.length} authoring issue(s)`);
-  const result = await runAgent({ root: ctx.root, testDir, settings, prompt: buildHealPrompt({ root: ctx.root, failing: input.failing, issues: input.issues }), ...(input.onOutput ? { onOutput: input.onOutput } : {}), ...(input.onActivity ? { onActivity: input.onActivity } : {}), ...(ctx.signal ? { signal: ctx.signal } : {}) });
-  const verdicts = parseVerdicts(result.output);
+  let result;
+  try {
+    result = await runAgent({ root: ctx.root, testDir, settings, prompt: buildHealPrompt({ root: ctx.root, failing: input.failing, issues: input.issues }), ...(input.onOutput ? { onOutput: input.onOutput } : {}), ...(input.onActivity ? { onActivity: input.onActivity } : {}), ...(ctx.signal ? { signal: ctx.signal } : {}) });
+  } catch (error) {
+    // Admission has not succeeded: restore watched edits even when the agent aborts or throws.
+    for (const [file, text] of before) if (readText(file) !== text) {
+      ctx.changes.push({ file: relative(ctx.root, file), reason: 'agent failed before edit admission', diff: lineDiff(text, readText(file) ?? '', relative(ctx.root, file)), status: 'rejected', by: 'agent', note: 'restored' });
+      writeFileSync(file, text);
+    }
+    for (const file of walkFiles(ctx.root, () => true)) if (!existed.has(file)) rmSync(file, { force: true });
+    return { provider: settings.provider, model: settings.model, exitCode: ctx.signal?.aborted ? 4 : 3, verdicts: [], summary: `agent did not complete; edits restored: ${(error as Error).message}` };
+  }
+  const admission = editAdmission(result.output, new Set(input.failing.map(c => c.caseId)));
+  const verdicts = admission.verdicts;
+  try {
   const verdictFor = new Map(verdicts.map((v) => [v.caseId, v]));
   for (const f of input.findings) {
     if (f.kind !== 'assertion' || !f.caseId) continue;
@@ -338,7 +386,12 @@ async function healWithAgent(ctx: Ctx, input: { failing: CaseReport[]; issues: C
     }
     const caseId = input.failing.find((c) => join(ctx.root, c.file) === file)?.caseId;
     const v = caseId ? verdictFor.get(caseId) : undefined;
-    const guard = v && v.verdict !== 'test_drift' ? `the agent judged this ${v.verdict.replace('_', ' ')} but still edited the test` : guardFlowEdit(text, now ?? '');
+    const matching = verdicts.filter(value => value.caseId === caseId);
+    const guard = result.exitCode !== 0 || ctx.signal?.aborted ? 'agent did not complete successfully; edits are not admitted'
+      : admission.problem ? admission.problem
+      : !caseId || matching.length !== 1 ? 'exactly one matching case verdict is required before an edit can be admitted'
+      : v?.verdict !== 'test_drift' ? `the agent did not judge this case to be test drift`
+      : guardFlowEdit(text, now ?? '');
     if (guard || input.dryRun) {
       writeFileSync(file, text);
       ctx.changes.push({ file: rel, reason: v?.reason || 'agent repair', diff: lineDiff(text, now ?? '', rel), status: guard ? 'rejected' : 'reverted', by: 'agent', note: guard ?? 'dry run: not applied' });
@@ -377,6 +430,15 @@ async function healWithAgent(ctx: Ctx, input: { failing: CaseReport[]; issues: C
     }
   }
   return { provider: result.provider, model: result.model, exitCode: result.exitCode, verdicts, summary: result.output.split('\n').filter((l) => !l.includes(VERDICT_TAG)).join('\n').trim().slice(-2000) };
+  } finally {
+    // A verification exception cannot leave an unretained candidate edit behind.
+    for (const [file, text] of before) {
+      const rel = relative(ctx.root, file);
+      if (ctx.changes.some(change => change.file === rel && change.status === 'kept') || readText(file) === text) continue;
+      const edited = readText(file) ?? ''; writeFileSync(file, text); ctx.backups.delete(file);
+      ctx.changes.push({ file: rel, reason: 'edit was not retained by verification', diff: lineDiff(text, edited, rel), status: 'reverted', by: 'agent', note: 'restored' });
+    }
+  }
 }
 
 function snap(report: TestRunReport | null, issues: CheckIssue[]): HealSnapshot {
@@ -386,11 +448,16 @@ function snap(report: TestRunReport | null, issues: CheckIssue[]): HealSnapshot 
 
 /** Diagnose, repair what is safe, verify, and write .tracegrove/heals/<id>/report.json. */
 export async function heal(options: HealOptions): Promise<HealReport> {
+  const release = acquireMutation(resolve(options.dir));
+  try { return await healOwned(options); } finally { release(); }
+}
+
+async function healOwned(options: HealOptions): Promise<HealReport> {
   const root = resolve(options.dir);
   const configPath = join(root, CONFIG_FILE);
   if (!existsSync(configPath)) throw new Blocked([{ code: 'config_not_found', detail: configPath, owner: 'operator', action: 'run tracegrove init first' }]);
   const startedAt = new Date();
-  const id = stamp(startedAt);
+  const id = `${stamp(startedAt)}_${randomUUID()}`;
   const healDir = join(root, STATE_DIR, HEALS_DIR, id);
   const progress = options.onProgress ?? (() => {});
   const ctx: Ctx = { root, configPath, healDir, changes: [], backups: new Map(), progress, signal: options.signal };
@@ -443,7 +510,7 @@ export async function heal(options: HealOptions): Promise<HealReport> {
 
   const bugs = findings.filter((f) => f.kind === 'product_bug');
   const openOnes = findings.filter((f) => f.status === 'open');
-  const outcome: HealReport['outcome'] = findings.length === 0 ? 'healthy'
+  const outcome: HealReport['outcome'] = options.signal?.aborted ? 'cancelled' : findings.length === 0 ? 'healthy'
     : bugs.length ? 'product_bugs'
     : openOnes.length === 0 ? 'healed'
     : kept.length ? 'partly_healed' : 'needs_human';
@@ -464,8 +531,10 @@ export async function heal(options: HealOptions): Promise<HealReport> {
   }
   const result: HealReport = {
     schemaVersion: 'tracegrove.heal/v1', id, root, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
-    outcome, exitCode: outcome === 'healthy' || outcome === 'healed' ? 0 : bugs.length ? 1 : 2,
+    outcome, exitCode: outcome === 'cancelled' ? 4 : outcome === 'healthy' || outcome === 'healed' ? 0 : bugs.length ? 1 : 2,
     before, after, findings, changes: ctx.changes, agent, next, reportPath: join(healDir, 'report.json'),
+    fileBindings: [...ctx.backups].filter(([abs]) => kept.some(change => change.file === relative(root, abs)))
+      .map(([abs, original]) => ({ file: relative(root, abs), beforeSha256: sha(original), afterSha256: sha(readFileSync(abs, 'utf8')) })),
   };
   writeFileSync(result.reportPath, `${JSON.stringify(result, null, 2)}\n`);
   progress('Done', outcome);
@@ -475,14 +544,20 @@ export async function heal(options: HealOptions): Promise<HealReport> {
 export function listHeals(root: string): HealReport[] {
   const dir = join(resolve(root), STATE_DIR, HEALS_DIR);
   if (!existsSync(dir)) return [];
-  return readdirSync(dir).sort().reverse().flatMap((name) => {
+  return readdirSync(dir).flatMap((name) => {
     try { return [JSON.parse(readFileSync(join(dir, name, 'report.json'), 'utf8')) as HealReport]; } catch { return []; }
-  });
+  }).sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
 }
 
 /** Restore every file a heal kept a change to. Refuses when the file changed again since. */
 export function undoHeal(dir: string, id: string): { id: string; restored: string[]; skipped: Array<{ file: string; why: string }> } {
+  const release = acquireMutation(resolve(dir));
+  try { return undoHealOwned(dir, id); } finally { release(); }
+}
+
+function undoHealOwned(dir: string, id: string): { id: string; restored: string[]; skipped: Array<{ file: string; why: string }> } {
   const root = resolve(dir);
+  if (id !== 'latest' && !/^[A-Za-z0-9_.:-]+$/.test(id)) throw new Blocked([{ code: 'heal_not_found', detail: id }]);
   const healDir = join(root, STATE_DIR, HEALS_DIR, id === 'latest' ? (listHeals(root)[0]?.id ?? '') : id);
   const path = join(healDir, 'report.json');
   if (!existsSync(path)) throw new Blocked([{ code: 'heal_not_found', detail: id, owner: 'operator', action: 'run tracegrove heal --json to list heal ids, or pass --undo latest' }]);
@@ -490,13 +565,26 @@ export function undoHeal(dir: string, id: string): { id: string; restored: strin
   const restored: string[] = []; const skipped: Array<{ file: string; why: string }> = [];
   const files = [...new Set(report.changes.filter((c) => c.status === 'kept').map((c) => c.file))];
   for (const file of files) {
+    const target = resolve(root, file);
+    if (!target.startsWith(root + sep)) { skipped.push({ file, why: 'file is outside the project' }); continue; }
+    const bindings = report.fileBindings?.filter(binding => binding.file === file) ?? [];
+    if (bindings.length !== 1) { skipped.push({ file, why: 'report has no unique complete file binding; undo by hand' }); continue; }
+    const binding = bindings[0]!;
     const saved = readText(join(healDir, 'backup', file));
     if (saved === null) { skipped.push({ file, why: 'no backup was recorded' }); continue; }
-    const lastDiff = report.changes.filter((c) => c.file === file && c.status === 'kept').at(-1)!.diff;
-    const current = readText(join(root, file)) ?? '';
-    const expectedLines = lastDiff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1));
-    if (expectedLines.some((l) => l.trim() && !current.includes(l))) { skipped.push({ file, why: 'it changed again after the heal; undo by hand' }); continue; }
-    writeFileSync(join(root, file), saved);
+    const current = readText(target);
+    if (sha(saved) !== binding.beforeSha256 || current === null || sha(current) !== binding.afterSha256) {
+      skipped.push({ file, why: 'complete file or backup differs from the recorded heal; undo by hand' }); continue;
+    }
+    requireRealDirectory(dirname(target));
+    if (!lstatSync(target).isFile() || lstatSync(target).isSymbolicLink()) { skipped.push({ file, why: 'target is not a regular file' }); continue; }
+    const temporary = join(dirname(target), `.tracegrove-undo-${randomUUID()}`);
+    try {
+      writeExclusiveDurable(temporary, Buffer.from(saved));
+      // Cooperating heals/undos hold the project lock; arbitrary editors must leave this tree quiescent.
+      if (sha(readFileSync(target, 'utf8')) !== binding.afterSha256) { skipped.push({ file, why: 'file changed during undo; undo by hand' }); continue; }
+      renameSync(temporary, target); syncDirectory(dirname(target));
+    } finally { rmSync(temporary, { force: true }); }
     restored.push(file);
   }
   writeFileSync(join(healDir, 'undone.json'), `${JSON.stringify({ at: new Date().toISOString(), restored, skipped, digest: sha(restored.join('\n')) }, null, 2)}\n`);

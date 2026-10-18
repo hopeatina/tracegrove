@@ -207,13 +207,24 @@ export async function runAgent(input: { root: string; testDir: string; settings:
       for (const line of lines) for (const said of describeAgentLine(line)) input.onActivity(said);
     };
     child.stdout.on('data', take); child.stderr.on('data', take);
-    const code = await new Promise<number>((done) => { child.on('close', (c) => done(c ?? 1)); child.on('error', () => done(127)); });
+    let stopTimer: ReturnType<typeof setTimeout> | undefined;
+    const boundStop = () => { stopTimer = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }, 2000); stopTimer.unref(); };
+    input.signal?.addEventListener('abort', boundStop, { once: true });
+    if (input.signal?.aborted) boundStop();
+    // Abort emits error before close: edit rollback must wait until the child can no longer write.
+    let launchFailed = false;
+    const code = await new Promise<number>((done) => {
+      child.on('error', () => { launchFailed = true; });
+      child.on('close', (c) => done(input.signal?.aborted ? 4 : launchFailed ? 127 : c ?? 1));
+    });
+    if (stopTimer) clearTimeout(stopTimer);
+    input.signal?.removeEventListener('abort', boundStop);
     return { code, text };
   };
   let { code: exitCode, text: output } = await launch(command.args);
   let modelFallback: string | null = null;
   // Self-heal a stale or mistyped model id once, with the provider's cheapest alias, and say so.
-  if (exitCode !== 0 && input.settings.provider === 'claude' && /unrecognized_model|issue with the selected model/.test(output)) {
+  if (!input.signal?.aborted && exitCode !== 0 && input.settings.provider === 'claude' && /unrecognized_model|issue with the selected model/.test(output)) {
     modelFallback = 'haiku';
     input.onOutput?.(`\n[tracegrove] model ${input.settings.model} was rejected; retrying with ${modelFallback}\n`);
     const args = [...command.args]; args[args.indexOf('--model') + 1] = modelFallback;

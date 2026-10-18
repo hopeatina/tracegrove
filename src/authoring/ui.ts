@@ -20,6 +20,7 @@ import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, 
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
+import { readSavedRun, readSavedRunSummary } from './savedRun.ts';
 import { heal, listHeals, undoHeal } from './heal.ts';
 import { projectStatus } from './status.ts';
 import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
@@ -45,6 +46,18 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const dir = resolve(options.dir);
   const token = randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
+  let active: { id: string; kind: 'run' | 'heal' | 'draft'; controller: AbortController; cancelling: boolean } | null = null;
+  let closing = false;
+  let closePromise: Promise<void> | null = null;
+  const pendingBodies = new Map<IncomingMessage, ServerResponse>();
+  const readBody = async (req: IncomingMessage, res: ServerResponse) => {
+    pendingBodies.set(req, res);
+    try { return await readJson(req); } finally { pendingBodies.delete(req); }
+  };
+  const begin = (kind: 'run' | 'heal' | 'draft') => {
+    const operation = { id: randomBytes(12).toString('hex'), kind, controller: new AbortController(), cancelling: false };
+    active = operation; return operation;
+  };
   let drafting = false;
   const live: Live = { agent: { status: 'idle', task: null, lines: [], startedAt: null }, heal: { status: 'idle', phase: '', detail: null } };
   const agentStart = (task: 'draft' | 'heal') => { live.agent = { status: 'running', task, lines: [], startedAt: new Date().toISOString() }; };
@@ -62,8 +75,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     const runsDir = join(dir, STATE_DIR, 'runs');
     if (!existsSync(runsDir)) return [];
     return readdirSync(runsDir).filter((name) => name !== 'latest' && existsSync(join(runsDir, name, 'summary.json'))).sort().reverse().slice(0, 50)
-      .map((name) => { const r = JSON.parse(readFileSync(join(runsDir, name, 'summary.json'), 'utf8')) as TestRunReport;
-        return { name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }; });
+      .flatMap((name) => { try { const r = readSavedRunSummary(dir, name);
+        return [{ name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }]; } catch { return []; } });
   };
   const testDir = () => {
     try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
@@ -105,12 +118,16 @@ export async function startUi(options: { dir: string; branch?: string | null; po
 
   const handle = async (req: IncomingMessage, res: ServerResponse, port: number) => {
     const send = (status: number, body: unknown, type = 'application/json') => {
-      res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      if (res.writableEnded || res.destroyed) return;
+      const unreadRejection = status >= 400 && !req.complete;
+      if (unreadRejection) res.once('finish', () => req.socket.destroySoon());
+      res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...(unreadRejection ? { connection: 'close' } : {}) });
       res.end(type === 'application/json' ? JSON.stringify(body) : String(body));
     };
     if (req.headers.host !== `127.0.0.1:${port}` && req.headers.host !== `localhost:${port}`) return send(421, { error: 'unexpected host' });
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
     if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token) return send(403, { error: 'missing session token' });
+    if (closing && req.method === 'POST') return send(409, { error: 'UI is closing; new work is not admitted.' });
     try {
       if (req.method === 'GET' && url.pathname === '/') {
         const scriptJson = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c');
@@ -120,21 +137,27 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const { result, error } = compiled();
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
-        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, activeRunId: active?.id ?? null, cancelling: active?.cancelling ?? false, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
       }
       if (req.method === 'POST' && url.pathname === '/api/source/preview') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         if (typeof body.path !== 'string' || !body.path.trim() || body.path.length > 8192) return send(400, { error: 'Enter a snapshot manifest path.' });
         return send(200, previewVerificationSource(dir, body.path.trim(), loadAuthoringConfig(configPath())));
       }
       if (req.method === 'POST' && url.pathname === '/api/source') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         saveVerificationSource(dir, body.source, loadAuthoringConfig(configPath()));
         const { result, error } = compiled();
         return send(200, sourceInfo(result, error));
       }
       if (req.method === 'POST' && url.pathname === '/api/prune') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         const graft = body.graft === true;
         const live = flowPath(body.file, '');
         const cut = flowPath(body.file, '.pruned');
@@ -147,15 +170,19 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       if (req.method === 'GET' && url.pathname === '/api/settings') return send(200, agentInfo());
       if (req.method === 'GET' && url.pathname === '/api/activity') return send(200, RunActivity.parse(activity));
+      if (req.method === 'GET' && url.pathname === '/api/run-control') return send(200, { runId: active?.id ?? null, operation: active?.kind ?? null, cancelling: active?.cancelling ?? false, closing });
       if (req.method === 'GET' && url.pathname === '/api/live') return send(200, { run: RunActivity.parse(activity), agent: live.agent, heal: live.heal });
       if (req.method === 'GET' && url.pathname === '/api/status') return send(200, projectStatus(dir));
       if (req.method === 'GET' && url.pathname === '/api/heals') return send(200, listHeals(dir).slice(0, 20));
       if (req.method === 'POST' && url.pathname === '/api/heal') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         if (running || drafting) return send(409, { error: 'a run or agent draft is already in progress' });
         live.heal = { status: 'running', phase: 'Starting', detail: null };
         activity = { status: 'running', event: null, stepId: null, label: 'Healing', observedAt: new Date().toISOString() };
-        const job = heal({ dir, agent: body.agent !== false, dryRun: body.dryRun === true,
+        const operation = begin('heal');
+        const job = heal({ dir, signal: operation.controller.signal, agent: body.agent !== false, dryRun: body.dryRun === true,
           onProgress: (phase, detail) => {
             live.heal = { status: 'running', phase, detail: detail ?? null };
             if (phase === 'Asking the agent') agentStart('heal');
@@ -174,32 +201,41 @@ export async function startUi(options: { dir: string; branch?: string | null; po
           if (live.agent.status === 'running') live.agent.status = 'failed';
           activity = { status: 'failed', event: null, stepId: null, label: 'Heal could not be completed', observedAt: new Date().toISOString() };
           throw error;
-        } finally { running = null; }
+        } finally { if (active === operation) { running = null; active = null; } }
       }
       if (req.method === 'POST' && url.pathname === '/api/heal/undo') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         if (typeof body.id !== 'string' || !/^[A-Za-z0-9_.:-]+$/.test(body.id)) return send(400, { error: 'id required' });
         return send(200, undoHeal(dir, body.id));
       }
       if (req.method === 'POST' && url.pathname === '/api/settings') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         const agent = (body.agent ?? {}) as Record<string, unknown>;
         const clean = Object.fromEntries(Object.entries(agent).filter(([, v]) => v !== '' && v !== null));
         writeLocalSettings(dir, { ...readLocalSettings(dir), agent: clean });
         return send(200, agentInfo());
       }
       if (req.method === 'POST' && url.pathname === '/api/agent-draft') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         // Body reads yield: admit against the current state only after parsing.
         if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         drafting = true;
+        const operation = begin('draft');
         agentStart('draft');
         try {
-          const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, onActivity: agentSay });
+          const job = draftWithAgent({ dir, signal: operation.controller.signal, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, onActivity: agentSay });
+          running = job;
+          const result = await job;
           live.agent.status = result.agent.exitCode === 0 ? 'finished' : 'failed';
           return send(200, result);
         } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
-        finally { drafting = false; }
+        finally { drafting = false; if (active === operation) { running = null; active = null; } }
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
         return send(200, discoverProject(dir, url.searchParams.get('branch') || null));
@@ -207,6 +243,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
       if ((req.method === 'GET' || req.method === 'HEAD') && video) {
         try {
+          if (readSavedRun(dir, decodeURIComponent(video[1]!)).savedEvidence.status !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
           const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
           const range = videoRange(req.headers.range, bytes.length);
           const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
@@ -220,14 +257,19 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!/^[A-Za-z0-9_.:-]+$/.test(name)) return send(400, { error: 'bad run name' });
-        const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
-        return existsSync(file) ? send(200, readRunSource(dirname(file), JSON.parse(readFileSync(file, 'utf8')) as TestRunReport)) : send(404, { error: 'run not found' });
+        try {
+          const saved = readSavedRun(dir, name);
+          return send(200, saved.savedEvidence.status === 'verified' ? readRunSource(saved.runDir, saved) : { ...saved, sourceBinding: null, sourceChecked: false });
+        } catch { return send(409, { error: 'Saved run is unavailable or invalid.' }); }
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         if (running) return send(409, { error: 'a run is already in progress' });
         activity = { status: 'running', event: null, stepId: null, label: 'Planning verification', observedAt: new Date().toISOString() };
-        const job = runTests({ configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
+        const operation = begin('run');
+        const job = runTests({ signal: operation.controller.signal, configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
           onEvent: event => { activity = runActivity(event); } });
         running = job;
         try {
@@ -237,13 +279,32 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         } catch (error) {
           activity = { status: 'failed', event: null, stepId: null, label: 'Run could not be completed', observedAt: new Date().toISOString() };
           throw error;
-        } finally { running = null; }
+        } finally { if (active === operation) { running = null; active = null; } }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/cancel') {
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        const operation = active; const job = running;
+        if (!operation || !job || body.runId !== operation.id) return send(409, { error: 'No matching active operation.' });
+        if (!operation.cancelling) { operation.cancelling = true; operation.controller.abort(new Error('user_cancelled')); }
+        try {
+          const value = await job as { report?: { outcome: string; exitCode: number; executionId: string | null; runDir: string; bundleVerified: boolean | null }; outcome?: string; exitCode?: number; agent?: { exitCode: number } };
+          const facts = operation.kind === 'run' ? value.report : operation.kind === 'draft'
+            ? { outcome: value.agent?.exitCode === 4 ? 'cancelled' : value.agent?.exitCode === 0 ? 'completed' : 'infrastructure_failed', exitCode: value.agent?.exitCode ?? 3,
+              edits: 'Drafted edits remain for review.' }
+            : { outcome: value.outcome, exitCode: value.exitCode };
+          return send(200, { runId: operation.id, operation: operation.kind, state: 'settled', ...facts,
+            cleanup: 'Inspect the saved receipts and heal changes; cancellation alone does not confirm cleanup.' });
+        } catch { return send(500, { error: 'Operation did not settle successfully; preserve its existing state and inspect its records.' }); }
       }
       if (req.method === 'POST' && url.pathname === '/api/init') {
+        if (closing || active) return send(409, { error: 'UI is closing or an operation is active' });
         return send(200, initProject(dir));
       }
       if (req.method === 'POST' && url.pathname === '/api/draft') {
-        const body = await readJson(req);
+        const body = await readBody(req, res);
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
         if (typeof body.method !== 'string' || typeof body.path !== 'string' || !body.path.startsWith('/')) return send(400, { error: 'method and path required' });
         const draft = draftFlow({ method: body.method, path: body.path });
         if (body.save === true) {
@@ -267,5 +328,22 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const port = (server.address() as { port: number }).port;
   server.on('request', (req, res) => { void handle(req, res, port); });
   const query = options.branch ? `?branch=${encodeURIComponent(options.branch)}` : '';
-  return { url: `http://127.0.0.1:${port}/${query}`, port, close: () => new Promise((done) => server.close(() => done())) };
+  return { url: `http://127.0.0.1:${port}/${query}`, port, close: () => {
+    if (closePromise) return closePromise;
+    closing = true;
+    if (active && !active.cancelling) { active.cancelling = true; active.controller.abort(new Error('ui_closed')); }
+    const pending = running;
+    closePromise = (async () => {
+      try { await pending; } catch { /* Preserve response failure; close grants no cleanup verdict. */ }
+      for (const [request, response] of pendingBodies) {
+        if (!response.writableEnded && !response.destroyed) {
+          response.once('finish', () => request.socket.destroySoon());
+          response.writeHead(409, { 'content-type': 'application/json', connection: 'close' });
+          response.end(JSON.stringify({ error: 'UI is closing; new work is not admitted.' }));
+        }
+      }
+      await new Promise<void>(done => server.close(() => done()));
+    })();
+    return closePromise;
+  } };
 }
