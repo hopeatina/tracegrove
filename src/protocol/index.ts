@@ -12,6 +12,7 @@ import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObser
 import { NativeJobAction, NativeJobObservation, NativeJobRequest, NativeJobResponse, NativeJobReady } from './schemas/nativeJob.ts';
 import { ResultIngestReceipt } from './schemas/resultSink.ts';
 import { WorkflowEvidenceProjection } from './schemas/evidenceProjection.ts';
+import { McpToolCall, McpToolObservation } from './schemas/mcp.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
   ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
@@ -28,6 +29,7 @@ export * from './schemas/review.ts';
 export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
 export * from './schemas/browser.ts';
+export * from './schemas/mcp.ts';
 export * from './schemas/nativeJob.ts';
 export * from './schemas/resultSink.ts';
 export * from './schemas/evidenceProjection.ts';
@@ -94,6 +96,8 @@ export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 export const NON_DOCUMENT_SCHEMAS = {
   'workflow.native-job-action/v1': NativeJobAction,
   'workflow.native-job-observation/v1': NativeJobObservation,
+  'workflow.mcp-tool-call/v1': McpToolCall,
+  'workflow.mcp-tool-observation/v1': McpToolObservation,
   'workflow.native-job-request/v1': NativeJobRequest,
   'workflow.native-job-response/v1': NativeJobResponse,
   'workflow.native-job-ready/v1': NativeJobReady,

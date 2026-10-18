@@ -238,6 +238,7 @@
                   "http.observation",
                   "browser.observation",
                   "job.observation",
+                  "mcp.observation",
                   "step.result"
                 ],
                 "type": "string"
@@ -578,6 +579,16 @@
           "maxItems": 32,
           "type": "array"
         },
+        "allowedMcpTools": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
         "allowedMethods": {
           "items": {
             "enum": [
@@ -655,6 +666,11 @@
           "type": "integer"
         },
         "maxJobs": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maxMcpCalls": {
           "maximum": 2147483647,
           "minimum": 0,
           "type": "integer"
@@ -1056,6 +1072,7 @@
                   "http.observation",
                   "browser.observation",
                   "job.observation",
+                  "mcp.observation",
                   "step.result"
                 ],
                 "type": "string"
@@ -3636,6 +3653,296 @@
           {
             "additionalProperties": false,
             "properties": {
+              "auth": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "persona",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "credential",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "captures": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "const": "json",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "type": "string"
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "maxLength": 400,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "from",
+                    "path"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              "command": {
+                "additionalProperties": false,
+                "properties": {
+                  "arguments": {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "propertyNames": {
+                      "maxLength": 128,
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "endpoint": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "pattern": "^\\/(?!\\/)[A-Za-z0-9_./-]*$",
+                    "type": "string"
+                  },
+                  "tool": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "endpoint",
+                  "tool",
+                  "arguments"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "inputs": {
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "literal",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/$defs/__schema1"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entityKey": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "fixture",
+                          "type": "string"
+                        },
+                        "outputName": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "entityKey",
+                        "outputName"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "capture",
+                          "type": "string"
+                        },
+                        "name": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        "stepId": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "stepId",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "credential",
+                          "type": "string"
+                        },
+                        "name": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "runtime",
+                          "type": "string"
+                        },
+                        "name": {
+                          "enum": [
+                            "execution_nonce",
+                            "lease_namespace",
+                            "target_origin"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "kind": {
+                "const": "mcp.call",
+                "type": "string"
+              },
+              "retry": {
+                "additionalProperties": false,
+                "properties": {
+                  "attempts": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "attempts"
+                ],
+                "type": "object"
+              },
+              "timeoutMs": {
+                "maximum": 2592000000,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "timeoutMs",
+              "inputs",
+              "retry",
+              "kind",
+              "command",
+              "auth",
+              "captures"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
               "id": {
                 "maxLength": 200,
                 "minLength": 1,
@@ -3771,7 +4078,6 @@
               "kind": {
                 "enum": [
                   "integration.action",
-                  "mcp.call",
                   "widget.action",
                   "native.action",
                   "computer.action"

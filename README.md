@@ -358,6 +358,12 @@ The [native job bridge](docs/native-jobs.md) uses the same application, worker,
 and storage with typed Node IPC requests and job observations. Hosted providers,
 independent worker attestation and distributed crash recovery remain open.
 
+For local MCP tools, install the pinned optional SDK and generate
+`sample-config --sample notes-mcp --output ./mcp-notes`. The
+[MCP protocol driver](docs/mcp-driver.md) uses the same planner, persona, evidence
+and CLI path, with explicit tool/call limits and independent HTTP readback.
+Protocol results do not qualify a widget host or mobile surface.
+
 ## Checks
 
 For clean, credential-free Docker runs, see [container qualification](containers/README.md). Native real HTTP and offline contract lanes produce separate saved bundles.

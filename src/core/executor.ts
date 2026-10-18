@@ -9,10 +9,10 @@ import { join } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
-  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, Persona, RoutingDecision, SeedRecipe,
+  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type Accounting, type CampaignResult, type Ref, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource, type BrowserObservation, type NativeJobObservation, type RunnerCapabilities,
+  type TargetTuple, type VariableSource, type BrowserObservation, type NativeJobObservation, type McpToolObservation, type RunnerCapabilities,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
 import { NativeJobError } from '../adapters/job/driver.ts';
@@ -351,6 +351,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   // ---- running: compiled steps in frozen order; every step gets one terminal observation ----
   const captured: Record<string, Record<string, unknown>> = {};
+  let integrationOperations = 0;
+  let uncertainOperations = 0;
   let halted = blockedReasons.length > 0 || infrastructureFailure || !session || !driver || (fixtureState !== 'verified' && fixtureState !== 'not_required');
   for (const stepId of compiled.orderedStepIds) {
     const step = compiled.stepsById.get(stepId)!;
@@ -382,7 +384,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation | BrowserObservation | NativeJobObservation;
+      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation;
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
@@ -395,6 +397,20 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'observe') {
         observation = await driver!.observe({ origin, method: step.readback.method, path: step.readback.path, auth: step.readback.auth, variables, deadline, signal }, step.predicate, step.pollIntervalMs);
         captured[stepId] = captureValues(observation, step.captures);
+      } else if (step.kind === 'mcp.call') {
+        if (!spec.effects.allowedHosts.includes(`launch://${hostPlan.launch?.componentId}`)) throw new HttpStepError('mcp_origin_not_admitted', 'MCP application origin is outside the frozen effect envelope');
+        const command = McpToolCall.parse({ ...step.command, arguments: applyTemplateDeep(step.command.arguments, variables) });
+        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session?.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session?.credentials ?? []) });
+        let module: typeof import('../adapters/mcp/driver.ts');
+        try { module = await import('../adapters/mcp/driver.ts'); }
+        catch { throw new HttpStepError('mcp_driver_unavailable', 'Install the pinned optional MCP SDK before planning this flow'); }
+        integrationOperations++;
+        uncertainOperations++;
+        observation = await new module.McpDriver(origin).call(command, credential, deadline, signal);
+        if (!observation.isError) {
+          uncertainOperations--;
+          captured[stepId] = captureValues({ body: observation }, step.captures);
+        }
       } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
         if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
         const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));
@@ -410,8 +426,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         throw new HttpStepError('unsupported_operation', `${step.kind} is not implemented by the HTTP runner`);
       }
       const output = 'requestId' in observation ? redactObservation(observation) : observation;
-      const finished = log.emit('step.finished', stepId, { result: 'completed', observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
-      stepObservations.push({ stepId, result: 'completed', reasonCode: null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
+      const toolError = 'kind' in observation && observation.kind === 'mcp_tool' && observation.isError;
+      const result = toolError ? 'failed' as const : 'completed' as const;
+      const finished = log.emit('step.finished', stepId, { result, observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });
+      stepObservations.push({ stepId, result, reasonCode: toolError ? 'mcp_tool_error' : null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
+      if (toolError) halted = true;
     } catch (error) {
       const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError || error instanceof NativeJobError ? error.code : 'transport_failure';
       const code = rawCode === 'browser_cancelled' ? 'cancelled' : rawCode;
@@ -461,7 +480,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
   const { cleanup, criticalCleanupConfirmed } = await collectCleanup({ allocated,
-    uncertainAllocations: uncertainAllocations.size, registry: item.fixture?.registry ?? null,
+    uncertainAllocations: uncertainAllocations.size, uncertainOperations, registry: item.fixture?.registry ?? null,
     driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
   const hostSeconds = (monotonicMs() - hostStartedMs) / 1000;
 
@@ -491,7 +510,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     reservations: [{ reservationId: ctx.reservation.ref.id, kind: 'action', cents: ctx.reservation.actionCents }],
     runnerSeconds: Number(hostSeconds.toFixed(3)), browserSeconds: Number(browser.seconds.toFixed(3)), inferenceCalls: 0, inferenceTokens: 0, requestedModel: null, observedModel: null,
     providerRequestIds: stepObservations.flatMap((s) => (s.output && typeof s.output === 'object' && (s.output as { requestId?: string | null }).requestId ? [String((s.output as { requestId?: string | null }).requestId)] : [])),
-    integrationOperations: 0, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
+    integrationOperations, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
     routingDecisionRefs: [routing.ref], costObservationRefs: costs.map((c) => c.ref),
   };
   const receipt = parseAs(ExecutionReceipt, freeze({

@@ -6,7 +6,8 @@
       "enum": [
         "http",
         "browser",
-        "native_job"
+        "native_job",
+        "mcp"
       ],
       "type": "string"
     },

@@ -14,6 +14,7 @@ export type AllocatedFixture = {
 /** Collect observed cleanup only. This report is not an authority to release a hosted lease. */
 export async function collectCleanup(input: {
   allocated: readonly AllocatedFixture[]; uncertainAllocations: number;
+  uncertainOperations?: number;
   registry: ActionRegistry | null; driver: Pick<HttpDriver, 'request'> | null; origin: string;
   deadline: Deadline; session: HostSession | null; reason: string; log: Pick<EventLog, 'emit'>;
 }): Promise<{ cleanup: CleanupObservation; criticalCleanupConfirmed: boolean }> {
@@ -58,7 +59,7 @@ export async function collectCleanup(input: {
   // Every allocation remains unresolved until observed cleanup, including those
   // lacking handles. A lost allocation response cannot invent a physical ID.
   const unconfirmed = allocated.filter(item => !confirmed.includes(item.entityKey)).length;
-  const unknown = unconfirmed + input.uncertainAllocations;
+  const unknown = unconfirmed + input.uncertainAllocations + (input.uncertainOperations ?? 0);
   const hostResources = session?.ownedResources ?? [];
   const cleanup = CleanupSchema.parse({
     ownedResources: [...allocated.map(item => ({ entityKey: item.entityKey, physicalId: item.physicalId, boundaryId: 'application' })), ...hostResources],
@@ -69,6 +70,7 @@ export async function collectCleanup(input: {
     janitorReceiptRef: null,
     reasonCodes: [...(unconfirmed ? ['fixture_cleanup_unconfirmed'] : []),
       ...(input.uncertainAllocations ? ['fixture_allocation_uncertain'] : []),
+      ...(input.uncertainOperations ? ['operation_outcome_uncertain'] : []),
       ...(session && !hostStopConfirmed ? ['host_stop_unconfirmed'] : [])],
   });
   return { cleanup, criticalCleanupConfirmed: unknown === 0 && (!session || hostStopConfirmed) };

@@ -4,7 +4,7 @@
  * evidence by itself and nothing bypasses the planner, executor or reducer.
  */
 import { z } from 'zod';
-import { ActionEnvelope, BrowserCommand, NativeJobAction, Persona, HexSha256 } from '../protocol/index.ts';
+import { ActionEnvelope, BrowserCommand, NativeJobAction, McpToolCall, Persona, HexSha256 } from '../protocol/index.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -97,7 +97,10 @@ export type BrowserFlowStep = z.infer<typeof BrowserFlowStep>;
 export const JobFlowStep = z.object({ name: z.string().min(1).max(120).optional(), job: NativeJobAction,
   as: z.string().optional(), expect: Expect.optional(), save: z.record(Name, DotPath).optional(),
   timeoutMs: z.number().int().positive().max(120_000).optional() }).strict();
-export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep]);
+export const McpFlowStep = z.object({ name: z.string().min(1).max(120).optional(), mcp: McpToolCall,
+  as: z.string().optional(), expect: Expect.optional(), save: z.record(Name, DotPath).optional(),
+  timeoutMs: z.number().int().positive().max(120_000).optional() }).strict();
+export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep]);
 export type FlowStep = z.infer<typeof FlowStep>;
 
 export const Flow = z.object({
@@ -107,7 +110,7 @@ export const Flow = z.object({
   tags: z.array(Name).default([]),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),
-  effects: ActionEnvelope.pick({ maxJobs: true }).optional().describe('Declared job effect ceiling; observations must independently establish job behavior.'),
+  effects: ActionEnvelope.pick({ maxJobs: true, maxMcpCalls: true, allowedMcpTools: true }).partial().optional().describe('Explicit job and MCP effect ceilings; tool annotations do not grant authority.'),
   browser: z.object({
     allowPaths: z.array(Path).min(1).max(64).describe('Path prefixes in this flow’s effect envelope, including browser assets and API calls.'),
     allowMethods: z.array(z.enum(HTTP_VERBS)).min(1).max(6).default(['GET', 'HEAD']),

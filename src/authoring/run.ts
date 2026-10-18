@@ -11,7 +11,7 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
 import { verifyBundle } from '../core/bundle.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, NativeJobObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
@@ -51,6 +51,8 @@ function excerpt(value: unknown, max = 240): string {
 
 function observedLine(output: unknown): string | null {
   if (!output || typeof output !== 'object') return null;
+  const mcp = McpToolObservation.safeParse(output);
+  if (mcp.success) return `MCP ${mcp.data.endpoint} ${mcp.data.tool} -> ${mcp.data.isError ? 'tool error' : 'result'} ${excerpt(mcp.data.structuredContent ?? mcp.data.content)}`;
   const o = output as { method?: string; url?: string; status?: number; body?: unknown; bodyText?: string | null };
   const path = o.url ? o.url.replace(/^https?:\/\/[^/]+/, '') : '';
   return `${o.method ?? ''} ${path} -> ${o.status ?? '?'} ${excerpt(o.body ?? o.bodyText ?? '')}`.trim();
@@ -63,8 +65,9 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     const output = s.output as { status?: number } | null;
     const browser = BrowserObservation.safeParse(s.output);
     const job = NativeJobObservation.safeParse(s.output);
+    const mcp = McpToolObservation.safeParse(s.output);
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
-      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
+      ...(mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');

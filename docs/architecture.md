@@ -31,7 +31,7 @@ The [Chromium browser runner](browser-driver.md) supports short flows and the lo
 | Install | Private package; install a packed archive | `npm i -D tracegrove`, `pipx`/`uvx` shim for Python repos |
 | Set up | `tracegrove init` detects FastAPI, Django or Node and writes config + example flow | Same, plus discovery proposes the first flows |
 | Discover what to test | `tracegrove ui` scans routes (FastAPI, Django, Express/Fastify/Hono) and shows which have no flow, at a folder or a git branch | Source-selection resolver: diff-aware selection, coverage policy, AI-drafted flows reviewed through the plan review API |
-| Write tests | YAML/TypeScript flows with HTTP, browser, native job steps, personas, saved values, fixtures | Integration steps and MCP calls |
+| Write tests | YAML/TypeScript flows with HTTP, browser, native job and local MCP steps, personas, saved values, fixtures | Hosted integration steps and widget-host qualification |
 | Run | `tracegrove test` (local process host, real lane) | Lanes: mock contract, recorded replay, hybrid, full live sandbox, canary; hosts: container, CI, cloud sandbox |
 | Read results | Terminal table, run folder, JUnit, `tracegrove show`, UI run history | Trace/video media, flaky-history, PR comments |
 | Prove it | `verify-bundle` re-derives the verdict from sealed evidence | Importer with issuer trust; hosted qualification lifecycle |
@@ -40,7 +40,7 @@ The [Chromium browser runner](browser-driver.md) supports short flows and the lo
 
 | Layer | Supported now | Declared but not implemented |
 | --- | --- | --- |
-| Surfaces (step kinds) | HTTP, Chromium UI, and `job.submit`/`job.observe`/`job.cancel` through an opted-in local Node IPC bridge | Hosted job providers, `integration.action`, `mcp.call`, `widget.action`, native desktop and computer-use |
+| Surfaces (step kinds) | HTTP, Chromium UI, local `mcp.call` through the optional SDK, and `job.submit`/`job.observe`/`job.cancel` through an opted-in local Node IPC bridge | Hosted MCP/job providers, `integration.action`, `widget.action`, native desktop and computer-use |
 | Hosts | `local_process` (POSIX), `mock_loopback` | container, managed sandbox, cloud VM, customer CI, device service; Windows process trees |
 | Fidelity lanes | `full_live_sandbox`, `mock_contract` | `recorded_replay`, `hybrid_live_product`, `full_live_canary` |
 | Boundaries | `application`, `storage` observed as real/stubbed | per-provider boundaries with interceptors and readback oracles |

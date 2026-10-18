@@ -18,6 +18,7 @@ import { compileBrowserStep } from './browser.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
+import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
 import { applicationLaunch } from './appLaunch.ts';
@@ -231,9 +232,11 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   if (selected.length === 0) fail('no_flows_selected', `no flow matches${options.grep ? ` --grep ${options.grep}` : ''}${options.tags?.length ? ` --tag ${options.tags.join(',')}` : ''}`, 'run tracegrove list to see flow ids and tags');
   const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
   const hasJobs = selected.some(({ flow }) => flow.steps.some(step => 'job' in step));
+  const hasMcp = selected.some(({ flow }) => flow.steps.some(step => 'mcp' in step));
+  if (hasMcp && (hasJobs || hasBrowser)) fail('mixed_mcp_runner_unqualified', 'MCP, native job and browser runners are not qualified together', 'select separate flows with --grep');
   if (hasJobs && hasBrowser) fail('mixed_native_browser_unqualified', 'Native job and browser runners are not qualified together', 'run separate flows with --grep');
   if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
-  const runner = hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const runner = hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
   // ---- attested source identity ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
@@ -288,9 +291,11 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000, cleanupReserveMs: 10_000,
   });
-  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http', maxStepsPerCase: 50, cancellation: 'confirmed' });
-  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api', protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
-  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api', packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe'] });
+  const runnerAdapter = hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
+  const surfaceKind = hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
+  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed' });
+  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
+  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: ['http.request', 'observe', ...(hasMcp ? ['mcp.call'] : [])] });
   const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass: 'local', readbackOracleRef: null, interceptorRef: null });
   write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: [boundary('application'), boundary('storage')] });
   const stage = { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 };
@@ -332,13 +337,28 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const label = 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      const label = 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
       const where = `${rel} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
       const inputs: Record<string, Json> = {};
       const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
+      if ('mcp' in step) {
+        if (statusOf(step.expect) !== null) fail('mcp_http_expectation', where, 'use expect.json for MCP protocol observations');
+        const command = { ...step.mcp, arguments: bindTemplates(step.mcp.arguments as Json, scope, inputs, where) };
+        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const configured = predicateFor(step.expect);
+        const predicate = { kind: 'all', predicates: [{ kind: 'json_path_equals', path: 'body.isError', value: false }, ...(configured ? [configured] : [])] };
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: 'mcp.call', command, auth, captures, timeoutMs, inputs, retry: { attempts: 1 } });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: ['isolated_candidate'], stepId: id,
+          oracle: { name: 'mcp.observation', version: '1' }, predicate, coverageTags: flow.tags });
+        methods.add('POST'); prefixes.add(step.mcp.endpoint);
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: 'MCP', path: `${step.mcp.endpoint} ${step.mcp.tool}`, as: step.as ?? defaultPersona, expectStatus: null, expectation: 'MCP tool result and configured facts' });
+        return;
+      }
       if ('job' in step) {
         if (statusOf(step.expect) !== null) fail('native_job_http_expectation', where, 'use expect.json for native job facts');
         const command = bindTemplates(step.job as Json, scope, inputs, where);
@@ -433,14 +453,15 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     }
     write(compiledDir, `cases/${caseId}.yaml`, {
       schemaVersion: 'workflow.case/v1', ref: { id: caseId, revision: '1' }, purpose: flow.title, workflowId: caseId,
-      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
-      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
-      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(browserFlow ? ['ui.navigate', 'ui.action', 'ui.observe'] : []), ...(given.size ? ['fixture.http'] : [])],
+      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: hasMcp ? 'integration' : browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
+      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
+      environmentClasses: ['isolated_candidate'], requiredCapabilities: ['http.request', 'observe', ...(hasMcp ? ['mcp.call'] : []), ...(browserFlow ? ['ui.navigate', 'ui.action', 'ui.observe'] : []), ...(given.size ? ['fixture.http'] : [])],
       requiredBoundaries: [{ boundaryId: 'application', mode: 'real' }, { boundaryId: 'storage', mode: 'real' }],
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
       effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
-        ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}) },
+        ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}),
+        ...(hasMcp ? { maxMcpCalls: flow.effects?.maxMcpCalls ?? 0, allowedMcpTools: flow.effects?.allowedMcpTools ?? [] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
       capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
       baselineRef: null, generation: null,

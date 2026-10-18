@@ -129,17 +129,29 @@
     },
     "effects": {
       "additionalProperties": false,
-      "description": "Declared job effect ceiling; observations must independently establish job behavior.",
+      "description": "Explicit job and MCP effect ceilings; tool annotations do not grant authority.",
       "properties": {
+        "allowedMcpTools": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
         "maxJobs": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maxMcpCalls": {
           "maximum": 2147483647,
           "minimum": 0,
           "type": "integer"
         }
       },
-      "required": [
-        "maxJobs"
-      ],
       "type": "object"
     },
     "given": {
@@ -794,6 +806,129 @@
             },
             "required": [
               "job"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "as": {
+                "type": "string"
+              },
+              "expect": {
+                "anyOf": [
+                  {
+                    "maximum": 599,
+                    "minimum": 100,
+                    "type": "integer"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "absent": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "count": {
+                        "additionalProperties": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "json": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "description": "Dot paths into the response body and their exact values.",
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "present": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "status": {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "mcp": {
+                "additionalProperties": false,
+                "properties": {
+                  "arguments": {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "propertyNames": {
+                      "maxLength": 128,
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "endpoint": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "pattern": "^\\/(?!\\/)[A-Za-z0-9_./-]*$",
+                    "type": "string"
+                  },
+                  "tool": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "endpoint",
+                  "tool",
+                  "arguments"
+                ],
+                "type": "object"
+              },
+              "name": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "save": {
+                "additionalProperties": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "timeoutMs": {
+                "exclusiveMinimum": 0,
+                "maximum": 120000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "mcp"
             ],
             "type": "object"
           }

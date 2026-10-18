@@ -31,6 +31,11 @@ export function writeSample(samplesRoot: string, name: SampleName, output: strin
     detail: output, action: 'choose an empty output directory; existing files are never overwritten' }]);
   mkdirSync(output, { recursive: true });
   cpSync(join(samplesRoot, 'notes-api'), output, { recursive: true });
+  if (name === 'notes-mcp') {
+    for (const owned of ['tracegrove', 'verification', 'app/app.mjs']) rmSync(join(output, owned), { recursive: true, force: true });
+    cpSync(join(samplesRoot, name), output, { recursive: true });
+    return compileProject(join(output, 'tracegrove.config.yaml')).workflowConfigPath;
+  }
   if (name === 'report-jobs' || name === 'report-native') {
     for (const owned of ['tracegrove', 'verification', 'app/app.mjs']) rmSync(join(output, owned), { recursive: true, force: true });
     cpSync(join(samplesRoot, 'report-jobs'), output, { recursive: true });

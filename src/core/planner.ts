@@ -14,6 +14,7 @@ import { runnerCapabilitiesFor } from './runnerCapabilities.ts';
 export { runnerCapabilitiesFor } from './runnerCapabilities.ts';
 import { compileCase } from './compiler.ts';
 import { cleanupActionError } from './cleanupActions.ts';
+import { mcpSdkAvailable } from '../adapters/mcp/capabilities.ts';
 import { Blocked } from './errors.ts';
 import { materializeLogicalPayload } from './generators.ts';
 import { REDUCER_REF } from './reducer.ts';
@@ -112,6 +113,11 @@ export function plan(input: PlanInput): FrozenBundle {
     if (!applicable) { excludedCells.push({ cellKey: id, reason: `suite entry applies only to profiles ${suiteEntry?.profiles?.join(', ')}` }); continue; }
     const cellBlock = (code: string, detail: string, owner = 'case author', action = 'revise the case or choose a compatible profile') => blockers.push({ code, detail, owner, action, cellId: id });
     if (spec.steps.some(step => step.kind.startsWith('job.')) && (hostPlan.adapter !== 'local_process' || hostPlan.launch?.nativeJobs !== 'node_ipc/v1')) cellBlock('native_job_host_unavailable', 'Native jobs require an explicitly enabled local Node IPC host');
+    if (spec.steps.some(step => step.kind === 'mcp.call')) {
+      if (hostPlan.adapter !== 'local_process' || profile.class !== 'isolated_candidate') cellBlock('mcp_host_unqualified', 'MCP calls currently require an isolated local application host');
+      if (!hostPlan.launch || !spec.effects.allowedHosts.includes(`launch://${hostPlan.launch.componentId}`)) cellBlock('mcp_origin_not_admitted', 'MCP effects must explicitly allow the launched application component');
+      if (!mcpSdkAvailable()) cellBlock('mcp_sdk_missing', 'The pinned optional MCP SDK is unavailable', 'operator', 'install @modelcontextprotocol/sdk@1.32.1 before planning this MCP flow');
+    }
 
     if (!spec.environmentClasses.includes(profile.class)) cellBlock('environment_class_not_applicable', `${spec.ref.id} does not apply to ${profile.class}`);
     const binding = corpus.getAs(SurfaceBinding, spec.surfaceBindingRef);
