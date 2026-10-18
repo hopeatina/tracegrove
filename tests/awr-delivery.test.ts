@@ -47,6 +47,7 @@ it('prepares canonical AWR v0.2 without upgrading mocked evidence, leaking paylo
   expect(projection).toMatchObject({ productOutcome: 'passed', plannedLanes: ['mock_contract'], issuerStatus: 'unverified',
     qualificationStatus: 'not_evaluated', payloads: 'withheld', media: 'withheld', nativeOutcome: 'not_observed' });
   expect(projection.attempts.every(attempt => attempt.provenance.runtime === 'mocked')).toBe(true);
+  expect(projection.attempts.every(attempt => attempt.estimatedCents === null && attempt.reconciledCents === null && attempt.unknownChargeCount > 0)).toBe(true);
   expect(prepared.prepared.receipt.verification.status).toBe('unverified');
   expect(prepared.prepared.receipt.cost).toMatchObject({ estimated: true, metadata: { status: 'unknown', zero_is_schema_placeholder: true } });
   expect(prepared.prepared.receipt.actor.runtime?.name).not.toBe('orgx-verify');

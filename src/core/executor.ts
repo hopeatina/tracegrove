@@ -8,10 +8,10 @@ import { lstatSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
-  CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
+  CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
-  type Accounting, type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
+  type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
   type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation,
 } from '../protocol/index.ts';
 import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
@@ -38,6 +38,7 @@ import { checkedFrozenRequest, prepareFrozenCells, type DocStore, type PreparedC
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
 import { targetFromComponentAttestations } from './targetObservation.ts';
 import { authorizeQualificationExecution, type QualificationExecutionOwner } from './qualificationExecution.ts';
+import { summarizeAttemptUsage } from './attemptUsage.ts';
 
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
 
@@ -207,7 +208,6 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const allocated: AllocatedFixture[] = [];
   const uncertainAllocations = new Set<string>();
   const fixtureOutputs: Record<string, Record<string, unknown>> = {};
-  const costs: CostObservation[] = [];
   const hostStartedMs = monotonicMs();
   log.emit('cell.started', null, { selectionCellId: cell.selectionCellId, caseId: spec.ref.id, caseDigest: spec.ref.digest.hex, lane: fidelityCell.lane });
 
@@ -509,19 +509,12 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     intelligencePolicyRef: ctx.intelligencePolicy.ref, catalogRef: null, candidates: [], selected: null,
     estimate: { amountCents: 0, unknownReason: null }, budgetReservationRef: ctx.reservation.ref, escalationReason: 'known case replay performs no authoring inference', decidedAt: nowIso(),
   }), 'routing decision');
-  costs.push(parseAs(CostObservation, freeze({
-    schemaVersion: 'workflow.cost-observation/v1' as const, ref: { id: `${executionId}.${cell.selectionCellId}.cost.host`, revision: '1' }, scope,
-    owner: { kind: 'attempt' as const, campaignId: request.campaignId, executionId, attemptId }, operationId: `${cell.selectionCellId}.host`, stage: 'execution',
-    billingRoute: 'host_minutes' as const, providerRequestId: null, usageRef: null, rateSnapshotRef: null,
-    quantity: { value: Number(hostSeconds.toFixed(3)), unit: 'seconds' }, amount: { value: 0, currency: 'USD', kind: 'measured' as const }, reconciliation: 'reconciled' as const, observedAt: nowIso(),
-  }), 'cost observation'));
-  const accounting: Accounting = {
-    reservations: [{ reservationId: ctx.reservation.ref.id, kind: 'action', cents: ctx.reservation.actionCents }],
-    runnerSeconds: Number(hostSeconds.toFixed(3)), browserSeconds: Number(browser.seconds.toFixed(3)), inferenceCalls: 0, inferenceTokens: 0, requestedModel: null, observedModel: null,
-    providerRequestIds: stepObservations.flatMap((s) => (s.output && typeof s.output === 'object' && (s.output as { requestId?: string | null }).requestId ? [String((s.output as { requestId?: string | null }).requestId)] : [])),
-    integrationOperations, artifactBytes: allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0), estimatedCents: 0, reconciledCents: 0, rateCardDigest: null, unknownCharges: [],
-    routingDecisionRefs: [routing.ref], costObservationRefs: costs.map((c) => c.ref),
-  };
+  const { accounting, performance, costs } = summarizeAttemptUsage({
+    owner: { kind: 'attempt', campaignId: request.campaignId, executionId, attemptId }, scope, cellId: cell.selectionCellId,
+    runnerSeconds: hostSeconds, browserSeconds: browser.seconds, integrationOperations, hostAdapter: hostPlan.adapter,
+    steps: stepObservations, stepKinds: new Map([...compiled.stepsById].map(([id, step]) => [id, step.kind])), artifacts: allArtifacts,
+    reservation: ctx.reservation, routingRef: routing.ref, observedAt: nowIso(),
+  });
   const receipt = parseAs(ExecutionReceipt, freeze({
     schemaVersion: 'workflow.execution/v1' as const, ref: { id: `${executionId}.${cell.selectionCellId}.receipt`, revision: '1' },
     executionId, campaignId: request.campaignId, attemptId, attemptNumber: ctx.attemptNumber, predecessorAttemptRef: ctx.predecessor, retryReason: ctx.predecessor ? 'redelivery after interrupted attempt' : null,
@@ -530,7 +523,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: request.qualificationRoundRef,
     fixtureManifestRef: fixtureManifest?.ref ?? null, boundaryObservationRefs: boundaryObservations.map((b) => b.ref), proofClaim: spec.proofClaim,
     coverage: reduction.coverage, eventsDigest: eventsArtifact.ref.digest, assertions, steps: stepObservations, artifacts: allArtifacts, accounting,
-    performance: stepObservations.filter((s) => s.timing).map((s) => ({ metric: `step.${s.stepId}.duration`, boundary: compiled.stepsById.get(s.stepId)!.kind.startsWith('ui.') ? 'browser' : 'http', clock: 'monotonic' as const, cellId: cell.selectionCellId, valueMs: s.timing!.durationMs, censored: false, warm: false, strata: { host: hostPlan.adapter } })),
+    performance,
     cleanup, outcome: reduction.outcome, reasonCodes: reduction.reasonCodes, proofEligible: reduction.proofEligible, startedAt, finalizedAt: finishedAt,
   }), 'execution receipt');
   const finalization = log.emit('cell.finalized', null, { outcome: receipt.outcome, reasonCodes: receipt.reasonCodes, receiptRef: receipt.ref });

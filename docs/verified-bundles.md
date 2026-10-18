@@ -1,5 +1,9 @@
 # Verified bundle snapshots
 
+Recorded timing and accounting fields retain their own proof boundaries. See
+[attempt usage and pricing](attempt-usage.md) for measured quantities, unknown prices
+and nullable warm/cold labels.
+
 `verifyBundle(directory)` retains its summary response shape; invalid bundles report a null outcome instead of echoing a producer's PASS label. `readVerifiedBundle(directory)` returns the checked request, selection, campaign, per-cell receipts, frozen document map and manifest byte digest; it throws instead of returning records for an invalid bundle. These records prepare whole-round qualification evaluation but do not themselves qualify or activate a scenario.
 
 Both paths use one `BundleSnapshot`. Each listed payload is read once, checked against its sealed byte count/hash and retained privately. JSON decoding, assertion checks and campaign reduction consume those captured bytes. Mutating the directory after capture does not change that snapshot. Buffers returned by the snapshot are copies. A later verification call takes a fresh snapshot rather than caching a former success.

@@ -450,7 +450,7 @@ export const PerformanceObservation = z.object({
   cellId: IdString,
   valueMs: NonNegInt.nullable(),
   censored: z.boolean(),
-  warm: z.boolean(),
+  warm: z.boolean().nullable(), // null = cache/startup temperature was not observed
   strata: z.record(z.string().max(64), ShortText),
 }).strict();
 
