@@ -6,6 +6,7 @@ import { LocalResultSink } from './resultSink.ts';
 import { readQualificationEvidence, type QualificationResultPorts, type QualificationRoundInput } from './qualification.ts';
 import { Conflict } from './errors.ts';
 import { readVerifiedBundle } from './bundle.ts';
+import type { ReplayAssessmentPorts } from './replayAssessment.ts';
 
 const IndexedRound = z.object({ round: QualificationRound, resultRef: RefSchema, manifestDigest: DigestSchema }).strict();
 type IndexedRound = z.infer<typeof IndexedRound>;
@@ -14,6 +15,10 @@ export interface LocalQualificationResultAuthority extends QualificationResultPo
   authorizeRetention(scope: Scope): Promise<void>;
 }
 export type RetainedQualificationRound = { round: QualificationRound; bundleDir: string; replayed: boolean };
+export interface LocalQualificationReplaySnapshot extends Pick<ReplayAssessmentPorts, 'resolveRound' | 'authenticateEvidence'> {
+  /** Synchronous final check; no await is allowed between this check and the owner's journal publication. */
+  assertCurrent(): void;
+}
 
 /** Durable local terminal-round index. Reuses the immutable result sink; never records readiness or activates coverage. */
 export class LocalQualificationResults {
@@ -49,6 +54,33 @@ export class LocalQualificationResults {
   }
   private intact(record: IndexedRound, bundleDir: string): void {
     if (!sameDigest(readVerifiedBundle(bundleDir).manifestDigest, record.manifestDigest)) throw new Conflict('qualification archive changed during authorization');
+  }
+  replayPorts(): Pick<ReplayAssessmentPorts, 'resolveRound' | 'authenticateEvidence'> {
+    return { resolveRound: admission => this.resolveRound(admission), authenticateEvidence: async (admission, bundle) => {
+      this.scoped(admission.scope); this.scoped(bundle.request.requestedScope);
+      await this.authority.authorize(structuredClone(this.scope));
+      await this.authority.authenticateEvidence(structuredClone(admission), structuredClone(bundle));
+    } };
+  }
+  async replaySnapshot(ledger: LocalLedger): Promise<LocalQualificationReplaySnapshot> {
+    if (ledger !== this.ledger) throw new Conflict('activation must use the result owner ledger');
+    await this.authority.authorize(structuredClone(this.scope));
+    this.history(); const version = this.ledger.version(this.aggregate);
+    const captured = new Map<string, ReturnType<typeof readVerifiedBundle>['manifestDigest']>();
+    return { ...this.replayPorts(), resolveRound: async admission => {
+      const location = await this.resolveRound(admission);
+      if (location) {
+        const record = this.find(this.history(), admission.ref);
+        if (!record) throw new Conflict('qualification result disappeared during activation');
+        this.intact(record, location.bundleDir); captured.set(location.bundleDir, record.manifestDigest);
+      }
+      return location;
+    }, assertCurrent: () => {
+      if (this.ledger.version(this.aggregate) !== version) throw new Conflict('qualification result index changed during activation');
+      for (const [path, digest] of captured) {
+        if (!sameDigest(readVerifiedBundle(path).manifestDigest, digest)) throw new Conflict('qualification archive changed during activation');
+      }
+    } };
   }
   private async checked(record: IndexedRound): Promise<{ round: QualificationRound; bundleDir: string }> {
     const retained = await this.sink.get(record.resultRef.id);

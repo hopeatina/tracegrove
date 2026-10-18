@@ -63,8 +63,12 @@ is never silently dropped. The state directory must stay private to the trusted
 controller and inaccessible to candidate processes. Local hashes and projection
 states are not signatures or hosted approval receipts.
 
-This adapter does not install activation/result persistence, physical lease
-provisioning, hosted source/issuer authorization or CLI lifecycle commands.
+The [terminal result index](qualification-results.md#durable-local-terminal-results)
+retains complete rounds through the existing result sink. The
+[activation adapter](scenario-activation.md#local-atomic-storage) publishes the active
+projection, receipt and assessment records in one scenario-registry append.
+This adapter does not install physical lease provisioning, hosted source/issuer
+authorization, promotion/structural-validation transitions or CLI lifecycle commands.
 [Registered qualification execution](qualification-registration.md#executing-a-registered-round)
 requires a separate authenticated runtime owner and uses the admission's allocated
 cell identities. Requests without that owner and all activated regression requests

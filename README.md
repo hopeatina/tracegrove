@@ -301,6 +301,9 @@ admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
 `activateScenario` rechecks that evidence and publishes an authenticated activation through
 an atomic host port, with exact round selection and idempotent receipt recovery. See
 [activation contract](docs/scenario-activation.md); hosted authority and activated regression execution remain open.
+`LocalScenarioStore.activationPorts(results, authority)` publishes the active projection,
+receipt and full assessment records together on the existing local ledger, after fresh
+evidence and explicit owner authorization checks. Historical receipts cannot reverse invalidation.
 `LocalScenarioStore` persists actual registration on the local ledger. The SDK's
 `prepareQualificationExecution` and explicit runtime owner connect those admissions
 to new executions using allocated cell identities, with current authority checks

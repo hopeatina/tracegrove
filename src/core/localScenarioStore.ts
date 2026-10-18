@@ -5,6 +5,8 @@ import { Conflict } from './errors.ts';
 import { appendImmutable, checkAdmission, checkLocalScenarioState, storedDefinition, storedSelection,
   type LocalScenarioState, type StoredScenario } from './localScenarioState.ts';
 import type { ScenarioPorts, ScenarioSnapshot } from './scenario.ts';
+import type { LocalQualificationResults } from './localQualificationResults.ts';
+import { localScenarioActivationPorts, type LocalScenarioActivationAuthority } from './localScenarioActivation.ts';
 
 export interface LocalScenarioAuthority {
   authorize(scope: Scope, action: 'initialize' | 'stage' | 'read' | 'register_round' | 'invalidate'): Promise<void>;
@@ -53,7 +55,7 @@ export class LocalScenarioStore {
     if (state.scenarios.some(item => item.projection.id === this.id)) throw new Conflict('local scenario is already initialized');
     const projection = ScenarioProjection.parse({ id: this.id, scope: this.scope, aggregateVersion: 1, definitionRef: definition.ref,
       state: 'validating', invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
-    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [] });
+    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [] });
     this.write(version, state, 'workflow.scenario.initialized');
   }
   async stage(raw: unknown, selections: unknown[] = []): Promise<void> {
@@ -139,5 +141,11 @@ export class LocalScenarioStore {
         await this.authority.validateDefinition(structuredClone(definition));
       },
       compareAndSwap: (version, projection, admission) => this.commit(version, projection, admission) };
+  }
+  activationPorts(results: LocalQualificationResults, authority: LocalScenarioActivationAuthority) {
+    return localScenarioActivationPorts({ id: this.id, scope: structuredClone(this.scope), ledger: this.ledger, readPorts: this.ports(),
+      authorizeRead: async scope => { this.scoped(this.id, scope); await this.authority.authorize(structuredClone(scope), 'read'); },
+      current: () => this.current(), entry: state => this.entry(state), write: (version, state, event) => this.write(version, state, event),
+    }, results, authority);
   }
 }

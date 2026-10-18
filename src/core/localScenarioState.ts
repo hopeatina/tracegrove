@@ -3,9 +3,11 @@ import { IdString, QualificationRoundAdmission, ScenarioDefinition, ScenarioProj
   digestOfValue, sameDigest, sameRef, sameScope, verifySelfDigest, type Ref, type Scope } from '../protocol/index.ts';
 import { qualificationStrataDigest, validateQualificationMatrix, validateQualificationSelection, validateScenarioDefinition, validateScenarioSnapshot } from './scenario.ts';
 import { Conflict } from './errors.ts';
+import { StoredActivation, validateStoredActivations } from './localActivationState.ts';
 
 export const StoredScenario = z.object({ projection: ScenarioProjection, definitions: z.array(ScenarioDefinition).min(1).max(500),
-  selections: z.array(SelectionManifest).min(1).max(500), admissions: z.array(QualificationRoundAdmission).max(500) }).strict();
+  selections: z.array(SelectionManifest).min(1).max(500), admissions: z.array(QualificationRoundAdmission).max(500),
+  activations: z.array(StoredActivation).max(500).default([]) }).strict();
 export type StoredScenario = z.infer<typeof StoredScenario>;
 export const LocalScenarioState = z.object({ schemaVersion: z.literal('workflow.local-scenario-state/v1'), scope: ScopeSchema,
   scenarios: z.array(StoredScenario).min(1).max(100) }).strict();
@@ -38,8 +40,9 @@ export function checkLocalScenarioState(raw: unknown, scope: Scope): LocalScenar
   const state = LocalScenarioState.parse(raw);
   if (!sameScope(state.scope, scope)) throw new Conflict('local scenario registry scope mismatch');
   if (state.scenarios.reduce((n, s) => n + s.admissions.length, 0) > 500 ||
+      state.scenarios.reduce((n, s) => n + s.activations.length, 0) > 500 ||
       state.scenarios.reduce((n, s) => n + s.definitions.length + s.selections.length, 0) > 2000) throw new Conflict('local scenario registry needs archival indexing before more history');
-  const names = new Set<string>(); const documents = new Map<string, Ref>();
+  const names = new Set<string>(); const documents = new Map<string, Ref>(); const activationKeys = new Set<string>();
   const claims = new Set<string>();
   const claim = (kind: string, id: string) => { const key = `${kind}:${id}`;
     if (claims.has(key)) throw new Conflict('scenario registry reuses a campaign, execution, attempt or leased-state identity'); claims.add(key); };
@@ -68,6 +71,7 @@ export function checkLocalScenarioState(raw: unknown, scope: Scope): LocalScenar
       for (const attempt of admission.attempts) { claim('execution', attempt.executionId); claim('attempt', attempt.attemptId); }
       for (const lease of admission.stateLeaseRefs) claim('state', lease.id);
     }
+    validateStoredActivations(scenario, activationKeys);
   }
   return state;
 }
