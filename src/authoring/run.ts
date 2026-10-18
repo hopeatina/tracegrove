@@ -64,7 +64,7 @@ function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefine
     const browser = BrowserObservation.safeParse(s.output);
     const job = NativeJobObservation.safeParse(s.output);
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
-      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action} ${job.data.status} · ${excerpt(job.data.output, 500)}` } : {}) };
+      ...(browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
