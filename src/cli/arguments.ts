@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RunRequest } from '../protocol/index.ts';
+import { IdString, RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { SampleName } from './samples/catalog.ts';
 
@@ -33,6 +33,8 @@ export const COMMAND_SCHEMAS = {
   inspect: z.object({ ...common, execution: Text, 'state-dir': Text, 'failed-step': Bool }).strict(),
   export: z.object({ ...common, execution: Text, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
+  'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
+  results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
   'verify-cleanup': z.object({ ...common, proof: Text, expectation: Text, trust: Text }).strict(),
   'source-resolve': z.object({ ...common, input: Text, output: Text }).strict(),
   'source-materialize': z.object({ ...common, input: Text, repository: Text, root: Text, side: z.enum(['base', 'head']), output: Text }).strict(),

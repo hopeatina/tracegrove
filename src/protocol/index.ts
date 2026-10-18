@@ -10,6 +10,7 @@ import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/sou
 import { GitSourceRequest, GitSourceResolution, GitSourceSnapshot } from './schemas/gitSources.ts';
 import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
 import { NativeJobAction, NativeJobObservation, NativeJobRequest, NativeJobResponse, NativeJobReady } from './schemas/nativeJob.ts';
+import { ResultIngestReceipt } from './schemas/resultSink.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
   ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
@@ -27,10 +28,12 @@ export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
 export * from './schemas/browser.ts';
 export * from './schemas/nativeJob.ts';
+export * from './schemas/resultSink.ts';
 export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
+  'workflow.result-ingest/v1': ResultIngestReceipt,
   'workflow.config/v1': WorkflowConfig,
   'workflow.suite/v1': Suite,
   'workflow.corpus/v1': CorpusManifest,

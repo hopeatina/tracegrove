@@ -20,7 +20,8 @@ export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } 
 export { resolveGitSources, GitSourceReader, GIT_RESOLVER_REF, type GitSourceAuthorization } from './core/gitSources.ts';
 export { materializeGitSnapshot } from './core/gitSnapshot.ts';
 export { readGitSnapshotManifest, readGitSnapshotTree } from './source/snapshotTree.ts';
-export { verifyBundle, readVerifiedBundle, readVerifiedVideo, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
+export { verifyBundle, readVerifiedBundle, readVerifiedVideo, VerifiedBundleSnapshot, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
+export { LocalResultSink, type ResultSink, type ResultSinkAuthority, type RetainedResult, type ResultPage } from './core/resultSink.ts';
 export { compileCase } from './core/compiler.ts';
 export { evaluatePredicate, evaluateAssertions, reduceCell, reduceCampaign, REDUCER_REF } from './core/reducer.ts';
 export { materializeLogicalPayload } from './core/generators.ts';

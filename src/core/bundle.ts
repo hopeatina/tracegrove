@@ -18,6 +18,7 @@ import { compileCase } from './compiler.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { cellBundleName, videoBundlePath } from './bundlePaths.ts';
+import { Conflict } from './errors.ts';
 
 
 function writeJson(path: string, value: unknown): void {
@@ -91,6 +92,24 @@ export function readVerifiedBundle(dir: string): VerifiedBundleRecords {
   const checked = verifyBundleRecords(dir);
   if (!checked.verification.ok || !checked.records) throw new Error(`invalid bundle: ${checked.verification.problems.slice(0, 20).join('; ')}`);
   return { ...checked.records, verification: { ...checked.verification, ok: true } };
+}
+
+/** Copy/export from the exact bytes that passed reduction, never a second filesystem read. */
+export class VerifiedBundleSnapshot {
+  readonly #snapshot: BundleSnapshot;
+  readonly #records: VerifiedBundleRecords;
+  private constructor(snapshot: BundleSnapshot, records: VerifiedBundleRecords) { this.#snapshot = snapshot; this.#records = records; }
+  static open(dir: string): VerifiedBundleSnapshot {
+    try {
+      const snapshot = new BundleSnapshot(dir); const checked = verifySnapshot(snapshot);
+      if (!checked.verification.ok || !checked.records) throw new Error('invalid evidence');
+      return new VerifiedBundleSnapshot(snapshot, { ...checked.records, verification: { ...checked.verification, ok: true } });
+    } catch { throw new Conflict('Bundle could not be captured and verified; use verify-bundle for details'); }
+  }
+  get records(): VerifiedBundleRecords { return structuredClone(this.#records); }
+  get manifestDigest(): Digest { return structuredClone(this.#snapshot.manifestDigest); }
+  paths(): string[] { return ['manifest.json', ...this.#snapshot.paths()]; }
+  read(path: string): Buffer { return path === 'manifest.json' ? this.#snapshot.manifestBytes() : this.#snapshot.read(path); }
 }
 
 /** Read recording bytes from the same immutable snapshot that passed complete bundle verification. */

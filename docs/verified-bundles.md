@@ -4,6 +4,13 @@
 
 Both paths use one `BundleSnapshot`. Each listed payload is read once, checked against its sealed byte count/hash and retained privately. JSON decoding, assertion checks and campaign reduction consume those captured bytes. Mutating the directory after capture does not change that snapshot. Buffers returned by the snapshot are copies. A later verification call takes a fresh snapshot rather than caching a former success.
 
+`VerifiedBundleSnapshot.open(directory)` exposes the exact verified manifest and
+payload bytes as defensive copies for storage adapters. Its records and manifest
+digest are copies too. The [local result sink](result-sink.md) writes those
+captured bytes, verifies the completed archive, and publishes a scoped receipt
+through the existing ledger. It does not re-open producer files during copying
+or promote a storage receipt into qualification authority.
+
 The reader refuses traversal, duplicate paths, symlinks and nonregular files. Reads are bounded to the expected size plus one byte so growth is detected without loading an arbitrarily larger file. Current prototype bounds are 1 MiB for the manifest, 16 MiB per file, 64 MiB of payload and 10,000 files. Oversize bundles fail verification; files are never truncated or silently omitted. Larger media packs need an explicitly supported bounded reader.
 
 Campaign verification rechecks complete receipt bindings, missing cells, coverage and proof eligibility, as well as full request/selection/campaign scope and reference identity. Per-cell checks bind exact case/persona/surface/variant and qualification-admission refs. The outcome label alone cannot cover inconsistent campaign metadata.

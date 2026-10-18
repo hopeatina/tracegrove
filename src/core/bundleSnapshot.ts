@@ -20,15 +20,17 @@ function json(bytes: Uint8Array, path: string): unknown {
 /** Sealed bytes, not issuer authority. Caller owns/authorizes the quiescent artifact directory. */
 export class BundleSnapshot {
   readonly manifestDigest: Digest;
+  readonly #manifestBytes: Buffer;
   readonly #files = new Map<string, Buffer>();
   constructor(dir: string) {
     if (!lstatSync(dir).isDirectory()) throw new Error('bundle root must be a real directory');
     const manifestBytes = readBounded(join(dir, 'manifest.json'), BUNDLE_LIMITS.manifestBytes);
+    this.#manifestBytes = manifestBytes;
     this.manifestDigest = digestOfBytes(manifestBytes);
     const manifest = Manifest.parse(json(manifestBytes, 'manifest.json'));
     let total = 0;
     for (const file of manifest.files) {
-      if (isAbsolute(file.path) || file.path.includes('\\') || /[\x00-\x1f\x7f]/.test(file.path) || file.path.split('/').some(part => !part || part === '.' || part === '..') || this.#files.has(file.path)) {
+      if (file.path === 'manifest.json' || isAbsolute(file.path) || file.path.includes('\\') || /[\x00-\x1f\x7f]/.test(file.path) || file.path.split('/').some(part => !part || part === '.' || part === '..') || this.#files.has(file.path)) {
         throw new Error(`unsafe or duplicate manifest path ${file.path}`);
       }
       total += file.bytes;
@@ -44,6 +46,7 @@ export class BundleSnapshot {
     }
   }
   has(path: string): boolean { return this.#files.has(path); }
+  manifestBytes(): Buffer { return Buffer.from(this.#manifestBytes); }
   paths(): string[] { return [...this.#files.keys()]; }
   read(path: string): Buffer {
     const bytes = this.#files.get(path);

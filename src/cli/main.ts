@@ -11,6 +11,7 @@ import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
 import { LocalLedger } from '../core/ledger.ts';
+import { LocalResultSink } from '../core/resultSink.ts';
 import { delegateRun, startController } from '../core/controller.ts';
 import { searchCases } from '../core/lookup.ts';
 import { createRerun } from '../core/rerun.ts';
@@ -89,6 +90,9 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   inspect --execution <id> --state-dir <dir> [--failed-step]
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
+  results --sink <dir> [--id <record-id>]               list receipts; --id re-verifies its retained archive
+          [--limit 1..100] [--cursor <opaque>]           bounded, snapshot-stable pages; issuer remains unverified
   verify-cleanup --proof <json> --expectation <json> --trust <json> [--json]
                                                        check signed follow-up integrity; no hosted release
   schema --output <dir>                                export JSON Schemas
@@ -388,6 +392,28 @@ async function main(argv: string[]): Promise<number> {
       const verification = verifyBundle(resolve(args.flags['bundle']));
       out(args, verification, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
       return verification.ok ? 0 : 2;
+    }
+
+    case 'result-ingest':
+    case 'results': {
+      if (args.command === 'results' && args.flags.id && (args.flags.cursor !== undefined || args.flags.limit !== undefined)) throw new Conflict('Choose --id or pagination options, not both');
+      const scope = localScope(); const ledger = LocalLedger.open(resolve(args.flags.sink));
+      try {
+        const sink = new LocalResultSink(ledger, scope, { authorize: async requested => {
+          if (!sameScope(requested, scope)) throw new Conflict('Result scope differs from the local operator');
+        } });
+        if (args.command === 'result-ingest') {
+          const result = await sink.ingest(resolve(args.flags.bundle));
+          out(args, result, `${result.replayed ? 'already retained' : 'retained'}: ${result.receipt.ref.id}\noutcome: ${result.receipt.retainedOutcome}; planned lanes: ${result.receipt.plannedLanes.join(', ') || 'unavailable'}\nissuer unverified; qualification not evaluated\narchive: ${result.bundleDir}`);
+        } else if (args.flags.id) {
+          const result = await sink.get(args.flags.id);
+          out(args, result, `${result.receipt.ref.id}\nretained outcome: ${result.receipt.retainedOutcome}; archive re-verified\nplanned lanes: ${result.receipt.plannedLanes.join(', ') || 'unavailable'}\nissuer unverified; qualification not evaluated\narchive: ${result.bundleDir}`);
+        } else {
+          const page = await sink.list({ ...(args.flags.cursor ? { cursor: args.flags.cursor } : {}), ...(args.flags.limit ? { limit: Number(args.flags.limit) } : {}) });
+          out(args, page, `${page.records.map(record => `${record.ref.id}  ${record.retainedOutcome}  [${record.plannedLanes.join(', ')}]  ${record.campaignRef.id}`).join('\n') || 'No retained results.'}\nStored receipts only; archives not checked. Issuers unverified; qualification not evaluated.${page.nextCursor ? `\nnext cursor: ${page.nextCursor}` : ''}`);
+        }
+        return 0;
+      } finally { ledger.close(); }
     }
 
     case 'verify-cleanup': {

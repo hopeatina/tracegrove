@@ -300,6 +300,14 @@ admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
 an atomic host port, with exact round selection and idempotent receipt recovery. See
 [activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
 
+`result-ingest --bundle <run/bundle> --sink <directory>` retains an independently
+re-verified local bundle in the existing single-writer ledger and an immutable
+archive. `results --sink <directory>` lists scoped receipts;
+`results --sink <directory> --id <result-id>` freshly re-verifies a retained result
+after the producer's directory is gone. The [result sink](docs/result-sink.md)
+preserves failed and mocked outcomes, rejects conflicting deliveries, and never
+treats storage acceptance as issuer authentication, qualification, or activation.
+
 The [local browser runner](docs/browser-driver.md) executes typed UI steps alongside HTTP
 fixtures and independent readback, and verifies recordings in the portable bundle.
 Browser short flows run through `tracegrove test`; Grove plays receipt-bound recordings
