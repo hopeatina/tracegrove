@@ -175,7 +175,10 @@ describe('status and terminal rendering', () => {
     expect(bare.status).toBe(0);
     expect(bare.stdout).toContain('next: tracegrove test');
     const json = spawnSync(process.execPath, ['--import', 'tsx', join(ROOT, 'src/cli/main.ts'), 'status', '--json', '--dir', root], { encoding: 'utf8', cwd: ROOT });
-    expect(JSON.parse(json.stdout)).toMatchObject({ schemaVersion: 'tracegrove.status/v1', next: [{ command: 'tracegrove test' }, expect.anything()] });
+    const status = JSON.parse(json.stdout);
+    expect(status).toMatchObject({ schemaVersion: 'tracegrove.status/v1' });
+    expect(status.next[0]).toMatchObject({ command: 'tracegrove test' });
+    expect(status.next.map((n: { command: string }) => n.command)).toContain('tracegrove ui');
   });
 });
 
