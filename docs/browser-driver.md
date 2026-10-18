@@ -142,3 +142,7 @@ Browser polling retains its last completed observation at the deadline so an
 unmet expectation keeps its observed value and remains an assertion failure.
 Cancellation and actual browser errors still propagate; failed mutating actions
 close the browser to revoke late effects.
+
+Capture failures remain infrastructure failures with no accepted video. The sealed `browser.failed` event includes a bounded driver `cause` and `phase` (`capture`, `frame`, or `flush`) when available; unknown exceptions expose neither their message nor arbitrary fields.
+
+Recordings use the persona viewport at native size, rounded up to even dimensions for VP9 (at most one padding pixel per edge), instead of scaling mobile content into a desktop canvas. Fresh-frame and encoder-flush checks remain required.

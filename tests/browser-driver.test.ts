@@ -22,7 +22,7 @@ async function finalVideoPixel(bytes: Buffer): Promise<number[]> {
       const video = element;
       const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       const context = canvas.getContext('2d')!; context.drawImage(video, 0, 0);
-      return Array.from(context.getImageData(310, 10, 1, 1).data);
+      return [...Array.from(context.getImageData(310, 10, 1, 1).data), video.videoWidth, video.videoHeight];
     });
   } finally { await browser.close(); }
 }
@@ -92,6 +92,15 @@ describe('real isolated browser driver', () => {
     const pixel = await finalVideoPixel(await driver!.collectVideo());
     expect(pixel[0]).toBeGreaterThan(200);
     expect(pixel[1]).toBeLessThan(30);
+  });
+
+  it('records mobile pixels without scaling them into a desktop canvas', async () => {
+    driver = await BrowserDriver.start({ origin, deadline: Deadline.in(10_000), viewport: { width: 375, height: 812 } });
+    await execute({ kind: 'navigate', path: '/' });
+    const pixelAndSize = await finalVideoPixel(await driver.collectVideo());
+    expect(pixelAndSize.slice(4)).toEqual([376, 812]);
+    expect(pixelAndSize[0]).toBeGreaterThan(200);
+    expect(pixelAndSize[1]).toBeLessThan(30);
   });
 
   it('rejects cross-origin URL resolution before contacting that origin', async () => {
