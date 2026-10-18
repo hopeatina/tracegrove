@@ -15,7 +15,7 @@ import { WorkflowEvidenceProjection } from './schemas/evidenceProjection.ts';
 import { McpToolCall, McpToolObservation } from './schemas/mcp.ts';
 import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, QualificationRound, QualificationPolicy,
   ReplayFinding, ReplayAssessment, ScenarioReplayAssessment, ScenarioRevisionToken, QualificationRoundIntent,
-  ScenarioActivationIntent, ScenarioActivation } from './schemas/scenario.ts';
+  ScenarioActivationIntent, ScenarioActivation, ScenarioStructuralValidation } from './schemas/scenario.ts';
 
 export * from './canonical.ts';
 export * from './primitives.ts';
@@ -54,6 +54,7 @@ export const SCHEMA_REGISTRY = {
   'workflow.replay-finding/v1': ReplayFinding,
   'workflow.replay-assessment/v1': ReplayAssessment,
   'workflow.scenario-activation/v1': ScenarioActivation,
+  'workflow.scenario-structure/v1': ScenarioStructuralValidation,
   'workflow.git-source-resolution/v1': GitSourceResolution,
   'workflow.git-source-snapshot/v1': GitSourceSnapshot,
   'workflow.case/v1': D.CaseSpec,

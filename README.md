@@ -288,7 +288,10 @@ reviews/source checks across reopen. [Local review storage](docs/local-review-st
 requires trusted host admission and source checking; it does not supply distributed authority.
 
 Scenario qualification now has a typed registration/invalidation API with exact-matrix
-and monotonic-history checks. It registers pending work and invalidates semantic edits;
+and monotonic-history checks. [Structural validation](docs/scenario-structure.md) shares
+the executor's static preflight and atomically moves authorized proposed/degraded
+scenarios to validating, without running them. The lifecycle API records pending work
+and invalidates semantic edits;
 it does not qualify or activate coverage. See [registration contract](docs/qualification-registration.md).
 `reduceQualificationRound` binds an entire verified terminal campaign to the registered
 cell/attempt allocations, retaining failed and mock evidence without granting a live

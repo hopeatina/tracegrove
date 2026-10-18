@@ -7,6 +7,8 @@ import { appendImmutable, checkAdmission, checkLocalScenarioState, storedDefinit
 import type { ScenarioPorts, ScenarioSnapshot } from './scenario.ts';
 import type { LocalQualificationResults } from './localQualificationResults.ts';
 import { localScenarioActivationPorts, type LocalScenarioActivationAuthority } from './localScenarioActivation.ts';
+import { localScenarioStructurePorts, type LocalScenarioStructureAuthority } from './localScenarioStructure.ts';
+import type { LocalScenarioOwner } from './localScenarioOwner.ts';
 
 export interface LocalScenarioAuthority {
   authorize(scope: Scope, action: 'initialize' | 'stage' | 'read' | 'register_round' | 'invalidate'): Promise<void>;
@@ -44,6 +46,13 @@ export class LocalScenarioStore {
     this.ledger.append(this.aggregate, version, event, checkLocalScenarioState(state, this.scope));
   }
   async initialize(raw: unknown, selections: unknown[]): Promise<void> {
+    return this.initializeState(raw, selections, 'validating');
+  }
+  /** Stage an authorized proposal without claiming structural validation or admitting rounds. */
+  async propose(raw: unknown, selections: unknown[]): Promise<void> {
+    return this.initializeState(raw, selections, 'proposed');
+  }
+  private async initializeState(raw: unknown, selections: unknown[], initialState: 'proposed' | 'validating'): Promise<void> {
     const definition = ScenarioDefinition.parse(raw); const parsed = selections.map(selection => SelectionManifest.parse(selection));
     for (const document of [definition, ...parsed]) this.scopedDocument(document);
     const uniqueSelections: SelectionManifest[] = [];
@@ -54,8 +63,8 @@ export class LocalScenarioStore {
     const { version, state } = this.current();
     if (state.scenarios.some(item => item.projection.id === this.id)) throw new Conflict('local scenario is already initialized');
     const projection = ScenarioProjection.parse({ id: this.id, scope: this.scope, aggregateVersion: 1, definitionRef: definition.ref,
-      state: 'validating', invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
-    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [] });
+      state: initialState, invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
+    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], structuralValidations: [] });
     this.write(version, state, 'workflow.scenario.initialized');
   }
   async stage(raw: unknown, selections: unknown[] = []): Promise<void> {
@@ -142,10 +151,16 @@ export class LocalScenarioStore {
       },
       compareAndSwap: (version, projection, admission) => this.commit(version, projection, admission) };
   }
-  activationPorts(results: LocalQualificationResults, authority: LocalScenarioActivationAuthority) {
-    return localScenarioActivationPorts({ id: this.id, scope: structuredClone(this.scope), ledger: this.ledger, readPorts: this.ports(),
+  private owner(): LocalScenarioOwner {
+    return { id: this.id, scope: structuredClone(this.scope), ledger: this.ledger, readPorts: this.ports(),
       authorizeRead: async scope => { this.scoped(this.id, scope); await this.authority.authorize(structuredClone(scope), 'read'); },
       current: () => this.current(), entry: state => this.entry(state), write: (version, state, event) => this.write(version, state, event),
-    }, results, authority);
+    };
+  }
+  activationPorts(results: LocalQualificationResults, authority: LocalScenarioActivationAuthority) {
+    return localScenarioActivationPorts(this.owner(), results, authority);
+  }
+  structuralPorts(authority: LocalScenarioStructureAuthority) {
+    return localScenarioStructurePorts(this.owner(), authority);
   }
 }

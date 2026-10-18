@@ -1,24 +1,17 @@
 import { IdString, ScenarioActivation, ScenarioActivationIntent, ScenarioProjection, ScenarioReplayAssessment,
   digestOfValue, sameScope, verifySelfDigest, type Scope } from '../protocol/index.ts';
-import { LocalLedger } from './ledger.ts';
 import type { LocalQualificationResults } from './localQualificationResults.ts';
-import { storedDefinition, type LocalScenarioState, type StoredScenario } from './localScenarioState.ts';
+import { storedDefinition } from './localScenarioState.ts';
 import { ActivationActor, deriveScenarioActivation } from './activationDecision.ts';
 import { assessScenarioReplay } from './replayAssessment.ts';
-import { validateScenarioSnapshot, type ScenarioReadPorts } from './scenario.ts';
+import { validateScenarioSnapshot } from './scenario.ts';
+import type { LocalScenarioOwner } from './localScenarioOwner.ts';
 import type { ScenarioActivationPorts } from './scenarioActivation.ts';
 import { Conflict } from './errors.ts';
 
 export type LocalScenarioActivationAuthority = Pick<ScenarioActivationPorts, 'resolvePolicy' | 'authorizeActivation'>;
-export interface LocalScenarioActivationOwner {
-  id: string; scope: Scope; ledger: LocalLedger; readPorts: ScenarioReadPorts;
-  authorizeRead(scope: Scope): Promise<void>;
-  current(): { version: number; state: LocalScenarioState };
-  entry(state: LocalScenarioState): StoredScenario;
-  write(version: number, state: LocalScenarioState, event: string): void;
-}
 /** Internal composition over the existing scenario owner; no separate transaction or activation journal. */
-export function localScenarioActivationPorts(owner: LocalScenarioActivationOwner, results: LocalQualificationResults,
+export function localScenarioActivationPorts(owner: LocalScenarioOwner, results: LocalQualificationResults,
   authority: LocalScenarioActivationAuthority): ScenarioActivationPorts {
   const scoped = (scope: Scope) => { if (!sameScope(scope, owner.scope)) throw new Conflict('activation belongs to another scope'); };
   const ports: ScenarioActivationPorts = { ...owner.readPorts, ...results.replayPorts(),

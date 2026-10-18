@@ -48,5 +48,6 @@ concurrency, lost acknowledgement with reopen, pre-write failure, forged submiss
 registration/invalidation/revocation/archive/index races and corrupt persisted reports.
 Host, reviewed-source, physical-lease and issuer authority are explicitly simulated.
 These proofs do not establish hosted activation, deployed staging qualification or
-live regression admission. Promotion/structural transitions, hosted persistence and
+live regression admission. [Structural transitions](scenario-structure.md) have a local
+adapter. Source-plan promotion, hosted persistence and
 activated regression execution remain open.

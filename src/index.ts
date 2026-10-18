@@ -15,6 +15,8 @@ export { editPlan, reviewPlan, type PlanReviewPorts, type PlanRevisionToken, typ
 export { registerQualificationRound, invalidateScenario, qualificationStrataDigest, ScenarioRevisionToken, type ScenarioPorts, type ScenarioSnapshot } from './core/scenario.ts';
 export { LocalScenarioStore, type LocalScenarioAuthority } from './core/localScenarioStore.ts';
 export type { LocalScenarioActivationAuthority } from './core/localScenarioActivation.ts';
+export { validateScenarioStructure, type ScenarioStructurePorts } from './core/scenarioStructure.ts';
+export type { LocalScenarioStructureAuthority } from './core/localScenarioStructure.ts';
 export { prepareQualificationExecution } from './core/qualificationBundle.ts';
 export { QualificationExecutionContext, localQualificationExecutionOwner, type QualificationExecutionOwner } from './core/qualificationExecution.ts';
 export { reduceQualificationRound, type QualificationResultPorts } from './core/qualification.ts';

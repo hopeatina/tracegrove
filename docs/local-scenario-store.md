@@ -67,8 +67,11 @@ The [terminal result index](qualification-results.md#durable-local-terminal-resu
 retains complete rounds through the existing result sink. The
 [activation adapter](scenario-activation.md#local-atomic-storage) publishes the active
 projection, receipt and assessment records in one scenario-registry append.
+`propose` and the [structural validation adapter](scenario-structure.md) separate
+staging a proposal from compiling its frozen execution closure and entering validating
+state. The same operation can revalidate a semantically edited, degraded definition.
 This adapter does not install physical lease provisioning, hosted source/issuer
-authorization, promotion/structural-validation transitions or CLI lifecycle commands.
+authorization, source-plan promotion or CLI lifecycle commands.
 [Registered qualification execution](qualification-registration.md#executing-a-registered-round)
 requires a separate authenticated runtime owner and uses the admission's allocated
 cell identities. Requests without that owner and all activated regression requests
