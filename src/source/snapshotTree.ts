@@ -1,10 +1,11 @@
 import { lstatSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { GitSourceSnapshot, GIT_SNAPSHOT_LIMITS } from '../protocol/schemas/gitSources.ts';
+import { GitSourceSnapshot, GIT_SNAPSHOT_LIMITS, type GitCommitObservation } from '../protocol/schemas/gitSources.ts';
 import { digestOfBytes, sameDigest, verifySelfDigest } from '../protocol/canonical.ts';
 import { Conflict } from '../core/errors.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { assertSnapshotPaths } from './snapshotPaths.ts';
+import { verifyGitSnapshotCommit, verifyGitSnapshotProofMetadata } from './gitObjectProof.ts';
 
 export type SnapshotFile = { path: string; mode: '100644' | '100755'; bytes: Buffer };
 
@@ -13,11 +14,15 @@ export function readGitSnapshotManifest(path: string): GitSourceSnapshot {
   try { snapshot = GitSourceSnapshot.parse(JSON.parse(readBoundedFile(path, 32 * 1024 * 1024).toString('utf8'))); }
   catch { throw new Conflict('Choose a bounded, regular source snapshot manifest with valid metadata'); }
   if (!verifySelfDigest(snapshot)) throw new Conflict('Git snapshot manifest digest mismatch');
+  if (snapshot.commitProof) verifyGitSnapshotProofMetadata(snapshot);
   return snapshot;
 }
 
 /** Read every pinned regular file, ignoring untracked inputs that will never enter the launch copy. */
 export function readGitSnapshotTree(input: unknown, sourceRoot: string): SnapshotFile[] {
+  return readGitSnapshotSource(input, sourceRoot).files;
+}
+export function readGitSnapshotSource(input: unknown, sourceRoot: string): { files: SnapshotFile[]; gitSource: GitCommitObservation | null } {
   const snapshot = GitSourceSnapshot.parse(input);
   if (!verifySelfDigest(snapshot)) throw new Conflict('Git snapshot manifest digest mismatch');
   assertSnapshotPaths(snapshot.files.map(file => file.path));
@@ -30,13 +35,14 @@ export function readGitSnapshotTree(input: unknown, sourceRoot: string): Snapsho
     checked.add(path);
   };
   directory(root);
-  return snapshot.files.map(file => {
+  const files = snapshot.files.map(file => {
     let parent = root;
     for (const segment of file.path.split('/').slice(0, -1)) { parent = join(parent, segment); directory(parent); }
     const bytes = readBoundedFile(join(root, file.path), file.bytes, file.bytes);
     if (!sameDigest(digestOfBytes(bytes), file.digest)) throw new Conflict('Git snapshot file digest mismatch');
     return { path: file.path, mode: file.mode, bytes };
   });
+  return { files, gitSource: snapshot.commitProof ? verifyGitSnapshotCommit(snapshot, files) : null };
 }
 
 /** Exclusively create a private tree; a failed write removes only this owned directory. */

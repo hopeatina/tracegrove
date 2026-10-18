@@ -8,7 +8,8 @@ import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { HostCapabilityObservation, HostLease, IdentityAttestation, freeze, parseAs, sameRef, sameScope, verifySelfDigest, type LaunchRecipe } from '../protocol/index.ts';
+import { HostCapabilityObservation, HostLease, IdentityAttestation, digestOfValue, freeze, parseAs, sameRef, sameScope, verifySelfDigest, type LaunchRecipe, type GitCommitObservation } from '../protocol/index.ts';
+import { verifyGitSnapshotProofMetadata } from '../source/gitObjectProof.ts';
 import { Deadline, sleep } from '../core/deadline.ts';
 import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
@@ -90,6 +91,7 @@ export class LocalProcessHost implements ExecutorHost {
     }
     let identity = sourceIdentityDigest(cwd, launch.identitySourceFiles);
     let observedSnapshotRef: SnapshotLaunchObservation['snapshotRef'] | undefined;
+    let observedGitSource: GitCommitObservation | undefined;
     const runtime = await observeApplicationRuntime(launch.command, cwd, process.env.PATH ?? '', context.signal);
     if (launch.nativeJobs && runtime.family !== 'node') throw new Blocked([{ code: 'native_job_runtime_unsupported', detail: 'The native job bridge requires a Node application' }]);
     const dataDir = join(context.workspaceDir, 'data');
@@ -130,6 +132,10 @@ export class LocalProcessHost implements ExecutorHost {
         const parsed = SnapshotLaunchObservation.safeParse(message);
         if (!parsed.success) return;
         if (!sameRef(parsed.data.snapshotRef, launch.sourceSnapshot!.snapshot.ref) || identityFromEntries(parsed.data.identity.entries).hex !== parsed.data.identity.hex) return failed('observation');
+        try {
+          const expected = launch.sourceSnapshot!.snapshot.commitProof ? { ...verifyGitSnapshotProofMetadata(launch.sourceSnapshot!.snapshot).binding, verification: 'actual_file_bytes' } : undefined;
+          if (digestOfValue(parsed.data.gitSource ?? null).hex !== digestOfValue(expected ?? null).hex) return failed('objects');
+        } catch { return failed('objects'); }
         cleanup(); resolveSource(parsed.data);
       };
       const cleanup = () => { clearTimeout(timer); child.off('message', onMessage); child.off('exit', exited); child.off('error', exited); };
@@ -185,7 +191,7 @@ export class LocalProcessHost implements ExecutorHost {
       const [health, source] = await Promise.all([exitedEarly ? Promise.race([ready, exitedEarly]) : ready, sourceObservation,
         nativeJobs?.waitReady(Deadline.in(launch.readiness.timeoutMs), context.signal)]);
       healthBody = health;
-      if (source) { identity = source.identity; observedSnapshotRef = source.snapshotRef; }
+      if (source) { identity = source.identity; observedSnapshotRef = source.snapshotRef; observedGitSource = source.gitSource; }
     }
     catch (error) {
       stopPolling.abort();
@@ -203,7 +209,7 @@ export class LocalProcessHost implements ExecutorHost {
       issuer: 'local_launcher' as const,
       trustPolicy: 'launcher_computed_source_digest' as const,
       evidence: { files: identity.entries, runtimeProbe: runtime, observedHealthBody: (healthBody ?? null) as never,
-        ...(observedSnapshotRef ? { sourceSnapshotRef: observedSnapshotRef } : {}) },
+        ...(observedSnapshotRef ? { sourceSnapshotRef: observedSnapshotRef } : {}), ...(observedGitSource ? { gitSource: observedGitSource } : {}) },
       observedAt: nowIso(),
     }), 'identity attestation');
     const observation = buildCapabilityObservation({

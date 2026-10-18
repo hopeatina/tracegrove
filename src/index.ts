@@ -30,6 +30,7 @@ export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } 
 export { resolveGitSources, GitSourceReader, GIT_RESOLVER_REF, type GitSourceAuthorization } from './core/gitSources.ts';
 export { materializeGitSnapshot } from './core/gitSnapshot.ts';
 export { readGitSnapshotManifest, readGitSnapshotTree } from './source/snapshotTree.ts';
+export { verifyGitSnapshotCommit, verifyGitSnapshotProofMetadata } from './source/gitObjectProof.ts';
 export { verifyBundle, readVerifiedBundle, readVerifiedVideo, VerifiedBundleSnapshot, writeExecutionBundle, BUNDLE_LIMITS, type VerifiedBundleRecords } from './core/bundle.ts';
 export { LocalResultSink, type ResultSink, type ResultSinkAuthority, type RetainedResult, type ResultPage, type ResultIngestOptions } from './core/resultSink.ts';
 export { compileCase } from './core/compiler.ts';

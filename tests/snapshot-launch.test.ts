@@ -17,7 +17,8 @@ import { readVerifiedBundle, verifyBundle } from '../src/core/bundle.ts';
 import { IdentityAttestation } from '../src/protocol/index.ts';
 import { LocalProcessHost } from '../src/hosts/local.ts';
 import type { ExecutorHost } from '../src/hosts/types.ts';
-import { freeze } from '../src/protocol/index.ts';
+import { digestOfBytes, freeze } from '../src/protocol/index.ts';
+import { verifyGitSnapshotProofMetadata } from '../src/source/gitObjectProof.ts';
 import { resealBundle } from '../conformance/helpers.ts';
 
 afterEach(cleanupGitRepositories);
@@ -48,6 +49,7 @@ it('launches pinned files from a private supervisor-owned tree and seals its sou
     const host = JSON.parse(readFileSync(join(report.runDir, 'bundle', 'cells', name, 'host.json'), 'utf8'));
     const attestation = IdentityAttestation.parse(host.attestations[0]);
     expect(attestation.evidence.sourceSnapshotRef).toEqual(p.snapshot.ref);
+    expect(attestation.evidence.gitSource).toMatchObject({ commit: p.snapshot.commit, algorithm: 'sha1', verification: 'actual_file_bytes' });
     const health = z.object({ cwd: z.string(), untracked: z.literal(false) }).parse(attestation.evidence.observedHealthBody);
     expect(health.cwd).not.toBe(p.sourceDir); expect(health.cwd).toMatch(/\/host\/[^/]+\/source$/);
     expect(existsSync(health.cwd)).toBe(false);
@@ -77,6 +79,26 @@ it('refuses a resealed bundle with an invented snapshot observation', async () =
   const verification = verifyBundle(directory);
   expect(verification.ok).toBe(false);
   expect(verification.problems.some(problem => problem.includes('supervisor observation'))).toBe(true);
+});
+it('refuses a resealed bundle that drops the supervisor Git object observation', async () => {
+  const p = await project(); const { report } = await runTests({ configPath: p.configPath, sourceSnapshot: p.manifestPath, grep: 'notes.list' });
+  const directory = join(report.runDir, 'bundle'); const bundle = readVerifiedBundle(directory);
+  const name = bundle.receipts[0]!.selectionCellId.replace(/[^A-Za-z0-9._-]/g, '_'); const path = join(directory, 'cells', name, 'host.json');
+  const host = JSON.parse(readFileSync(path, 'utf8')); const attestation = IdentityAttestation.parse(host.attestations[0]);
+  const { gitSource: _observed, ...evidence } = attestation.evidence;
+  host.attestations[0] = freeze({ ...attestation, evidence }); writeFileSync(path, JSON.stringify(host)); resealBundle(directory);
+  const verification = verifyBundle(directory); expect(verification.ok).toBe(false);
+  expect(verification.problems.some(problem => problem.includes('Git object observation'))).toBe(true);
+});
+it('blocks a resealed checksum-valid source replacement that does not belong to its claimed Git commit', async () => {
+  const p = await project(); const path = join(p.sourceDir, 'app/app.mjs');
+  const bytes = Buffer.concat([readFileSync(path), Buffer.from('\n// replacement outside the selected Git commit\n')]);
+  writeFileSync(path, bytes);
+  const counterfeit = freeze({ ...p.snapshot, files: p.snapshot.files.map(file => file.path === 'app/app.mjs'
+    ? { ...file, bytes: bytes.length, digest: digestOfBytes(bytes) } : file) });
+  expect(verifyGitSnapshotProofMetadata(counterfeit).verification).toBe('object_links_only');
+  writeFileSync(p.manifestPath, JSON.stringify(counterfeit));
+  expect(() => compileProject(p.configPath, { sourceSnapshot: p.manifestPath })).toThrow('snapshot_source_changed');
 });
 
 it('refuses an eval wrapper before it can execute outside the pinned tree', async () => {

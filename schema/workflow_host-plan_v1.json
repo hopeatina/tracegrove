@@ -185,6 +185,43 @@
                       "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
                       "type": "string"
                     },
+                    "commitProof": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "commitBase64": {
+                          "maxLength": 1398104,
+                          "type": "string"
+                        },
+                        "trees": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "base64": {
+                                "maxLength": 5592408,
+                                "type": "string"
+                              },
+                              "objectId": {
+                                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "objectId",
+                              "base64"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 8192,
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "commitBase64",
+                        "trees"
+                      ],
+                      "type": "object"
+                    },
                     "files": {
                       "items": {
                         "additionalProperties": false,
@@ -217,6 +254,10 @@
                               "100644",
                               "100755"
                             ],
+                            "type": "string"
+                          },
+                          "objectId": {
+                            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
                             "type": "string"
                           },
                           "path": {

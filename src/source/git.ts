@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { devNull } from 'node:os';
 import { resolve } from 'node:path';
@@ -7,6 +6,8 @@ import { Conflict } from '../core/errors.ts';
 import { GitObjectId, GitRevision, RepositoryPath } from '../protocol/primitives.ts';
 import { GIT_SNAPSHOT_LIMITS } from '../protocol/schemas/gitSources.ts';
 import { assertSnapshotPaths } from './snapshotPaths.ts';
+import { gitObjectId } from './gitObjectProof.ts';
+import { GitCommitProof } from '../protocol/schemas/gitSources.ts';
 
 export type GitChange = { path: string; oldMode: string; newMode: string; oldId: string; newId: string; status: 'A' | 'D' | 'M' | 'T' };
 
@@ -40,12 +41,12 @@ export class GitRepository {
   private object(type: 'commit' | 'tree' | 'blob', id: string, bound: number): Buffer {
     GitObjectId.parse(id);
     const bytes = this.run(['cat-file', type, id], bound);
-    const actual = createHash(id.length === 40 ? 'sha1' : 'sha256').update(`${type} ${bytes.length}\0`).update(bytes).digest('hex');
+    const actual = gitObjectId(type, bytes, id.length === 40 ? 'sha1' : 'sha256');
     if (actual !== id) throw new Conflict(`Git ${type} bytes disagree with the immutable object identity`);
     return bytes;
   }
-  private verifyRevision(id: string): void {
-    GitObjectId.parse(id); if (this.verified.has(id)) return;
+  private revisionObjects(id: string) {
+    GitObjectId.parse(id);
     const commit = this.object('commit', id, 1_048_576);
     const root = /^tree ([a-f0-9]{40}|[a-f0-9]{64})\n/.exec(commit.toString('utf8'))?.[1];
     if (!root) throw new Conflict('Git commit has no valid root tree');
@@ -57,8 +58,18 @@ export class GitRepository {
       if (match[1] === 'tree') trees.add(match[2]!);
     }
     if (trees.size > 8192) throw new Conflict('selected Git tree closure exceeds supported coverage');
+    return { commit, trees };
+  }
+  private verifyRevision(id: string): void {
+    GitObjectId.parse(id); if (this.verified.has(id)) return;
+    const { trees } = this.revisionObjects(id);
     for (const tree of trees) this.object('tree', tree, 4 * 1024 * 1024);
     this.verified.add(id);
+  }
+  commitProof(id: string): GitCommitProof {
+    const { commit, trees } = this.revisionObjects(id);
+    return GitCommitProof.parse({ commitBase64: commit.toString('base64'),
+      trees: [...trees].sort().map(objectId => ({ objectId, base64: this.object('tree', objectId, 4 * 1024 * 1024).toString('base64') })) });
   }
   mergeBase(base: string, head: string): { commit: string | null; reason: string | null } {
     // Require an unambiguous observed merge base; missing history never becomes an invented empty base.
@@ -98,7 +109,7 @@ export class GitRepository {
     return this.object('blob', id, 1_048_576);
   }
   /** Complete regular-file tree, rehashed from objects; never reads the checkout. */
-  snapshot(commit: string): Array<{ path: string; mode: '100644' | '100755'; bytes: Buffer }> {
+  snapshot(commit: string): Array<{ path: string; mode: '100644' | '100755'; bytes: Buffer; objectId: string }> {
     this.verifyRevision(commit);
     const listing = new TextDecoder('utf-8', { fatal: true }).decode(this.run(['ls-tree', '-r', '-z', '--full-tree', commit], 4 * 1024 * 1024));
     const records = listing.split('\0');
@@ -110,7 +121,7 @@ export class GitRepository {
       const path = RepositoryPath.parse(match[3]);
       const bytes = this.blob(match[2]!); total += bytes.length;
       if (total > GIT_SNAPSHOT_LIMITS.totalBytes) throw new Conflict('complete Git snapshot exceeds the total byte bound');
-      return { path, mode: match[1] as '100644' | '100755', bytes };
+      return { path, mode: match[1] as '100644' | '100755', bytes, objectId: match[2]! };
     });
     assertSnapshotPaths(entries.map(entry => entry.path));
     return entries;

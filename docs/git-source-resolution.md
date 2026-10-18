@@ -90,9 +90,11 @@ digests. Dependency installations, interpreter binaries and application environm
 remain separately supplied inputs; this is not a process sandbox or a complete
 dependency attestation. The CLI refuses snapshots from another local scope.
 
-This is local source-content binding, not authenticated Git/remote/deployment
-identity or a runtime `SourceSelection`. A self-sealed manifest does not prove
-who resolved its commit. The host does not yet populate repository observations
+New snapshots carry [Git object proofs](git-object-proof.md). The supervisor checks the
+actual private tree against blob/tree/commit object identities and records that fact.
+Metadata-only checks remain distinct from actual-file verification. A self-sealed
+manifest does not prove who resolved its commit, remote repository ownership or deployed
+identity. This is not a runtime `SourceSelection`. The host does not yet populate repository observations
 or promote qualification from this manifest. Authenticated resolver/admission
 policy, reviewed lifecycle execution and hosted activation remain separate work.
 

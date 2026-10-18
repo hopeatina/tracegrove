@@ -2,7 +2,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import { readGitSnapshotTree, writeGitSnapshotTree } from '../source/snapshotTree.ts';
+import { readGitSnapshotSource, readGitSnapshotTree, writeGitSnapshotTree } from '../source/snapshotTree.ts';
 import { sourceIdentityDigest } from './sourceIdentity.ts';
 import type { LaunchRecipe } from '../protocol/schemas/definitions.ts';
 import { pinnedArguments } from './pinnedArguments.ts';
@@ -51,7 +51,7 @@ process.once('message', (message: Launch) => {
   workspaceDir = message.workspaceDir;
   let cwd = message.cwd; let args = message.args;
   if (message.sourceSnapshot) {
-    let stage: 'read' | 'template' | 'copy' | 'identity' = 'read';
+    let stage: 'read' | 'template' | 'copy' | 'objects' | 'identity' = 'read';
     try {
       const binding = message.sourceSnapshot; const root = resolve(binding.root); const within = relative(root, cwd);
       if (within.startsWith('..') || isAbsolute(within) || (within || '.') !== binding.cwd) throw new Error('snapshot cwd outside binding');
@@ -60,11 +60,13 @@ process.once('message', (message: Launch) => {
       args = pinnedArguments(message.args, cwd, root, binding.snapshot, message.runtimeFamily);
       stage = 'copy';
       const privateRoot = join(workspaceDir, 'source'); writeGitSnapshotTree(files, privateRoot);
+      stage = 'objects';
+      const { gitSource } = readGitSnapshotSource(binding.snapshot, privateRoot);
       cwd = resolve(privateRoot, within);
       stage = 'identity';
       const identity = sourceIdentityDigest(cwd, message.identitySourceFiles);
       if (!process.connected) { void stop(); return; }
-      process.send?.({ kind: 'host.source', snapshotRef: binding.snapshot.ref, identity }, undefined, undefined, error => { if (error) void stop(); });
+      process.send?.({ kind: 'host.source', snapshotRef: binding.snapshot.ref, identity, ...(gitSource ? { gitSource } : {}) }, undefined, undefined, error => { if (error) void stop(); });
     } catch {
       if (process.connected) process.send?.({ kind: 'host.source_failed', stage }, undefined, undefined, () => { void stop(); });
       else void stop();

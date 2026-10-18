@@ -4,11 +4,12 @@ import { z } from 'zod';
 import { digestOfBytes, sha256Hex } from '../protocol/canonical.ts';
 import { HexSha256, RefSchema } from '../protocol/primitives.ts';
 import { Blocked } from '../core/errors.ts';
+import { GitCommitObservation } from '../protocol/schemas/gitSources.ts';
 
 export const SourceIdentity = z.object({ hex: HexSha256, entries: z.array(z.object({ path: z.string(), sha256: HexSha256 }).strict()).min(1).max(256) }).strict();
-export const SnapshotLaunchObservation = z.object({ kind: z.literal('host.source'), snapshotRef: RefSchema, identity: SourceIdentity }).strict();
+export const SnapshotLaunchObservation = z.object({ kind: z.literal('host.source'), snapshotRef: RefSchema, identity: SourceIdentity, gitSource: GitCommitObservation.optional() }).strict();
 export type SnapshotLaunchObservation = z.infer<typeof SnapshotLaunchObservation>;
-export const SnapshotLaunchFailure = z.object({ kind: z.literal('host.source_failed'), stage: z.enum(['read', 'template', 'copy', 'identity']) }).strict();
+export const SnapshotLaunchFailure = z.object({ kind: z.literal('host.source_failed'), stage: z.enum(['read', 'template', 'copy', 'objects', 'identity']) }).strict();
 
 export function identityFromEntries(entries: SourceIdentity['entries']): SourceIdentity {
   const sorted = [...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);

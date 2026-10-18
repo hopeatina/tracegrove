@@ -5,6 +5,7 @@ import { GitRepository } from '../source/git.ts';
 import { GIT_RESOLVER_REF, type GitSourceAuthorization } from './gitSources.ts';
 import { Conflict } from './errors.ts';
 import { writeGitSnapshotTree } from '../source/snapshotTree.ts';
+import { verifyGitSnapshotCommit } from '../source/gitObjectProof.ts';
 
 /** Materialize selected immutable source facts. Does not execute code, install dependencies or grant authority. */
 export async function materializeGitSnapshot(input: { resolution: unknown; repositoryRef: unknown; side: unknown; root: string; output: string }, authorize: GitSourceAuthorization) {
@@ -21,8 +22,10 @@ export async function materializeGitSnapshot(input: { resolution: unknown; repos
   const binding = { resolutionRef: resolution.ref, repositoryRef, side, commit };
   const snapshot = GitSourceSnapshot.parse(freeze({ schemaVersion: 'workflow.git-source-snapshot/v1' as const,
     ref: { id: `git-snapshot-${digestOfValue(binding).hex}`, revision: '1' }, scope: resolution.scope, ...binding,
-    files: entries.map(entry => ({ path: entry.path, mode: entry.mode, digest: digestOfBytes(entry.bytes), bytes: entry.bytes.length })),
+    files: entries.map(entry => ({ path: entry.path, mode: entry.mode, digest: digestOfBytes(entry.bytes), bytes: entry.bytes.length, objectId: entry.objectId })),
+    commitProof: git.commitProof(commit),
   }));
+  verifyGitSnapshotCommit(snapshot, entries);
   // Check authorization again after object reads, before allocating a private output.
   await authorize(structuredClone(resolution.scope), structuredClone(repositoryRef));
   const output = resolve(input.output); const sourceDir = join(output, 'source');

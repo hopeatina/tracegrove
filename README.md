@@ -339,7 +339,10 @@ after rechecking the bundle. See the browser sample and guide for the exact synt
 Still open: full runtime source selection,
 hosted review and qualification, coordination acceptance, `seed --apply`, and distributed crash recovery.
 Selected Git base/head trees can now be materialized into private independent
-directories with `source-materialize`; the [source guide](docs/git-source-resolution.md#run-selected-revisions-independently)
+directories with [Git object proofs](docs/git-object-proof.md) checked against actual
+file bytes and rechecked by the launch supervisor. Metadata-only proof checks do not
+establish runtime verification. Repository tuple/issuer qualification remains separate.
+Use `source-materialize`; the [source guide](docs/git-source-resolution.md#run-selected-revisions-independently)
 shows running the same saved flow against each revision. `test --source-snapshot`
 binds local launch content to the manifest: the supervisor verifies and copies the
 pinned tree into its owned workspace. Automatic authenticated runtime revision
