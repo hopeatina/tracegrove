@@ -298,7 +298,11 @@ and failed history, requires at least two independent live campaigns and checks 
 admitted round. [Replay assessment](docs/replay-assessment.md) is read-only.
 `activateScenario` rechecks that evidence and publishes an authenticated activation through
 an atomic host port, with exact round selection and idempotent receipt recovery. See
-[activation contract](docs/scenario-activation.md); hosted authority and execution wiring remain open.
+[activation contract](docs/scenario-activation.md); hosted authority and activated regression execution remain open.
+`LocalScenarioStore` persists actual registration on the local ledger. The SDK's
+`prepareQualificationExecution` and explicit runtime owner connect those admissions
+to new executions using allocated cell identities, with current authority checks
+before effects. See [registered execution](docs/qualification-registration.md#executing-a-registered-round).
 
 `result-ingest --bundle <run/bundle> --sink <directory>` retains an independently
 re-verified local bundle in the existing single-writer ledger and an immutable

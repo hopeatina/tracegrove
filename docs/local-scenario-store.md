@@ -64,10 +64,11 @@ controller and inaccessible to candidate processes. Local hashes and projection
 states are not signatures or hosted approval receipts.
 
 This adapter does not install activation/result persistence, physical lease
-provisioning, hosted source/issuer authorization or CLI lifecycle commands. The
-executor still refuses qualification/regression requests until the authenticated
-admission and per-cell allocated identities are wired through execution. Do not
-rename trial evidence as qualification merely because this registry exists.
+provisioning, hosted source/issuer authorization or CLI lifecycle commands.
+[Registered qualification execution](qualification-registration.md#executing-a-registered-round)
+requires a separate authenticated runtime owner and uses the admission's allocated
+cell identities. Requests without that owner and all activated regression requests
+remain refused. A registration record cannot relabel trial evidence as qualification.
 
 Tests use real journal bytes, reopen recovery and competing operations. Host
 authentication, structural promotion and physical lease checks are explicitly

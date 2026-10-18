@@ -81,6 +81,23 @@ export class LocalScenarioStore {
     const snapshot = await this.read(this.id, scope); const admission = snapshot.admissions.find(item => sameRef(item.ref, ref));
     if (!admission) throw new Conflict('qualification admission is not registered'); return structuredClone(admission);
   }
+  /** Execution uses this owner's actual writer, never a producer's copied registration document. */
+  async executionContext(ref: Ref, scope: Scope, ledger: LocalLedger) {
+    this.scoped(this.id, scope);
+    if (ledger !== this.ledger) throw new Conflict('qualification execution must use the registration owner ledger');
+    await this.authority.authorize(structuredClone(this.scope), 'read');
+    const { version, state } = this.current(); const entry = this.entry(state);
+    const admission = entry.admissions.find(item => sameRef(item.ref, ref));
+    if (!admission || !['validating', 'active'].includes(entry.projection.state) ||
+        !sameRef(admission.scenarioRef, entry.projection.definitionRef) || admission.invalidationEpoch !== entry.projection.invalidationEpoch) throw new Conflict('qualification registration is missing, invalidated or not executable');
+    const definition = storedDefinition(entry, admission.scenarioRef);
+    await this.authority.validateDefinition(structuredClone(definition));
+    await this.authority.validateStateLeases(structuredClone(admission));
+    await this.authority.authorize(structuredClone(this.scope), 'read');
+    if (this.current().version !== version) throw new Conflict('qualification authority changed during execution admission');
+    return structuredClone({ admission, definition, selection: storedSelection(entry, admission.selectionManifestRef),
+      matrix: storedSelection(entry, admission.qualificationMatrixRef) });
+  }
   private async commit(expected: number, raw: ScenarioProjection, rawAdmission: QualificationRoundAdmission | null): Promise<boolean> {
     const next = ScenarioProjection.parse(raw); this.scoped(next.id, next.scope);
     const admission = rawAdmission === null ? null : QualificationRoundAdmission.parse(rawAdmission);

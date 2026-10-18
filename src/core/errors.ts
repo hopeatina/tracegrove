@@ -2,6 +2,7 @@ export type ReasonCode = string;
 
 /** Shared by live execution and independent bundle reduction. */
 const INFRASTRUCTURE_STEP_FAILURES = new Set([
+  'qualification_authority_unavailable',
   'transport_failure', 'deadline_exceeded', 'native_job_unavailable', 'native_job_queue_unavailable',
   'native_job_request_too_large', 'native_job_response_invalid', 'native_job_identity_missing', 'native_job_identity_mismatch', 'native_job_secret_echo',
   'mcp_driver_unavailable', 'mcp_origin_not_admitted', 'mcp_endpoint_invalid', 'mcp_request_too_large', 'mcp_capability_missing', 'mcp_response_invalid', 'mcp_protocol_failure', 'mcp_secret_echo',

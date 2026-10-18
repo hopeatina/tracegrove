@@ -5,7 +5,7 @@
  * The reducer derives every verdict; drivers and hosts only supply observations.
  */
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CostObservation, CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
@@ -34,6 +34,7 @@ import type { FrozenBundle } from './planner.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, reduceCampaign, reduceCell } from './reducer.ts';
 import { targetFromComponentAttestations } from './targetObservation.ts';
+import { authorizeQualificationExecution, type QualificationExecutionOwner } from './qualificationExecution.ts';
 
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
 
@@ -51,6 +52,7 @@ export type RunOptions = {
   signal?: AbortSignal;
   onEvent?: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => void;
   hosts?: { local?: ExecutorHost; mock?: ExecutorHost };
+  qualification?: QualificationExecutionOwner;
 };
 
 class DocStore {
@@ -97,8 +99,9 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   if (digestOfValue(request.requestedScope).hex !== digestOfValue(scope).hex) {
     throw new Blocked([{ code: 'scope_mismatch', detail: 'request scope differs from the authenticated controller owner' }]);
   }
-  if (request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) {
-    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'reviewed source plans, qualification and activated regression admission require the unimplemented lifecycle authority' }]);
+  if ((request.purpose === 'qualification' || request.purpose === 'regression' || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) &&
+      !(request.purpose === 'qualification' && options.qualification)) {
+    throw new Blocked([{ code: 'scenario_lifecycle_unavailable', detail: 'qualification requires an authenticated runtime owner; source trials and activated regression admission are unavailable' }]);
   }
   const docs = new DocStore(bundle.documents);
   const selection = docs.get<SelectionManifest>(SelectionManifest, request.selectionManifestRef, 'selection');
@@ -144,45 +147,62 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   });
 
   // Idempotent admission: the same frozen key reconciles the existing execution.
-  const idemAggregate = `idempotency:${request.idempotencyKey}`;
+  const qualification = options.qualification && request.purpose === 'qualification'
+    ? await authorizeQualificationExecution(options.qualification, request, selection, ledger, null) : null;
+  if (qualification && resolve(join(stateDir, 'ledger')) !== resolve(ledger.dir)) throw new Conflict('qualification state directory must belong to the registration owner ledger');
+  const idemAggregate = qualification ? `qualification-execution:${qualification.admission.ref.digest.hex}` : `idempotency:${request.idempotencyKey}`;
   const existing = ledger.current(idemAggregate);
   let predecessor: Ref | null = null;
   let attemptNumber = 1;
   if (existing) {
-    const executionId = String(existing.data.executionId);
-    const admitted = ledger.history(`execution:${executionId}`).find((entry) => entry.type === 'admitted');
+    const admissionHistory = qualification ? ledger.history(idemAggregate) : ledger.history(`execution:${String(existing.data.executionId)}`);
+    const admitted = admissionHistory.find((entry) => entry.type === 'admitted');
+    const executionId = qualification ? String(admitted?.data.executionId) : String(existing.data.executionId);
     if (admitted?.data.requestDigest !== request.ref.digest.hex) throw new Conflict('idempotency key is already bound to a different frozen request');
-    const state = ledger.current(`execution:${executionId}`);
+    if (qualification && admitted.data.stateDir !== resolve(stateDir)) throw new Conflict('qualification execution is already bound to another state directory');
+    const state = qualification ? existing : ledger.current(`execution:${executionId}`);
     if (state && state.type === 'finalized') {
       return { ...(state.data.summary as RunSummary), redelivered: true };
     }
+    if (qualification) throw new Conflict('qualification attempt is incomplete; reconcile it instead of replaying allocated effects');
     if (state && state.type !== 'interrupted') throw new Conflict(`request ${request.idempotencyKey} is already in flight as ${executionId} (${state.type}); redelivery reconciles, it does not start another attempt`);
     predecessor = (state?.data.receiptRef as Ref | undefined) ?? null;
     attemptNumber = Number(existing.data.attemptNumber ?? 1) + 1;
   }
   if (request.limits.costCeilingCents < bundle.estimatedCostCents) throw new Blocked([{ code: 'insufficient_budget_headroom', detail: `estimate ${bundle.estimatedCostCents} > ceiling ${request.limits.costCeilingCents}` }]);
 
-  const executionId = newId('exec');
-  const attemptId = newId('attempt');
+  const executionId = qualification?.admission.attempts[0]!.executionId ?? newId('exec');
+  const attemptId = qualification?.admission.attempts[0]!.attemptId ?? newId('attempt');
+  if (qualification && ledger.current(`execution:${executionId}`)) throw new Conflict('qualification allocation was already claimed; reconcile its execution');
   const generation = 1;
   const executionDir = join(stateDir, 'executions', executionId);
-  mkdirSync(executionDir, { recursive: true });
+  mkdirSync(join(stateDir, 'executions'), { recursive: true });
+  mkdirSync(executionDir, { recursive: !qualification });
+  const executionAggregate = qualification ? idemAggregate : `execution:${executionId}`;
   const reservation = parseAs(BudgetReservation, freeze({
     schemaVersion: 'workflow.budget-reservation/v1' as const, ref: { id: `${executionId}.reservation`, revision: '1' }, scope,
     campaignId: request.campaignId, executionId, attemptId, actionCents: request.limits.costCeilingCents, cleanupCents: 0, uncertainCents: 0, state: 'reserved' as const, reservedAt: nowIso(),
   }), 'budget reservation');
-  ledger.append(`execution:${executionId}`, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, attemptId, generation, attemptNumber, reservation: reservation.ref });
-  ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
+  ledger.append(executionAggregate, 0, 'admitted', { requestDigest: request.ref.digest.hex, idempotencyKey: request.idempotencyKey, executionId, attemptId, generation, attemptNumber, reservation: reservation.ref,
+    ...(qualification ? { stateDir: resolve(stateDir), qualificationRoundRef: qualification.admission.ref } : {}) });
+  if (!qualification) ledger.append(idemAggregate, existing ? existing.version : 0, 'bound', { executionId, attemptNumber });
   const artifacts = new LocalArtifactStore(join(stateDir, 'artifacts'));
   const campaignDeadline = Deadline.in(request.limits.deadlineMs);
   const receipts: ExecutionReceipt[] = [];
   const hosts = { local: options.hosts?.local ?? new LocalProcessHost(), mock: options.hosts?.mock ?? new MockLoopbackHost() };
-  let phaseVersion = ledger.version(`execution:${executionId}`);
+  let phaseVersion = ledger.version(executionAggregate);
 
   for (const item of prepared) {
-    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope, executionId, attemptId, generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, executionDir, hosts, bundle, onEvent: options.onEvent });
+    const allocation = qualification?.admission.attempts.find(a => a.selectionCellId === item.cell.selectionCellId);
+    const beforeEffect = qualification && options.qualification ? async () => {
+      try { await authorizeQualificationExecution(options.qualification!, request, selection, ledger, item.cell.selectionCellId); }
+      catch { throw new HttpStepError('qualification_authority_unavailable', 'Qualification registration, source, state or effect authority is no longer current'); }
+    } : undefined;
+    const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope,
+      executionId: allocation?.executionId ?? executionId, attemptId: allocation?.attemptId ?? attemptId,
+      generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, executionDir, hosts, bundle, onEvent: options.onEvent, beforeEffect });
     receipts.push(receipt);
-    phaseVersion = ledger.append(`execution:${executionId}`, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
+    phaseVersion = ledger.append(executionAggregate, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
   }
   const campaign = reduceCampaign({ scope, campaignId: request.campaignId, requestRef: request.ref, selection, receipts });
   writeExecutionBundle({ dir: executionDir, bundle, request, selection, receipts, campaign });
@@ -190,7 +210,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     executionId, attemptId, generation, campaignId: request.campaignId, outcome: campaign.outcome, exitCode: EXIT_CODES[campaign.outcome],
     reasonCodes: [...new Set(receipts.flatMap((r) => r.reasonCodes))], receipts, campaign, executionDir, redelivered: false,
   };
-  ledger.append(`execution:${executionId}`, phaseVersion, 'finalized', { outcome: campaign.outcome, campaignResultRef: campaign.ref, receiptRef: receipts[0]?.ref ?? null, summary: { ...summary, receipts: [], campaign } });
+  ledger.append(executionAggregate, phaseVersion, 'finalized', { outcome: campaign.outcome, campaignResultRef: campaign.ref, receiptRef: receipts[0]?.ref ?? null, summary: { ...summary, receipts: [], campaign } });
   return summary;
 }
 
@@ -200,6 +220,7 @@ type CellContext = {
   executionId: string; attemptId: string; generation: number; attemptNumber: number; predecessor: Ref | null; reservation: BudgetReservation;
   campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; executionDir: string;
   hosts: { local: ExecutorHost; mock: ExecutorHost }; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
+  beforeEffect?: (() => Promise<void>) | undefined;
 };
 
 async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
@@ -228,6 +249,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const host = hostPlan.adapter === 'mock_loopback' ? ctx.hosts.mock : ctx.hosts.local;
   const mockResponses = hostPlan.mockResponsesRef ? ctx.docs.get<MockResponses>(MockResponses, hostPlan.mockResponsesRef, 'mock responses') : null;
   try {
+    if (ctx.beforeEffect) await ctx.beforeEffect();
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
   } catch (error) {
@@ -302,6 +324,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const allocatingEvent = log.emit('fixture.allocating', null, { entityKey, actionId: action.actionId, effectKey: `${attemptId}:${entityKey}` });
       try {
         if (action.effect !== 'create') throw new HttpStepError('fixture_ownership_unavailable', 'only a registered create action can allocate an owned fixture');
+        if (ctx.beforeEffect) await ctx.beforeEffect();
         uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
         if (action.expectStatus !== null && observation.status !== action.expectStatus) throw new HttpStepError('unexpected_status', `${action.actionId} returned ${observation.status}, expected ${action.expectStatus}`);
@@ -385,6 +408,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
       let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation;
+      if (ctx.beforeEffect) await ctx.beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
@@ -518,7 +542,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     executionId, campaignId: request.campaignId, attemptId, attemptNumber: ctx.attemptNumber, predecessorAttemptRef: ctx.predecessor, retryReason: ctx.predecessor ? 'redelivery after interrupted attempt' : null,
     scope, requesterId: ownerFor(scope), caseRef: spec.ref, personaRef: item.persona.ref, surfaceBindingRef: item.binding.ref, variantRef: null,
     executionHostRef: hostPlan.ref, hostLeaseRef: session?.lease.ref ?? { id: `${executionId}.host-lease.unissued`, revision: '0', digest: digestOfValue('unissued') }, hostObservationRefs: session ? [session.observation.ref] : [],
-    environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: null,
+    environment, idempotencyKey: request.idempotencyKey, requestRef: request.ref, selectionCellId: cell.selectionCellId, qualificationRoundRef: request.qualificationRoundRef,
     fixtureManifestRef: fixtureManifest?.ref ?? null, boundaryObservationRefs: boundaryObservations.map((b) => b.ref), proofClaim: spec.proofClaim,
     coverage: reduction.coverage, eventsDigest: eventsArtifact.ref.digest, assertions, steps: stepObservations, artifacts: allArtifacts, accounting,
     performance: stepObservations.filter((s) => s.timing).map((s) => ({ metric: `step.${s.stepId}.duration`, boundary: compiled.stepsById.get(s.stepId)!.kind.startsWith('ui.') ? 'browser' : 'http', clock: 'monotonic' as const, cellId: cell.selectionCellId, valueMs: s.timing!.durationMs, censored: false, warm: false, strata: { host: hostPlan.adapter } })),
