@@ -9,9 +9,9 @@ const common = { json: Bool, help: Bool };
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
   init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
-  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, 'source-snapshot': Text.optional() }).strict(),
+  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional() }).strict(),
   list: z.object({ ...common, config: Text.optional() }).strict(),
-  compile: z.object({ ...common, config: Text.optional(), 'source-snapshot': Text.optional() }).strict(),
+  compile: z.object({ ...common, config: Text.optional(), 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional() }).strict(),
   show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),
   ui: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), port: Text.optional() }).strict(),
   discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional() }).strict(),

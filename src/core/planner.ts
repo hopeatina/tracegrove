@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import {
   ActionRegistry, AuthRecipe, CampaignFixturePlan, CaseFixturePlan, CaseSpec, ComponentProfile, EffectiveConfig,
   EnvironmentPlan, FidelityPlan, FidelityProfile, HostPlan, IntelligencePolicy, LogicalPayload, Persona,
-  RunRequest, RunnerProfile, SeedRecipe, SelectionManifest, SurfaceBinding, SurfacePack, digestOfValue, freeze,
+  RunRequest, RunnerProfile, SeedRecipe, SelectionManifest, SurfaceBinding, SurfacePack, SourceSelection, digestOfValue, freeze,
   parseAs, refKey, sameDigest, type Ref, type Scope, type TargetTuple,
 } from '../protocol/index.ts';
 import { runnerCapabilitiesFor } from './runnerCapabilities.ts';
@@ -18,6 +18,8 @@ import { mcpSdkAvailable } from '../adapters/mcp/capabilities.ts';
 import { Blocked } from './errors.ts';
 import { materializeLogicalPayload } from './generators.ts';
 import { REDUCER_REF } from './reducer.ts';
+import { snapshotRepository } from './snapshotRepository.ts';
+import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 import type { LoadedProject } from './corpus.ts';
 import { newId } from './clock.ts';
 
@@ -69,6 +71,7 @@ export function plan(input: PlanInput): FrozenBundle {
   const intelligencePolicy = corpus.getAs(IntelligencePolicy, fileRef(project.config.intelligencePolicyRef));
   const componentProfile = corpus.getAs(ComponentProfile, environmentPlan.componentProfileRef);
   const capabilities = runnerCapabilitiesFor(runnerProfile);
+  const sourceSelection = project.config.sourceSelectionRef ? corpus.getAs(SourceSelection, fileRef(project.config.sourceSelectionRef)) : null;
   void authRecipe;
 
   if (environmentPlan.class !== profile.class) {
@@ -89,7 +92,7 @@ export function plan(input: PlanInput): FrozenBundle {
     requiredComponents: componentProfile.components.filter((c) => c.required).map((c) => c.componentId),
     excludedComponents: componentProfile.components.filter((c) => !c.required).map((c) => ({ component: c.componentId, reason: c.exclusionReason ?? 'excluded by profile' })),
     components: componentProfile.components.map((c) => ({ componentId: c.componentId, kind: c.kind, identity: c.expectedIdentity })),
-    repositories: [],
+    repositories: hostPlan.launch?.sourceSnapshot?.repositoryRole ? [snapshotRepository(hostPlan.launch.sourceSnapshot)] : [],
     corpus: corpus.manifest.ref,
     runner: capabilities.ref,
     evaluator: REDUCER_REF,
@@ -178,7 +181,7 @@ export function plan(input: PlanInput): FrozenBundle {
 
     cells.push({
       selectionCellId: id, required: entry.required, caseRef: spec.ref, personaRef: persona.ref,
-      surfaceBindingRef: binding.ref, variantRef: null, sourceSelectionRef: null,
+      surfaceBindingRef: binding.ref, variantRef: null, sourceSelectionRef: sourceSelection?.ref ?? null,
       environmentRef: environmentPlan.ref, expectedTarget, executionHostRef: hostPlan.ref,
     });
     caseRefs.push(spec.ref);
@@ -227,7 +230,7 @@ export function plan(input: PlanInput): FrozenBundle {
       purpose: input.purpose ?? 'trial',
       sourcePlanRef: null, reviewRef: null, scenarioRefs: [], qualificationRoundRef: null,
       effectiveConfigRef: effectiveConfig.ref,
-      sourceSelectionRef: null,
+      sourceSelectionRef: sourceSelection?.ref ?? null,
       executionHostRef: hostPlan.ref,
       intelligencePolicyRef: intelligencePolicy.ref,
       fidelityPlanRef: fidelityPlan.ref,
@@ -240,7 +243,12 @@ export function plan(input: PlanInput): FrozenBundle {
       limits: { deadlineMs: profile.budget.deadlineMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: profile.budget.costCeilingCents, maxBrowserActions: 0, maxArtifactBytes: 64 * 1024 * 1024, diagnosticRetries: 0, concurrencyGroup: project.config.project },
       replayOf: null,
     }), 'run request');
-    keep(request);
+    for (const cell of selection.cells) {
+      const host = corpus.getAs(HostPlan, cell.executionHostRef);
+      for (const detail of repositorySelectionProblems(request, cell, host, documents)) blockers.push({ code: 'repository_source_binding_invalid', detail, owner: 'operator', action: 'compile a complete pinned resolver-head selection', cellId: cell.selectionCellId });
+    }
+    if (blockers.length) request = null;
+    else keep(request);
   }
   return {
     schemaVersion: 'workflow.frozen-request-bundle/v1',

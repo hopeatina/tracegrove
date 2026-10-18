@@ -341,7 +341,10 @@ hosted review and qualification, coordination acceptance, `seed --apply`, and di
 Selected Git base/head trees can now be materialized into private independent
 directories with [Git object proofs](docs/git-object-proof.md) checked against actual
 file bytes and rechecked by the launch supervisor. Metadata-only proof checks do not
-establish runtime verification. Repository tuple/issuer qualification remains separate.
+establish runtime verification. Add `--source-repository-role application` to bind a
+single resolver-head snapshot to its measured Git-object repository tuple and frozen
+source selection. Local revision qualification is covered; hosted issuer authentication
+and remote repository ownership remain separate.
 Use `source-materialize`; the [source guide](docs/git-source-resolution.md#run-selected-revisions-independently)
 shows running the same saved flow against each revision. `test --source-snapshot`
 binds local launch content to the manifest: the supervisor verifies and copies the

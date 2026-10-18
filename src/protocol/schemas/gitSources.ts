@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RefSchema, ScopeSchema, GitRevision, GitObjectId, RepositoryPath, DigestSchema } from '../primitives.ts';
+import { RefSchema, ScopeSchema, GitRevision, GitObjectId, RepositoryPath, DigestSchema, IdString } from '../primitives.ts';
 import { RevisionMatrix } from './source.ts';
 
 export const GitRepositoryBinding = z.object({ repositoryRef: RefSchema, root: z.string().min(1).max(8192) }).strict();
@@ -35,5 +35,5 @@ export const GitSourceSnapshot = z.object({
   commitProof: GitCommitProof.optional(),
 }).strict();
 export type GitSourceSnapshot = z.infer<typeof GitSourceSnapshot>;
-export const GitSnapshotBinding = z.object({ snapshot: GitSourceSnapshot, root: z.string().min(1).max(8192), cwd: z.union([z.literal('.'), RepositoryPath]) }).strict();
+export const GitSnapshotBinding = z.object({ snapshot: GitSourceSnapshot, root: z.string().min(1).max(8192), cwd: z.union([z.literal('.'), RepositoryPath]), repositoryRole: IdString.optional() }).strict();
 export type GitSnapshotBinding = z.infer<typeof GitSnapshotBinding>;

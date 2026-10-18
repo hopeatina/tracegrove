@@ -173,6 +173,12 @@
                     }
                   ]
                 },
+                "repositoryRole": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
                 "root": {
                   "maxLength": 8192,
                   "minLength": 1,

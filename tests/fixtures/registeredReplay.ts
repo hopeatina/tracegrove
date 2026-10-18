@@ -6,15 +6,16 @@ import { registerQualificationRound } from '../../src/core/scenario.ts';
 import { prepareQualificationExecution } from '../../src/core/qualificationBundle.ts';
 import { QualificationPolicy, digestOfBytes, freeze, type ScenarioActivationIntent, type ScenarioProjection } from '../../src/protocol/index.ts';
 import { registeredQualificationFixture } from './registeredQualification.ts';
+import type { FrozenBundle } from '../../src/core/planner.ts';
 
 const ref = (id: string) => ({ id, revision: '1', digest: digestOfBytes(id) });
 export const projectionToken = (p: ScenarioProjection) => ({ id: p.id, scope: p.scope, expectedAggregateVersion: p.aggregateVersion,
   expectedDefinitionRef: p.definitionRef, expectedInvalidationEpoch: p.invalidationEpoch, expectedLatestRoundSequence: p.latestRoundSequence });
 /** Actual ledger/registration/execution/result path. External authority is explicitly simulated. */
-export async function registeredReplayFixture(track: (ledger: LocalLedger) => void, profileName = 'native-real') {
+export async function registeredReplayFixture(track: (ledger: LocalLedger) => void, profileName = 'native-real', options?: { frozen: FrozenBundle; requiredLevel: 'environment' | 'revision' }) {
   const policy = QualificationPolicy.parse(freeze({ schemaVersion: 'workflow.qualification-policy/v1', ref: { id: 'actual-policy', revision: '1' },
-    scope: localScope(), requiredLevel: 'environment', minimumIndependentRounds: 2 }));
-  const f = await registeredQualificationFixture(track, policy.ref, profileName);
+    scope: localScope(), requiredLevel: options?.requiredLevel ?? 'environment', minimumIndependentRounds: 2 }));
+  const f = await registeredQualificationFixture(track, policy.ref, profileName, options?.frozen);
   const controls = { authorized: true, calls: 0, beforeAuthorization: async () => {} };
   const resultAuthority: LocalQualificationResultAuthority = { authorize: async () => {}, authorizeRetention: async () => {},
     resolveAdmission: (ref, scope) => f.store.resolveAdmission(ref, scope), authenticateEvidence: async () => {} };

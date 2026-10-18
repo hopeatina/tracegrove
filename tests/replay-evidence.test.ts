@@ -73,10 +73,12 @@ function revisionEvidence() {
   }
   return value;
 }
-it('derives revision level only when each observed repository matches its resolved source identity', () => {
+it('refuses synthetic matching repository metadata without the frozen executable source closure', () => {
   const stronger = QualificationPolicy.parse(freeze({ ...policy, requiredLevel: 'revision' }));
   const good = assessReplayEvidence(revisionEvidence(), stronger, scenario);
-  expect(good.assessment).toMatchObject({ level: 'revision', qualifies: true });
+  // Actual positive revision qualification is exercised by repository-selection.test.ts.
+  expect(good.assessment).toMatchObject({ level: 'environment', qualifies: false });
+  expect(good.findings.map(f => f.code)).toContain('revision_identity_unproven');
   for (const field of ['commit', 'origin', 'lockfile', 'objects', 'role', 'missing repository'] as const) {
     const changed = revisionEvidence();
     // Keep expected/observed target equal so source-to-target checks must catch the mismatch.

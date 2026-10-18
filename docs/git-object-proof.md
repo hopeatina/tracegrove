@@ -38,11 +38,53 @@ establish this observation through its health response.
 Saved-bundle verification checks the proof's metadata, snapshot ref, component file
 closure and recorded Git observation after the private launch directory is removed.
 It does not regain the full source bytes from that observation. Authenticating the host
-and its runtime file measurements remains the issuer's job. Repository observations,
-remote URLs, runtime `SourceSelection`, dependency/runtime provenance and source-bound
-qualification are separate contracts; this change does not populate them or activate
-coverage. Existing proof-less snapshots remain component-only and receive no Git
-observation.
+and its runtime file measurements remains the issuer's job. Existing proof-less snapshots
+remain component-only and receive no Git observation. Repository binding is a separate,
+explicit option described below; remote ownership and dependency-install provenance are
+not inferred from Git object hashes.
+
+## Bind a repository role
+
+Materialization also saves a sealed `resolution.json` next to `snapshot.json`. To connect
+the selected resolver head to a repository role:
+
+```sh
+tracegrove test --config ./head/source/tracegrove.config.yaml \
+  --source-snapshot ./head/snapshot.json --source-repository-role application
+```
+
+The same flags work with `compile`. Compilation verifies the complete source tree,
+checks the sealed resolution sidecar against the snapshot, and emits `SourceSelection`,
+the original `RevisionMatrix`, and snapshot documents in the normal frozen corpus. The
+planner binds that selection to the request and every cell. Existing component-only
+snapshot runs do not change unless a repository role is provided. Old snapshots can
+be rematerialized to obtain a sidecar; no network access is required.
+
+The descriptor uses `urn:tracegrove:git-object:<algorithm>:<commit>` and origin
+`snapshot_bundle`. It identifies the actual Git object, not ownership of a GitHub URL.
+`requestedRef` in the target is the immutable commit; `requestedExpression` in source
+selection retains the resolver's original expression. Both Git SHA-1 and SHA-256 work.
+`dirty: false` describes the supervisor's complete private pinned copy, not the checkout.
+
+Lockfile identity v1 hashes a sorted manifest of complete pinned path, mode and SHA-256
+digest for `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`,
+`bun.lock`, `bun.lockb`, `uv.lock`, `poetry.lock`, `Pipfile.lock`, `Cargo.lock`, `Gemfile.lock`,
+`composer.lock` and `go.sum` at any depth. No recognized lockfile produces an explicit
+empty-manifest digest. This identifies pinned lockfiles; it does not establish which
+dependencies were installed.
+
+Repository observation is derived only after the supervisor's `actual_file_bytes`
+observation matches the proof. Planning, execution preflight, saved-bundle checks and
+revision assessment share the frozen source-closure checks. They reject different
+roles, remote URLs, lockfile identities, missing closure documents and source plans
+whose reviewed matrix differs. Base snapshots and multi-repository resolution sidecars
+cannot use this single-head binding; companion repositories are never silently dropped.
+They remain available for component-only runs until a complete multi-host binding exists.
+
+Two independent native campaigns can now meet a revision-level local qualification
+policy and activate through the durable scenario store. The tests simulate issuer and
+physical-lease authority explicitly. This does not establish hosted issuer trust, live
+staging coverage, remote repository ownership, or a reviewed-source promotion by itself.
 
 Proofs fail on missing or duplicate trees, unrelated objects, malformed/canonicalization
 errors, changed file/object/mode bindings, incomplete actual file coverage and unsupported

@@ -28,6 +28,7 @@ export { activateScenario, type ScenarioActivationPorts } from './core/scenarioA
 export { SourceCitation, verifySourceCitation, SOURCE_FILE_MAX_BYTES, type SourceCitationPorts } from './core/source-citation.ts';
 export { validatePlanSources, MAX_SOURCE_DIFF_BYTES, type SourceAnalysisPorts } from './core/source-analysis.ts';
 export { resolveGitSources, GitSourceReader, GIT_RESOLVER_REF, type GitSourceAuthorization } from './core/gitSources.ts';
+export { snapshotRepository, snapshotSourceSelection } from './core/snapshotRepository.ts';
 export { materializeGitSnapshot } from './core/gitSnapshot.ts';
 export { readGitSnapshotManifest, readGitSnapshotTree } from './source/snapshotTree.ts';
 export { verifyGitSnapshotCommit, verifyGitSnapshotProofMetadata } from './source/gitObjectProof.ts';

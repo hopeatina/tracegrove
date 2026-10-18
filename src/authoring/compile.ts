@@ -45,7 +45,7 @@ export type CompileResult = {
   sourceFiles: string[];
   sourceBinding: VerificationSourceBinding;
 };
-export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined };
+export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined };
 
 type Json = unknown;
 
@@ -200,6 +200,7 @@ function write(dir: string, rel: string, doc: Json): void {
 export function compileProject(configPath: string, options: CompileOptions = {}): CompileResult {
   const root = dirname(resolve(configPath));
   const snapshotSource = resolveVerificationSource(root, options.sourceSnapshot);
+  if (options.sourceRepositoryRole !== undefined && !snapshotSource) fail('snapshot_repository_unbound', 'A repository role needs a selected source snapshot.', 'pass --source-snapshot with --source-repository-role');
   const config = loadAuthoringConfig(resolve(configPath));
   const testDir = resolve(root, config.testDir);
   const appRoot = resolve(snapshotSource?.root ?? root, config.app.root);
@@ -242,7 +243,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
   const launch = applicationLaunch(config, root, appRoot);
   const launchCwd = launch.cwd;
-  const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir);
+  const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir, options.sourceRepositoryRole);
+  const sourceSelection = sourceSnapshot?.repositoryRole ? snapshotSource!.selection(sourceSnapshot) : null;
   if (config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
   const runtime = observeApplicationRuntimeSync(launch.command, launchCwd, process.env.PATH ?? '');
   launch.command = runtime.executable;
@@ -253,6 +255,14 @@ export function compileProject(configPath: string, options: CompileOptions = {})
 
   rmSync(compiledDir, { recursive: true, force: true });
   mkdirSync(compiledDir, { recursive: true });
+  if (sourceSelection && sourceSnapshot) {
+    write(compiledDir, 'source-snapshot.yaml', sourceSnapshot.snapshot);
+    write(compiledDir, 'source-revisions.yaml', sourceSelection.matrix);
+    write(compiledDir, 'source-selection.yaml', { ...sourceSelection.selection,
+      revisionMatrixRef: { $file: './source-revisions.yaml' },
+      repositories: sourceSelection.selection.repositories.map(repository => ({ ...repository, sourceObjectsRef: { $file: './source-snapshot.yaml' } })),
+    });
+  }
   const ref = (id: string) => ({ id: `${config.project}.${id}`, revision: '1' });
 
   // ---- shared definitions ----
@@ -472,6 +482,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   write(compiledDir, 'cases/suite.yaml', { schemaVersion: 'workflow.suite/v1', id: `${config.project}.suite`, cases: suiteCases });
   write(compiledDir, 'workflow.yaml', {
     schemaVersion: 'workflow.config/v1', project: config.project, suiteRef: './cases/suite.yaml', defaultProfile: PROFILE, outputDir: './output', sourceSetRef: null,
+    ...(sourceSelection ? { sourceSelectionRef: './source-selection.yaml' } : {}),
     executionHostRef: './host.yaml', intelligencePolicyRef: './policy.yaml',
     profiles: { [PROFILE]: { class: 'isolated_candidate', environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
   });

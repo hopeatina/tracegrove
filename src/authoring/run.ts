@@ -158,7 +158,7 @@ export type TestOptions = CompileOptions & {
 
 export async function runTests(options: TestOptions): Promise<{ report: TestRunReport; compiled: CompileResult }> {
   const startedAt = new Date();
-  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot });
+  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot, sourceRepositoryRole: options.sourceRepositoryRole });
   const project = loadProject(compiled.workflowConfigPath);
   const scope = localScope();
   const bundle: FrozenBundle = plan({ project, profileName: 'real', scope });

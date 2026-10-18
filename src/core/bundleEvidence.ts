@@ -12,6 +12,7 @@ import { videoBundlePath } from './bundlePaths.ts';
 import { targetFromComponentAttestations } from './targetObservation.ts';
 import { snapshotAttestationProblems } from './snapshotEvidence.ts';
 import { isInfrastructureStepFailure } from './errors.ts';
+import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 
 export function checkCellEvidence(input: {
   readBytes(path: string): Buffer; readJson(path: string): unknown; name: string; receipt: ExecutionReceipt; request: RunRequest;
@@ -41,6 +42,7 @@ export function checkCellEvidence(input: {
   if (!fidelityCell) { problem('missing fidelity cell'); return; }
   const plan = parseAs(HostPlan, documents[refKey(cell.executionHostRef)], 'host plan');
   record(plan, cell.executionHostRef, 'host plan');
+  for (const message of repositorySelectionProblems(request, cell, plan, documents)) problem(message);
   record(r.environment, r.environment.ref, 'environment');
   if (digestOfValue(read('environment.json')).hex !== digestOfValue(r.environment).hex) problem('environment records disagree');
   if (digestOfValue(r.environment.expected).hex !== digestOfValue(cell.expectedTarget).hex) problem('expected identity differs from selection');

@@ -4,15 +4,16 @@ import { LocalScenarioStore } from '../../src/core/localScenarioStore.ts';
 import { registerQualificationRound } from '../../src/core/scenario.ts';
 import { prepareQualificationExecution } from '../../src/core/qualificationBundle.ts';
 import { localQualificationExecutionOwner } from '../../src/core/qualificationExecution.ts';
+import type { FrozenBundle } from '../../src/core/planner.ts';
 import { CampaignFixturePlan, FidelityPlan, RunRequest, ScenarioDefinition, SelectionManifest,
   digestOfBytes, freeze, refKey, type Ref } from '../../src/protocol/index.ts';
 
 const ref = (id: string): Ref => ({ id, revision: '1', digest: digestOfBytes(id) });
 /** Real registration and two native cells; host/source/physical-lease authorization is simulated. */
-export async function registeredQualificationFixture(track: (ledger: LocalLedger) => void, policyRef: Ref = ref('policy'), profileName = 'native-real') {
+export async function registeredQualificationFixture(track: (ledger: LocalLedger) => void, policyRef: Ref = ref('policy'), profileName = 'native-real', frozen?: FrozenBundle) {
   const copy = sampleCopy(); const root = copy.stateDir;
   const ledger = LocalLedger.open(root); track(ledger);
-  const base = planSample(copy.configPath, profileName);
+  const base = frozen ?? planSample(copy.configPath, profileName);
   const previous = SelectionManifest.parse(base.documents[refKey(base.request!.selectionManifestRef)]);
   const secondId = `${previous.cells[0]!.selectionCellId}.second`;
   const selection = SelectionManifest.parse(freeze({ ...previous, ref: { id: 'two-cell-selection', revision: '1' }, cells: [...previous.cells, { ...previous.cells[0]!, selectionCellId: secondId }] }));

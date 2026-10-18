@@ -35,6 +35,7 @@ export async function materializeGitSnapshot(input: { resolution: unknown; repos
     writeGitSnapshotTree(entries, sourceDir);
     const manifestPath = join(output, 'snapshot.json');
     writeFileSync(manifestPath, `${JSON.stringify(snapshot, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+    writeFileSync(join(output, 'resolution.json'), `${JSON.stringify(resolution)}\n`, { flag: 'wx', mode: 0o600 });
     return { snapshot, sourceDir, manifestPath };
   } catch (error) { rmSync(output, { recursive: true, force: true }); throw error; }
 }

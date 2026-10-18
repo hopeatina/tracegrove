@@ -5,6 +5,7 @@ import { compileCase, type CompiledCase } from './compiler.ts';
 import { Blocked } from './errors.ts';
 import { frozenRunnerCapabilities } from './runnerCapabilities.ts';
 import type { FrozenBundle } from './planner.ts';
+import { repositorySelectionProblems } from './repositorySelectionEvidence.ts';
 
 export class DocStore {
   private readonly docs = new Map<string, unknown>();
@@ -71,6 +72,8 @@ export function prepareFrozenCells(bundle: FrozenBundle, scope: Scope, request: 
     const binding = docs.get<SurfaceBinding>(SurfaceBinding, cell.surfaceBindingRef, 'surface binding');
     const environmentPlan = docs.get<EnvironmentPlan>(EnvironmentPlan, cell.environmentRef, 'environment plan');
     const hostPlan = docs.get<HostPlan>(HostPlan, cell.executionHostRef, 'host plan');
+    const sourceProblems = repositorySelectionProblems(request, cell, hostPlan, bundle.documents);
+    if (sourceProblems.length) throw new Blocked(sourceProblems.map(detail => ({ code: 'repository_source_binding_invalid', detail })));
     const capabilities = docs.runnerCapabilities(cell.expectedTarget.runner);
     const fidelityCell = fidelityPlan.cells.find((f) => f.selectionCellId === cell.selectionCellId);
     if (!fidelityCell) throw new Blocked([{ code: 'fidelity_cell_missing', detail: cell.selectionCellId }]);
