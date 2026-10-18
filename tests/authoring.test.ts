@@ -11,7 +11,7 @@ import { plan } from '../src/core/planner.ts';
 import { Blocked } from '../src/core/errors.ts';
 import { HostPlan } from '../src/protocol/index.ts';
 import { observeApplicationRuntimeSync } from '../src/hosts/runtime.ts';
-import * as bundleVerification from '../src/core/bundle.ts';
+import * as atomicFiles from '../src/core/atomicFiles.ts';
 
 const SAMPLES = join(import.meta.dirname, '..', 'src', 'samples');
 const temps: string[] = [];
@@ -101,10 +101,10 @@ describe('authoring compiler', () => {
 describe('tracegrove test', () => {
   it('never publishes a passed report or green JUnit when its exported evidence bundle is corrupt', async () => {
     const root = copy('notes-api');
-    const verify = bundleVerification.verifyBundle;
-    vi.spyOn(bundleVerification, 'verifyBundle').mockImplementation(path => {
-      writeFileSync(join(path, 'campaign.json'), '{}\n');
-      return verify(path);
+    const write = atomicFiles.writeExclusiveDurable;
+    vi.spyOn(atomicFiles, 'writeExclusiveDurable').mockImplementation((path, bytes) => {
+      write(path, bytes);
+      if (path.includes('.tracegrove-publish-') && path.endsWith('/campaign.json')) writeFileSync(path, '{}\n');
     });
     const { report } = await runTests({ configPath: join(root, 'tracegrove.config.yaml'), grep: 'list' });
     expect(report.bundleVerified).toBe(false);

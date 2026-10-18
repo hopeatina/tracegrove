@@ -44,6 +44,7 @@ import { projectRoot, projectStatus } from '../authoring/status.ts';
 import { runActivity } from '../authoring/activity.ts';
 import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
 import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
+import { readSavedRun } from '../authoring/runSource.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -234,10 +235,10 @@ async function main(argv: string[]): Promise<number> {
       const configPath = findConfig(flag(args, 'config') ?? '.');
       const root = dirname(configPath);
       const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
-      if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
-      const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
+      if (!runDir) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
+      const report = readSavedRun(runDir);
       out(args, report, renderTree(report, root, paint()));
-      return 0;
+      return report.bundleVerified === false ? 2 : 0;
     }
 
     case 'ui': {

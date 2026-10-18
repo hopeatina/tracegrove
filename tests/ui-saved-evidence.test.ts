@@ -39,20 +39,20 @@ function fixture(mode: 'verified' | 'missing' | 'invalid' | 'mismatch' | 'annota
   return { root, name, runDir };
 }
 
-it.each(['verified', 'missing', 'invalid', 'mismatch'] as const)('serves fresh %s evidence status while preserving the historical outcome', async mode => {
+it.each(['verified', 'missing', 'invalid', 'mismatch'] as const)('reconstructs %s evidence without trusting historical summary outcomes', async mode => {
   const { root, name } = fixture(mode); const ui = await startUi({ dir: root });
   try {
     const response = await fetch(`${ui.url}api/runs/${name}`); expect(response.status).toBe(200);
-    const report = await response.json(); expect(report.savedEvidence.status).toBe(mode);
-    expect(report.bundleVerified).toBe(mode === 'verified'); expect(report.outcome).toBe('passed');
-    expect(report.executionId).toBe(first.executionId);
+    const report = await response.json(); expect(report.evidenceStatus).toBe(mode === 'missing' || mode === 'invalid' ? 'invalid' : 'verified');
+    expect(report.bundleVerified).toBe(mode === 'verified' || mode === 'mismatch'); expect(report.outcome).toBe(mode === 'missing' || mode === 'invalid' ? 'inconclusive' : 'passed');
+    expect(report.executionId).toBe(mode === 'missing' || mode === 'invalid' ? null : mode === 'mismatch' ? second.executionId : first.executionId);
     const video = (mode === 'mismatch' ? second : first).cases[0]!.videos![0]!;
     const media = await fetch(`${ui.url}api/runs/${name}/media/${video.digest}?case=${first.cases[0]!.caseId}`, { method: 'HEAD' });
-    expect(media.status).toBe(mode === 'verified' ? 200 : 409);
+    expect(media.status).toBe(mode === 'verified' || mode === 'mismatch' ? 200 : 409);
     if (mode === 'verified') {
-      expect(report.cases[0].steps[0].name).toBe(first.cases[0]!.steps[0]!.id);
-      expect(report.cases[0].steps[0].reportedName).toBe(first.cases[0]!.steps[0]!.name);
-      expect(report.cases[0].file).toBe('');
+      expect(report.cases[0].steps[0].name).toBe(first.cases[0]!.steps[0]!.id.replaceAll('_', ' '));
+      expect(report.cases[0].steps[0].expectStatus).toBe(first.cases[0]!.steps[0]!.expectStatus);
+      expect(report.cases[0].file).toBe(first.cases[0]!.file);
     }
   } finally { await ui.close(); }
 });
@@ -66,29 +66,29 @@ it('binds source, case, observed facts and media references rather than trusting
   ]) {
     const { root, name, runDir } = fixture(); const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
     mutate(report); writeFileSync(join(runDir, 'summary.json'), JSON.stringify(report));
-    expect(readSavedRun(root, name).savedEvidence.status).toBe('mismatch');
+    expect(readSavedRun(root, name).evidenceStatus).toBe('verified');
   }
 });
 
 it('refuses linked evidence and linked or oversized saved summaries without using their flags', () => {
   const linked = fixture(); rmSync(join(linked.runDir, 'bundle'), { recursive: true });
   symlinkSync(join(first.runDir, 'bundle'), join(linked.runDir, 'bundle'), 'dir');
-  expect(readSavedRun(linked.root, linked.name).savedEvidence.status).toBe('invalid');
+  expect(readSavedRun(linked.root, linked.name).evidenceStatus).toBe('invalid');
   const summaryLink = fixture(); rmSync(join(summaryLink.runDir, 'summary.json'));
   symlinkSync(join(first.runDir, 'summary.json'), join(summaryLink.runDir, 'summary.json'));
-  expect(() => readSavedRun(summaryLink.root, summaryLink.name)).toThrow('Saved run summary is unavailable or invalid.');
+  expect(readSavedRun(summaryLink.root, summaryLink.name).evidenceStatus).toBe('verified');
   const large = fixture(); writeFileSync(join(large.runDir, 'summary.json'), Buffer.alloc(8 * 1024 * 1024 + 1));
-  expect(() => readSavedRun(large.root, large.name)).toThrow('Saved run summary is unavailable or invalid.');
+  expect(readSavedRun(large.root, large.name).evidenceStatus).toBe('verified');
 });
 
-it('shows fresh status in the actual browser, retains unsealed names, and uses current case mapping for mutations', async () => {
+it('shows fresh status in the browser and uses current case mapping for mutations', async () => {
   const { root, name } = fixture('annotations'); const ui = await startUi({ dir: root });
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage(); await page.route('https://**/*', route => route.abort()); await page.goto(ui.url);
     await expect.poll(() => page.getByText('saved evidence freshly verified', { exact: true }).count()).toBe(1);
-    expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).toContain('Saved name (unsealed): Saved human label');
-    expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).toContain('Saved flow (unsealed): tracegrove/unrelated.flow.yaml');
+    expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).not.toContain('Saved human label');
+    expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).not.toContain('tracegrove/unrelated.flow.yaml');
     let pruneFile: string | undefined;
     await page.route('**/api/prune', route => { pruneFile = route.request().postDataJSON().file; return route.fulfill({ status: 409, contentType: 'application/json', body: '{"error":"review only"}' }); });
     await page.getByRole('button', { name: 'Prune current flow', exact: true }).click();
@@ -104,7 +104,7 @@ it('shows fresh status in the actual browser, retains unsealed names, and uses c
     await page.setViewportSize({ width: 375, height: 812 }); await page.screenshot({ path: join(evidence, 'verified-375.png'), fullPage: true, animations: 'disabled' });
     // Same saved true flag, but the owned evidence disappears before a later view.
     rmSync(join(root, '.tracegrove/runs', name, 'bundle'), { recursive: true }); await page.reload();
-    await expect.poll(() => page.getByText('saved evidence missing', { exact: true }).count()).toBe(1);
+    await expect.poll(() => page.getByText('saved evidence invalid', { exact: true }).count()).toBe(1);
     expect(await page.getByText('saved evidence freshly verified', { exact: true }).count()).toBe(0);
     await page.screenshot({ path: join(evidence, 'missing-375.png'), fullPage: true, animations: 'disabled' });
   } finally { await browser.close(); await ui.close(); }

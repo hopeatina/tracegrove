@@ -3,7 +3,7 @@
  * summary.md, summary.json, junit.xml, the frozen request and the verified evidence bundle.
  */
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { executeBundle, type RunSummary } from '../core/executor.ts';
@@ -11,28 +11,17 @@ import { LocalLedger } from '../core/ledger.ts';
 import { delegateRun } from '../core/controller.ts';
 import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
-import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
 
-export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
-export type CaseReport = {
-  caseId: string; file: string; title: string; outcome: string; durationMs: number;
-  steps: StepReport[]; failure: { step: string; message: string; observed: string | null } | null;
-  videos?: RunVideo[];
-};
-export type TestRunReport = {
-  schemaVersion: 'tracegrove.run-summary/v1';
-  project: string; outcome: string; exitCode: number; startedAt: string; finishedAt: string;
-  executionId: string | null; sourceDigest: string; runDir: string; stateDir?: string; bundleVerified: boolean | null;
-  blockers: Array<{ code: string; detail: string; action: string }>;
-  cases: CaseReport[];
-  totals: { passed: number; failed: number; other: number };
-  sourceBinding?: VerificationSourceBinding | null;
-};
+import type { StepReport, CaseReport, TestRunReport } from './runReport.ts';
+import { SavedRunName, invalidateRunReport } from './runReport.ts';
+import { isRunDirectory } from './runLocation.ts';
+export type { StepReport, CaseReport, TestRunReport } from './runReport.ts';
 
 const OUTCOME_LABEL: Record<string, string> = { passed: 'pass', assertion_failed: 'fail', blocked: 'blocked', infrastructure_failed: 'error', inconclusive: 'inconclusive', cancelled: 'cancelled' };
 
@@ -70,6 +59,7 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const job = NativeJobObservation.safeParse(s.output);
     const mcp = McpToolObservation.safeParse(s.output);
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
+      declared: !!info, expectStatus: info?.expectStatus ?? null, ...(info?.expectation ? { expectation: info.expectation } : {}),
       ...(mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
@@ -101,7 +91,8 @@ function xml(text: string): string {
 
 export function renderJunit(report: TestRunReport): string {
   const failures = report.cases.filter((c) => c.outcome === 'assertion_failed').length;
-  const errors = report.cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length + (report.cases.length === 0 && report.blockers.length ? 1 : 0) + (report.bundleVerified === false ? 1 : 0);
+  const planningBlocked = report.cases.length === 0 && report.blockers.length > 0 && report.bundleVerified !== false;
+  const errors = report.cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length + (planningBlocked ? 1 : 0) + (report.bundleVerified === false ? 1 : 0);
   const body = report.cases.map((c) => {
     const time = (c.durationMs / 1000).toFixed(3);
     const head = `    <testcase classname="${xml(report.project)}" name="${xml(c.caseId)}" file="${xml(c.file)}" time="${time}">`;
@@ -110,7 +101,7 @@ export function renderJunit(report: TestRunReport): string {
     const message = c.failure ? `${c.failure.step}: ${c.failure.message}` : c.outcome;
     return `${head}\n      <${tag} message="${xml(message)}" type="${xml(c.outcome)}">${xml(c.failure?.observed ?? '')}</${tag}>\n    </testcase>`;
   });
-  if (report.cases.length === 0 && report.blockers.length) {
+  if (planningBlocked) {
     body.push(`    <testcase classname="${xml(report.project)}" name="plan"><error message="blocked" type="blocked">${xml(report.blockers.map((b) => `${b.code}: ${b.detail}`).join('\n'))}</error></testcase>`);
   }
   if (report.bundleVerified === false) body.push(`    <testcase classname="${xml(report.project)}" name="evidence-integrity"><error message="Evidence bundle verification failed" type="inconclusive">See bundle-problems.txt in this run.</error></testcase>`);
@@ -218,7 +209,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     cases,
     totals: { passed: cases.filter((c) => c.outcome === 'passed').length, failed: cases.filter((c) => c.outcome === 'assertion_failed').length, other: cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length },
   };
-  if (bundleVerified === false && report.exitCode === 0) report.exitCode = 2;
+  if (bundleVerified === false) Object.assign(report, invalidateRunReport(report, 'Evidence could not be exported with matching sealed bytes.'));
   writeFileSync(join(runDir, 'summary.json'), `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(join(runDir, 'summary.md'), renderMarkdown(report));
   writeFileSync(join(runDir, 'junit.xml'), renderJunit(report));
@@ -235,8 +226,12 @@ export function resolveRun(root: string, name: string): string | null {
   if (name === 'latest') {
     const latest = join(runsDir, 'latest');
     if (!existsSync(latest)) return null;
-    return join(runsDir, lstatSync(latest).isSymbolicLink() ? readlinkSync(latest) : readFileSync(latest, 'utf8').trim());
+    const target = resolve(runsDir, lstatSync(latest).isSymbolicLink() ? readlinkSync(latest) : readBoundedFile(latest, 2048).toString('utf8').trim());
+    const name = relative(runsDir, target);
+    return SavedRunName.safeParse(name).success && name !== 'latest' && isRunDirectory(target) ? target : null;
   }
-  const match = readdirSync(runsDir).filter((entry) => entry !== 'latest' && entry.includes(name)).sort().at(-1);
+  if (!SavedRunName.safeParse(name).success) return null;
+  const match = readdirSync(runsDir).filter((entry) => entry !== 'latest' && entry.includes(name) && SavedRunName.safeParse(entry).success &&
+    isRunDirectory(join(runsDir, entry))).sort().at(-1);
   return match ? join(runsDir, match) : null;
 }

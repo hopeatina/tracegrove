@@ -173,3 +173,41 @@ For example, a valid browser profile captured by an unreleased verifier with cap
 `0.3.0` cannot be reproduced by a verifier that implements only `0.1.0`. That is an unsupported reader
 boundary, not proof that the profile is absent or that either workflow passed now. These diagnostics
 do not add historical runner implementations, alter accepted evidence, or grant replay authority.
+
+## Saved run reports and workbench history
+
+`readSavedRun(runDirectory)` is the shared read path for `show`, workbench history,
+run details and a completed run's API response. `summary.json` supplies optional local
+file hints, never product outcomes. The reader captures and verifies the evidence,
+then reconstructs project and execution identity, recorded timestamps, cases, steps,
+failure diagnostics, totals, videos and input binding from the sealed records and
+frozen definitions. Expected statuses come from those frozen definitions even when
+the current YAML now expects something else. Recorded cases remain visible after
+they disappear from the current project. Step results are never matched by array index.
+Those historical-only cases are read-only: saved file hints cannot authorize a run
+or prune operation. The workbench's **Run current flow** action uses current files;
+use the frozen CLI `rerun` command when the original contract must remain unchanged.
+
+The authoring API exports `StepReport`, `CaseReport`, `TestRunReport`, `CheckedRunReport`
+and `SavedRunName` Zod schemas. Checked reports include `manifestDigest` and
+`evidenceStatus: verified | invalid | not_executed`. `sourceChecked` describes the
+recorded input binding; it does not authenticate an issuer or renew review authority.
+The source digest is the frozen request's declared source identity, not a new live
+deployment observation.
+
+Malformed, missing or oversized summary metadata does not hide valid evidence. A
+damaged neighboring run does not make the whole history unreadable. Summary reads
+are bounded to 16 MiB and reject linked files. Run directories must be real directories;
+`latest` pointers cannot escape the selected collection. Parent-directory protection
+remains the local owner's responsibility. No saved file is rewritten during inspection.
+
+Missing or invalid evidence produces an inconclusive report with no passing cases,
+counts, recordings or source/execution identity. The workbench labels that state
+unavailable, including history cells, rather than showing a passed or not-run result.
+`show` exits 2 for that state. A typed planning-blocked report with no execution stays
+planning-blocked and claims no verified runtime evidence.
+
+New authoring runs use the same atomic captured-byte exporter as the CLI.
+An export failure clears passing display facts and produces one evidence-integrity
+JUnit error. Raw runtime observations remain in the original protected execution
+store; the display report cannot turn a failed export into accepted proof.
