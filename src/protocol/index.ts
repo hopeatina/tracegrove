@@ -6,6 +6,7 @@ import { HostFrame, PluginFrame } from './schemas/protocol.ts';
 import { CorpusManifest } from './schemas/corpus.ts';
 import { CleanupExpectationSchema, CleanupFollowupSchema, SignedCleanupFollowupSchema, WorkflowOwnershipSchema } from './schemas/cleanup.ts';
 import { SourcePlan, PlanReview, PlanEditProjection } from './schemas/review.ts';
+import { ScenarioPromotion } from './schemas/promotion.ts';
 import { RevisionMatrix, ChangeModel, PlanSourceValidation } from './schemas/source.ts';
 import { GitSourceRequest, GitSourceResolution, GitSourceSnapshot } from './schemas/gitSources.ts';
 import { BrowserCommand, BrowserLocator, BrowserObservation, BrowserNetworkObservation } from './schemas/browser.ts';
@@ -26,6 +27,7 @@ export * from './schemas/protocol.ts';
 export * from './schemas/corpus.ts';
 export * from './schemas/cleanup.ts';
 export * from './schemas/review.ts';
+export * from './schemas/promotion.ts';
 export * from './schemas/source.ts';
 export * from './schemas/gitSources.ts';
 export * from './schemas/browser.ts';
@@ -44,6 +46,7 @@ export const SCHEMA_REGISTRY = {
   'workflow.corpus/v1': CorpusManifest,
   'workflow.source-plan/v1': SourcePlan,
   'workflow.plan-review/v1': PlanReview,
+  'workflow.scenario-promotion/v1': ScenarioPromotion,
   'workflow.revisions/v1': RevisionMatrix,
   'workflow.change-model/v1': ChangeModel,
   'workflow.source-validation/v1': PlanSourceValidation,

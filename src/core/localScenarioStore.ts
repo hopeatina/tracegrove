@@ -9,6 +9,8 @@ import type { LocalQualificationResults } from './localQualificationResults.ts';
 import { localScenarioActivationPorts, type LocalScenarioActivationAuthority } from './localScenarioActivation.ts';
 import { localScenarioStructurePorts, type LocalScenarioStructureAuthority } from './localScenarioStructure.ts';
 import type { LocalScenarioOwner } from './localScenarioOwner.ts';
+import type { LocalReviewStore } from './localReviewStore.ts';
+import { localScenarioPromotionPorts, type LocalScenarioPromotionAuthority } from './localScenarioPromotion.ts';
 
 export interface LocalScenarioAuthority {
   authorize(scope: Scope, action: 'initialize' | 'stage' | 'read' | 'register_round' | 'invalidate'): Promise<void>;
@@ -64,7 +66,7 @@ export class LocalScenarioStore {
     if (state.scenarios.some(item => item.projection.id === this.id)) throw new Conflict('local scenario is already initialized');
     const projection = ScenarioProjection.parse({ id: this.id, scope: this.scope, aggregateVersion: 1, definitionRef: definition.ref,
       state: initialState, invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
-    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], structuralValidations: [] });
+    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], structuralValidations: [], promotion: null });
     this.write(version, state, 'workflow.scenario.initialized');
   }
   async stage(raw: unknown, selections: unknown[] = []): Promise<void> {
@@ -162,5 +164,10 @@ export class LocalScenarioStore {
   }
   structuralPorts(authority: LocalScenarioStructureAuthority) {
     return localScenarioStructurePorts(this.owner(), authority);
+  }
+  promotionPorts(review: LocalReviewStore, authority: LocalScenarioPromotionAuthority) {
+    return localScenarioPromotionPorts({ ...this.owner(), authorizeInitialization: async () => {
+      await this.authority.authorize(structuredClone(this.scope), 'initialize');
+    } }, review, authority);
   }
 }

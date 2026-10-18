@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  IdString, PlanEditProjection, PlanReview, PositiveInt, RefSchema, ScopeSchema,
+  IdString, PlanEditProjection, PlanReview, PlanRevisionToken, PositiveInt, RefSchema, ScopeSchema,
   SourcePlan, PlanSourceValidation, freeze, parseAs, refKey, refList, selfDigest, sameDigest, sameRef, sameScope, verifySelfDigest,
   type Ref, type Scope,
 } from '../protocol/index.ts';
@@ -19,16 +19,7 @@ export interface PlanReviewPorts {
   compareAndSwap(expectedStorageVersion: number, projection: PlanEditProjection, review: PlanReview | null, sourceValidation: PlanSourceValidation | null): Promise<boolean>;
 }
 
-export interface PlanRevisionToken {
-  id: string;
-  scope: Scope;
-  expectedEditRevision: number;
-  expectedSourcePlanRef: Ref;
-}
-
-const RevisionToken = z.object({
-  id: IdString, scope: ScopeSchema, expectedEditRevision: PositiveInt, expectedSourcePlanRef: RefSchema,
-}).strict();
+export type { PlanRevisionToken } from '../protocol/index.ts';
 
 async function current(ports: PlanReviewPorts, token: PlanRevisionToken): Promise<ReviewSnapshot> {
   const snapshot = await ports.read(token.id, structuredClone(token.scope));
@@ -51,7 +42,7 @@ async function resolved(ports: PlanReviewPorts, ref: Ref, scope: Scope): Promise
 
 /** Every specification edit clears review; observation refreshes do not call this operation. */
 export async function editPlan(ports: PlanReviewPorts, token: PlanRevisionToken, nextRef: Ref): Promise<PlanEditProjection> {
-  token = RevisionToken.parse(token);
+  token = PlanRevisionToken.parse(token);
   nextRef = RefSchema.parse(nextRef);
   await ports.authorize(ScopeSchema.parse(token.scope), 'edit');
   const snapshot = await current(ports, token);
@@ -68,7 +59,7 @@ export async function editPlan(ports: PlanReviewPorts, token: PlanRevisionToken,
 export async function reviewPlan(
   ports: PlanReviewPorts, token: PlanRevisionToken, decision: 'approved' | 'rejected', reasonRefs: Ref[],
 ): Promise<PlanReview> {
-  token = RevisionToken.parse(token);
+  token = PlanRevisionToken.parse(token);
   decision = z.enum(['approved', 'rejected']).parse(decision);
   reasonRefs = refList().parse(reasonRefs);
   const admission = z.object({ actorId: IdString, policyRef: RefSchema }).strict().parse(await ports.authorize(ScopeSchema.parse(token.scope), 'review'));

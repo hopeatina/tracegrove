@@ -286,6 +286,9 @@ independent review policy, full source transport and runtime identity remain sep
 `LocalReviewStore` connects that API to the existing single-writer journal and preserves
 reviews/source checks across reopen. [Local review storage](docs/local-review-store.md)
 requires trusted host admission and source checking; it does not supply distributed authority.
+`promoteScenario` binds actual current review storage to a proposed scenario and retains
+the full plan, gaps and source-validation snapshot. [Source promotion](docs/source-promotion.md)
+remains separate from structural validation, execution and activation.
 
 Scenario qualification now has a typed registration/invalidation API with exact-matrix
 and monotonic-history checks. [Structural validation](docs/scenario-structure.md) shares

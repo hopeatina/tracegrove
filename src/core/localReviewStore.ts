@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { IdString, PlanEditProjection, PlanReview, PlanSourceValidation, ScopeSchema, SourcePlan, digestOfValue,
+import { IdString, PlanEditProjection, PlanReview, PlanRevisionToken, PlanSourceValidation, RefSchema, ScenarioDefinition, ScopeSchema, SourcePlan, digestOfValue,
   refKey, sameRef, sameScope, verifySelfDigest, type Ref, type Scope } from '../protocol/index.ts';
 import { LocalLedger } from './ledger.ts';
 import { Conflict } from './errors.ts';
 import type { PlanReviewPorts, ReviewSnapshot } from './review.ts';
+import { validateApprovedPlanReview, validatePromotedCases, type ApprovedPlanSnapshot } from './sourcePromotion.ts';
 
 const State = z.object({ schemaVersion: z.literal('workflow.local-review-state/v1'), projection: PlanEditProjection,
   plans: z.array(SourcePlan).min(1).max(500), reviews: z.array(PlanReview).max(500), validations: z.array(PlanSourceValidation).max(500),
@@ -90,6 +91,30 @@ export class LocalReviewStore {
     const plan = this.current().state.plans.find(plan => sameRef(plan.ref, ref));
     if (!plan) throw new Conflict('local review plan reference is not stored');
     return structuredClone(plan);
+  }
+  /** Requires current review authority but creates no review or approval. The runtime fence is never serialized. */
+  async approvedSnapshot(ledger: LocalLedger, input: PlanRevisionToken, expectedReview: Ref): Promise<ApprovedPlanSnapshot> {
+    if (ledger !== this.ledger) throw new Conflict('promotion must use the review owner ledger');
+    const token = PlanRevisionToken.parse(input); const reviewRef = RefSchema.parse(expectedReview); this.scoped(token.id, token.scope);
+    await this.authority.authorize(structuredClone(this.scope), 'review');
+    const { version, state } = this.current();
+    const plan = state.plans.find(p => sameRef(p.ref, state.projection.sourcePlanRef));
+    const review = state.reviews.find(r => state.projection.currentReviewRef && sameRef(r.ref, state.projection.currentReviewRef));
+    const validation = review && [...review.reasonRefs].reverse().map(ref => state.validations.find(v => sameRef(v.ref, ref))).find(Boolean);
+    if (!plan || !review || review.decision !== 'approved' || !validation) throw new Conflict('promotion requires a current approved review and persisted source validation');
+    const documents = validateApprovedPlanReview({ storageVersion: version, projection: state.projection, plan, review, validation }, token, reviewRef);
+    return { documents: structuredClone(documents), assertCurrent: () => {
+      if (this.current().version !== version) throw new Conflict('approved review changed during promotion');
+    } };
+  }
+  /** Compose with the scenario host's other definition checks; an edited/rejected plan cannot remain current approval. */
+  async definitionSnapshot(ledger: LocalLedger, raw: ScenarioDefinition): Promise<ApprovedPlanSnapshot> {
+    const definition = ScenarioDefinition.parse(raw);
+    if (!verifySelfDigest(definition) || !definition.sourcePlanRef) throw new Conflict('review-backed scenario needs a sealed source plan binding');
+    const { state } = this.current();
+    const snapshot = await this.approvedSnapshot(ledger, { id: this.id, scope: definition.scope,
+      expectedEditRevision: state.projection.editRevision, expectedSourcePlanRef: definition.sourcePlanRef }, definition.reviewRef);
+    validatePromotedCases(definition, snapshot.documents); return snapshot;
   }
 
   ports(): PlanReviewPorts {

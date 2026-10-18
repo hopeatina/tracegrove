@@ -71,7 +71,8 @@ projection, receipt and assessment records in one scenario-registry append.
 staging a proposal from compiling its frozen execution closure and entering validating
 state. The same operation can revalidate a semantically edited, degraded definition.
 This adapter does not install physical lease provisioning, hosted source/issuer
-authorization, source-plan promotion or CLI lifecycle commands.
+authorization or CLI lifecycle commands. [Source-plan promotion](source-promotion.md)
+uses actual current approved review storage to register proposed scenarios.
 [Registered qualification execution](qualification-registration.md#executing-a-registered-round)
 requires a separate authenticated runtime owner and uses the admission's allocated
 cell identities. Requests without that owner and all activated regression requests

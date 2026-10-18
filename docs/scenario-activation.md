@@ -49,5 +49,6 @@ registration/invalidation/revocation/archive/index races and corrupt persisted r
 Host, reviewed-source, physical-lease and issuer authority are explicitly simulated.
 These proofs do not establish hosted activation, deployed staging qualification or
 live regression admission. [Structural transitions](scenario-structure.md) have a local
-adapter. Source-plan promotion, hosted persistence and
+adapter. [Source-plan promotion](source-promotion.md) has a local approved-review bridge.
+Hosted persistence and
 activated regression execution remain open.

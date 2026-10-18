@@ -27,8 +27,9 @@ The authenticated host supplies `authorizeValidation(scope, intentDigest)`, retu
 the current actor and authorization policy for the exact token, frozen request and
 executable-closure digest. Source/review/definition checking remains the store's
 required `validateDefinition` responsibility. No permission or independent source
-validation is inferred from a caller's success flag. Proposed storage is not the
-source-plan promotion manifest; that integration remains separate unfinished work.
+validation is inferred from a caller's success flag. Proposed storage is not itself
+the source-plan promotion manifest; [source promotion](source-promotion.md) supplies
+that separate approved-review operation.
 
 The local adapter recompiles the supplied closure and rechecks definition and actor
 authority before publishing the sealed `workflow.scenario-structure/v1` receipt and
@@ -51,7 +52,7 @@ scenario; it does not produce this receipt and requires the host to establish bo
 promotion and validation authority before calling it.
 
 This is protected local single-writer storage. It does not install hosted IAM, physical
-state leases, source-plan promotion, CLI lifecycle commands, live qualification or
+state leases, hosted source promotion, CLI lifecycle commands, live qualification or
 activation. Tests use real journal bytes and static compilation; one positive test then
 executes two newly admitted native cells. Host/source/review/effect authority is explicitly
 simulated, and structural success alone is never reported as application success.
