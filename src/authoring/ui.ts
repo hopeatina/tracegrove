@@ -20,6 +20,11 @@ import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, 
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
+import { heal, listHeals, undoHeal } from './heal.ts';
+import { projectStatus } from './status.ts';
+
+/** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
+type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
 
 export type UiServer = { url: string; port: number; close: () => Promise<void> };
 
@@ -39,6 +44,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const token = randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
   let drafting = false;
+  const live: Live = { agent: { status: 'idle', task: null, lines: [], startedAt: null }, heal: { status: 'idle', phase: '', detail: null } };
+  const agentStart = (task: 'draft' | 'heal') => { live.agent = { status: 'running', task, lines: [], startedAt: new Date().toISOString() }; };
+  const agentSay = (line: string) => { live.agent.lines.push(line.replaceAll(`${dir}/`, '')); if (live.agent.lines.length > 80) live.agent.lines.splice(0, live.agent.lines.length - 80); };
   let activity: RunActivity = { status: 'idle', event: null, stepId: null, label: 'No run in progress', observedAt: new Date().toISOString() };
 
   const configPath = () => join(dir, CONFIG_FILE);
@@ -120,6 +128,40 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       if (req.method === 'GET' && url.pathname === '/api/settings') return send(200, agentInfo());
       if (req.method === 'GET' && url.pathname === '/api/activity') return send(200, RunActivity.parse(activity));
+      if (req.method === 'GET' && url.pathname === '/api/live') return send(200, { run: RunActivity.parse(activity), agent: live.agent, heal: live.heal });
+      if (req.method === 'GET' && url.pathname === '/api/status') return send(200, projectStatus(dir));
+      if (req.method === 'GET' && url.pathname === '/api/heals') return send(200, listHeals(dir).slice(0, 20));
+      if (req.method === 'POST' && url.pathname === '/api/heal') {
+        const body = await readJson(req);
+        if (running || drafting) return send(409, { error: 'a run or agent draft is already in progress' });
+        live.heal = { status: 'running', phase: 'Starting', detail: null };
+        activity = { status: 'running', event: null, stepId: null, label: 'Healing', observedAt: new Date().toISOString() };
+        const job = heal({ dir, agent: body.agent !== false, dryRun: body.dryRun === true,
+          onProgress: (phase, detail) => {
+            live.heal = { status: 'running', phase, detail: detail ?? null };
+            if (phase === 'Asking the agent') agentStart('heal');
+            activity = { status: 'running', event: null, stepId: null, label: `${phase}${detail ? ` · ${detail}` : ''}`.slice(0, 300), observedAt: new Date().toISOString() };
+          },
+          onAgentActivity: agentSay });
+        running = job;
+        try {
+          const report = await job;
+          live.heal = { status: 'finished', phase: 'Done', detail: report.outcome };
+          if (live.agent.status === 'running') live.agent.status = 'finished';
+          activity = { status: 'finished', event: null, stepId: null, label: `Heal finished: ${report.outcome}`, observedAt: report.finishedAt };
+          return send(200, report);
+        } catch (error) {
+          live.heal = { status: 'failed', phase: 'Failed', detail: (error as Error).message };
+          if (live.agent.status === 'running') live.agent.status = 'failed';
+          activity = { status: 'failed', event: null, stepId: null, label: 'Heal could not be completed', observedAt: new Date().toISOString() };
+          throw error;
+        } finally { running = null; }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/heal/undo') {
+        const body = await readJson(req);
+        if (typeof body.id !== 'string' || !/^[A-Za-z0-9_.:-]+$/.test(body.id)) return send(400, { error: 'id required' });
+        return send(200, undoHeal(dir, body.id));
+      }
       if (req.method === 'POST' && url.pathname === '/api/settings') {
         const body = await readJson(req);
         const agent = (body.agent ?? {}) as Record<string, unknown>;
@@ -132,10 +174,13 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         // Body reads yield: admit against the current state only after parsing.
         if (drafting) return send(409, { error: 'an agent draft is already in progress' });
         drafting = true;
+        agentStart('draft');
         try {
-          const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null });
+          const result = await draftWithAgent({ dir, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, onActivity: agentSay });
+          live.agent.status = result.agent.exitCode === 0 ? 'finished' : 'failed';
           return send(200, result);
-        } finally { drafting = false; }
+        } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
+        finally { drafting = false; }
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
         return send(200, discoverProject(dir, url.searchParams.get('branch') || null));

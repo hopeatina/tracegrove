@@ -16,7 +16,7 @@ import type { Discovery } from './discover.ts';
 
 export const SETTINGS_FILE = 'settings.json';
 /** Explicit low-cost defaults from workspace policy; never inherit the CLI's production model. */
-export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-4.5', codex: 'gpt-6-luna', none: null };
+export const DEFAULT_MODELS: Record<AgentProvider, string | null> = { claude: 'claude-haiku-4-5', codex: 'gpt-6-luna', none: null };
 
 export const LocalSettings = z.object({
   agent: z.object({
@@ -26,6 +26,12 @@ export const LocalSettings = z.object({
   }).strict().optional(),
 }).strict();
 export type LocalSettings = z.infer<typeof LocalSettings>;
+
+/** Claude Code takes dashed ids (claude-haiku-4-5); a dotted version is a common typo, not a different model. */
+export function normalizeModel(provider: AgentProvider, model: string | null): string | null {
+  if (provider !== 'claude' || model === null) return model;
+  return /^claude-[a-z]+-\d+\.\d+$/.test(model) ? model.replace(/\.(\d+)$/, '-$1') : model;
+}
 
 export type AgentSettings = { provider: AgentProvider; model: string | null; maxBudgetUsd: number | null; source: Record<'provider' | 'model', 'flag' | 'settings' | 'config' | 'default'> };
 export type AgentOverrides = { provider?: string | null | undefined; model?: string | null | undefined };
@@ -67,7 +73,7 @@ export function resolveAgentSettings(root: string, config: AuthoringConfig | nul
   const model = providerChanged ? { value: DEFAULT_MODELS[provider.value], from: 'default' as const }
     : pick<string | null>(overrides.model, localProvider === provider.value ? local.model : undefined,
       sharedProvider === provider.value ? shared?.model : undefined, DEFAULT_MODELS[provider.value]);
-  return { provider: provider.value, model: model.value, maxBudgetUsd: local.maxBudgetUsd ?? shared?.maxBudgetUsd ?? null, source: { provider: provider.from, model: model.from } };
+  return { provider: provider.value, model: normalizeModel(provider.value, model.value), maxBudgetUsd: local.maxBudgetUsd ?? shared?.maxBudgetUsd ?? null, source: { provider: provider.from, model: model.from } };
 }
 
 /** Which agent CLIs are on PATH. */
@@ -103,7 +109,7 @@ export function buildAgentCommand(settings: AgentSettings, prompt: string, trace
   const tg = tracegrove.join(' ');
   if (settings.provider === 'claude') {
     const allowed = ['Read', 'Write', 'Edit', 'Glob', 'Grep', `Bash(${tg} check:*)`, `Bash(${tg} list:*)`, `Bash(${tg} discover:*)`];
-    return { bin: 'claude', args: ['-p', prompt, '--model', settings.model ?? DEFAULT_MODELS.claude!, '--output-format', 'json', '--permission-mode', 'acceptEdits',
+    return { bin: 'claude', args: ['-p', prompt, '--model', settings.model ?? DEFAULT_MODELS.claude!, '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits',
       '--allowedTools', allowed.join(','), '--add-dir', schemaDir(), '--no-session-persistence', ...(settings.maxBudgetUsd ? ['--max-budget-usd', String(settings.maxBudgetUsd)] : [])] };
   }
   if (settings.provider === 'codex') {
@@ -156,7 +162,7 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
   ].filter((line) => line !== '').join('\n');
 }
 
-export type AgentRunResult = { provider: AgentProvider; model: string | null; exitCode: number; files: string[]; output: string; command: string[] };
+export type AgentRunResult = { provider: AgentProvider; model: string | null; modelFallback?: { from: string | null; to: string }; exitCode: number; files: string[]; output: string; command: string[] };
 
 function listFlows(dir: string): Map<string, number> {
   const found = new Map<string, number>();
@@ -172,22 +178,78 @@ function listFlows(dir: string): Map<string, number> {
   return found;
 }
 
+/** The final answer from Claude Code output: one JSON object, or the `result` event of stream-json. */
+export function claudeResult(output: string): string | null {
+  try { const parsed = JSON.parse(output) as { result?: unknown }; if (typeof parsed.result === 'string') return parsed.result; } catch { /* stream or text */ }
+  for (const line of output.split('\n').reverse()) {
+    if (!line.startsWith('{')) continue;
+    try { const event = JSON.parse(line) as { type?: string; result?: unknown }; if (event.type === 'result' && typeof event.result === 'string') return event.result; } catch { /* partial line */ }
+  }
+  return null;
+}
+
+/** Human-sized lines for live progress: what the agent is reading, editing, running or saying. */
+export function describeAgentLine(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed) return [];
+  if (!trimmed.startsWith('{')) return [trimmed.slice(0, 200)];
+  let event: { type?: string; message?: { content?: Array<{ type?: string; text?: string; name?: string; input?: Record<string, unknown> }> } };
+  try { event = JSON.parse(trimmed); } catch { return []; }
+  if (event.type !== 'assistant') return [];
+  return (event.message?.content ?? []).flatMap((part) => {
+    if (part.type === 'text' && part.text?.trim()) return [part.text.trim().split('\n')[0]!.slice(0, 200)];
+    if (part.type === 'tool_use') {
+      const target = part.input?.file_path ?? part.input?.path ?? part.input?.pattern ?? part.input?.command ?? '';
+      return [`${part.name ?? 'tool'} ${String(target).slice(0, 160)}`.trim()];
+    }
+    return [];
+  });
+}
+
+/**
+ * The agent runs as its own session in `root`. When tracegrove itself is driven from inside a
+ * Claude Code session, the inherited session ids would attach the child to the parent's session
+ * and its working folder, so those are dropped; credentials and proxy settings are kept.
+ */
+export function agentEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const drop = new Set(['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_REMOTE_SESSION_ID', 'CLAUDE_PID', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_SSE_PORT']);
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !drop.has(key)));
+}
+
 /** Run the agent in `root`, then report which flow files it created or changed. */
-export async function runAgent(input: { root: string; testDir: string; settings: AgentSettings; prompt: string; onOutput?: (chunk: string) => void; signal?: AbortSignal }): Promise<AgentRunResult> {
+export async function runAgent(input: { root: string; testDir: string; settings: AgentSettings; prompt: string; onOutput?: (chunk: string) => void; onActivity?: (line: string) => void; signal?: AbortSignal }): Promise<AgentRunResult> {
   const command = buildAgentCommand(input.settings, input.prompt);
   const detected = detectAgents();
   const bin = detected[input.settings.provider as 'claude' | 'codex'];
   if (!bin) throw new Blocked([{ code: 'agent_not_installed', detail: `${command.bin} is not on PATH`, owner: 'operator',
     action: input.settings.provider === 'claude' ? 'install Claude Code (npm i -g @anthropic-ai/claude-code) and sign in, or switch provider in Settings' : 'install the Codex CLI (npm i -g @openai/codex) and sign in, or switch provider in Settings' }]);
   const before = listFlows(input.testDir);
-  const child = spawn(bin, command.args, { cwd: input.root, stdio: ['ignore', 'pipe', 'pipe'], ...(input.signal ? { signal: input.signal } : {}) });
-  let output = '';
-  const take = (chunk: Buffer) => { const text = chunk.toString(); output = (output + text).slice(-200_000); input.onOutput?.(text); };
-  child.stdout.on('data', take); child.stderr.on('data', take);
-  const exitCode = await new Promise<number>((done) => { child.on('close', (code) => done(code ?? 1)); child.on('error', () => done(127)); });
+  const launch = async (args: string[]) => {
+    const child = spawn(bin, args, { cwd: input.root, env: agentEnv(), stdio: ['ignore', 'pipe', 'pipe'], ...(input.signal ? { signal: input.signal } : {}) });
+    let text = ''; let pending = '';
+    const take = (chunk: Buffer) => {
+      const piece = chunk.toString(); text = (text + piece).slice(-200_000); input.onOutput?.(piece);
+      if (!input.onActivity) return;
+      pending += piece;
+      const lines = pending.split('\n'); pending = lines.pop() ?? '';
+      for (const line of lines) for (const said of describeAgentLine(line)) input.onActivity(said);
+    };
+    child.stdout.on('data', take); child.stderr.on('data', take);
+    const code = await new Promise<number>((done) => { child.on('close', (c) => done(c ?? 1)); child.on('error', () => done(127)); });
+    return { code, text };
+  };
+  let { code: exitCode, text: output } = await launch(command.args);
+  let modelFallback: string | null = null;
+  // Self-heal a stale or mistyped model id once, with the provider's cheapest alias, and say so.
+  if (exitCode !== 0 && input.settings.provider === 'claude' && /unrecognized_model|issue with the selected model/.test(output)) {
+    modelFallback = 'haiku';
+    input.onOutput?.(`\n[tracegrove] model ${input.settings.model} was rejected; retrying with ${modelFallback}\n`);
+    const args = [...command.args]; args[args.indexOf('--model') + 1] = modelFallback;
+    ({ code: exitCode, text: output } = await launch(args));
+  }
   const after = listFlows(input.testDir);
   const files = [...after].filter(([path, mtime]) => before.get(path) !== mtime).map(([path]) => relative(input.root, path)).sort();
   let summary = output;
-  if (input.settings.provider === 'claude') { try { const parsed = JSON.parse(output) as { result?: string }; if (typeof parsed.result === 'string') summary = parsed.result; } catch { /* plain text */ } }
-  return { provider: input.settings.provider, model: input.settings.model, exitCode, files, output: summary.trim().slice(-8000), command: [command.bin, ...command.args.map((a) => (a === input.prompt ? '<prompt>' : a))] };
+  if (input.settings.provider === 'claude') summary = claudeResult(output) ?? output;
+  return { provider: input.settings.provider, model: modelFallback ?? input.settings.model, ...(modelFallback ? { modelFallback: { from: input.settings.model, to: modelFallback } } : {}), exitCode, files, output: summary.trim().slice(-8000), command: [command.bin, ...command.args.map((a) => (a === input.prompt ? '<prompt>' : a))] };
 }

@@ -37,7 +37,7 @@ function call(port: number, method: string, path: string, opts: { token?: string
 describe('agent settings', () => {
   it('pins the low-cost drafting model for both providers', () => {
     const s = resolveAgentSettings(temp(), null);
-    expect(s).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', source: { provider: 'default', model: 'default' } });
+    expect(s).toMatchObject({ provider: 'claude', model: 'claude-haiku-4-5', source: { provider: 'default', model: 'default' } });
     expect(resolveAgentSettings(temp(), null, { provider: 'codex' }).model).toBe('gpt-6-luna');
   });
 
@@ -45,7 +45,7 @@ describe('agent settings', () => {
     const root = temp();
     const config = AuthoringConfig.parse({ project: 'p', app: { adapter: 'node', entry: 'server.js' }, personas: { alice: { subject: 'alice' } }, agent: { provider: 'codex', model: 'codex-team-model' } });
     writeLocalSettings(root, { agent: { provider: 'claude' } });
-    expect(resolveAgentSettings(root, config)).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', source: { model: 'default' } });
+    expect(resolveAgentSettings(root, config)).toMatchObject({ provider: 'claude', model: 'claude-haiku-4-5', source: { model: 'default' } });
   });
 
   it('resolves flag over settings.json over config', () => {
@@ -65,7 +65,7 @@ describe('agent settings', () => {
     const tg = ['node', '/x/main.js'];
     const claude = buildAgentCommand({ provider: 'claude', model: 'haiku', maxBudgetUsd: 0.5, source: { provider: 'default', model: 'default' } }, 'PROMPT', tg);
     expect(claude.bin).toBe('claude');
-    expect(claude.args).toEqual(expect.arrayContaining(['-p', 'PROMPT', '--model', 'haiku', '--output-format', 'json', '--max-budget-usd', '0.5']));
+    expect(claude.args).toEqual(expect.arrayContaining(['-p', 'PROMPT', '--model', 'haiku', '--output-format', 'stream-json', '--max-budget-usd', '0.5']));
     const allowed = claude.args[claude.args.indexOf('--allowedTools') + 1]!;
     expect(allowed).toContain('Bash(node /x/main.js check:*)');
     expect(allowed).not.toMatch(/Bash\(\*|Bash,|Bash$/);
@@ -147,7 +147,7 @@ echo '{"result":"tracegrove/discovered/notes/owner-only.flow.yaml: owner-only re
     process.env.PATH = `${fakeClaude()}${delimiter}${PATH}`;
     expect(detectAgents().claude).toBeTruthy();
     const result = await draftWithAgent({ dir: root, branch: null, intent: 'only the owner can read a note' });
-    expect(result.agent).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5', exitCode: 0, files: ['tracegrove/discovered/notes/owner-only.flow.yaml'] });
+    expect(result.agent).toMatchObject({ provider: 'claude', model: 'claude-haiku-4-5', exitCode: 0, files: ['tracegrove/discovered/notes/owner-only.flow.yaml'] });
     expect(result.agent.output).toContain('owner-only read');
     expect(result.agent.command).toContain('<prompt>');
     expect(result.check.ok).toBe(true);
@@ -165,7 +165,7 @@ echo '{"result":"tracegrove/discovered/notes/owner-only.flow.yaml: owner-only re
     const server = await startUi({ dir: root }); servers.push(server);
     const page = await call(server.port, 'GET', '/');
     const token = /const TOKEN='([^']+)'/.exec(page.body)![1]!;
-    expect((await call(server.port, 'GET', '/api/settings')).body.settings).toMatchObject({ provider: 'claude', model: 'claude-haiku-4.5' });
+    expect((await call(server.port, 'GET', '/api/settings')).body.settings).toMatchObject({ provider: 'claude', model: 'claude-haiku-4-5' });
     expect((await call(server.port, 'POST', '/api/settings', { body: { agent: { provider: 'codex' } } })).status).toBe(403);
     const saved = await call(server.port, 'POST', '/api/settings', { token, body: { agent: { provider: 'codex', model: '' } } });
     expect(saved.status).toBe(200);

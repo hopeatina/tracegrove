@@ -48,13 +48,13 @@ function configOrNull(root: string): AuthoringConfig | null {
 
 export type DraftResult = { agent: AgentRunResult; check: CheckResult; discovery: { source: string; routes: number; uncovered: number } };
 
-export async function draftWithAgent(input: { dir: string; branch: string | null; intent: string | null; overrides?: AgentOverrides; onOutput?: (chunk: string) => void; signal?: AbortSignal }): Promise<DraftResult> {
+export async function draftWithAgent(input: { dir: string; branch: string | null; intent: string | null; overrides?: AgentOverrides; onOutput?: (chunk: string) => void; onActivity?: (line: string) => void; signal?: AbortSignal }): Promise<DraftResult> {
   const root = resolve(input.dir);
   const config = configOrNull(root);
   const testDir = resolve(root, config?.testDir ?? 'tracegrove');
   const settings = resolveAgentSettings(root, config, input.overrides ?? {});
   const discovery = discoverProject(root, input.branch);
   const prompt = buildDraftPrompt({ root, testDir, discovery, intent: input.intent, config });
-  const agent = await runAgent({ root, testDir, settings, prompt, ...(input.onOutput ? { onOutput: input.onOutput } : {}), ...(input.signal ? { signal: input.signal } : {}) });
+  const agent = await runAgent({ root, testDir, settings, prompt, ...(input.onOutput ? { onOutput: input.onOutput } : {}), ...(input.onActivity ? { onActivity: input.onActivity } : {}), ...(input.signal ? { signal: input.signal } : {}) });
   return { agent, check: checkProject(root), discovery: { source: discovery.source, routes: discovery.routes.length, uncovered: discovery.uncovered } };
 }

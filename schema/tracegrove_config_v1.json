@@ -16,7 +16,7 @@
           "type": "number"
         },
         "model": {
-          "description": "Explicit model passed to the agent CLI. Defaults: claude-haiku-4.5 for claude; gpt-6-luna for codex.",
+          "description": "Explicit model passed to the agent CLI. Defaults: claude-haiku-4-5 for claude; gpt-6-luna for codex.",
           "maxLength": 120,
           "minLength": 1,
           "type": "string"
