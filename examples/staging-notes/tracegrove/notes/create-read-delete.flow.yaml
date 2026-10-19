@@ -1,0 +1,29 @@
+title: Create a note, read it back, deny a stranger, delete it
+risk: critical
+tags: [notes, authz]
+envs: [local, docker, compose]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Fresh note, body: Written through the real API. }
+    expect: { status: 201 }
+    save: { noteId: note.id }
+
+  - name: read back
+    GET: /notes/{noteId}
+    observe: true
+    expect: { status: 200, json: { note.title: Fresh note } }
+
+  - name: stranger is denied
+    GET: /notes/{noteId}
+    as: stranger
+    expect: { status: 403, absent: [note] }
+
+  - name: delete
+    DELETE: /notes/{noteId}
+    expect: 204
+
+  - name: gone
+    GET: /notes/{noteId}
+    observe: true
+    expect: 404
