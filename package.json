@@ -1,6 +1,6 @@
 {
   "name": "tracegrove",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "description": "Verify app behavior with real requests, independent readback and inspectable evidence.",
   "license": "Apache-2.0",
@@ -47,6 +47,8 @@
     "docs/browser-driver.md",
     "docs/native-jobs.md",
     "docs/mcp-driver.md",
+    "docs/images/notes-run.png",
+    "docs/images/notes-run-mobile.png",
     "LICENSE",
     "README.md",
     "docs/result-sink.md",
