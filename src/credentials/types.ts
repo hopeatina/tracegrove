@@ -33,6 +33,8 @@ export type CredentialCheck = 'valid' | 'expired' | 'revoked' | 'unknown';
 export type ResolvedSecret = {
   value: Secret;
   expiresAt: string | null;
+  /** The subject the issuer says this credential signs in as (a broker-minted persona); whoami must match it. */
+  subject?: string;
   /** A run-owned identity (e.g. a broker persona) that cleanup must revoke. */
   owned?: { entityKey: string; physicalId: string; boundaryId: string };
   revoke?(signal: AbortSignal): Promise<{ confirmed: boolean; detail: string }>;
