@@ -29,6 +29,7 @@ import { isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
 import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
 import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
+import { projectBenchmark } from './projectBenchmark.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -270,6 +271,11 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       if (req.method === 'GET' && ['/api/workflow-map','/api/workflows'].includes(url.pathname)) {
         const reply=savedWorkflowKnowledge(dir,url);return send(reply.status,reply.body);
+      }
+      if (url.pathname === '/api/benchmark') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return send(403, { error: 'unexpected origin' });
+        if (req.method !== 'GET') return send(405, { error: 'Benchmark inspection is read-only.' });
+        const reply = projectBenchmark(dir, url); return send(reply.status, reply.body);
       }
       if (req.method === 'GET' && url.pathname === '/api/compare') {
         const pair = SavedRunPair.safeParse(Object.fromEntries(url.searchParams));

@@ -9,6 +9,7 @@ import { SOURCE_CONTROLS_JS } from './uiSourceControls.ts';
 import { NATIVE_IMPORTS_JS } from './uiNativeImports.ts';
 import { WORKFLOW_MAP_JS } from './uiWorkflowMap.ts';
 import { COMPARISON_CSS, COMPARISON_JS } from './uiComparison.ts';
+import { BENCHMARK_CSS, BENCHMARK_JS } from './uiBenchmark.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>tracegrove</title>
@@ -105,13 +106,14 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 @media (max-width:720px){header{padding:12px 16px}.page{padding:20px 16px 40px}.ctx{margin-left:0;width:100%}h1{font-size:23px;line-height:30px}
  .step{grid-template-columns:8px 1fr 48px;}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:minmax(0,1fr)}}
 ${COMPARISON_CSS}
+${BENCHMARK_CSS}
 </style></head><body>
 <header><span class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="color:var(--moss)"><path d="M12 21V11"/><path d="M12 14c-3 0-5-2-6-4"/><path d="M12 11c2.5 0 4.5-1.5 5.5-3.5"/><circle cx="6" cy="9" r="2.2"/><circle cx="17.8" cy="7.2" r="2.2"/><circle cx="12" cy="6" r="2.6"/><path d="M8 21h8"/></svg>tracegrove</span>
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','Heal','History','Compare','Imports','Map','Settings'];
+const TABS=['Run','Discover','Heal','History','Compare','Imports','Map','Benchmark','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
 const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
@@ -135,6 +137,7 @@ ${SOURCE_CONTROLS_JS}
 ${COMPARISON_JS}
 ${NATIVE_IMPORTS_JS}
 ${WORKFLOW_MAP_JS}
+${BENCHMARK_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
@@ -361,10 +364,10 @@ document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/
  if(e.key==='Escape'&&palette){closeOverlay();return}
  if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/'){e.preventDefault();openPalette()}else if(e.key==='?'){shortcuts()}else if(e.key==='j'){moveSel(1)}else if(e.key==='k'){moveSel(-1)}
- else if(!['Imports','Map'].includes(tab)&&e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(!['Imports','Map'].includes(tab)&&e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(!['Imports','Map'].includes(tab)&&e.key==='h'&&!ui.running){startHeal(false)}
+ else if(!['Imports','Map','Benchmark'].includes(tab)&&e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(!['Imports','Map','Benchmark'].includes(tab)&&e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(!['Imports','Map','Benchmark'].includes(tab)&&e.key==='h'&&!ui.running){startHeal(false)}
  else if(/^[1-9]$/.test(e.key)&&Number(e.key)<=TABS.length){openTab(TABS[Number(e.key)-1])}});
 document.getElementById('palbtn').addEventListener('click',openPalette);
 
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

@@ -9,6 +9,20 @@ The SDK equivalent is `inspectBenchmark({ stateDir, scope, axis })`. It reads al
 execution admissions at one unchanged ledger checkpoint. It opens no writer,
 starts no host, performs no inference, and runs no recovery or cleanup.
 
+In `tracegrove ui`, open **Benchmark** to inspect the same project checkpoint.
+The comparison axis survives reload through `?benchmark-axis=runner` or `model`.
+Refresh clears prior results before checking the ledger again. Changing axis or
+leaving the view invalidates late responses. A missing, changed or unreadable
+checkpoint is distinct from a readable empty ledger; unavailable counts never
+become a known zero-history display.
+
+The view retains every admission, including unavailable attempts, and shows
+recorded outcomes, condition references, pricing gaps and warm/cold/unknown
+timing strata. **Download captured JSON** saves the displayed capture without
+rereading a newer checkpoint. Condition pages and bounded cohort/timing previews
+keep the interface usable; their additional rows remain in that JSON. Keyboard
+shortcuts for running and healing do not execute from the Benchmark view.
+
 Every admission remains in the inventory, including failed, cancelled,
 interrupted, unsealed and unavailable attempts. The report cites each retained
 receipt by admission sequence, execution, attempt and cell. It retains actual

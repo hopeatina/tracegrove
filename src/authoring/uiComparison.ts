@@ -21,8 +21,9 @@ function syncComparisonLocation(){const url=new URL(location.href),c=ui.comparis
  else{url.searchParams.delete('compare-baseline');url.searchParams.delete('compare-candidate')}
  if(url.href!==location.href)history.replaceState(null,'',url.href);
 }
-function openTab(next){if(ui.map){invalidateMap();ui.map.auto=next==='Map'}if(ui.native){clearNative();ui.native.loaded=false}const c=ui.comparison;c.serial++;c.loading=false;c.report=null;c.error=null;c.auto=next==='Compare';tab=next;render();
+function openTab(next){if(ui.benchmark){invalidateBenchmark();ui.benchmark.auto=next==='Benchmark'}if(ui.map){invalidateMap();ui.map.auto=next==='Map'}if(ui.native){clearNative();ui.native.loaded=false}const c=ui.comparison;c.serial++;c.loading=false;c.report=null;c.error=null;c.auto=next==='Compare';tab=next;render();
  if(next==='Compare'){const focus=document.getElementById('compare-baseline')||document.getElementById('comparison-empty');if(focus)focus.focus()}
+ if(next==='Benchmark')document.getElementById('benchmark-axis')?.focus();
 }
 const COMPARISON_CHANGES={unchanged:'Same recorded outcome',passed_to_failed:'Passed → assertion failed',failed_to_passed:'Assertion failed → passed',outcome_changed:'Outcome changed',selection_added:'Selection added',selection_removed:'Selection removed',ambiguous_selection:'Ambiguous selection',missing_receipt:'Receipt unavailable',contract_changed:'Contract changed',context_changed:'Execution context changed'};
 const COMPARISON_OUTCOMES={passed:'Passed',assertion_failed:'Assertion failed',blocked:'Blocked',infrastructure_failed:'Infrastructure failed',inconclusive:'Inconclusive',cancelled:'Cancelled'};
