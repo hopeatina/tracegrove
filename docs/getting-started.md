@@ -1,6 +1,6 @@
 # Test an existing app
 
-Start with the [npm README](https://www.npmjs.com/package/tracegrove) and its synthetic Notes sample. In your own repository, install `tracegrove@0.3.1` as a development dependency, then run `npx --no-install tracegrove init`. Review the generated config and flow before running them.
+Start with the [npm README](https://www.npmjs.com/package/tracegrove) and its synthetic Notes sample. In your own repository, install `tracegrove@0.3.2` as an exact development dependency, then run `npx --no-install tracegrove init`. Review the generated config and flow before running them.
 
 `tracegrove.config.yaml` names a `project`, an `app` adapter (`node`, `fastapi`, or `django`), its entry point and health route, source paths to digest, and test personas. Put flows at `tracegrove/<area>/<behavior>.flow.yaml`; their case IDs use `<area>.<behavior>`. A flow contains named steps with methods, paths, expected statuses and optional independent read requests (`observe: true`). Put reusable fixtures at `tracegrove/fixtures/<name>.fixture.yaml`. Steps can `save` a response value and refer to it later as `{name}`; inspect the generated starter flow or packaged Notes sample for a complete example. `npx --no-install tracegrove check --json` compiles these files without starting the app. `doctor --dir . --json` checks the selected native plan; it can probe an interpreter version but does not run your app.
 
