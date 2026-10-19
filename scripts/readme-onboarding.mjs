@@ -29,7 +29,7 @@ function retainRun(stdout, preferredRunDir) {
   } catch { return { status: 'export_failed', bundleVerified: false }; }
 }
 let result;
-try { result = await promisify(execFile)('bash', ['-c', block[1]], { cwd: root, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }); }
+try { result = await promisify(execFile)('bash', ['-c', block[1]], { cwd: root, env: { ...process.env, TRACEGROVE_CLI: join(root, 'dist', 'cli', 'main.js') }, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }); }
 catch (error) {
   writeFileSync(join(output, 'stdout.txt'), String(error.stdout ?? ''), { mode: 0o600 });
   writeFileSync(join(output, 'stderr.txt'), String(error.stderr ?? ''), { mode: 0o600 });

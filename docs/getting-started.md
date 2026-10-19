@@ -1,0 +1,13 @@
+# Test an existing app
+
+Start with the [npm README](https://www.npmjs.com/package/tracegrove) and its synthetic Notes sample. In your own repository, install `tracegrove@0.3.1` as a development dependency, then run `npx --no-install tracegrove init`. Review the generated config and flow before running them.
+
+`tracegrove.config.yaml` names a `project`, an `app` adapter (`node`, `fastapi`, or `django`), its entry point and health route, source paths to digest, and test personas. `tracegrove/*.flow.yaml` contains named steps with methods, paths, expected statuses and optional independent read requests (`observe: true`). `npx --no-install tracegrove check --json` compiles these files without starting the app. `doctor --dir . --json` checks the selected native plan; it can probe an interpreter version but does not run your app.
+
+The local adapter assigns a loopback port and owned data directory. Your app must consume the injected port and `TRACEGROVE_DATA_DIR` and recognize the per-run synthetic `TRACEGROVE_TOKENS` in test mode. Keep the test token path disabled in production. The Django adapter invokes migration before start: verify that Django's configured database lives in the injected data directory. Do not point a test run at a shared or production database.
+
+Run `npx --no-install tracegrove test --json`. A passing JSON summary names `runDir`, `executionId`, per-case outcomes, and `bundleVerified`. The run folder contains readable summaries, JUnit and `bundle/`. Run `npx --no-install tracegrove verify-bundle --bundle <runDir>/bundle --json` to independently check the stored files and verdict. Verification does not rerun your app or establish who produced an unsigned bundle.
+
+If a prerequisite blocks, read `blockers[]` and the suggested recovery before retrying. A nonzero assertion result is a finding about the app or test, not a setup failure. For a single interrupt, wait for the owned cleanup and inspect its receipts. Keep the run folder until you have exported any evidence you need. `recovery-status` reads an existing checkpoint but cannot clear ownership or restart work.
+
+Browser tests need the pinned Playwright Chromium installed through your environment's approved dependency path. The browser and native job guides are in this npm package. External staging, a general cloud runner and arbitrary shell launchers are not available through the current CLI.
