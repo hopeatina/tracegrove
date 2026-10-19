@@ -479,9 +479,9 @@
                   "required": [
                     "runnerSeconds",
                     "browserSeconds",
+                    "artifactBytes",
                     "inferenceCalls",
                     "inferenceTokens",
-                    "artifactBytes",
                     "integrationOperations"
                   ],
                   "type": "object"
@@ -1323,9 +1323,16 @@
           ]
         },
         "uniqueIds": {
-          "maximum": 9007199254740991,
-          "minimum": 0,
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

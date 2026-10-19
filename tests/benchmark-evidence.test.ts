@@ -133,6 +133,21 @@ it('fails the evidence bound without silently benchmarking a passing subset', ()
   expect(report.groups).toEqual([]); expect(report.findings).toContain('evidence_limit_exceeded'); expect(report.exitCode).toBe(2);
 });
 
+it('keeps ordinary inventory reads streaming and fails aggregate capture bounds without retaining a subset', () => {
+  const options = { stateDir, scope: localScope() };
+  const inventoryOnly = readAttemptCheckpoint({ ...options, retainEvidence: false });
+  expect(inventoryOnly.evidence).toEqual([]); expect(inventoryOnly.report.evidenceComplete).toBe(true);
+  const bounded = readAttemptCheckpoint({ ...options, evidenceByteLimit: 1 });
+  expect(bounded.evidence).toEqual([]); expect(bounded.evidenceLimitExceeded).toBe(true);
+  expect(bounded.report.attempts).toHaveLength(2);
+  const report = aggregateBenchmark(bounded, 'runner');
+  expect(report.retainedReceipts).toBe(2); expect(report.unassignedReceipts).toBe(2);
+  expect(report.groups).toEqual([]); expect(report.reservations.retainedCents).toBe(null);
+  expect(report.reservations.uniqueIds).toBe(null);
+  expect(report.findings).toContain('evidence_limit_exceeded'); expect(report.exitCode).toBe(2);
+  expect(captured.evidence[0]!.records).not.toHaveProperty('documents');
+});
+
 it('reads real sealed admissions through the SDK and compiled-compatible CLI without writing or labeling unknowns warm', () => {
   const journal = join(stateDir, 'ledger/journal.jsonl'), before = readFileSync(journal);
   const report = inspectBenchmark({ stateDir, scope: localScope(), axis: 'runner' });

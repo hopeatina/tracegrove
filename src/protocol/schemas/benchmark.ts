@@ -27,8 +27,7 @@ export const BenchmarkCohort = z.object({ key: DigestSchema, runnerRef: RefSchem
   receipts: z.array(z.object({ admissionSequence: count, receiptRef: RefSchema,
     executionId: IdString, attemptId: IdString, selectionCellId: IdString, outcome: Outcome }).strict()).min(1).max(5000),
   outcomes: z.array(z.object({ outcome: Outcome, count }).strict()).min(1),
-  usage: z.object({ runnerSeconds: quantity, browserSeconds: quantity, inferenceCalls: count,
-    inferenceTokens: count, artifactBytes: count, integrationOperations: count }).strict(),
+  usage: AttemptInventoryReport.shape.recordedUsageSubtotal.unwrap().omit({ receipts: true }),
   pricing: z.object({ estimatedSubtotalCents: count.nullable(), reconciledSubtotalCents: count.nullable(),
     unpricedEstimates: count, unreconciledReceipts: count, unknownChargeCount: count }).strict(),
   timings: z.array(BenchmarkTiming).max(50000),
@@ -40,7 +39,7 @@ export const BenchmarkReport = z.object({ schemaVersion: z.literal('tracegrove.b
   code: z.enum(['descriptive_evidence', 'incomplete_evidence']), exitCode: z.union([z.literal(0), z.literal(2)]),
   inventory: Inventory, findings: z.array(BenchmarkFinding),
   retainedReceipts: count, unassignedReceipts: count, groupsWithMultipleCohorts: count,
-  reservations: z.object({ uniqueIds: count, retainedCents: count.nullable(), basis: z.literal('recorded_reservations_not_actual_charges') }).strict(),
+  reservations: z.object({ uniqueIds: count.nullable(), retainedCents: count.nullable(), basis: z.literal('recorded_reservations_not_actual_charges') }).strict(),
   groups: z.array(z.object({ conditionsDigest: DigestSchema, conditions: BenchmarkConditions,
     cohorts: z.array(BenchmarkCohort).min(1).max(5000) }).strict()).max(1000),
 }).strict();

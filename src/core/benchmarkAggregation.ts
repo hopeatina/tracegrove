@@ -1,14 +1,15 @@
-import { BenchmarkReport, FidelityPlan, digestOfValue, refKey, sameRef,
+import { BenchmarkReport, digestOfValue, sameRef,
   type BenchmarkAxis, type BenchmarkCohort, type BenchmarkTiming, type ExecutionReceipt,
   type TargetTuple } from '../protocol/index.ts';
-import type { readAttemptCheckpoint } from './attemptInventory.ts';
+import { ATTEMPT_EVIDENCE_BYTES, type readAttemptCheckpoint } from './attemptInventory.ts';
 
 type Capture = ReturnType<typeof readAttemptCheckpoint>;
 type Finding = BenchmarkReport['findings'][number];
 type Timing = { report: BenchmarkTiming; values: number[] };
 type Cohort = { report: BenchmarkCohort; timings: Map<string, Timing> };
 const usageKeys = ['runnerSeconds', 'browserSeconds', 'inferenceCalls', 'inferenceTokens', 'artifactBytes', 'integrationOperations'] as const;
-export const BENCHMARK_LIMITS = { receipts: 5000, points: 50000, groups: 1000, reportBytes: 8 * 1024 * 1024 } as const;
+export const BENCHMARK_LIMITS = { receipts: 5000, points: 50000, groups: 1000,
+  evidenceBytes: ATTEMPT_EVIDENCE_BYTES, reportBytes: 8 * 1024 * 1024 } as const;
 
 function targetConditions(target: TargetTuple, axis: BenchmarkAxis) {
   if (axis === 'model') return target; // Opaque model-config digests stay bound; equality cannot be assumed across them.
@@ -79,16 +80,16 @@ export function aggregateBenchmark(capture: Capture, axis: BenchmarkAxis): Bench
   const { report: inventory, evidence } = capture;
   const findings = new Set<Finding>();
   if (!inventory.evidenceComplete) findings.add('inventory_incomplete');
-  const total = evidence.reduce((n, item) => n + item.records.receipts.length, 0);
+  const total = capture.evidenceLimitExceeded ? inventory.recordedUsageSubtotal?.receipts ?? 0 : evidence.reduce((n, item) => n + item.records.receipts.length, 0);
   const pointCount = evidence.reduce((n, item) => n + item.records.receipts.reduce((sum, r) => sum + r.performance.length, 0), 0);
   const groups = new Map<string, { conditionsDigest: BenchmarkCohort['key'];
     conditions: BenchmarkReport['groups'][number]['conditions']; cohorts: Map<string, Cohort> }>();
   const reservations = new Map<string, { kind: string; cents: number }>();
-  let unassignedReceipts = 0, retainedCents = 0, warm = 0, cold = 0, unknown = 0;
+  let unassignedReceipts = capture.evidenceLimitExceeded ? total : 0, retainedCents = 0, warm = 0, cold = 0, unknown = 0;
   if (!total) findings.add('no_receipts');
-  if (total > BENCHMARK_LIMITS.receipts || pointCount > BENCHMARK_LIMITS.points) findings.add('evidence_limit_exceeded');
+  if (capture.evidenceLimitExceeded || total > BENCHMARK_LIMITS.receipts || pointCount > BENCHMARK_LIMITS.points) findings.add('evidence_limit_exceeded');
   else for (const { admissionSequence, records } of evidence) {
-    const fidelity = FidelityPlan.parse(records.documents[refKey(records.request.fidelityPlanRef)]);
+    const fidelity = records.fidelity;
     for (const receipt of records.receipts) {
       for (const reservation of receipt.accounting.reservations) {
         const existing = reservations.get(reservation.reservationId);
@@ -148,7 +149,8 @@ export function aggregateBenchmark(capture: Capture, axis: BenchmarkAxis): Bench
     code: findings.size ? 'incomplete_evidence' : 'descriptive_evidence', exitCode: findings.size ? 2 : 0,
     inventory: { ...inventory, attempts: inventory.attempts.map(({ cells: _cells, ...row }) => row) },
     findings: [...findings].sort(), retainedReceipts: total, unassignedReceipts, groupsWithMultipleCohorts,
-    reservations: { uniqueIds: reservations.size, retainedCents: findings.has('reservation_conflict') ? null : retainedCents,
+    reservations: { uniqueIds: findings.has('evidence_limit_exceeded') ? null : reservations.size,
+      retainedCents: findings.has('reservation_conflict') || findings.has('evidence_limit_exceeded') ? null : retainedCents,
       basis: 'recorded_reservations_not_actual_charges' },
     groups: [...groups.values()].sort((a, b) => a.conditionsDigest.hex.localeCompare(b.conditionsDigest.hex)).map(group => ({
       conditionsDigest: group.conditionsDigest, conditions: group.conditions,

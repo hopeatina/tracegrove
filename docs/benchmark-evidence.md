@@ -47,7 +47,9 @@ temperature, so its ordinary execution receipts do not satisfy a priced warm/col
 benchmark by themselves.
 
 Bounds are 500 admissions, 5,000 receipts, 50,000 timing points, 1,000 condition
-groups and 8 MiB of report output. Exceeding a bound fails the report rather than
+groups, 32 MiB of captured benchmark inputs and 8 MiB of report output. Inventory
+reads do not retain benchmark inputs. Exceeding a bound clears captured evidence
+and fails the report rather than
 selecting a smaller successful subset. Cell detail remains available through
 `usage` and the sealed bundles; this report retains per-admission inventory and
 citations without copying every cell into the inventory again.
