@@ -154,6 +154,16 @@
       },
       "type": "object"
     },
+    "envs": {
+      "description": "Environments this flow may run in. Defaults to [local]; list staging etc. to opt in.",
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+    },
     "given": {
       "additionalProperties": {
         "type": "string"

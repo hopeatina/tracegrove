@@ -20,7 +20,9 @@ export type CapabilitySpec = {
   docs: string;
 };
 
-const LIVE: readonly HostKind[] = ['local_process', 'mock_loopback'];
+const LIVE: readonly HostKind[] = ['local_process', 'mock_loopback', 'url', 'compose', 'container'];
+const LOOPBACK: readonly HostKind[] = ['local_process', 'mock_loopback', 'compose', 'container'];
+const DOCKER: readonly HostKind[] = ['compose', 'container'];
 const LAUNCHED: readonly HostKind[] = ['local_process'];
 const docs = (anchor: string) => `docs/environments.md#${anchor}`;
 
@@ -34,7 +36,9 @@ export const CAPABILITIES = {
   'ui.observe': { version: 1, layer: 'surface', summary: 'Browser observations (Playwright)', providedBy: LAUNCHED, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
   native_job: { version: 1, layer: 'host', summary: 'Native Node job bridge over IPC', providedBy: LAUNCHED, requires: ['shell'], probe: null, writes: true, docs: docs('capabilities') },
   shell: { version: 1, layer: 'host', summary: 'Launch the app as a local process', providedBy: LAUNCHED, requires: [], probe: null, writes: false, docs: docs('capabilities') },
-  'network_origin:loopback': { version: 1, layer: 'host', summary: 'App reachable on loopback', providedBy: LIVE, requires: [], probe: null, writes: false, docs: docs('capabilities') },
+  'network_origin:loopback': { version: 1, layer: 'host', summary: 'App reachable on loopback', providedBy: LOOPBACK, requires: [], probe: null, writes: false, docs: docs('capabilities') },
+  'network_origin:external': { version: 1, layer: 'host', summary: 'A deployment reached over the network', providedBy: ['url'], requires: [], probe: null, writes: false, docs: docs('capabilities') },
+  container: { version: 1, layer: 'host', summary: 'App runs in Docker containers tracegrove owns', providedBy: DOCKER, requires: [], probe: 'docker', writes: false, docs: docs('docker') },
   confirmed_cancel: { version: 1, layer: 'host', summary: 'Host confirms it stopped what it started', providedBy: LIVE, requires: [], probe: null, writes: false, docs: docs('capabilities') },
   artifact_delivery: { version: 1, layer: 'host', summary: 'Evidence artifacts are retained', providedBy: LIVE, requires: [], probe: null, writes: false, docs: docs('capabilities') },
   file_persistence: { version: 1, layer: 'host', summary: 'Owned data directory', providedBy: LAUNCHED, requires: [], probe: null, writes: false, docs: docs('capabilities') },

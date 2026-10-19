@@ -39,6 +39,9 @@ import { REDUCER_REF, compareTargets, evaluateAssertions, evaluatePredicate, red
 import { targetFromComponentAttestations } from './targetObservation.ts';
 import { authorizeQualificationExecution, type QualificationExecutionOwner } from './qualificationExecution.ts';
 
+/** Step failures that say the environment, not the app, stopped the run. */
+const ENVIRONMENT_BLOCKS = new Set(['persona_credential_expired', 'environment_writes_forbidden', 'budget_exceeded']);
+
 export const EXIT_CODES = { passed: 0, assertion_failed: 1, blocked: 2, inconclusive: 2, infrastructure_failed: 3, cancelled: 4 } as const;
 
 export type RunSummary = {
@@ -224,7 +227,10 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
   } catch (error) {
-    if (error instanceof Blocked) blockedReasons.push(...error.reasons.map((r) => r.code));
+    if (error instanceof Blocked) {
+      blockedReasons.push(...error.reasons.map((r) => r.code));
+      log.emit('host.blocked', null, { reasons: error.reasons.map(r => ({ code: r.code, detail: r.detail, owner: r.owner, action: r.action })) });
+    }
     else { infrastructureFailure = true; log.emit('host.failed', null, { error: String((error as Error).message) }); }
   }
 
@@ -252,7 +258,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const credentialLease = parseAs(CredentialLease, freeze({
     schemaVersion: 'workflow.credential-lease/v1' as const, ref: { id: `${executionId}.${cell.selectionCellId}.credential-lease`, revision: '1' }, scope,
     authRecipeRef: authRecipe.ref, personaRef: item.persona.ref, executionId, attemptId, credentialName: authRecipe.credentialName,
-    issuedBy: session ? (hostPlan.adapter === 'mock_loopback' ? 'environment' as const : 'local_launcher' as const) : 'none' as const, expiresAt: isoPlusMs(hostPlan.sessionLifetimeMs),
+    issuedBy: session ? (hostPlan.adapter === 'mock_loopback' || hostPlan.adapter === 'url' ? 'environment' as const : 'local_launcher' as const) : 'none' as const, expiresAt: isoPlusMs(hostPlan.sessionLifetimeMs),
+    ...(session?.credentialRecords?.length ? { resolved: session.credentialRecords.map(r => ({ ...r, resolver: r.resolver as never })) } : {}),
   }), 'credential lease');
   const origins = session ? environmentPlan.origins.map((o) => (o.startsWith('launch://') ? session!.origin : o)) : environmentPlan.origins;
   const provenance = fidelityCell.lane === 'mock_contract'
@@ -266,7 +273,18 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     expected: cell.expectedTarget, observed: observedTarget, provenance, networkProfileRef: null, clockProfileRef: null,
   }), 'environment binding');
 
-  const driver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), new Set([session.origin, ...Object.values(session.endpoints ?? {})])) : null;
+  const admittedOrigins = session ? new Set([session.origin, ...Object.values(session.endpoints ?? {})]) : new Set<string>();
+  const driver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), admittedOrigins, { maxRequests: session.requestBudget ?? null, allowedMethods: session.allowedMethods ?? null }) : null;
+  // Cleanup is never refused by the request budget: owned records must be removable.
+  const cleanupDriver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), admittedOrigins) : null;
+  /** A 401 from a deployment may mean the issuer expired or revoked the persona mid-run; ask the issuer before blaming the app. */
+  const credentialStillLive = async (status: number, auth: { kind: string; name?: string }) => {
+    if (status !== 401 || auth.kind === 'none' || !session?.credentialCheck) return;
+    const name = auth.kind === 'persona' ? authRecipe.credentialName : auth.name ?? null;
+    const state = name ? await session.credentialCheck(name, signal) : 'unknown';
+    if (state === 'expired' || state === 'revoked') throw new HttpStepError('persona_credential_expired', `${name} was ${state} by its issuer mid-run; the 401 says nothing about the app`);
+  };
+  if (session?.credentialRecords?.length) log.emit('credentials.resolved', null, { personas: session.credentialRecords });
   const origin = session?.origin ?? '';
   const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: credentialFor(session, authRecipe.credentialName)?.bearer?.reveal() ?? null,
     onNetwork: observation => { log.emit('browser.network', null, observation); },
@@ -299,6 +317,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         ctx.ownership.reserve(`fixture:${cell.selectionCellId}:${entityKey}`, 'fixture', cell.selectionCellId, recipe.ref);
         uncertainAllocations.add(entityKey);
         const observation = await driver.request({ origin, method: action.method, path: action.path, body: action.body, auth: action.auth, variables, deadline: cellDeadline.child(10_000), signal });
+        await credentialStillLive(observation.status, action.auth);
         if (action.expectStatus !== null && observation.status !== action.expectStatus) throw new HttpStepError('unexpected_status', `${action.actionId} returned ${observation.status}, expected ${action.expectStatus}`);
         const outputs = captureValues(observation, action.captures);
         fixtureOutputs[entityKey] = { ...variables, ...outputs };
@@ -319,6 +338,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         if (entity.readback) {
           const readAction = registry.actions.find((a) => a.actionId === entity.readback!.actionId)!;
           const readback = await driver.request({ origin, method: readAction.method, path: readAction.path, body: readAction.body, auth: readAction.auth, variables: { ...variables, ...outputs }, deadline: cellDeadline.child(10_000), signal });
+          await credentialStillLive(readback.status, readAction.auth);
           const evaluation = evaluatePredicate(entity.readback.predicate, { status: readback.status, body: readback.body });
           const readEvent = log.emit('fixture.readback', null, { entityKey, pass: evaluation.pass, reason: evaluation.reason, observation: redactObservation(readback) }, { requestId: readback.requestId });
           readbackRefs = [EventLog.refOf(readEvent)];
@@ -329,6 +349,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         failed = true;
         const code = error instanceof HttpStepError ? error.code : 'transport_failure';
         log.emit('fixture.failed', null, { entityKey, code, message: String((error as Error).message) });
+        if (ENVIRONMENT_BLOCKS.has(code)) blockedReasons.push(code);
         missing.push(entityKey);
         if (code === 'cancelled') cancelled = true;
       }
@@ -385,6 +406,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       if (ctx.beforeEffect) await ctx.beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
+        await credentialStillLive(observation.status, step.auth);
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
           const finished = log.emit('step.finished', stepId, { result: 'failed', reason: 'unexpected_status', observation: redactObservation(observation) }, { requestId: observation.requestId });
           stepObservations.push({ stepId, result: 'failed', reasonCode: `unexpected_status:${observation.status}`, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(redactObservation(observation)), output: redactObservation(observation), timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: observation.durationMs } });
@@ -394,6 +416,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         captured[stepId] = captureValues(observation, step.captures);
       } else if (step.kind === 'observe') {
         observation = await driver!.observe({ origin, method: step.readback.method, path: step.readback.path, auth: step.readback.auth, variables, deadline, signal }, step.predicate, step.pollIntervalMs);
+        await credentialStillLive(observation.status, step.readback.auth);
         captured[stepId] = captureValues(observation, step.captures);
       } else if (step.kind === 'mcp.call') {
         if (!spec.effects.allowedHosts.includes(`launch://${hostPlan.launch?.componentId}`)) throw new HttpStepError('mcp_origin_not_admitted', 'MCP application origin is outside the frozen effect envelope');
@@ -435,6 +458,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       const finished = log.emit('step.finished', stepId, { result: code === 'cancelled' ? 'cancelled' : 'failed', reason: code, message: String((error as Error).message) });
       if (code === 'cancelled' || code === 'browser_cancelled') cancelled = true;
       else if (isInfrastructureStepFailure(code)) infrastructureFailure = true;
+      if (ENVIRONMENT_BLOCKS.has(code)) blockedReasons.push(code);
       stepObservations.push({ stepId, result: code === 'cancelled' ? 'cancelled' : 'failed', reasonCode: code, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: null, output: null, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: 0 } });
       halted = true;
     }
@@ -488,7 +512,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   } catch (error) { ownershipWriteError = error; }
   const { cleanup, criticalCleanupConfirmed, confirmedFixtureKeys, hostCleanupConfirmed } = await collectCleanup({ allocated,
     uncertainAllocations: uncertainAllocations.size, uncertainOperations, registry: item.fixture?.registry ?? null,
-    driver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
+    driver: cleanupDriver, origin, deadline: cleanupDeadline, session, reason: cancelled ? 'cancelled' : 'cell complete', log });
   if (!ownershipWriteError) {
     if (session && hostCleanupConfirmed) ctx.ownership.removed(hostOwnershipKey);
     for (const entry of allocated) if (confirmedFixtureKeys.includes(entry.entityKey)) ctx.ownership.removed(`fixture:${cell.selectionCellId}:${entry.entityKey}`);
@@ -505,7 +529,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     && (spec.capture.video !== 'required' || mediaArtifacts.length > 0)
     && allArtifacts.reduce((sum, artifact) => sum + artifact.byteCount, 0) <= spec.limits.maxArtifactBytes;
   const assertions = evaluateAssertions(spec, environmentPlan.class, stepObservations, REDUCER_REF, startedAt, finishedAt);
-  const reduction = reduceCell({ spec, expectedStepIds: compiled.orderedStepIds, steps: stepObservations, assertions, cancelled, fixtureState, identityMatched, fidelityMatched, requiredCapabilitiesObserved, artifactsVerified, unknownMutations: cleanup.remainingUnknownMutations, criticalCleanupConfirmed, infrastructureFailure, blockedReasons });
+  const reduction = reduceCell({ spec, expectedStepIds: compiled.orderedStepIds, steps: stepObservations, assertions, cancelled, fixtureState, identityMatched, fidelityMatched, requiredCapabilitiesObserved, artifactsVerified, unknownMutations: cleanup.remainingUnknownMutations, criticalCleanupConfirmed, infrastructureFailure, blockedReasons, environmentClass: environmentPlan.class });
   const routing = parseAs(RoutingDecision, freeze({
     schemaVersion: 'workflow.routing-decision/v1' as const, ref: { id: `${executionId}.${cell.selectionCellId}.routing`, revision: '1' }, scope,
     owner: { kind: 'attempt' as const, campaignId: request.campaignId, executionId, attemptId }, stage: 'replay' as const, inputDigest: spec.ref.digest,

@@ -4,7 +4,7 @@
  * a one-line live progress indicator. Colour only on a TTY without NO_COLOR.
  */
 import { relative } from 'node:path';
-import type { TestRunReport, CaseReport } from '../authoring/run.ts';
+import { environmentBadge, type TestRunReport, type CaseReport } from '../authoring/run.ts';
 import type { HealReport } from '../authoring/heal.ts';
 import { ageOf, type NextAction, type ProjectStatus } from '../authoring/status.ts';
 
@@ -33,8 +33,10 @@ function caseLines(p: Paint, c: CaseReport, last: boolean): string[] {
   const head = `${p.dim(branch)} ${mark(p, c.outcome)} ${p.bold(c.caseId)}  ${tint(label)}  ${p.dim(`${c.steps.length} steps · ${c.durationMs} ms`)}`;
   if (c.outcome === 'passed') return [head];
   const lines = [head];
-  if (c.failure?.step === '(app startup)' || c.failure?.step === '(case)') {
-    lines.push(`${p.dim(stem)}   ${p.amber(c.failure.message)}`);
+  if (c.failure?.step === '(app startup)' || c.failure?.step === '(case)' || c.failure?.step === '(before steps)' || c.failure?.step.startsWith('(fixture')) {
+    if (c.failure.step.startsWith('(fixture')) lines.push(`${p.dim(stem)}   ${p.dim(`${c.failure.step.slice(1, -1)} setup failed; ${c.steps.length} steps not run`)}`);
+    for (const line of c.failure.message.split('\n')) lines.push(`${p.dim(stem)}   ${p.amber(line)}`);
+    if (c.failure.fix) lines.push(`${p.dim(stem)}   ${p.dim('run:')} ${p.moss(c.failure.fix)}`);
     return lines;
   }
   const width = Math.min(28, Math.max(...c.steps.map((s) => s.name.length)));
@@ -61,6 +63,15 @@ export function nextLines(p: Paint, next: NextAction[], max = 3): string[] {
 export function runNext(report: TestRunReport): NextAction[] {
   if (report.outcome === 'passed') return [{ command: 'tracegrove ui', why: 'browse the run, its evidence and video' }];
   const startup = report.cases.some((c) => c.failure?.step === '(app startup)') || report.blockers.length > 0;
+  // Heal edits local flows and re-runs locally; a deployment's problems are fixed where they live.
+  if (report.environment && report.environment.kind === 'url') {
+    const fix = report.cases.map(c => c.failure?.fix).find((f): f is string => !!f) ?? report.blockers.map(b => b.fix).find((f): f is string => !!f);
+    return [
+      ...(fix && fix !== `tracegrove env doctor ${report.environment.name}` ? [{ command: fix, why: 'the owner of this failure runs this first' }] : []),
+      { command: `tracegrove env doctor ${report.environment.name}`, why: 'recheck reachability, persona secrets and identity' },
+      { command: 'tracegrove show --run latest --json', why: 'the full failure, for you or your agent' },
+    ];
+  }
   return [
     { command: 'tracegrove heal', why: startup ? 'the app did not start; heal repairs setup and proves it with a re-run' : 'tell drifted tests from product bugs; keeps only fixes that pass' },
     { command: 'tracegrove show --run latest --json', why: 'the full failure, for you or your agent' },
@@ -68,7 +79,10 @@ export function runNext(report: TestRunReport): NextAction[] {
 }
 
 export function renderTree(report: TestRunReport, root: string, p: Paint): string {
-  const lines = [`${p.moss('tracegrove')} ${p.dim('·')} ${p.bold(report.project)} ${p.dim(`· app ${report.sourceDigest.slice(0, 12)}`)}`, p.dim('│')];
+  const badge = environmentBadge(report.environment);
+  const deployed = report.environment && report.environment.class !== 'isolated_candidate';
+  const lines = [`${p.moss('tracegrove')} ${p.dim('·')} ${p.bold(report.project)} ${p.dim(`· ${report.environment && report.environment.kind !== 'launch' ? 'target' : 'app'} ${report.sourceDigest.slice(0, 12)}`)}${badge ? ` ${deployed ? p.amber(`[${badge}]`) : p.dim(`[${badge}]`)}` : ''}`,
+    ...(report.environment?.origin ? [`${p.dim('│')}  ${p.dim(`${report.environment.origin}${report.environment.expectedRelease ? ` · release ${report.environment.expectedRelease}` : ''}`)}`] : []), p.dim('│')];
   for (const b of report.blockers) lines.push(`${p.dim('├─')} ${p.amber('!')} ${p.bold(b.code)}  ${b.detail}`, `${p.dim('│')}     ${p.dim(`fix: ${b.action}`)}`, ...(b.fix ? [`${p.dim('│')}     ${p.dim('run:')} ${p.moss(b.fix)}${b.owner ? p.dim(` (owner: ${b.owner})`) : ''}`] : []));
   report.cases.forEach((c, i) => lines.push(...caseLines(p, c, i === report.cases.length - 1)));
   const t = report.totals;

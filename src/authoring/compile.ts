@@ -25,6 +25,10 @@ import { applicationLaunch } from './appLaunch.ts';
 import { describeSnapshot, resolveVerificationSource } from './verificationSource.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
 import { caseCapabilities } from '../core/capabilities.ts';
+import { flowEnabledIn, resolveEnvironment } from '../environments/resolve.ts';
+import type { ResolvedEnvironment } from '../environments/schema.ts';
+import { expectedRelease, targetBinding } from '../environments/binding.ts';
+import { digestOfValue } from '../protocol/index.ts';
 
 export const CONFIG_FILE = 'tracegrove.config.yaml';
 export const CONFIG_FILES = [CONFIG_FILE, 'tracegrove.config.ts'] as const;
@@ -45,8 +49,14 @@ export type CompileResult = {
   sourceDigest: string;
   sourceFiles: string[];
   sourceBinding: VerificationSourceBinding;
+  /** Flows the selection matched that this environment does not run (they lack it under envs:). */
+  skipped: Array<{ caseId: string; file: string; title: string; envs: string[] }>;
+  /** The environment this corpus was compiled for (local unless --env names another). */
+  environment: ResolvedEnvironment;
+  /** Deployed or containerized target: origin (url only) and the release the plan pins, if any. */
+  target: { origin: string | null; expectedRelease: string | null } | null;
 };
-export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined };
+export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined; env?: string | undefined };
 
 type Json = unknown;
 
@@ -199,9 +209,9 @@ function write(dir: string, rel: string, doc: Json): void {
 }
 
 /** The environment classes a flow's assertions apply to (R5). One place derives them. */
-export function flowEnvironments(flow: Flow, config: AuthoringConfig): Array<'isolated_candidate' | 'deployed_preview' | 'deployed_canary' | 'production_observation'> {
-  void flow; void config;
-  return ['isolated_candidate'];
+export function flowEnvironments(flow: Flow, environment: Pick<ResolvedEnvironment, 'class'>): Array<ResolvedEnvironment['class']> {
+  void flow;
+  return [environment.class];
 }
 
 export function compileProject(configPath: string, options: CompileOptions = {}): CompileResult {
@@ -209,6 +219,9 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   const snapshotSource = resolveVerificationSource(root, options.sourceSnapshot);
   if (options.sourceRepositoryRole !== undefined && !snapshotSource) fail('snapshot_repository_unbound', 'A repository role needs a selected source snapshot.', 'pass --source-snapshot with --source-repository-role');
   const config = loadAuthoringConfig(resolve(configPath));
+  const environment = resolveEnvironment(config, options.env ?? 'local');
+  const launched = environment.kind === 'launch';
+  if (!launched && snapshotSource) fail('snapshot_requires_launch', `environment ${environment.name} is not launched from source, so --source-snapshot does not apply`, 'drop --source-snapshot, or run against a launched environment');
   const testDir = resolve(root, config.testDir);
   const appRoot = resolve(snapshotSource?.root ?? root, config.app.root);
   const compiledDir = join(root, STATE_DIR, 'compiled');
@@ -234,9 +247,11 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     seen.add(caseId);
   }
   const parsedFlows = indexedFlows.map(row => ({ ...row, flow: readAuthoring(Flow, row.file, root) }));
-  const selected = parsedFlows.filter(({ caseId, flow, file }) =>
+  const matched = parsedFlows.filter(({ caseId, flow, file }) =>
     (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
+  const selected = matched.filter(({ flow }) => flowEnabledIn(flow, environment.name));
+  if (matched.length > 0 && selected.length === 0) fail('no_flows_for_environment', `none of the ${matched.length} matching flow(s) lists ${environment.name} under envs:`, `add envs: [${environment.name}] to flows that may run there (flows default to [local])`);
   if (selected.length === 0) fail('no_flows_selected', `no flow matches${options.grep ? ` --grep ${options.grep}` : ''}${options.tags?.length ? ` --tag ${options.tags.join(',')}` : ''}`, 'run tracegrove list to see flow ids and tags');
   const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
   const hasJobs = selected.some(({ flow }) => flow.steps.some(step => 'job' in step));
@@ -246,19 +261,28 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
   const runner = hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
-  // ---- attested source identity ----
+  // ---- attested source identity (launched apps) or target binding (deployed, containerized) ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
-  const launch = applicationLaunch(config, root, appRoot);
-  const launchCwd = launch.cwd;
-  const sourceSnapshot = snapshotSource?.bind(launchCwd, compiledDir, options.sourceRepositoryRole);
+  const launch = launched ? applicationLaunch(config, root, appRoot) : null;
+  const launchCwd = launch?.cwd ?? root;
+  const sourceSnapshot = launch ? snapshotSource?.bind(launchCwd, compiledDir, options.sourceRepositoryRole) : undefined;
   const sourceSelection = sourceSnapshot?.repositoryRole ? snapshotSource!.selection(sourceSnapshot) : null;
-  if (config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
-  const runtime = observeApplicationRuntimeSync(launch.command, launchCwd, process.env.PATH ?? '');
-  launch.command = runtime.executable;
-  launch.runtime = runtime.runtime;
-  const extraSkip = [relative(launchCwd, testDir).split(sep).join('/')].filter((p) => p && !p.startsWith('..'));
-  const sourceFiles = expandSources(launchCwd, config.app.sources ?? defaultSourceGlobs(), extraSkip);
-  const identity = sourceIdentityDigest(launchCwd, sourceFiles);
+  if (launched && config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
+  let sourceFiles: string[] = [];
+  let identity: ReturnType<typeof sourceIdentityDigest> | null = null;
+  if (launch) {
+    const runtime = observeApplicationRuntimeSync(launch.command, launchCwd, process.env.PATH ?? '');
+    launch.command = runtime.executable;
+    launch.runtime = runtime.runtime;
+    const extraSkip = [relative(launchCwd, testDir).split(sep).join('/')].filter((p) => p && !p.startsWith('..'));
+    sourceFiles = expandSources(launchCwd, config.app.sources ?? defaultSourceGlobs(), extraSkip);
+    identity = sourceIdentityDigest(launchCwd, sourceFiles);
+  }
+  const declared = targetBinding(environment, config, root, compiledDir);
+  const release = declared ? expectedRelease(declared) : null;
+  // The host compares the release it observes with this before any step runs (identity_mismatch).
+  const binding = declared && release ? { ...declared, identity: { ...declared.identity, expect: release } } : declared;
+  const targetOrigin = binding?.origin ?? ORIGIN;
 
   rmSync(compiledDir, { recursive: true, force: true });
   mkdirSync(compiledDir, { recursive: true });
@@ -274,7 +298,12 @@ export function compileProject(configPath: string, options: CompileOptions = {})
 
   // ---- shared definitions ----
   const defaultAuth = `./auth/${defaultPersona}.yaml`;
-  for (const name of personas) write(compiledDir, `auth/${name}.yaml`, { schemaVersion: 'workflow.auth-recipe/v1', ref: ref(`auth.${name}`), kind: 'host_issued', credentialName: `${name}_token`, header: 'authorization', scheme: 'Bearer' });
+  for (const name of personas) {
+    const bound = binding?.personas.find(p => p.persona === name);
+    const hostIssued = !binding || bound?.from === 'host_issued';
+    const bearer = !bound || bound.auth.kind === 'bearer';
+    write(compiledDir, `auth/${name}.yaml`, { schemaVersion: 'workflow.auth-recipe/v1', ref: ref(`auth.${name}`), kind: hostIssued ? 'host_issued' : 'env_credential', credentialName: `${name}_token`, header: bearer ? 'authorization' : null, scheme: bearer ? 'Bearer' : null });
+  }
   write(compiledDir, `personas/${defaultPersona}.yaml`, {
     schemaVersion: 'workflow.persona/v1', ref: ref(`persona.${defaultPersona}`), traits: [], accountBindingRef: null, roleScopes: [], stateRecipeRef: null, dataVolumeRecipeRef: null, entitlementRef: null, connectorStateRef: null,
     authRecipeRef: { $file: `.${defaultAuth}` },
@@ -284,15 +313,23 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   });
   write(compiledDir, 'components.yaml', {
     schemaVersion: 'workflow.component-profile/v1', ref: ref('components'),
-    components: [{ componentId: APP_ID, kind: 'application', required: true, expectedIdentity: { kind: 'source_digest', sourceDigest: { algorithm: 'sha256', hex: identity.hex }, runtime: launch.runtime }, exclusionReason: null }],
+    // A launched app has a launcher-computed source digest the kernel trusts. A deployment or container
+    // only declares its release: the host blocks on a mismatch before running, and the bundle records it,
+    // but it is not claimed as a verified identity.
+    components: [identity && launch
+      ? { componentId: APP_ID, kind: 'application', required: true, expectedIdentity: { kind: 'source_digest', sourceDigest: { algorithm: 'sha256', hex: identity.hex }, runtime: launch.runtime }, exclusionReason: null }
+      : { componentId: APP_ID, kind: 'application', required: false, expectedIdentity: release ? { kind: 'declared_release', release } : null,
+        exclusionReason: release
+          ? `environment ${environment.name}: the target declares release ${release}; the host refuses any other release, but a declared release is not a launcher-computed digest`
+          : `environment ${environment.name} does not pin a release; the observed release is recorded, not compared (set target.release.expect to require one)` }],
   });
   write(compiledDir, 'environment.yaml', {
-    schemaVersion: 'workflow.environment-plan/v1', ref: ref('environment'), class: 'isolated_candidate', origins: [ORIGIN],
+    schemaVersion: 'workflow.environment-plan/v1', ref: ref('environment'), class: environment.class, origins: [targetOrigin],
     componentProfileRef: { $file: './components.yaml' }, credentialRecipeRef: { $file: defaultAuth },
     actionEnvelopeRef: null, personaLeasePolicyRef: null, budgetPolicyRef: null, networkProfileRef: null, clockProfileRef: null,
   });
   const budgetMs = config.defaults.caseTimeoutMs * selected.length + 30_000;
-  write(compiledDir, 'host.yaml', {
+  if (launch && identity) write(compiledDir, 'host.yaml', {
     schemaVersion: 'workflow.host-plan/v1', ref: ref('host'), placement: 'local', adapter: 'local_process',
     launch: {
       componentId: APP_ID, command: launch.command, args: launch.args, cwd: relative(compiledDir, launchCwd).split(sep).join('/') || '.',
@@ -308,13 +345,23 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000, cleanupReserveMs: 10_000,
   });
+  else if (binding) write(compiledDir, 'host.yaml', {
+    schemaVersion: 'workflow.host-plan/v1', ref: ref('host'), placement: binding.kind === 'url' ? 'local' : 'container', adapter: binding.kind, launch: null,
+    mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: binding.kind === 'url' ? 'none' : 'fresh_directory_and_port', networkRules: [binding.kind === 'url' ? 'declared_origins_only' : 'loopback_only'],
+    requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 },
+    requiredCapabilities: binding.kind === 'url' ? ['network_origin:external', 'confirmed_cancel', 'artifact_delivery'] : ['container', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
+    captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000 + binding.readiness.timeoutMs, cleanupReserveMs: binding.kind === 'url' ? 15_000 : 60_000, binding,
+  });
   const runnerAdapter = hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
   const surfaceKind = hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
   write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed' });
   write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
   write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: false, fixtures: false }) });
-  const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass: 'local', readbackOracleRef: null, interceptorRef: null });
-  write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: [boundary('application'), boundary('storage')] });
+  // A deployment is a test sandbox (or designated production when read-only); tracegrove cannot see its storage.
+  const accountClass = binding?.kind === 'url' ? (binding.writes === 'none' ? 'designated_production' : 'test_sandbox') : 'local';
+  const boundaryIds = launched ? ['application', 'storage'] : ['application'];
+  const boundary = (boundaryId: string) => ({ boundaryId, adapterRef: null, mode: 'real', required: true, exclusionReasonRef: null, accountClass, readbackOracleRef: null, interceptorRef: null });
+  write(compiledDir, 'fidelity.yaml', { schemaVersion: 'workflow.fidelity-profile/v1', ref: ref('fidelity.real'), lane: 'full_live_sandbox', boundaryProfileRef: null, boundaryRules: boundaryIds.map(boundary) });
   const stage = { allowed: false, maxCalls: 0, maxTokens: 0, costCeilingCents: 0 };
   write(compiledDir, 'policy.yaml', { schemaVersion: 'workflow.intelligence-policy/v1', ref: ref('policy'), stages: { analysis: stage, drafting: stage, discovery: stage, diagnosis: stage, evaluation: stage, benchmark: stage }, replayInference: 'none' });
 
@@ -351,7 +398,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const methods = new Set<string>(browserFlow ? flow.browser!.allowMethods : []);
     const prefixes = new Set<string>(browserFlow ? flow.browser!.allowPaths : []);
     let creates = 0;
-    const classes = flowEnvironments(flow, config);
+    const classes = flowEnvironments(flow, environment);
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
@@ -472,12 +519,14 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     write(compiledDir, `cases/${caseId}.yaml`, {
       schemaVersion: 'workflow.case/v1', ref: { id: caseId, revision: '1' }, purpose: flow.title, workflowId: caseId,
       requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: hasMcp ? 'integration' : browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
-      proofClaim: `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`,
+      proofClaim: launched
+        ? `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`
+        : `The ${config.project} ${binding!.kind === 'url' ? `deployment at ${binding!.origin}` : `${binding!.kind} target`} in environment ${environment.name} (${environment.class})${release ? `, reporting release ${release},` : ''} satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}, as the configured personas.`,
       environmentClasses: classes, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: browserFlow, fixtures: given.size > 0 }),
-      requiredBoundaries: [{ boundaryId: 'application', mode: 'real' }, { boundaryId: 'storage', mode: 'real' }],
+      requiredBoundaries: boundaryIds.map(boundaryId => ({ boundaryId, mode: 'real' })),
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
-      effects: { mode: 'designated_writes', allowedHosts: [ORIGIN], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
+      effects: { mode: binding?.writes === 'none' ? 'read_only' : 'designated_writes', allowedHosts: [targetOrigin], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
         ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}),
         ...(hasMcp ? { maxMcpCalls: flow.effects?.maxMcpCalls ?? 0, allowedMcpTools: flow.effects?.allowedMcpTools ?? [] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
@@ -492,8 +541,11 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     schemaVersion: 'workflow.config/v1', project: config.project, suiteRef: './cases/suite.yaml', defaultProfile: PROFILE, outputDir: './output', sourceSetRef: null,
     ...(sourceSelection ? { sourceSelectionRef: './source-selection.yaml' } : {}),
     executionHostRef: './host.yaml', intelligencePolicyRef: './policy.yaml',
-    profiles: { [PROFILE]: { class: 'isolated_candidate', environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
+    profiles: { [PROFILE]: { class: environment.class, environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
   });
-  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles,
-    sourceBinding: snapshotSource ? describeSnapshot(snapshotSource.snapshot) : { kind: 'working_tree' } };
+  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows,
+    sourceDigest: identity?.hex ?? digestOfValue(binding).hex, sourceFiles,
+    sourceBinding: snapshotSource ? describeSnapshot(snapshotSource.snapshot) : { kind: 'working_tree' },
+    skipped: matched.filter(row => !selected.includes(row)).map(({ caseId, file, flow }) => ({ caseId, file: relative(root, file).split(sep).join('/'), title: flow.title, envs: flow.envs ?? ['local'] })),
+    environment, target: binding ? { origin: binding.origin, expectedRelease: release } : null };
 }

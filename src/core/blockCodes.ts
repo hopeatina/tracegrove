@@ -25,6 +25,11 @@ export const BLOCK_CODES = {
   mcp_sdk_missing: { owner: 'developer', action: 'install the optional MCP SDK', fix: () => 'npm install @modelcontextprotocol/sdk@1.32.1', docs: 'docs/mcp-driver.md' },
   identity_mismatch: { owner: 'operator', action: 'the target is not the build this plan expects; redeploy or update the expected release', fix: doctor, docs: d('identity') },
   // environments
+  invalid_environment: { owner: 'developer', action: 'fix the environment in tracegrove.config.yaml', fix: ctx => `tracegrove env show ${ctx.env ?? 'local'}`, docs: d('environments') },
+  no_flows_for_environment: { owner: 'agent', action: 'opt flows into this environment with envs: [<env>]', fix: ctx => `tracegrove explain${envFlag(ctx)}`, docs: d('flows') },
+  host_binding_missing: { owner: 'agent', action: 'compile for the environment so the host has its binding', fix: ctx => `tracegrove compile${envFlag(ctx)}`, docs: d('environments') },
+  snapshot_requires_launch: { owner: 'agent', action: 'source snapshots only apply to launched environments', fix: () => null, docs: d('environments') },
+  approval_requires_human: { owner: 'operator', action: 'approvals must come from a person, not an agent', fix: ctx => `tracegrove approve --env ${ctx.env ?? '<env>'}`, docs: d('agents') },
   unknown_environment: { owner: 'agent', action: 'choose a declared environment', fix: () => 'tracegrove env list', docs: d('environments') },
   environment_writes_forbidden: { owner: 'developer', action: 'this environment allows no writes; run read-only flows here or pick a writable environment', fix: ctx => `tracegrove explain${envFlag(ctx)}`, docs: d('safety') },
   approval_required: { owner: 'operator', action: 'a human must approve agent runs in this environment', fix: ctx => `tracegrove approve --env ${ctx.env ?? '<env>'}`, docs: d('agents') },
@@ -38,6 +43,7 @@ export const BLOCK_CODES = {
   deployment_not_ready: { owner: 'operator', action: 'the deployment answered but its health check failed', fix: doctor, docs: d('doctor') },
   origin_not_allowed: { owner: 'developer', action: 'add the endpoint to the environment network allowlist', fix: ctx => `tracegrove env show ${ctx.env ?? 'local'}`, docs: d('network') },
   cleanup_unconfirmed: { owner: 'operator', action: 'cleanup in a deployed environment was not confirmed; reconcile the leftover records', fix: () => 'tracegrove show --json', docs: d('safety') },
+  deployed_cleanup_unconfirmed: { owner: 'operator', action: 'a deployed environment kept records this run created; the run fails until cleanup is confirmed', fix: () => 'tracegrove show --run latest --json', docs: d('safety') },
   docker_unavailable: { owner: 'developer', action: 'start Docker (the daemon must be reachable)', fix: () => 'docker info', docs: d('docker') },
   budget_exceeded: { owner: 'operator', action: 'the run would exceed the environment request budget', fix: ctx => `tracegrove explain${envFlag(ctx)}`, docs: d('budget') },
 } as const satisfies Record<string, BlockSpec>;

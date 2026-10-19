@@ -5,9 +5,533 @@
     "adapter": {
       "enum": [
         "local_process",
-        "mock_loopback"
+        "mock_loopback",
+        "url",
+        "compose",
+        "container"
       ],
       "type": "string"
+    },
+    "binding": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "maxRequests": {
+                  "maximum": 2147483647,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxSpendCents": {
+                  "maximum": 1000000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "maxRequests",
+                "maxSpendCents"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compose": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "maxLength": 400,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "fileDigest": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "port": {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "service": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "tokensEnv": {
+                  "maxLength": 64,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file",
+                "service",
+                "port",
+                "tokensEnv",
+                "fileDigest"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "container": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "additionalProperties": {
+                    "maxLength": 400,
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "maxLength": 64,
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "image": {
+                  "maxLength": 400,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "port": {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "tokensEnv": {
+                  "maxLength": 64,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image",
+                "port",
+                "env",
+                "tokensEnv"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoints": {
+          "additionalProperties": {
+            "format": "uri",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "propertyNames": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "environment": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "expect": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "field": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "field",
+            "expect"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "url",
+            "compose",
+            "container"
+          ],
+          "type": "string"
+        },
+        "network": {
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "items": {
+                "maxLength": 255,
+                "pattern": "^[A-Za-z0-9.-]+(?::\\d+)?$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            }
+          },
+          "required": [
+            "allow"
+          ],
+          "type": "object"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "personas": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "auth": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Authorization: Bearer <secret>.",
+                    "properties": {
+                      "kind": {
+                        "const": "bearer",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "<name>: <prefix><secret>.",
+                    "properties": {
+                      "kind": {
+                        "const": "header",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 64,
+                        "pattern": "^[A-Za-z0-9-]+$",
+                        "type": "string"
+                      },
+                      "prefix": {
+                        "default": "",
+                        "maxLength": 32,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "prefix"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "POST a login form; keep the named session cookie. The secret is the password, or JSON {username,password}.",
+                    "properties": {
+                      "cookie": {
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_.-]+$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "form_login",
+                        "type": "string"
+                      },
+                      "passwordField": {
+                        "default": "password",
+                        "maxLength": 64,
+                        "type": "string"
+                      },
+                      "path": {
+                        "maxLength": 400,
+                        "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                        "type": "string"
+                      },
+                      "username": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "usernameField": {
+                        "default": "username",
+                        "maxLength": 64,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path",
+                      "usernameField",
+                      "passwordField",
+                      "cookie"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "OAuth 2.0 client credentials grant; the secret is the client secret.",
+                    "properties": {
+                      "audience": {
+                        "maxLength": 512,
+                        "type": "string"
+                      },
+                      "clientId": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "oauth_client_credentials",
+                        "type": "string"
+                      },
+                      "scope": {
+                        "maxLength": 512,
+                        "type": "string"
+                      },
+                      "tokenUrl": {
+                        "format": "uri",
+                        "maxLength": 2048,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "tokenUrl",
+                      "clientId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Clerk testing token plus a sign-in ticket exchanged for a session token; the secret is the Clerk secret key.",
+                    "properties": {
+                      "backendApi": {
+                        "default": "https://api.clerk.com",
+                        "format": "uri",
+                        "maxLength": 2048,
+                        "type": "string"
+                      },
+                      "frontendApi": {
+                        "format": "uri",
+                        "maxLength": 2048,
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "clerk_testing",
+                        "type": "string"
+                      },
+                      "userId": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "frontendApi",
+                      "backendApi",
+                      "userId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Supabase password grant; the secret is the password. The anon key is public by design.",
+                    "properties": {
+                      "anonKey": {
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "email": {
+                        "maxLength": 320,
+                        "minLength": 3,
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "supabase_password",
+                        "type": "string"
+                      },
+                      "url": {
+                        "format": "uri",
+                        "maxLength": 2048,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "url",
+                      "anonKey",
+                      "email"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "credentialName": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "from": {
+                "description": "Where the persona secret comes from. A reference, never a value.",
+                "maxLength": 400,
+                "minLength": 1,
+                "pattern": "^(?:host_issued|env:[A-Za-z_][A-Za-z0-9_]*|file:[^#\\s]+#[A-Za-z_][A-Za-z0-9_.-]*|aws-sm:\\/\\/[^\\s#]+(?:#[A-Za-z0-9_.-]+)?|aws-ssm:\\/\\/[^\\s]+|op:\\/\\/[^\\s]+|orgx-broker:\\/\\/[A-Za-z0-9._-]+(?:\\?[^\\s#]*)?)$",
+                "type": "string"
+              },
+              "persona": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "persona",
+              "credentialName",
+              "from",
+              "auth",
+              "subject"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "projectRoot": {
+          "maxLength": 400,
+          "type": "string"
+        },
+        "readiness": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "maxLength": 400,
+              "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+              "type": "string"
+            },
+            "timeoutMs": {
+              "maximum": 300000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "path",
+            "timeoutMs"
+          ],
+          "type": "object"
+        },
+        "whoami": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "maxLength": 400,
+                  "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                  "type": "string"
+                },
+                "subject": {
+                  "maxLength": 256,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "subject"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "writes": {
+          "enum": [
+            "none",
+            "owned_namespace"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "environment",
+        "projectRoot",
+        "origin",
+        "readiness",
+        "identity",
+        "endpoints",
+        "network",
+        "writes",
+        "personas",
+        "whoami",
+        "budget",
+        "compose",
+        "container"
+      ],
+      "type": "object"
     },
     "captureRequirements": {
       "items": {

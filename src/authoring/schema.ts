@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { ActionEnvelope, BrowserCommand, NativeJobAction, McpToolCall, Persona, HexSha256 } from '../protocol/index.ts';
+import { EnvironmentConfig } from '../environments/schema.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -50,6 +51,7 @@ export const AuthoringConfig = z.object({
     model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-5-5 for claude; gpt-6-luna for codex.'),
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
+  environments: z.record(Name, EnvironmentConfig).optional().describe('Where flows can run: local (default), docker, staging, prod-readonly. Each names a target, class, write policy, persona secret references and agent policy.'),
   defaults: z.object({
     stepTimeoutMs: z.number().int().positive().max(120_000).default(5000),
     caseTimeoutMs: z.number().int().positive().max(600_000).default(30_000),
@@ -108,6 +110,7 @@ export const Flow = z.object({
   title: z.string().min(1).max(400),
   risk: z.enum(['critical', 'standard', 'exploratory']).default('standard'),
   tags: z.array(Name).default([]),
+  envs: z.array(Name).min(1).max(16).optional().describe('Environments this flow may run in. Defaults to [local]; list staging etc. to opt in.'),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),
   effects: ActionEnvelope.pick({ maxJobs: true, maxMcpCalls: true, allowedMcpTools: true }).partial().optional().describe('Explicit job and MCP effect ceilings; tool annotations do not grant authority.'),

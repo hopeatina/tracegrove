@@ -79,11 +79,20 @@ export function authHeaders(spec: Pick<HttpRequestSpec, 'auth'>, credentials: Ht
   return Object.fromEntries(Object.entries(credential.headers).map(([name, value]) => [name, value.reveal()]));
 }
 
+/** Environment limits the driver enforces itself, independent of the planner. */
+export type HttpPolicy = { maxRequests?: number | null; allowedMethods?: readonly string[] | null };
+
 export class HttpDriver {
-  constructor(private readonly credentials: HttpCredentials, private readonly allowedOrigins: Set<string>) {}
+  private sent = 0;
+  constructor(private readonly credentials: HttpCredentials, private readonly allowedOrigins: Set<string>, private readonly policy: HttpPolicy = {}) {}
+
+  get requestCount(): number { return this.sent; }
 
   async request(spec: HttpRequestSpec): Promise<HttpObservation> {
     if (!this.allowedOrigins.has(spec.origin)) throw new HttpStepError('origin_not_admitted', `${spec.origin} is not an admitted origin`);
+    if (this.policy.allowedMethods && !this.policy.allowedMethods.includes(spec.method)) throw new HttpStepError('environment_writes_forbidden', `${spec.method} is not allowed in a read-only environment`);
+    if (this.policy.maxRequests !== undefined && this.policy.maxRequests !== null && this.sent >= this.policy.maxRequests) throw new HttpStepError('budget_exceeded', `the environment request budget of ${this.policy.maxRequests} is spent`);
+    this.sent++;
     const path = applyTemplate(spec.path, spec.variables);
     if (!path.startsWith('/')) throw new HttpStepError('invalid_path', path);
     const url = `${spec.origin}${path}`;

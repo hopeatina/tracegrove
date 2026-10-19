@@ -36,6 +36,12 @@ export type HostSession = {
   accountClass?: 'local' | 'test_sandbox' | 'designated_production' | 'none';
   /** Ask the credential's issuer whether it is still valid (e.g. a broker token that expired mid-run). */
   credentialCheck?(name: string, signal: AbortSignal): Promise<CredentialCheck>;
+  /** Resolver kind, reference, recipe, expiry and observed subject per persona; never values. */
+  credentialRecords?: import('./personas.ts').CredentialRecord[];
+  /** Request ceiling from the environment budget; null for none. */
+  requestBudget?: number | null;
+  /** Methods the environment admits (production observation: GET/HEAD only); null for any. */
+  allowedMethods?: string[] | null;
   stop(reason: string): Promise<{ confirmed: boolean; detail: string }>;
 };
 

@@ -30,6 +30,23 @@ export type { Blocker } from './frozenBundle.ts';
 
 export type PlanInput = { project: LoadedProject; profileName: string; scope: Scope; purpose?: RunRequest['purpose']; workBinding?: RunRequest['workBinding'] };
 
+/** What a case would write: non-read HTTP verbs, owned fixtures, tool calls, jobs and browser actions. */
+export function caseWrites(spec: CaseSpec): string[] {
+  const writes = new Set<string>();
+  for (const step of spec.steps) {
+    if (step.kind === 'http.request' && step.method !== 'GET' && step.method !== 'HEAD') writes.add(step.method);
+    if (step.kind === 'mcp.call') writes.add('mcp.call');
+    if (step.kind.startsWith('job.')) writes.add(step.kind);
+    if (step.kind === 'ui.action') writes.add('ui.action');
+  }
+  if (spec.fixturePlanRef) writes.add('owned fixtures');
+  return [...writes];
+}
+/** Upper-bound request estimate: one per step, four per fixture entity, plus readback polling slack. */
+function estimatedRequests(spec: CaseSpec): number {
+  return spec.steps.reduce((n, step) => n + (step.kind === 'observe' ? 5 : 1), 0) + (spec.fixturePlanRef ? 8 : 0);
+}
+
 function cellId(caseId: string, personaId: string): string {
   return `${caseId}__${personaId}`.replace(/[^A-Za-z0-9._:/-]/g, '_');
 }
@@ -68,6 +85,9 @@ export function plan(input: PlanInput): FrozenBundle {
   }
   if (hostPlan.adapter === 'local_process' && !hostPlan.launch) {
     blockers.push({ code: 'host_launch_missing', detail: hostPlan.ref.id, owner: 'operator', action: 'declare a launch recipe or bind an existing target', cellId: null });
+  }
+  if ((hostPlan.adapter === 'url' || hostPlan.adapter === 'compose' || hostPlan.adapter === 'container') && hostPlan.binding?.kind !== hostPlan.adapter) {
+    blockers.push({ code: 'host_binding_missing', detail: `${hostPlan.ref.id} is a ${hostPlan.adapter} host without a matching target binding`, owner: 'developer', action: 'compile the project with --env <environment>', cellId: null });
   }
   if (hostPlan.adapter === 'mock_loopback' && !hostPlan.mockResponsesRef) {
     blockers.push({ code: 'mock_responses_missing', detail: hostPlan.ref.id, owner: 'operator', action: 'declare mock responses for the loopback host', cellId: null });
@@ -121,6 +141,9 @@ export function plan(input: PlanInput): FrozenBundle {
     for (const cap of [...spec.requiredCapabilities, ...binding.requiredCapabilities]) {
       if (!advertised.has(cap)) cellBlock('unwired_capability', `${spec.ref.id} requires ${cap}, which runner ${capabilities.ref.id} does not implement`, 'runner owner', 'add a conforming adapter or exclude the case explicitly');
     }
+    const writes = caseWrites(spec);
+    if (hostPlan.binding?.writes === 'none' && writes.length) cellBlock('environment_writes_forbidden', `${spec.ref.id} writes (${writes.join(', ')}) but environment ${hostPlan.binding.environment} allows no writes`, 'developer', `run only read-only flows in ${hostPlan.binding.environment}; see tracegrove explain --env ${hostPlan.binding.environment}`);
+    if (hostPlan.binding?.budget && estimatedRequests(spec) > hostPlan.binding.budget.maxRequests) cellBlock('budget_exceeded', `${spec.ref.id} needs about ${estimatedRequests(spec)} requests; environment ${hostPlan.binding.environment} allows ${hostPlan.binding.budget.maxRequests}`, 'operator', 'raise budget.maxRequests or select fewer flows');
     for (const cap of new Set(spec.requiredCapabilities)) {
       const gap = capabilityGap(cap, hostPlan.adapter);
       if (gap) cellBlock('capability_not_provided_by_host', `${spec.ref.id}: ${gap}`, 'operator', 'choose an environment whose host provides it; run tracegrove capabilities');

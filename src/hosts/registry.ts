@@ -7,6 +7,9 @@ import type { ExecutorHost, HostFactory, HostKind } from './types.ts';
 export const HOSTS = {
   local_process: () => import('./local.ts').then(m => m.localProcessHost),
   mock_loopback: () => import('./mock.ts').then(m => m.mockLoopbackHost),
+  url: () => import('./url.ts').then(m => m.urlHost),
+  compose: () => import('./compose.ts').then(m => m.composeHost),
+  container: () => import('./container.ts').then(m => m.containerHost),
 } satisfies Record<HostKind, () => Promise<HostFactory>>;
 
 export async function hostFactory(kind: HostKind): Promise<HostFactory> {
