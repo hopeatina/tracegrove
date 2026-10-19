@@ -77,7 +77,8 @@
     "LICENSE",
     "README.md",
     "docs/images/ui-run.png",
-    "docs/persona-pools.md"
+    "docs/persona-pools.md",
+    "docs/benchmark-evidence.md"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",

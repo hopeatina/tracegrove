@@ -25,6 +25,8 @@ import { WorkflowKnowledgeSnapshot } from '../core/workflowKnowledge.ts';
 import { inspectPersonaPools } from '../core/coordination.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { inspectAttemptInventory } from '../core/attemptInventory.ts';
+import { inspectBenchmark } from '../core/benchmark.ts';
+import { formatBenchmark } from './benchmark.ts';
 import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
@@ -125,6 +127,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
        [--route <path> --case <id> --workflow <id> --surface <surface> --tag <tag> --limit <1..100> --cursor <cursor>]
   usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
+  benchmark --state-dir <dir> --axis runner|model      compare recorded cohorts across all checkpoint admissions
   pools --snapshot <json> [--pool <id>]                inspect recorded persona pool availability; no reservation or credentials
   import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
        [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
@@ -462,6 +465,11 @@ async function main(argv: string[]): Promise<number> {
       out(args, report, `Imported native observations · ${report.format}\nProducer-reported observations: ${JSON.stringify(counts)}\n` +
         `Limitations: ${report.warnings.join(', ') || 'none recorded'}\nIssuer not authenticated; qualification and verification not evaluated.`);
       return 0;
+    }
+    case 'benchmark': {
+      const report = inspectBenchmark({ stateDir: args.flags['state-dir'], scope: localScope(), axis: args.flags.axis });
+      out(args, report, formatBenchmark(report));
+      return report.exitCode;
     }
     case 'usage': {
       const report = inspectAttemptInventory({ stateDir: args.flags['state-dir'], scope: localScope() });

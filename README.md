@@ -428,6 +428,11 @@ The local controller owns an exclusive ledger and accepts authenticated loopback
 for one project. CLI runs delegate to that writer; concurrent redelivery reconciles the same
 execution. Case lookup uses bounded pages with snapshot-bound cursors. `rerun` freezes a fresh
 campaign while preserving case digests and original request lineage. Use
+`benchmark --state-dir <dir> --axis runner|model` groups recorded usage and timing
+across every admitted attempt, retaining failures and unknown pricing. See
+[recorded benchmark evidence](docs/benchmark-evidence.md) for condition matching,
+warm/cold gaps and the limits of descriptive comparisons.
+
 `inspect --request` for static frozen-plan checks and `inspect --bundle` for independently
 verified evidence. [Inspection and export](docs/verified-bundles.md#inspect-and-hand-off-a-frozen-run)
 use sealed snapshots; lifecycle reruns require fresh owner registration.

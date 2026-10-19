@@ -13,6 +13,7 @@ export { deriveCleanupExpectation } from './core/ownership.ts';
 export { signCleanupFollowup, verifyCleanupFollowup, cleanupExpectationDigest, type CleanupObserver } from './core/cleanupAttestation.ts';
 export { CoordinationSnapshotSchema, CoordinationCommandSchema, transitionCoordination, commitCoordination, type CoordinationSnapshot, type CoordinationCommand, type CoordinationFence, type CoordinationStore } from './core/coordination.ts';
 export { transitionPersonaPools, inspectPersonaPools } from './core/coordination.ts';
+export { inspectBenchmark, BENCHMARK_LIMITS } from './core/benchmark.ts';
 export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
 export { WorkflowKnowledgeSnapshot, WORKFLOW_KNOWLEDGE_LIMITS } from './core/workflowKnowledge.ts';

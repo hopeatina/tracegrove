@@ -1,6 +1,7 @@
 import { AttemptInventoryReport, ScopeSchema, type AttemptInventoryRow, type Scope } from '../protocol/index.ts';
 import { inspectLedger, LedgerInspectionError } from './ledgerInspection.ts';
 import { AttemptReadError, RecordedAdmission, readAdmittedAttempt } from './attemptInventoryBinding.ts';
+import type { VerifiedBundleRecords } from './bundle.ts';
 
 export const ATTEMPT_INVENTORY_LIMIT = 500;
 function empty(scope: Scope): AttemptInventoryReport {
@@ -12,12 +13,18 @@ function empty(scope: Scope): AttemptInventoryReport {
 
 /** One stable read-only checkpoint, including unsuccessful and unsealed admissions. No writer or recovery is opened. */
 export function inspectAttemptInventory(options: { stateDir: string; scope: Scope }): AttemptInventoryReport {
+  return readAttemptCheckpoint(options).report;
+}
+
+/** Internal shared capture. Evidence and inventory are read under the same unchanged checkpoint. */
+export function readAttemptCheckpoint(options: { stateDir: string; scope: Scope }) {
   const report = empty(ScopeSchema.parse(options.scope));
+  const evidence: Array<{ admissionSequence: number; records: VerifiedBundleRecords }> = [];
   try {
     const view = inspectLedger(options.stateDir); const entries = view.admissions();
     report.checkpoint = view.head; report.writerLock = view.writerLock;
     if (entries.length > ATTEMPT_INVENTORY_LIMIT) {
-      view.assertUnchanged(); return AttemptInventoryReport.parse({ ...report, code: 'inventory_limit_exceeded' });
+      view.assertUnchanged(); return { report: AttemptInventoryReport.parse({ ...report, code: 'inventory_limit_exceeded' }), evidence };
     }
     const usage = { receipts: 0, runnerSeconds: 0, browserSeconds: 0, artifactBytes: 0, inferenceCalls: 0, inferenceTokens: 0, integrationOperations: 0 };
     const pricing = { estimatedSubtotalCents: null as number | null, reconciledSubtotalCents: null as number | null,
@@ -60,6 +67,7 @@ export function inspectAttemptInventory(options: { stateDir: string; scope: Scop
             if (point.censored) timings.censored++;
           }
         }
+        evidence.push({ admissionSequence: entry.seq, records: checked.records });
       } catch (error) {
         row.status = error instanceof AttemptReadError ? error.status : 'binding_invalid';
         row.unresolvedResources = error instanceof AttemptReadError ? error.unresolvedResources : null; complete = false;
@@ -67,10 +75,10 @@ export function inspectAttemptInventory(options: { stateDir: string; scope: Scop
       report.attempts.push(row);
     }
     view.assertUnchanged();
-    return AttemptInventoryReport.parse({ ...report, code: !entries.length ? 'no_attempts' : complete ? 'complete_inventory' : 'partial_evidence',
+    return { report: AttemptInventoryReport.parse({ ...report, code: !entries.length ? 'no_attempts' : complete ? 'complete_inventory' : 'partial_evidence',
       exitCode: !entries.length || complete ? 0 : 2, recordedUsageSubtotal: usage.receipts ? usage : null,
-      recordedPricing: usage.receipts ? pricing : null, timingPoints: usage.receipts ? timings : null, evidenceComplete: complete });
+      recordedPricing: usage.receipts ? pricing : null, timingPoints: usage.receipts ? timings : null, evidenceComplete: complete }), evidence };
   } catch (error) {
-    return AttemptInventoryReport.parse({ ...empty(report.scope), code: error instanceof LedgerInspectionError ? error.code : 'inspection_failed' });
+    return { report: AttemptInventoryReport.parse({ ...empty(report.scope), code: error instanceof LedgerInspectionError ? error.code : 'inspection_failed' }), evidence: [] };
   }
 }

@@ -35,6 +35,7 @@
             "workflow-map",
             "workflows",
             "usage",
+            "benchmark",
             "pools",
             "import-observations",
             "observations",

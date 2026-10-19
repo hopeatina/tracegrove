@@ -7,6 +7,7 @@ import { RegressionAdmission } from './schemas/regression.ts';
 import { ImportedObservations } from './schemas/importedObservations.ts';
 import { WorkflowKnowledge, WorkflowKnowledgePage } from './schemas/workflowKnowledge.ts';
 import { PersonaPoolDefinition, PersonaPoolStatus } from './schemas/personaPool.ts';
+import { BenchmarkReport } from './schemas/benchmark.ts';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
 import * as P from './schemas/portableEnvironment.ts';
@@ -38,6 +39,7 @@ export * from './schemas/regression.ts';
 export * from './schemas/importedObservations.ts';
 export * from './schemas/workflowKnowledge.ts';
 export * from './schemas/personaPool.ts';
+export * from './schemas/benchmark.ts';
 export * from './schemas/capabilityLifecycle.ts';
 export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
@@ -126,6 +128,7 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'tracegrove.benchmark/v1': BenchmarkReport,
   'tracegrove.cli-error/v1': CliErrorReport,
   'tracegrove.recovery-status/v1': RecoveryStatusReport,
   'tracegrove.replay-comparison/v1': ReplayComparison,
