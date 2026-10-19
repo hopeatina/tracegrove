@@ -223,7 +223,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     // A host that never started explains every not_run step; surface its sealed message.
     const events = join(runDir, 'bundle', 'cells', r.selectionCellId, 'events.jsonl');
     if (report.outcome !== 'passed' && existsSync(events)) {
-      const parsed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; redactedPayload: { error?: string; reasons?: Array<{ code: string; detail: string }>; entityKey?: string; code?: string; message?: string } });
+      const parsed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; stepId?: string | null; redactedPayload: { error?: string; reasons?: Array<{ code: string; detail: string }>; entityKey?: string; code?: string; message?: string } });
       const hostFailed = parsed.find((e) => e.kind === 'host.failed');
       const hostBlocked = parsed.find((e) => e.kind === 'host.blocked');
       const fixtureFailed = parsed.find((e) => e.kind === 'fixture.failed');
@@ -239,6 +239,10 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
         const others = r.reasonCodes.filter(c => c !== code && c !== 'step_not_run');
         if (others.length) report.failure.message += `\nalso: ${others.join(', ')}`;
       } else if (report.failure) {
+        // A failed step with no observation (the request never produced one) keeps its sealed message.
+        const failed = report.steps.find(step => step.name === report.failure!.step && step.reason);
+        const finished = failed && parsed.find((e) => e.kind === 'step.finished' && e.stepId === failed.id && e.redactedPayload.message);
+        if (finished && !report.failure.observed) report.failure.observed = String(finished.redactedPayload.message).slice(0, 500);
         const code = r.reasonCodes.find(c => describeBlock(c).fix !== null);
         if (code) report.failure.fix = describeBlock(code, { env: compiled.environment.name }).fix;
       }
