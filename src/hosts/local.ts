@@ -70,12 +70,15 @@ function substitute(text: string, values: Record<string, string>): string {
 }
 
 async function waitReady(origin: string, path: string, deadline: Deadline, signal: AbortSignal): Promise<unknown> {
+  // Most apps are ready within tens of milliseconds; back off from 10 ms so a fixed 100 ms tick is not paid per case.
+  let pause = 10;
   while (!deadline.expired()) {
     try {
       const response = await fetch(`${origin}${path}`, { signal: deadline.child(2000).signal(signal) });
       if (response.ok) { try { return await response.json(); } catch { return null; } }
     } catch { /* not ready yet */ }
-    await sleep(100, signal);
+    await sleep(pause, signal);
+    pause = Math.min(pause * 2, 100);
   }
   throw new InfrastructureFailure(`application did not become ready at ${origin}${path} within the readiness timeout`);
 }

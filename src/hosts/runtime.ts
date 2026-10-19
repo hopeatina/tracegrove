@@ -1,7 +1,8 @@
 /** Observe the executable used for launch; controller Node is not application identity. */
 import { execFile, execFileSync } from 'node:child_process';
-import { accessSync, constants, readFileSync } from 'node:fs';
-import { delimiter, isAbsolute, resolve } from 'node:path';
+import { accessSync, constants, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { RuntimeObservation, sha256Hex } from '../protocol/index.ts';
 import { Blocked, InfrastructureFailure } from '../core/errors.ts';
@@ -26,8 +27,42 @@ function resolveExecutable(command: string, cwd: string, path: string): string {
 }
 
 const probeOptions = (cwd: string, path: string) => ({ cwd, env: { PATH: path }, timeout: 2000, maxBuffer: 4096, encoding: 'utf8' as const });
+// Hashing a 100+ MB interpreter costs 100-250 ms, and compile plus every case used to repeat it.
+// The key includes ctime, which any write to the file changes and unprivileged users cannot set back.
+const digestCachePath = () => join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'tracegrove', 'runtime-digests.json');
+const digestMemo = new Map<string, string>();
+
+function statKey(executable: string): string {
+  const s = statSync(executable, { bigint: true });
+  return [executable, s.dev, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(':');
+}
+
+function readDigestCache(): Record<string, string> {
+  try { const value: unknown = JSON.parse(readFileSync(digestCachePath(), 'utf8')); return value && typeof value === 'object' ? value as Record<string, string> : {}; }
+  catch { return {}; }
+}
+
+export function executableDigest(executable: string): string {
+  const key = statKey(executable);
+  const known = digestMemo.get(key) ?? readDigestCache()[key];
+  if (typeof known === 'string' && /^[0-9a-f]{64}$/.test(known)) { digestMemo.set(key, known); return known; }
+  const digest = sha256Hex(readFileSync(executable));
+  // A changed file between stat and read must not be cached under the old key.
+  if (statKey(executable) !== key) return digest;
+  digestMemo.set(key, digest);
+  try {
+    const path = digestCachePath();
+    const entries = Object.entries({ ...readDigestCache(), [key]: digest }).filter(([k]) => !k.startsWith(`${executable}:`) || k === key).slice(-32);
+    mkdirSync(dirname(path), { recursive: true });
+    const temporary = `${path}.${process.pid}.tmp`;
+    writeFileSync(temporary, `${JSON.stringify(Object.fromEntries(entries))}\n`);
+    renameSync(temporary, path);
+  } catch { /* the cache is an optimisation; a read-only home only costs the re-hash */ }
+  return digest;
+}
+
 const observation = (stdout: string, executable: string): RuntimeObservation => RuntimeObservation.parse({
-  ...parseRuntimeVersion(stdout), executable, executableSha256: sha256Hex(readFileSync(executable)),
+  ...parseRuntimeVersion(stdout), executable, executableSha256: executableDigest(executable),
 });
 
 /** Synchronous compiler companion; uses the same bounded interpreter probe as launch. */
