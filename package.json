@@ -96,9 +96,5 @@
     "cli",
     "evidence"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/hopeatina/tracegrove.git"
-  },
   "homepage": "https://www.npmjs.com/package/tracegrove"
 }
