@@ -8,7 +8,7 @@ Use the installed binary through `npx --no-install tracegrove` so CI never fetch
 | `discover --json` | Compares discovered routes and authored flows | Coverage suggestions, no app launch |
 | `check --json` | Compiles authoring files | `ok` and located issues; may evaluate trusted TypeScript authoring modules |
 | `doctor --dir . --json` | Checks the native plan without app launch | `tracegrove.doctor/v1`, `checks`, `errors`, `blocked`, `execution: not_started` |
-| `test --json` | Starts the selected app and executes scenarios | `tracegrove.run-summary/v1`, `outcome`, `cases`, `runDir`, `bundleVerified` |
+| `test --json` | Starts the selected app and executes scenarios | `tracegrove.run-summary/v1`, `outcome`, `cases`, `blockers`, `runDir`, `bundleVerified` |
 | `verify-bundle --bundle <dir> --json` | Checks existing evidence | `ok`, `problems`, `outcome`, `receipts`; no app launch |
 | `draft --intent '<goal>'` | Starts a coding agent to edit drafts | Review changed files and compile/run afterward |
 | `heal --dry-run` | Runs and diagnoses the suite | Findings without retained agent edits |

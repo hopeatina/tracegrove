@@ -57,6 +57,6 @@ Use `status --json` to find the next action, `discover --json` to compare routes
 
 `draft` runs a configured Claude Code or Codex CLI and may edit flow files. `heal` runs the suite and can edit setup or flow files after its checks. Commit or stash your work before either command; review every proposed diff. `heal --dry-run` inspects without keeping edits. An agent verdict or a successful compile does not prove that a changed test still expresses your intent.
 
-[Agent command and JSON guide](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/agent-guide.md) · [Portable environment setup and limits](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/portable-environments.md) · [Browser driver](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/browser-driver.md) · [Architecture](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/architecture.md)
+[Agent command and JSON guide](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/agent-guide.md) · [Browser driver](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/browser-driver.md) · [Native jobs](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/native-jobs.md) · [MCP driver](https://cdn.jsdelivr.net/npm/tracegrove@0.3.1/docs/mcp-driver.md)
 
 Apache-2.0 licensed. The repository is [hopeatina/tracegrove](https://github.com/hopeatina/tracegrove); repository access is separate from the public npm package.

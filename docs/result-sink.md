@@ -82,6 +82,6 @@ labels, including `WORKFLOW_VERIFY_OWNER`, do not authenticate a remote tenant.
 
 This sink verifies integrity and record consistency. It does not authenticate an
 issuer, approve a source plan, provision qualification leases, activate coverage,
-or publish an OrgX AWR record. Hosted receiver authentication, tenant delivery,
-and scoped OrgX projection require their own trusted adapters. A storage receipt
+or publish a third-party work receipt. Hosted receiver authentication, tenant delivery,
+and scoped downstream projections require their own trusted adapters. A storage receipt
 cannot stand in for those acceptance gates.
