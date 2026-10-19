@@ -105,9 +105,9 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','Heal','History','Settings'];
+const TABS=['Run','Discover','Heal','History','Environments','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
-const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null};
+const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null,envs:null,env:(()=>{try{return localStorage.getItem('tracegrove.env')||'local'}catch{return 'local'}})(),doctoring:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw j;return j}
 function toast(text,action){for(const old of document.querySelectorAll('.toast'))old.remove();const t=h('div',{class:'toast fade',role:'status'},h('span',{},text),
@@ -122,7 +122,7 @@ const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;return d<60?'j
 function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>{tab=t;render()}}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
+async function load(){state=await api('/api/overview');try{ui.envs=await api('/api/environments');if(!ui.envs.environments.some(e=>e.name===ui.env))ui.env='local'}catch{ui.envs=null}try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
 function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
 
 ${SOURCE_CONTROLS_JS}
@@ -145,8 +145,8 @@ function runTab(){
  const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
  const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},state.runs.map(r=>h('option',{value:r.name,selected:r.name===ui.runName},ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
  const hero=h('section',{style:'margin-bottom:28px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
-   h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),h('h1',{style:'margin-top:6px'},headline)),
-   h('div',{class:'row'},state.runs.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
+   h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),run?envBadge(run.environment):null,h('h1',{style:'margin-top:6px'},headline)),
+   h('div',{class:'row'},envSwitch(),state.runs.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
     [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError||!state.flows.some(f=>f.caseId===ui.sel),on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!state.hasConfig||!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
   run?h('div',{class:'stats'},h('div',{},h('b',{},held+' / '+ran.length),h('span',{class:'muted'},'scenarios held')),h('div',{},h('b',{},stepsHeld+' / '+allSteps.length),h('span',{class:'muted'},'steps held')),
    h('div',{},h('b',{},secs(new Date(run.finishedAt)-new Date(run.startedAt))),h('span',{class:'muted'},'wall time')),
@@ -211,7 +211,7 @@ function watchRun(){if(runWatch!==null)return;let polling=false;runWatch=setInte
   if(ui.running&&!ui.healing&&ui.agentPhase<0&&(a.status==='finished'||a.status==='failed')){stopRunWatch();ui.running=false;ui.runName=null;ui.run=null;await load()}}catch{}finally{polling=false}},400)}
 async function cancelRun(){const runId=ui.activeRunId;if(!runId||ui.cancelling)return;ui.cancelling=true;render();try{const r=await api('/api/cancel',{runId});toast((r.operation==='heal'?'Heal':r.operation==='draft'?'Draft':'Run')+' settled: '+r.outcome+'; inspect saved records')}catch(e){ui.error=e;render()}}
 async function runNow(grep){if(state.compileError){ui.error=state.compileError;render();return}if(ui.running)return;ui.running='Compiling flows and starting the app';render();watchRun();
- ui.error=null;try{const r=await api('/api/test',{grep});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false;ui.activeRunId=null;ui.cancelling=false}await load()}
+ ui.error=null;try{const r=await api('/api/test',{grep,env:ui.env});ui.runName=r.runDir.split('/').pop();ui.run=r;ui.sel=null;toast(r.outcome==='passed'?'Every scenario held':'Run finished: '+r.totals.passed+' held, '+(r.totals.failed+r.totals.other)+' need a look',r.outcome==='passed'?null:{label:'Heal',run:()=>startHeal(false)})}catch(e){ui.error=e}finally{stopRunWatch();ui.running=false;ui.activeRunId=null;ui.cancelling=false}await load()}
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned '+file.split('/').pop(),{label:'Undo',run:()=>prune(file,!graft)});ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
@@ -338,7 +338,7 @@ function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=a
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade',role:'dialog','aria-modal':'true','aria-label':'Command palette'},input,list,
   h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'))));
  document.body.append(palette);draw();input.focus()}
-function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to 5','switch tab'],['?','this list'],['esc','close']];
+function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to 6','switch tab'],['?','this list'],['esc','close']];
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade card',role:'dialog','aria-modal':'true','aria-label':'Keyboard shortcuts',style:'padding:20px'},h('h2',{},'Keyboard'),
   h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)]))));document.body.append(palette)}
 function moveSel(d){if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
@@ -349,9 +349,29 @@ document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/
  if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/'){e.preventDefault();openPalette()}else if(e.key==='?'){shortcuts()}else if(e.key==='j'){moveSel(1)}else if(e.key==='k'){moveSel(-1)}
  else if(e.key==='r'&&ui.sel&&!ui.running){tab='Run';runNow(ui.sel)}else if(e.key==='R'&&!ui.running){tab='Run';runNow('')}else if(e.key==='h'&&!ui.running){startHeal(false)}
- else if(/^[1-5]$/.test(e.key)){tab=TABS[Number(e.key)-1];render()}});
+ else if(/^[1-6]$/.test(e.key)){tab=TABS[Number(e.key)-1];render()}});
 document.getElementById('palbtn').addEventListener('click',openPalette);
 
-function render(){header();if(!state)return;const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function envBadge(e){if(!e||(e.name==='local'&&e.class==='isolated_candidate'))return null;const deployed=e.class!=='isolated_candidate';
+ return h('span',{class:'pill '+(e.class==='production_observation'?'p-fail':deployed?'p-warn':'p-info'),style:'margin-left:8px','aria-label':'Environment'},(deployed?e.name.toUpperCase():e.name)+' · '+e.class.replace(/_/g,' ')+(e.writes==='none'?' · read-only':''))}
+function envSwitch(){const list=ui.envs&&ui.envs.environments||[];if(list.length<2)return null;
+ return h('label',{class:'row small muted',style:'gap:6px'},'Environment',h('select',{'aria-label':'Environment to run in',on:{change:e=>{ui.env=e.target.value;try{localStorage.setItem('tracegrove.env',ui.env)}catch{}render()}}},
+  list.map(e=>h('option',{value:e.name,selected:e.name===ui.env},e.name+(e.class!=='isolated_candidate'?' · '+e.class.replace(/_/g,' '):'')))))}
+async function doctorEnv(name){ui.doctoring=name;render();try{const r=await api('/api/env-doctor',{env:name});ui.envs.doctor[name]=r;toast(name+': '+r.status)}catch(e){toast(e.reasons?e.reasons[0].detail:e.error||'Doctor failed')}ui.doctoring=null;render()}
+function envTab(){const list=ui.envs&&ui.envs.environments||[];
+ if(!list.length)return[h('div',{class:'card'},h('h2',{},'Only local'),h('p',{class:'muted'},'Add an environment with tracegrove env add <name> --url https://… --persona owner=aws-sm://…'))];
+ return[h('section',{style:'margin-bottom:20px'},h('span',{class:'label'},'Environments'),h('h1',{style:'margin-top:6px'},'Where flows can run, and with which identities.'),
+  h('p',{class:'small muted'},'Secrets are shown as references only. Deployed environments keep agents behind a person’s approval; production observation is read-only.')),
+  ...list.map(e=>{const d=ui.envs.doctor[e.name];const checks=d&&d.checks||[];
+   return h('div',{class:'card fade',style:'margin-bottom:12px'},
+    h('div',{class:'row',style:'justify-content:space-between'},h('div',{class:'row',style:'gap:8px'},h('h2',{class:'mono',style:'margin:0'},e.name),envBadge({name:e.name,class:e.class,writes:e.writes})||h('span',{class:'pill p-info'},e.class.replace(/_/g,' ')),
+      d?h('span',{class:'pill '+(d.status==='ready'?'p-pass':'p-fail')},'doctor: '+d.status):h('span',{class:'pill p-none'},'not checked')),
+     h('div',{class:'row'},h('button',{class:'btn ghost sm',disabled:ui.doctoring!==null,on:{click:()=>doctorEnv(e.name)}},ui.doctoring===e.name?'Checking…':'Doctor'),
+      h('button',{class:'btn sm',disabled:!!ui.running,on:{click:()=>{ui.env=e.name;try{localStorage.setItem('tracegrove.env',e.name)}catch{}tab='Run';render();runNow('')}}},'Run here'))),
+    h('table',{class:'kv',style:'margin-top:8px'},h('tbody',{},
+     h('tr',{},h('th',{},'Target'),h('td',{class:'mono small'},e.target)),h('tr',{},h('th',{},'Writes'),h('td',{},e.writes)),h('tr',{},h('th',{},'Agents'),h('td',{},e.agents)),
+     ...e.personas.map(p=>h('tr',{},h('th',{},'as '+p.persona),h('td',{class:'mono small'},p.ref+' · '+p.auth+(p.subject?' · expects '+p.subject:'')))))),
+    checks.filter(c=>c.state!=='pass').length?h('ul',{class:'small',style:'margin:8px 0 0;padding-left:18px'},checks.filter(c=>c.state!=='pass').map(c=>h('li',{},h('span',{class:c.required?'c-fail':'c-warn'},c.check+': '),c.detail,c.fix?h('div',{class:'mono muted'},'run: '+c.fix):null))):null)})]}
+function render(){header();if(!state)return;const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

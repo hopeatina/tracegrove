@@ -44,6 +44,13 @@ import { projectRoot, projectStatus } from '../authoring/status.ts';
 import { runActivity } from '../authoring/activity.ts';
 import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
 import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
+import { readLocalSettings as readEnvSettings } from '../authoring/localSettings.ts';
+import { resolveEnvironment, selectEnvironment } from '../environments/resolve.ts';
+import { detectAgent, grantApproval } from '../environments/agents.ts';
+import { capabilityMatrix, envList, envShow, explain, whoamiCommand } from '../environments/commands.ts';
+import { runEnvDoctor } from '../environments/doctorCache.ts';
+import { configGet, configPatch, configSet, envAddPatch, parseValue } from '../authoring/configEdit.ts';
+import { renderApproval, renderCapabilities, renderConfigEdit, renderDoctor, renderEnvList, renderEnvShow, renderExplain, renderWhoami } from './renderEnv.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -53,6 +60,15 @@ function flag(args: Args, name: string): string | null {
 function out(args: Args, value: unknown, text: string): void {
   if (('json' in args.flags && args.flags.json) || ('jsonl' in args.flags && args.flags.jsonl)) process.stdout.write(`${JSON.stringify(value)}\n`);
   else process.stdout.write(`${text}\n`);
+}
+
+/** flag > TRACEGROVE_ENV > .tracegrove/settings.json > local */
+function envFor(args: Args, root: string): string {
+  let settings = {}; try { settings = readEnvSettings(root); } catch { settings = {}; }
+  return selectEnvironment({ flag: flag(args, 'env'), settings }).name;
+}
+function positionals(args: Args): string[] {
+  return ((args.flags as { _?: string[] })._ ?? []);
 }
 
 function stateDirFor(projectRoot: string): string {
@@ -73,6 +89,7 @@ Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walk
   (no command)                                         where this project stands and what to run next
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+       [--env <name>] [--agent <name>]                 run in a declared environment (default: TRACEGROVE_ENV, settings, local)
        [--heal]                                        on failure, heal and re-run (see heal)
        [--source-snapshot <snapshot.json>]              verify and launch an owner-bound private source copy
        [--source-repository-role <role>]                bind the verified resolver head to a repository role
@@ -85,6 +102,19 @@ Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walk
   compile [--json] [--source-snapshot <snapshot.json>]   write the derived v1 corpus to .tracegrove/compiled/
           [--source-repository-role <role>]            bind a single resolver-head repository
   ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
+
+Environments (local, docker, staging, prod-readonly; see docs/environments.md):
+  env list                                             targets, classes, write and agent policy, persona secret references
+  env show [<env>]                                     one environment, each persona probed (resolvable/expired/missing), no values
+  env doctor [<env>] [--no-whoami]                     reachability, readiness, persona secrets, whoami identity, network, cleanup
+  env add <env> --url <https://…> --persona p=<ref>    validated shortcut that writes environments.<env> (also --class --writes --agents --dry-run)
+  whoami [--env <env>] [--as <persona>]                sign each persona in and show who the deployment thinks it is
+  explain [<case>] [--env <env>]                       dry plan: which flows run, as whom, what they write and clean up, what is skipped
+  capabilities [--env <env>]                           capability × environment matrix with the reason and fix for each gap
+  approve --env <env> [--ttl <min>] [--uses <n>]       a person approves the next agent run(s) where agents: ask
+  config get [<path>] | set <path> <value> | patch <json> [--dry-run]
+                                                       validated, comment-preserving edits to tracegrove.config.yaml
+  mcp [--max-calls <n>] [--max-test-runs <n>]          MCP stdio server: status, env_list, env_doctor, capabilities, explain, check, test, show_run, heal, draft
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
@@ -188,13 +218,15 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'compile': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'), { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined });
-      out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const compiled = compileProject(configPath, { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, env: envFor(args, dirname(configPath)) });
+      out(args, compiled, `compiled ${compiled.flows.length} flow(s) for ${compiled.environment.name} (${compiled.environment.class}) into ${compiled.compiledDir}\n${compiled.target ? `target digest ${compiled.sourceDigest.slice(0, 12)}${compiled.target.origin ? ` · ${compiled.target.origin}` : ''}` : `app source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)`}\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
       return 0;
     }
 
     case 'list': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const compiled = compileProject(configPath, { env: envFor(args, dirname(configPath)) });
       out(args, compiled.flows, compiled.flows.map((f) => `${f.caseId}  [${f.tags.join(', ')}]  ${f.file}\n  ${f.title}\n${f.steps.map((s) => `    - ${s.name}: ${s.method} ${s.path}${s.as !== Object.keys(compiled.config.personas)[0] ? ` (as ${s.as})` : ''}`).join('\n')}`).join('\n'));
       return 0;
     }
@@ -208,7 +240,7 @@ async function main(argv: string[]): Promise<number> {
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
         live.update('Compiling flows and starting the app');
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env: envFor(args, dirname(configPath)), agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
           onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
             if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
             else live.update(runActivity(event).label);
@@ -228,6 +260,86 @@ async function main(argv: string[]): Promise<number> {
         live.done();
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
       }
+    }
+
+    case 'env': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const root = dirname(configPath);
+      const [sub, name] = positionals(args);
+      const p = paint();
+      if (sub === 'list') {
+        const result = { ...envList(configPath), selected: envFor(args, root) };
+        out(args, result, renderEnvList(result.environments, p, result.selected));
+        return 0;
+      }
+      if (sub === 'show') {
+        const result = await envShow(configPath, name ?? envFor(args, root));
+        out(args, result, renderEnvShow(result, p));
+        return 0;
+      }
+      if (sub === 'doctor') {
+        const report = await runEnvDoctor({ configPath, env: name ?? envFor(args, root), identity: args.flags['no-whoami'] !== true, agent: detectAgent(process.env, flag(args, 'agent')) });
+        out(args, report, renderDoctor(report, p));
+        return report.exitCode;
+      }
+      if (sub === 'add') {
+        if (!name) throw new Blocked([{ code: 'missing_argument', detail: 'env add needs a name', owner: 'agent', action: 'tracegrove env add staging --url https://staging.example.com --persona owner=env:OWNER_TOKEN' }]);
+        const patch = envAddPatch({ name, url: flag(args, 'url'), personas: (args.flags as { persona?: string[] }).persona ?? [], class: flag(args, 'class'), writes: flag(args, 'writes'), agents: flag(args, 'agents'), health: flag(args, 'health'), whoami: flag(args, 'whoami') });
+        const result = configPatch(configPath, patch, { dryRun: args.flags['dry-run'] === true });
+        out(args, result, `${renderConfigEdit(result, p)}${result.written ? `\nnext: tracegrove env doctor ${name}` : ''}`);
+        return 0;
+      }
+      throw new Blocked([{ code: 'invalid_argument', detail: `env ${sub ?? ''}: use list, show, doctor or add`, owner: 'agent', action: 'tracegrove env list' }]);
+    }
+
+    case 'whoami': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const result = await whoamiCommand(configPath, envFor(args, dirname(configPath)), flag(args, 'as'), new AbortController().signal);
+      out(args, result, renderWhoami(result, paint()));
+      return result.exitCode;
+    }
+
+    case 'explain': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
+      const result = explain(configPath, { env: envFor(args, dirname(configPath)), caseId: positionals(args)[0] ?? null, grep: flag(args, 'grep') ?? undefined, tags, agent: detectAgent(process.env, flag(args, 'agent')) });
+      out(args, result, renderExplain(result, paint()));
+      return result.wouldRun ? 0 : 2;
+    }
+
+    case 'capabilities': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const result = capabilityMatrix(configPath, flag(args, 'env'));
+      out(args, result, renderCapabilities(result, paint()));
+      return 0;
+    }
+
+    case 'approve': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const environment = resolveEnvironment(loadAuthoringConfig(configPath), args.flags.env);
+      const approval = grantApproval(dirname(configPath), environment, { identity: detectAgent(process.env), ...(flag(args, 'ttl') ? { ttlMinutes: Number(flag(args, 'ttl')) } : {}), ...(flag(args, 'uses') ? { uses: Number(flag(args, 'uses')) } : {}) });
+      out(args, approval, renderApproval(approval, paint()));
+      return 0;
+    }
+
+    case 'config': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const [sub, path, value] = positionals(args);
+      const dryRun = args.flags['dry-run'] === true;
+      if (sub === 'get') { const result = configGet(configPath, path); out(args, result, typeof result.value === 'object' ? JSON.stringify(result.value, null, 2) : String(result.value)); return 0; }
+      if (sub === 'set' && path && value !== undefined) { const result = configSet(configPath, path, parseValue(value), { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0; }
+      if (sub === 'unset' && path) { const result = configSet(configPath, path, null, { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0; }
+      if (sub === 'patch' && path) {
+        let patch: unknown; try { patch = JSON.parse(path); } catch { throw new Blocked([{ code: 'config_edit_invalid', detail: 'config patch takes a JSON merge patch', owner: 'agent', action: `tracegrove config patch '{"environments":{"staging":{"agents":"ask"}}}' --dry-run` }]); }
+        const result = configPatch(configPath, patch, { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0;
+      }
+      throw new Blocked([{ code: 'invalid_argument', detail: 'use config get [<path>], config set <path> <value>, config unset <path> or config patch <json>', owner: 'agent', action: 'tracegrove config get environments' }]);
+    }
+
+    case 'mcp': {
+      const { serveMcp } = await import('../mcp/server.ts');
+      await serveMcp({ configPath: findConfig(flag(args, 'config') ?? '.'), ceilings: { ...(flag(args, 'max-calls') ? { maxCalls: Number(flag(args, 'max-calls')) } : {}), ...(flag(args, 'max-test-runs') ? { maxRuns: Number(flag(args, 'max-test-runs')) } : {}) } });
+      return 0;
     }
 
     case 'show': {

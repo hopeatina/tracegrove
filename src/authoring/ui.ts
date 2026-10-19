@@ -25,6 +25,8 @@ import { heal, listHeals, undoHeal } from './heal.ts';
 import { projectStatus } from './status.ts';
 import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
 import { readRunSource } from './runSource.ts';
+import { envList } from '../environments/commands.ts';
+import { runEnvDoctor } from '../environments/doctorCache.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -76,7 +78,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     if (!existsSync(runsDir)) return [];
     return readdirSync(runsDir).filter((name) => name !== 'latest' && existsSync(join(runsDir, name, 'summary.json'))).sort().reverse().slice(0, 50)
       .flatMap((name) => { try { const r = readSavedRunSummary(dir, name);
-        return [{ name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }]; } catch { return []; } });
+        return [{ name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, environment: (r as { environment?: unknown }).environment ?? null, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }]; } catch { return []; } });
   };
   const testDir = () => {
     try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
@@ -173,6 +175,17 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/run-control') return send(200, { runId: active?.id ?? null, operation: active?.kind ?? null, cancelling: active?.cancelling ?? false, closing });
       if (req.method === 'GET' && url.pathname === '/api/live') return send(200, { run: RunActivity.parse(activity), agent: live.agent, heal: live.heal });
       if (req.method === 'GET' && url.pathname === '/api/status') return send(200, projectStatus(dir));
+      if (req.method === 'GET' && url.pathname === '/api/environments') {
+        if (!existsSync(configPath())) return send(200, { schemaVersion: 'tracegrove.env-list/v1', selected: null, environments: [], doctor: {} });
+        const list = envList(configPath());
+        const doctor = Object.fromEntries(list.environments.map(e => { const file = join(dir, STATE_DIR, 'doctor', `${e.name}.json`); try { return [e.name, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as unknown : null]; } catch { return [e.name, null]; } }));
+        return send(200, { ...list, doctor });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/env-doctor') {
+        const body = await readBody(req, res);
+        if (typeof body.env !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(body.env)) return send(400, { error: 'env must be an environment name' });
+        return send(200, await runEnvDoctor({ configPath: configPath(), env: body.env }));
+      }
       if (req.method === 'GET' && url.pathname === '/api/heals') return send(200, listHeals(dir).slice(0, 20));
       if (req.method === 'POST' && url.pathname === '/api/heal') {
         const body = await readBody(req, res);
@@ -270,6 +283,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         activity = { status: 'running', event: null, stepId: null, label: 'Planning verification', observedAt: new Date().toISOString() };
         const operation = begin('run');
         const job = runTests({ signal: operation.controller.signal, configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
+          ...(typeof body.env === 'string' && /^[A-Za-z][A-Za-z0-9_-]*$/.test(body.env) ? { env: body.env } : {}),
           onEvent: event => { activity = runActivity(event); } });
         running = job;
         try {
