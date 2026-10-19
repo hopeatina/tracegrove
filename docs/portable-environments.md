@@ -106,7 +106,7 @@ profile execution flag is advertised.
 2. **Native selection/onboarding:** doctor now resolves the existing native authoring/HostPlan
    selection and reports source/runtime/dependency inspection. General portable profile dispatch
    and host-specific missing-ref recovery remain gated; no silent policy downgrade. Repeat the clean API/browser
-   first run independently on each actual machine. Mac remains unqualified while offline.
+   first run independently on each actual machine. A successful local sample on one machine does not qualify a general macOS adapter or other applications.
 3. **External staging:** install a reviewed read-only external-host adapter and existing secret
    broker integration. Prove deployment/endpoint identity and authorized test-persona access;
    fixtures require separately scoped owned synthetic-resource authority. No denied staging retry
@@ -128,8 +128,7 @@ Current evidence is limited to this Codex Linux cloud's isolated native/API/brow
 the hosted Linux sample CI lanes already linked in the release audit. Actual OrgX #3620 proved a
 settings heading, #3614 a method boundary, and #3645 failed receipt lookup with unavailable offline
 workspace/store. None proves full OrgX workflow/client acceptance. Local Docker registry HTTPS
-was refused; hosted CI's Docker success is separate evidence. Claude coding cloud, Hope's Mac,
-OrgX-triggered runtime and authenticated external staging remain unqualified.
+was refused; hosted CI's Docker success is separate evidence. Claude coding cloud, broader macOS applications, OrgX-triggered runtime and authenticated external staging remain unqualified.
 
 ## Recorded clean-room onboarding
 

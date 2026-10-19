@@ -2,29 +2,27 @@
 
 `BrowserDriver` runs real Chromium in a fresh, nonpersistent context. It does
 not connect to an existing browser profile. Install its pinned browser before
-running browser tests or using the driver:
+running browser tests or using the driver in a project with Tracegrove installed:
 
 ```sh
-npm ci
-PLAYWRIGHT_SKIP_BROWSER_GC=1 npx --no-install playwright install chromium
-npm test -- tests/browser-driver.test.ts
+npx --no-install playwright install chromium
 ```
 
 Linux CI uses `playwright install --with-deps chromium` to install the browser
 and its system libraries.
 
-Run the packaged browser sample through the same low-level CLI as an API case:
+Run the packaged browser sample through the same low-level CLI as an API case,
+from a directory where Tracegrove is installed:
 
 ```sh
-npm run build
-node dist/cli/main.js sample-config --sample notes-browser --output /tmp/notes-browser
-node dist/cli/main.js plan --config /tmp/notes-browser/verification/workflow.yaml --output /tmp/notes-browser-request.json
-node dist/cli/main.js run --request /tmp/notes-browser-request.json
+npx --no-install tracegrove sample-config --sample notes-browser --output "$PWD/notes-browser"
+npx --no-install tracegrove plan --config "$PWD/notes-browser/verification/workflow.yaml" --output "$PWD/notes-browser-request.json"
+npx --no-install tracegrove run --request "$PWD/notes-browser-request.json"
 ```
 
 Use fresh output paths: sample generation refuses to overwrite a project. The
 run prints its execution ID and bundle path. Pass that path to
-`node dist/cli/main.js verify-bundle --bundle <path>` for independent verification.
+`npx --no-install tracegrove verify-bundle --bundle <path>` for independent verification.
 The sample shares its real app, personas, fixture recipes, and cleanup with
 `notes-api`; only its browser runner, binding, and case differ.
 
@@ -94,11 +92,11 @@ controller-death browser cleanup remain open; no production qualification is cla
 
 ## Short flows and Grove
 
-The packaged sample also includes a short browser flow. From the repository root:
+The packaged sample also includes a short browser flow. From the same installed directory:
 
 ```sh
-node dist/cli/main.js test --config /tmp/notes-browser/tracegrove.config.yaml --grep notes.browser
-node dist/cli/main.js ui --dir /tmp/notes-browser
+npx --no-install tracegrove test --config "$PWD/notes-browser/tracegrove.config.yaml" --grep notes.browser
+npx --no-install tracegrove ui --dir "$PWD/notes-browser"
 ```
 
 Open the printed loopback address and select the browser scenario. Its step
