@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Request } from 'playwright';
+import type { Browser, BrowserContext, Locator, Page, Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,6 +42,8 @@ export class BrowserDriver {
     const abort = () => { void browser?.close().catch(() => {}); };
     signal.addEventListener('abort', abort, { once: true });
     try {
+      // Loaded on first browser step so HTTP-only runs never pay Playwright's import cost.
+      const { chromium } = await import('playwright');
       browser = await chromium.launch({ headless: true, timeout: Math.max(1, input.deadline.remainingMs()) });
       signal.throwIfAborted();
       const context = await browser.newContext({

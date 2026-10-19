@@ -70,12 +70,15 @@ function substitute(text: string, values: Record<string, string>): string {
 }
 
 async function waitReady(origin: string, path: string, deadline: Deadline, signal: AbortSignal): Promise<unknown> {
+  // Most apps are ready within tens of milliseconds; back off from 10 ms so a fixed 100 ms tick is not paid per case.
+  let pause = 10;
   while (!deadline.expired()) {
     try {
       const response = await fetch(`${origin}${path}`, { signal: deadline.child(2000).signal(signal) });
       if (response.ok) { try { return await response.json(); } catch { return null; } }
     } catch { /* not ready yet */ }
-    await sleep(100, signal);
+    await sleep(pause, signal);
+    pause = Math.min(pause * 2, 100);
   }
   throw new InfrastructureFailure(`application did not become ready at ${origin}${path} within the readiness timeout`);
 }
@@ -235,9 +238,14 @@ export class LocalProcessHost implements ExecutorHost {
           child.once('exit', () => resolveExit(true));
         });
         child.kill('SIGTERM');
-        const graceful = await Promise.race([exited, sleep(5000).then(() => false)]);
+        // Abort the losing timer so a prompt exit does not keep the CLI alive for the full grace period.
+        const waitFor = async (ms: number) => {
+          const timer = new AbortController();
+          try { return await Promise.race([exited, sleep(ms, timer.signal).then(() => false, () => false)]); } finally { timer.abort(); }
+        };
+        const graceful = await waitFor(5000);
         if (!graceful && child.connected) child.disconnect();
-        if (!graceful) await Promise.race([exited, sleep(2000).then(() => false)]);
+        if (!graceful) await waitFor(2000);
         const confirmed = ownedCleanupConfirmed && (child.exitCode !== null || child.signalCode !== null);
         if (confirmed) rmSync(context.workspaceDir, { recursive: true, force: true });
         const workspaceGone = !existsSync(context.workspaceDir);

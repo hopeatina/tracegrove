@@ -2,7 +2,6 @@
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { chromium } from 'playwright';
 import { compileProject, findConfig } from '../authoring/compile.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { Blocked } from '../core/errors.ts';
@@ -98,6 +97,8 @@ export async function inspectDoctor(options: { config?: string | undefined; dir?
     const browserRequired = (bundle.request?.caseRefs ?? []).some(ref => project.corpus.getAs(CaseSpec, ref).steps.some(step => step.kind.startsWith('ui.')));
     if (browserRequired) {
       try {
+        // Loaded only here so HTTP-only projects never pay Playwright's import cost.
+        const { chromium } = await import('playwright');
         accessSync(chromium.executablePath(), constants.X_OK);
         check('chromium_installation', 'ok', 'executable is installed; engine launch, system libraries and video capture are untested', 'browser_executable_installed');
       } catch {
