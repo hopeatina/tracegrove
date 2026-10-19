@@ -16,6 +16,7 @@ import { compileCase } from './compiler.ts';
 import { cleanupActionError } from './cleanupActions.ts';
 import { mcpSdkAvailable } from '../adapters/mcp/capabilities.ts';
 import { Blocked } from './errors.ts';
+import { capabilityGap } from './capabilities.ts';
 import { materializeLogicalPayload } from './generators.ts';
 import { REDUCER_REF } from './reducer.ts';
 import { snapshotRepository } from './snapshotRepository.ts';
@@ -119,6 +120,10 @@ export function plan(input: PlanInput): FrozenBundle {
     const advertised = new Set([...capabilities.operations, ...capabilities.fixtureOperations, ...capabilities.cleanupOperations]);
     for (const cap of [...spec.requiredCapabilities, ...binding.requiredCapabilities]) {
       if (!advertised.has(cap)) cellBlock('unwired_capability', `${spec.ref.id} requires ${cap}, which runner ${capabilities.ref.id} does not implement`, 'runner owner', 'add a conforming adapter or exclude the case explicitly');
+    }
+    for (const cap of new Set(spec.requiredCapabilities)) {
+      const gap = capabilityGap(cap, hostPlan.adapter);
+      if (gap) cellBlock('capability_not_provided_by_host', `${spec.ref.id}: ${gap}`, 'operator', 'choose an environment whose host provides it; run tracegrove capabilities');
     }
     for (const required of spec.requiredBoundaries) {
       const rule = fidelityProfile.boundaryRules.find((r) => r.boundaryId === required.boundaryId);

@@ -9,6 +9,7 @@ import { pollObservation } from '../poll.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { evaluatePredicate } from '../../core/reducer.ts';
 import type { PredicateT } from '../../protocol/index.ts';
+import type { RequestCredential } from '../../credentials/types.ts';
 import type { z } from 'zod';
 import type { Capture as CaptureSchema } from '../../protocol/index.ts';
 type Capture = z.infer<typeof CaptureSchema>;
@@ -28,7 +29,9 @@ export type HttpObservation = {
   attempts: number;
 };
 
-export type HttpCredentials = { persona: string | null; named: Record<string, string> };
+/** A bare string is a bearer token (legacy); a RequestCredential carries the auth recipe's headers. */
+export type HttpCredential = string | RequestCredential;
+export type HttpCredentials = { persona: HttpCredential | null; named: Record<string, HttpCredential> };
 
 export type HttpRequestSpec = {
   origin: string;
@@ -49,7 +52,7 @@ export class HttpStepError extends Error {
   }
 }
 
-export function bearerFor(spec: Pick<HttpRequestSpec, 'auth'>, credentials: HttpCredentials): string | null {
+function credentialOf(spec: Pick<HttpRequestSpec, 'auth'>, credentials: HttpCredentials): HttpCredential | null {
   if (spec.auth.kind === 'none') return null;
   if (spec.auth.kind === 'persona') {
     if (!credentials.persona) throw new HttpStepError('missing_persona_credential', 'persona credential was not issued for this attempt');
@@ -58,6 +61,22 @@ export function bearerFor(spec: Pick<HttpRequestSpec, 'auth'>, credentials: Http
   const named = credentials.named[spec.auth.name];
   if (!named) throw new HttpStepError('missing_named_credential', `credential ${spec.auth.name} was not issued for this attempt`);
   return named;
+}
+
+/** Drivers that only speak bearer (browser, MCP, native jobs) use this; other recipes are refused. */
+export function bearerFor(spec: Pick<HttpRequestSpec, 'auth'>, credentials: HttpCredentials): string | null {
+  const credential = credentialOf(spec, credentials);
+  if (credential === null || typeof credential === 'string') return credential;
+  if (!credential.bearer) throw new HttpStepError('auth_recipe_unsupported', `the ${credential.recipe} auth recipe cannot be used by this surface; use a bearer recipe`);
+  return credential.bearer.reveal();
+}
+
+/** Request headers for one call; values are revealed only into the outgoing request. */
+export function authHeaders(spec: Pick<HttpRequestSpec, 'auth'>, credentials: HttpCredentials): Record<string, string> {
+  const credential = credentialOf(spec, credentials);
+  if (credential === null) return {};
+  if (typeof credential === 'string') return { authorization: `Bearer ${credential}` };
+  return Object.fromEntries(Object.entries(credential.headers).map(([name, value]) => [name, value.reveal()]));
 }
 
 export class HttpDriver {
@@ -69,8 +88,7 @@ export class HttpDriver {
     if (!path.startsWith('/')) throw new HttpStepError('invalid_path', path);
     const url = `${spec.origin}${path}`;
     const headers: Record<string, string> = { ...(spec.headers ?? {}) };
-    const bearer = bearerFor(spec, this.credentials);
-    if (bearer) headers.authorization = `Bearer ${bearer}`;
+    Object.assign(headers, authHeaders(spec, this.credentials));
     let bodyText: string | undefined;
     if (spec.body !== undefined && spec.body !== null && spec.method !== 'GET' && spec.method !== 'HEAD') {
       headers['content-type'] = headers['content-type'] ?? 'application/json';

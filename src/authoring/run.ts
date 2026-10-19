@@ -14,6 +14,7 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
+import { describeBlock } from '../core/blockCodes.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
@@ -28,7 +29,7 @@ export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
   project: string; outcome: string; exitCode: number; startedAt: string; finishedAt: string;
   executionId: string | null; sourceDigest: string; runDir: string; stateDir?: string; bundleVerified: boolean | null;
-  blockers: Array<{ code: string; detail: string; action: string }>;
+  blockers: Array<{ code: string; detail: string; action: string; owner?: string; fix?: string | null; docs?: string | null }>;
   cases: CaseReport[];
   totals: { passed: number; failed: number; other: number };
   sourceBinding?: VerificationSourceBinding | null;
@@ -214,7 +215,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
     executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, stateDir, bundleVerified,
     sourceBinding: compiled.sourceBinding,
-    blockers: bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, action: b.action })),
+    blockers: bundle.blockers.map((b) => { const described = describeBlock(b.code, {}, b.action); return { code: b.code, detail: b.detail, action: b.action, owner: described.owner, fix: described.fix, docs: described.docs }; }),
     cases,
     totals: { passed: cases.filter((c) => c.outcome === 'passed').length, failed: cases.filter((c) => c.outcome === 'assertion_failed').length, other: cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length },
   };

@@ -69,7 +69,7 @@ export function runNext(report: TestRunReport): NextAction[] {
 
 export function renderTree(report: TestRunReport, root: string, p: Paint): string {
   const lines = [`${p.moss('tracegrove')} ${p.dim('·')} ${p.bold(report.project)} ${p.dim(`· app ${report.sourceDigest.slice(0, 12)}`)}`, p.dim('│')];
-  for (const b of report.blockers) lines.push(`${p.dim('├─')} ${p.amber('!')} ${p.bold(b.code)}  ${b.detail}`, `${p.dim('│')}     ${p.dim(`fix: ${b.action}`)}`);
+  for (const b of report.blockers) lines.push(`${p.dim('├─')} ${p.amber('!')} ${p.bold(b.code)}  ${b.detail}`, `${p.dim('│')}     ${p.dim(`fix: ${b.action}`)}`, ...(b.fix ? [`${p.dim('│')}     ${p.dim('run:')} ${p.moss(b.fix)}${b.owner ? p.dim(` (owner: ${b.owner})`) : ''}`] : []));
   report.cases.forEach((c, i) => lines.push(...caseLines(p, c, i === report.cases.length - 1)));
   const t = report.totals;
   const tally = `${p.moss(`${t.passed} passed`)}, ${t.failed ? p.red(`${t.failed} failed`) : `${t.failed} failed`}${t.other ? `, ${p.amber(`${t.other} other`)}` : ''}`;

@@ -1,3 +1,4 @@
+import type { CredentialCheck, RequestCredential } from '../credentials/types.ts';
 import type { HostCapabilityObservation, HostLease, HostPlan, IdentityAttestation, Scope } from '../protocol/index.ts';
 
 export type HostStartContext = {
@@ -27,9 +28,23 @@ export type HostSession = {
   ownedResources: Array<{ entityKey: string; physicalId: string; boundaryId: string }>;
   dataDir: string | null;
   nativeJobs?: import('../adapters/job/types.ts').NativeJobSession;
+  /** Auth-recipe credentials by credential name (R3). Hosts that only issue bearer tokens may omit it. */
+  requestCredentials?: Map<string, RequestCredential>;
+  /** Named endpoints this session admits (R4); the primary `origin` is always admitted. */
+  endpoints?: Record<string, string>;
+  /** Account class of the application boundary; defaults from boundaryMode. */
+  accountClass?: 'local' | 'test_sandbox' | 'designated_production' | 'none';
+  /** Ask the credential's issuer whether it is still valid (e.g. a broker token that expired mid-run). */
+  credentialCheck?(name: string, signal: AbortSignal): Promise<CredentialCheck>;
   stop(reason: string): Promise<{ confirmed: boolean; detail: string }>;
 };
 
 export interface ExecutorHost {
   start(context: HostStartContext): Promise<HostSession>;
 }
+
+/** Every host kind the kernel knows; the registry in ./registry.ts must cover each one. */
+export type HostKind = HostPlan['adapter'];
+export type HostCapabilities = { supported: readonly string[]; unsupported: readonly string[] };
+export type HostFactory = { kind: HostKind; capabilities: HostCapabilities; create(): ExecutorHost };
+export const defineHost = <K extends HostKind>(factory: HostFactory & { kind: K }) => factory;

@@ -18,9 +18,9 @@ import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation,
 import { NativeJobError } from '../adapters/job/driver.ts';
 import { BrowserStepError } from '../adapters/browser/driver.ts';
 import { CaseBrowserSession } from '../adapters/browser/session.ts';
-import { LocalProcessHost } from '../hosts/local.ts';
-import { MockLoopbackHost } from '../hosts/mock.ts';
-import type { ExecutorHost, HostSession } from '../hosts/types.ts';
+import { hostFor, type HostOverrides } from '../hosts/registry.ts';
+import type { HostSession } from '../hosts/types.ts';
+import { credentialFor, sessionCredentials } from '../credentials/access.ts';
 import { LocalArtifactStore } from './artifacts.ts';
 import { collectCleanup, type AllocatedFixture } from './cleanup.ts';
 import { readVerifiedBundle, writeExecutionBundle } from './bundle.ts';
@@ -54,7 +54,7 @@ export type RunOptions = {
   scope: Scope;
   signal?: AbortSignal;
   onEvent?: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => void;
-  hosts?: { local?: ExecutorHost; mock?: ExecutorHost };
+  hosts?: HostOverrides;
   qualification?: QualificationExecutionOwner;
 };
 
@@ -157,7 +157,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   const artifacts = new LocalArtifactStore(join(stateDir, 'artifacts'));
   const campaignDeadline = Deadline.in(request.limits.deadlineMs);
   const receipts: ExecutionReceipt[] = [];
-  const hosts = { local: options.hosts?.local ?? new LocalProcessHost(), mock: options.hosts?.mock ?? new MockLoopbackHost() };
+  const hosts = options.hosts;
   let phaseVersion = ledger.version(executionAggregate);
 
   for (const item of prepared) {
@@ -187,7 +187,7 @@ type CellContext = {
   campaignFixturePlan: CampaignFixturePlan | null; intelligencePolicy: IntelligencePolicy; docs: DocStore; scope: Scope;
   executionId: string; attemptId: string; generation: number; attemptNumber: number; predecessor: Ref | null; reservation: BudgetReservation;
   campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; ownership: ExecutionOwnership; executionDir: string;
-  hosts: { local: ExecutorHost; mock: ExecutorHost }; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
+  hosts: HostOverrides | undefined; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
   beforeEffect?: (() => Promise<void>) | undefined;
 };
 
@@ -216,10 +216,10 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const hostOwnershipKey = `host:${cell.selectionCellId}`;
   ctx.ownership.reserve(hostOwnershipKey, 'host', cell.selectionCellId, hostPlan.ref);
   mkdirSync(workspaceDir, { recursive: true });
-  const host = hostPlan.adapter === 'mock_loopback' ? ctx.hosts.mock : ctx.hosts.local;
   const mockResponses = hostPlan.mockResponsesRef ? ctx.docs.get<MockResponses>(MockResponses, hostPlan.mockResponsesRef, 'mock responses') : null;
   try {
     if (ctx.beforeEffect) await ctx.beforeEffect();
+    const host = await hostFor(hostPlan.adapter, ctx.hosts);
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
@@ -266,9 +266,9 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     expected: cell.expectedTarget, observed: observedTarget, provenance, networkProfileRef: null, clockProfileRef: null,
   }), 'environment binding');
 
-  const driver = session ? new HttpDriver({ persona: authRecipe.credentialName ? session.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session.credentials) }, new Set([session.origin])) : null;
+  const driver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), new Set([session.origin, ...Object.values(session.endpoints ?? {})])) : null;
   const origin = session?.origin ?? '';
-  const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: authRecipe.credentialName ? session?.credentials.get(authRecipe.credentialName) ?? null : null,
+  const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: credentialFor(session, authRecipe.credentialName)?.bearer?.reveal() ?? null,
     onNetwork: observation => { log.emit('browser.network', null, observation); },
   });
   const runtimeVariables: Record<string, unknown> = { execution_nonce: attemptId, lease_namespace: cell.selectionCellId, target_origin: origin };
@@ -398,7 +398,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'mcp.call') {
         if (!spec.effects.allowedHosts.includes(`launch://${hostPlan.launch?.componentId}`)) throw new HttpStepError('mcp_origin_not_admitted', 'MCP application origin is outside the frozen effect envelope');
         const command = McpToolCall.parse({ ...step.command, arguments: applyTemplateDeep(step.command.arguments, variables) });
-        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session?.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session?.credentials ?? []) });
+        const credential = bearerFor(step, sessionCredentials(session, authRecipe.credentialName));
         let module: typeof import('../adapters/mcp/driver.ts');
         try { module = await import('../adapters/mcp/driver.ts'); }
         catch { throw new HttpStepError('mcp_driver_unavailable', 'Install the pinned optional MCP SDK before planning this flow'); }
@@ -412,13 +412,13 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
         if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
         const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));
-        const credential = bearerFor(step, { persona: authRecipe.credentialName ? session.credentials.get(authRecipe.credentialName) ?? null : null, named: Object.fromEntries(session.credentials) });
+        const credential = bearerFor(step, sessionCredentials(session, authRecipe.credentialName));
         observation = step.kind === 'job.observe' && command.action === 'read'
           ? await session.nativeJobs.observe(command, credential, step.predicate, step.pollIntervalMs, deadline, signal)
           : await session.nativeJobs.request(command, credential, deadline, signal);
         captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'ui.navigate' || step.kind === 'ui.action' || step.kind === 'ui.observe') {
-        if (authRecipe.credentialName && !session?.credentials.get(authRecipe.credentialName)) throw new HttpStepError('missing_persona_credential', 'browser persona credential was not issued');
+        if (authRecipe.credentialName && !credentialFor(session, authRecipe.credentialName)) throw new HttpStepError('missing_persona_credential', 'browser persona credential was not issued');
         observation = await browser.execute(step, variables, deadline, signal);
       } else {
         throw new HttpStepError('unsupported_operation', `${step.kind} is not implemented by the HTTP runner`);
@@ -445,7 +445,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     let observedMode: BoundaryObservation['observedMode'] = 'unknown';
     let accountClass: BoundaryObservation['observedAccountClass'] = 'unknown';
     if (session) {
-      if (rule.boundaryId === 'application') { observedMode = session.boundaryMode; accountClass = session.boundaryMode === 'real' ? 'local' : 'none'; }
+      if (rule.boundaryId === 'application') { observedMode = session.boundaryMode; accountClass = session.accountClass ?? (session.boundaryMode === 'real' ? 'local' : 'none'); }
       else if (rule.boundaryId === 'storage') { observedMode = session.dataDir ? 'real' : 'unknown'; accountClass = session.dataDir ? 'local' : 'unknown'; }
     }
     const mismatch = observedMode !== rule.mode ? [`expected ${rule.mode}, observed ${observedMode}`] : [];
