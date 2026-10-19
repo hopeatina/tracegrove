@@ -235,9 +235,14 @@ export class LocalProcessHost implements ExecutorHost {
           child.once('exit', () => resolveExit(true));
         });
         child.kill('SIGTERM');
-        const graceful = await Promise.race([exited, sleep(5000).then(() => false)]);
+        // Abort the losing timer so a prompt exit does not keep the CLI alive for the full grace period.
+        const waitFor = async (ms: number) => {
+          const timer = new AbortController();
+          try { return await Promise.race([exited, sleep(ms, timer.signal).then(() => false, () => false)]); } finally { timer.abort(); }
+        };
+        const graceful = await waitFor(5000);
         if (!graceful && child.connected) child.disconnect();
-        if (!graceful) await Promise.race([exited, sleep(2000).then(() => false)]);
+        if (!graceful) await waitFor(2000);
         const confirmed = ownedCleanupConfirmed && (child.exitCode !== null || child.signalCode !== null);
         if (confirmed) rmSync(context.workspaceDir, { recursive: true, force: true });
         const workspaceGone = !existsSync(context.workspaceDir);
