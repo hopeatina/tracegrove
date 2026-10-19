@@ -91,6 +91,19 @@ The loop (every command takes --json and prints machine-readable \`next\` action
 
 Rules: never weaken a test to make it pass. If the app is wrong (a denial now succeeds, data is lost,
 a 5xx), leave the flow red and report the bug. Never delete steps or expectations.
+
+Environments (local, docker, staging, production; see docs/environments.md):
+
+- Runs default to \`local\`. Choose another with \`--env <name>\` or TRACEGROVE_ENV. A flow runs only in the
+  environments it lists under \`envs:\`; adding an environment there is a reviewed change, not a fix.
+- Before testing a deployed environment: \`tracegrove env doctor <env> --json\`, then \`tracegrove explain --env <env> --json\`.
+  Act on each check's \`fix\` only when its \`owner\` is \`agent\`; otherwise stop and tell a person.
+- Agent policy per environment: \`allow\`, \`ask\` (exit 2 \`approval_required\`: a person runs \`tracegrove approve --env <env>\`;
+  never run it yourself and never write .tracegrove/approvals/) or \`deny\` (do not retry).
+- Never print, copy, commit or paste a persona secret. Configs hold references (env:, aws-sm://, op://, orgx-broker://) only.
+- Never change \`class\`, \`writes\` or \`agents\` of an environment, or a flow's \`envs:\`, to make a run pass.
+- Staging and production failures are real: \`persona_identity_mismatch\`, \`deployed_cleanup_unconfirmed\`,
+  \`persona_credential_expired\` and \`environment_writes_forbidden\` go to a person, not to heal.
 `;
 
 export function initProject(root: string, options: { force?: boolean } = {}): { files: string[]; detection: Detection; snippet: string } {

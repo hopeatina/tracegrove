@@ -89,6 +89,28 @@ Press Ctrl-C once to request cancellation and wait for cleanup. If cleanup is un
 
 [Getting started with your app](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/getting-started.md) · [Verified bundles and cleanup](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/verified-bundles.md) · [Recovery inspection](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/local-execution-recovery.md)
 
+## Environments: local, Docker, staging, production
+
+The same flows can run against a container, a Compose project, a deployed staging URL, or production (read only). Each environment declares where persona credentials come from (`env:`, `file:`, `aws-sm://`, `aws-ssm://`, `op://`, or a short-lived `orgx-broker://` persona). The config holds references only; secret values never reach the config, bundles, run folders, or logs. Each environment also has a safety class that decides what a run may write, how cleanup is judged, and whether a coding agent may run it.
+
+```yaml
+environments:
+  staging:
+    target: { url: https://staging.example.com, health: /api/health }
+    whoami: { GET: /api/me, subject: user.id }
+    personas:
+      owner:    { from: "aws-sm://myapp/staging/personas#owner" }
+      stranger: { from: "aws-sm://myapp/staging/personas#stranger" }
+```
+
+```bash
+npx --no-install tracegrove env doctor staging      # reachable, ready, secrets resolvable, personas are who you think
+npx --no-install tracegrove explain --env staging   # what runs, as whom, what it writes and cleans up
+npx --no-install tracegrove test --env staging      # or TRACEGROVE_ENV=staging
+```
+
+Flows opt in with `envs: [local, staging]`. On staging, a run whose cleanup cannot be confirmed fails. Under `production_observation`, a flow that writes is blocked before it starts. Agents under `agents: ask` exit `2` with `approval_required` until a person runs `tracegrove approve --env staging`. `tracegrove mcp` exposes the same commands to MCP clients. See [docs/environments.md](docs/environments.md) and the runnable [examples/staging-notes](examples/staging-notes/).
+
 ## Where it runs
 
 | Placement | Current status |
@@ -101,7 +123,7 @@ Press Ctrl-C once to request cancellation and wait for cleanup. If cleanup is un
 
 ## For coding agents and CI
 
-Browser flows use pinned Playwright Chromium and can pair DOM assertions with an independent API read and a recording. Native jobs and MCP Streamable HTTP have separate guides; they are optional, not part of the Notes quickstart. External staging, arbitrary shell launchers, and a general cloud runner are not current CLI targets.
+Browser flows use pinned Playwright Chromium and can pair DOM assertions with an independent API read and a recording. Native jobs and MCP Streamable HTTP have separate guides; they are optional, not part of the Notes quickstart. Deployed URLs, containers and Compose projects are environments (above). Arbitrary shell launchers and a general cloud runner are not current CLI targets.
 
 Use `status --json` to find the next action, `discover --json` to compare routes and flows, `check --json` to compile, and `test --json` to execute. The `test` summary uses `tracegrove.run-summary/v1` and includes `outcome`, `runDir`, `bundleVerified`, `cases`, and `blockers`. `doctor` uses `tracegrove.doctor/v1`; top-level JSON errors use `tracegrove.cli-error/v1`. Keep the first failed run and its evidence when diagnosing a retry.
 
