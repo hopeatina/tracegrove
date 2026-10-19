@@ -61,7 +61,7 @@ name the requested job, and submitted results must retain the requested key.
 
 ## Application protocol
 
-Schemas are exported through `workflow-verify/protocol` and JSON Schema:
+Schemas are exported through `tracegrove/protocol` and JSON Schema:
 `workflow.native-job-{action,request,response,ready,observation}/v1`.
 The supervisor opens IPC only for an opted-in Node application and sets
 `TRACEGROVE_NATIVE_JOBS=node_ipc/v1`. After its worker/provider is ready, the
