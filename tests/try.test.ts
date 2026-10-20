@@ -31,7 +31,9 @@ describe('tracegrove try', () => {
 
   it('runs the vet receptionist against stand-in third parties', async () => {
     const { exitCode, facts } = await run('vet-receptionist');
-    expect(exitCode).toBe(0);
+    // Say which case and step broke, so a CI-only failure can be diagnosed from the assertion alone.
+    const why = exitCode === 0 ? '' : (() => { try { return readFileSync(join(facts.runDir as string, 'summary.json'), 'utf8').slice(0, 4000); } catch { return JSON.stringify(facts); } })();
+    expect(exitCode, why).toBe(0);
     expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true });
   }, 30_000);
 
