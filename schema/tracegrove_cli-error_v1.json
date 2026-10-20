@@ -71,7 +71,9 @@
             "import-call",
             "judge",
             "seal",
-            "unseal"
+            "unseal",
+            "keygen",
+            "sign"
           ],
           "type": "string"
         },

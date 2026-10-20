@@ -49,7 +49,8 @@ import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../auth
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { createInterface } from 'node:readline/promises';
-import { loadAuthoringConfig } from '../authoring/compile.ts';
+import { checkSignature, describeSignature, keygen, loadSigningKey, signRun } from '../authoring/signing.ts';
+import { configInDirectory, loadAuthoringConfig } from '../authoring/compile.ts';
 import { detectForConfig, detectedNamed, guidedEnvAdd, renderDetected } from './envAdd.ts';
 import { detectedPatch } from '../environments/detect.ts';
 import { heal, undoHeal } from '../authoring/heal.ts';
@@ -157,6 +158,8 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   import-call <log> [--out <flow.yaml>]                 draft a flow from a real call or chat log (Retell, Vapi, messages JSON, or text)
   seal [--run latest|<dir>] --out <file> [--remove]    encrypt a run folder (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
+  keygen [--name <you>]                                Ed25519 signing key: private in .tracegrove/keys, public in tracegrove/signers/ (commit it)
+  sign [--run latest|<dir>] [--key <pem>]              sign a verified run's bundle (TRACEGROVE_SIGNING_KEY signs every test run in CI)
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -188,7 +191,7 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   inspect --bundle <dir> [--failed-step]               inspect independently verified saved evidence
   inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
-  verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  verify-bundle --bundle <dir> [--signers <dir>]       recheck hashes, digests and re-reduce the verdict; check the signature
   compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
   workflow-map --bundle <bundle> [--cell <cell>]       derive cited recorded navigation, prerequisites and coverage
   workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
@@ -305,6 +308,11 @@ async function main(argv: string[]): Promise<number> {
           } });
         live.done();
         const p = paint();
+        // In CI, TRACEGROVE_SIGNING_KEY signs every verified run, so the card can say who vouches for it.
+        if (process.env.TRACEGROVE_SIGNING_KEY && report.bundleVerified) {
+          try { const signed = signRun(report.runDir, loadSigningKey(compiled.root, null)); process.stderr.write(`signed as ${signed.signer.name} (${signed.signer.fingerprint})\n`); }
+          catch (error) { process.stderr.write(`not signed: ${error instanceof Blocked ? error.reasons[0]!.detail : (error as Error).message}\n`); }
+        }
         if (args.flags.heal && report.exitCode !== 0 && report.exitCode !== 4) {
           if (!args.flags.json) process.stdout.write(`${renderTree(report, compiled.root, p)}\n\n`);
           const healed = await heal({ dir: compiled.root, report, signal: controller.signal, onProgress: (phase, detail) => live.update(`${phase}${detail ? ` · ${detail}` : ''}`), onAgentActivity: (line) => live.update(`agent · ${line.replaceAll(`${compiled.root}/`, '')}`) });
@@ -763,9 +771,33 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'verify-bundle': {
-      const verification = verifyBundle(resolve(args.flags['bundle']));
-      out(args, verification, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
-      return verification.ok ? 0 : 2;
+      const bundleDir = resolve(args.flags['bundle']);
+      const verification = verifyBundle(bundleDir);
+      // A signature sits beside the bundle; trust comes from the project's committed signers/ folder.
+      const owner = projectRoot(dirname(bundleDir));
+      const signersDir = args.flags.signers ? resolve(args.flags.signers) : owner ? join(owner, loadAuthoringConfig(configInDirectory(owner)!).testDir, 'signers') : null;
+      const signature = verification.ok ? checkSignature(dirname(bundleDir), signersDir) : { state: 'unsigned' as const };
+      out(args, { ...verification, signature }, verification.ok ? `bundle ok: ${verification.receipts} receipt(s), re-reduced outcome ${verification.outcome}\n${describeSignature(signature)}` : `bundle INVALID:\n  ${verification.problems.join('\n  ')}`);
+      return verification.ok && signature.state !== 'invalid' ? 0 : 2;
+    }
+
+    case 'keygen': {
+      const root = projectRoot(flag(args, 'dir') ?? '.') ?? resolve(flag(args, 'dir') ?? '.');
+      const configFile = configInDirectory(root);
+      const testDir = configFile ? loadAuthoringConfig(configFile).testDir : 'tracegrove';
+      const name = flag(args, 'name') ?? (process.env.USER || 'me');
+      const made = keygen(root, testDir, name);
+      out(args, { name, ...made }, `private key ${relative(root, made.privateKey)} (keep it on this machine; .tracegrove/ is not committed)\npublic key  ${relative(root, made.publicKey)} (commit it: runs signed by this key are trusted)\nfingerprint ${made.fingerprint}\nnext: tracegrove sign`);
+      return 0;
+    }
+
+    case 'sign': {
+      const root = projectRoot(flag(args, 'dir') ?? '.') ?? resolve(flag(args, 'dir') ?? '.');
+      const runDir = args.flags.run && existsSync(resolve(args.flags.run)) ? resolve(args.flags.run) : resolveRun(root, args.flags.run ?? 'latest');
+      if (!runDir) throw new Blocked([{ code: 'run_not_found', detail: args.flags.run ?? 'latest', owner: 'agent', action: 'run tracegrove test first, or pass --run <run folder>' }]);
+      const signature = signRun(runDir, loadSigningKey(root, flag(args, 'key') ? resolve(flag(args, 'key')!) : null));
+      out(args, signature, `signed ${signature.run} (${signature.outcome}) as ${signature.signer.name}, key ${signature.signer.fingerprint}\n  -> ${join(runDir, 'signature.json')}\nnext: tracegrove verify-bundle --bundle ${join(runDir, 'bundle')}`);
+      return 0;
     }
 
     case 'awr-prepare':

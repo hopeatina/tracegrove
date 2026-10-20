@@ -5,6 +5,9 @@
  */
 import { basename, relative, resolve } from 'node:path';
 import { readiness, type Claim, type Readiness } from './readiness.ts';
+import { loadAuthoringConfig, configInDirectory } from './compile.ts';
+import { resolveRun } from './run.ts';
+import { summarizeSignatures, type SignatureSummary } from './signing.ts';
 
 export const CARD_MARKER = '<!-- tracegrove-proof -->';
 
@@ -19,10 +22,13 @@ export type Card = {
   totals: { projects: number; claims: number; supported: number; contradicted: number; rejected: number; challenged: number; notRun: number; awaitingSignOff: number };
   failures: CardFailure[];
   disputes: CardDispute[];
+  /** Runs behind the claims, and how many carry a signature from a committed key (trusted), another key, or one that fails to verify. */
+  signatures: { runs: number; trusted: number; untrusted: number; invalid: number; signers: string[] };
   projects: Array<{ project: string; dir: string; claims: number; supported: number; contradicted: number; awaitingSignOff: number }>;
   markdown: string;
 };
 
+const sum = <K extends 'runs' | 'trusted' | 'untrusted' | 'invalid'>(xs: SignatureSummary[], key: K) => xs.reduce((n, x) => n + x[key], 0);
 const ICON = { holds: '✅', fails: '❌', incomplete: '⚠️' } as const;
 const cell = (text: string) => text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 const awaiting = (c: Claim) => c.assessment === 'supported' && c.validity === 'current' && c.decision === 'pending';
@@ -43,17 +49,23 @@ export function renderCard(input: CardInput): Card {
   const totals = { projects: states.length, claims: all.length, supported: all.filter(({ claim }) => claim.assessment === 'supported').length, contradicted: failures.length,
     rejected: disputes.filter((d) => d.decision === 'rejected').length, challenged: disputes.filter((d) => d.decision === 'challenged').length,
     notRun: all.filter(({ claim }) => claim.execution === 'not_run' || claim.assessment === 'inconclusive').length, awaitingSignOff: all.filter(({ claim }) => awaiting(claim)).length };
+  const signatures = states.map((s) => { const config = configInDirectory(s.root); return config ? summarizeSignatures(s.root, loadAuthoringConfig(config).testDir, s.claims.map((c) => c.run), (run) => resolveRun(s.root, run)) : null; })
+    .filter((x): x is SignatureSummary => !!x);
+  const signed = { runs: sum(signatures, 'runs'), trusted: sum(signatures, 'trusted'), untrusted: sum(signatures, 'untrusted'), invalid: sum(signatures, 'invalid'), signers: [...new Set(signatures.flatMap((s) => s.signers))] };
   // A person saying "this is wrong" outranks passing evidence: rejected fails the card, challenged leaves it incomplete.
-  const verdict: Card['verdict'] = totals.contradicted || totals.rejected ? 'fails' : totals.claims === 0 || totals.notRun || totals.challenged || totals.supported < totals.claims ? 'incomplete' : 'holds';
+  // Evidence whose signature doesn't verify was changed after signing, so the card fails.
+  const verdict: Card['verdict'] = totals.contradicted || totals.rejected || signed.invalid ? 'fails' : totals.claims === 0 || totals.notRun || totals.challenged || totals.supported < totals.claims ? 'incomplete' : 'holds';
   const commit = input.commit ? input.commit.slice(0, 12) : null;
   const on = commit ? ` on \`${commit}\`` : '';
   const failing = totals.contradicted + disputes.filter((d) => d.decision === 'rejected' && !failures.some((f) => f.project === d.project && f.caseId === d.caseId)).length;
   const headline = verdict === 'holds' ? `${totals.supported} of ${totals.claims} claims hold${on}`
+    : verdict === 'fails' && !failing ? `signed evidence was changed after it was signed${on}`
     : verdict === 'fails' ? `${failing} of ${totals.claims} claims fail${on}`
     : totals.challenged && !totals.notRun ? `${totals.supported} of ${totals.claims} claims have passing evidence${on}; ${totals.challenged} check${totals.challenged === 1 ? ' is' : 's are'} disputed`
     : `${totals.supported} of ${totals.claims} claims have passing evidence${on}; ${totals.claims - totals.supported - totals.contradicted} did not run to a verdict`;
 
   const lines = [CARD_MARKER, `### ${ICON[verdict]} ${input.title ?? 'tracegrove'}: ${headline}`, ''];
+  if (signed.invalid) lines.push(`**${signed.invalid} run${signed.invalid === 1 ? '' : 's'} carr${signed.invalid === 1 ? 'ies' : 'y'} a signature that does not verify**: the evidence changed after it was signed. \`tracegrove verify-bundle\` shows which.`, '');
   if (totals.awaitingSignOff) lines.push(`${totals.awaitingSignOff} critical claim${totals.awaitingSignOff === 1 ? ' passes and waits' : 's pass and wait'} for a person: \`tracegrove accept <claim>\`.`, '');
   for (const f of failures) lines.push(`- **${f.project} › ${f.title}** failed: ${cell(f.failure).slice(0, 300)}  \n  \`${f.file}\``);
   for (const d of disputes) lines.push(`- **${d.project} › ${d.title}** ${d.decision === 'rejected' ? 'is wrong' : 'has a disputed check'}, says ${d.by ?? 'a reviewer'}: ${cell(d.reason).slice(0, 300) || '(no reason given)'}  \n  \`${d.file}\``);
@@ -72,10 +84,11 @@ export function renderCard(input: CardInput): Card {
   lines.push('<details><summary>Every claim</summary>', '', '| Claim | Checks | Evidence | Judge | Sign-off |', '| --- | --- | --- | --- | --- |');
   for (const { project, claim } of all) lines.push(`| ${cell(states.length > 1 ? `${project} › ${claim.title}` : claim.title)} | ${claim.channels.join(', ')} | ${evidence(claim)} | ${claim.judged ? `${claim.judged.met}/${claim.judged.total}` : ''} | ${cell(signOff(claim))} |`);
   lines.push('', '</details>', '');
-  const footer = [input.link ? `[Full report](${input.link})` : null, 'Each run starts the app fresh, checks every effect with a separate read, and seals the evidence. Verified with [tracegrove](https://github.com/hopeatina/tracegrove).'].filter(Boolean);
+  const signedNote = signed.runs && signed.trusted === signed.runs ? `Signed by ${signed.signers.join(', ')}` : signed.trusted || signed.untrusted ? `${signed.trusted + signed.untrusted} of ${signed.runs} runs signed${signed.untrusted ? `, ${signed.untrusted} by a key not in signers/` : ''}` : null;
+  const footer = [input.link ? `[Full report](${input.link})` : null, signedNote, 'Each run starts the app fresh, checks every effect with a separate read, and seals the evidence. Verified with [tracegrove](https://github.com/hopeatina/tracegrove).'].filter(Boolean);
   lines.push(`<sub>${footer.join(' · ')}</sub>`);
 
-  return { schemaVersion: 'tracegrove.card/v1', verdict, commit, totals, failures, disputes,
+  return { schemaVersion: 'tracegrove.card/v1', verdict, commit, totals, failures, disputes, signatures: signed,
     projects: states.map((s, i) => ({ project: s.project, dir: relative(process.cwd(), resolve(input.dirs[i]!)) || '.', claims: s.counts.claims, supported: s.counts.supported, contradicted: s.counts.contradicted,
       awaitingSignOff: s.claims.filter(awaiting).length })),
     markdown: `${lines.join('\n')}\n` };
