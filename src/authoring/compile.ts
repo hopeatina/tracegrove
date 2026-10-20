@@ -20,6 +20,7 @@ import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
 import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
+import { withStandIns } from '../adapters/standin/capabilities.ts';
 import { CONVERSATION_RUNNER_CAPABILITIES } from '../adapters/conversation/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
@@ -294,7 +295,10 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   if (hasMcp && (hasJobs || hasBrowser)) fail('mixed_mcp_runner_unqualified', 'MCP, native job and browser runners are not qualified together', 'select separate flows with --grep');
   if (hasJobs && hasBrowser) fail('mixed_native_browser_unqualified', 'Native job and browser runners are not qualified together', 'run separate flows with --grep');
   if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
-  const runner = hasConversation ? CONVERSATION_RUNNER_CAPABILITIES : hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const hasStandIns = selected.some(({ flow }) => flow.steps.some(step => 'standin' in step));
+  const baseRunner = hasConversation ? CONVERSATION_RUNNER_CAPABILITIES : hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const runner = hasStandIns ? withStandIns(baseRunner) : baseRunner;
+  if (hasStandIns && !launched) fail('stand_in_requires_launch', `environment ${environment.name} is not launched from source, so tracegrove cannot point the app at stand-ins`, 'run stand-in flows on the local environment, or select other flows with --grep');
 
   // ---- attested source identity (launched apps) or target binding (deployed, containerized) ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
@@ -375,6 +379,9 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       portMode: 'assigned', runtime: launch.runtime,
       ...(sourceSnapshot ? { sourceSnapshot } : {}),
       ...(hasJobs ? { nativeJobs: config.app.nativeJobs } : {}),
+      ...(hasStandIns ? { standIns: Object.entries(config.standIns ?? {}).map(([name, standIn]) => ({ name, env: standIn.env,
+        responses: Object.entries(standIn.respond).map(([route, answer]) => { const [method, path] = route.split(' ');
+          return { method, path, ...(typeof answer === 'number' ? { status: answer } : answer) }; }) })) } : {}),
     },
     mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: 'fresh_directory_and_port', networkRules: ['loopback_only'],
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],
@@ -389,7 +396,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   });
   const runnerAdapter = hasConversation ? 'conversation' : hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
   const surfaceKind = hasConversation ? 'conversation' : hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
-  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed' });
+  write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed', ...(hasStandIns ? { standIns: true } : {}) });
   write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasConversation ? 'tracegrove.pack.conversation' : hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
   write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: false, fixtures: false, conversation: hasConversation }) });
   // A deployment is a test sandbox (or designated production when read-only); tracegrove cannot see its storage.
@@ -438,7 +445,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const label = 'voice' in step ? 'voice_call' : 'chat' in step ? 'chat' : 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      const label = 'standin' in step ? `standin_${step.standin}` : 'voice' in step ? 'voice_call' : 'chat' in step ? 'chat' : 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
@@ -467,6 +474,31 @@ export function compileProject(configPath: string, options: CompileOptions = {})
         for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
         info.push({ id, name: step.name ?? id, method: channel === 'voice' ? 'VOICE' : 'CHAT', path: `${spec.endpoint} · ${spec.turns.length} turn${spec.turns.length === 1 ? '' : 's'}`, as: step.as ?? defaultPersona, expectStatus: null,
           expectation: conversationSummary(spec.turns.map((turn) => turn.expect), step.expect) });
+        return;
+      }
+      if ('standin' in step) {
+        if (!config.standIns?.[step.standin]) fail('stand_in_undeclared', `${where}: no stand-in named ${step.standin}`, `declare it under standIns: in tracegrove.config.yaml (known: ${Object.keys(config.standIns ?? {}).join(', ') || 'none'})`);
+        const route = (text: string) => { const [method, path] = text.split(' '); return { method, path }; };
+        if (step.fail) {
+          const { route: text, ...fault } = step.fail;
+          steps.push({ id, kind: 'standin.fault', timeoutMs, inputs, retry: { attempts: 1 }, command: { standIn: step.standin, route: route(text), ...fault } });
+          assertions.push({ id: `${id}.expect`, required: true, environmentClasses: classes, stepId: id, oracle: { name: 'step.result', version: '1' }, predicate: { kind: 'step_result', value: 'completed' }, coverageTags: flow.tags });
+          info.push({ id, name: step.name ?? id, method: 'FAULT', path: `${step.standin} ${text}`, as: defaultPersona, expectStatus: null,
+            expectation: `next ${fault.times} call${fault.times === 1 ? '' : 's'} ${fault.drop ? 'dropped' : fault.status ? `get ${fault.status}` : `wait ${fault.delayMs} ms`}` });
+          return;
+        }
+        const e = step.expect!;
+        const predicates: Json[] = [...(e.calls !== undefined ? [{ kind: 'json_path_equals', path: 'body.count', value: e.calls }] : [])];
+        const rest = predicateFor({ ...(e.json ? { json: e.json } : {}), ...(e.present ? { present: e.present } : {}), ...(e.absent ? { absent: e.absent } : {}) });
+        if (rest) predicates.push(...((rest as { kind: string; predicates?: Json[] }).kind === 'all' ? (rest as { predicates: Json[] }).predicates : [rest]));
+        if (!predicates.length) fail('stand_in_expectation', `${where}: a stand-in readback needs expect.calls or expect.json`, 'add expect: { calls: 1 }');
+        const predicate = predicates.length === 1 ? predicates[0]! : { kind: 'all', predicates };
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: 'standin.observe', timeoutMs, inputs, retry: { attempts: 1 }, command: { standIn: step.standin, route: step.received ? route(step.received) : null }, predicate, pollIntervalMs: 50, captures });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: classes, stepId: id, oracle: { name: 'standin.observation', version: '1' }, predicate, coverageTags: flow.tags });
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: 'STANDIN', path: `${step.standin}${step.received ? ` ${step.received}` : ''}`, as: defaultPersona, expectStatus: null,
+          expectation: e.calls !== undefined ? `${e.calls} call${e.calls === 1 ? '' : 's'} received` : 'Configured facts about what the app sent' });
         return;
       }
       if ('mcp' in step) {
@@ -582,7 +614,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       proofClaim: launched
         ? `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${conversationFlow ? 'conversation and HTTP protocols' : hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`
         : `The ${config.project} ${binding!.kind === 'url' ? `deployment at ${binding!.origin}` : `${binding!.kind} target`} in environment ${environment.name} (${environment.class})${release ? `, reporting release ${release},` : ''} satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}, as the configured personas.`,
-      environmentClasses: classes, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: browserFlow, fixtures: given.size > 0, conversation: conversationFlow }),
+      environmentClasses: classes, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: browserFlow, fixtures: given.size > 0, conversation: conversationFlow, standIns: flow.steps.some(step => 'standin' in step) }),
       requiredBoundaries: boundaryIds.map(boundaryId => ({ boundaryId, mode: 'real' })),
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,

@@ -28,6 +28,8 @@ export type HostSession = {
   ownedResources: Array<{ entityKey: string; physicalId: string; boundaryId: string }>;
   dataDir: string | null;
   nativeJobs?: import('../adapters/job/types.ts').NativeJobSession;
+  /** Recording stand-ins for the app's third parties, when the launch declares them. */
+  standIns?: import('../adapters/standin/server.ts').StandIns;
   /** Present when a recording proxy fronts the app: `origin` is then the proxy's origin. */
   traffic?: import('./trafficProxy.ts').TrafficRecorder;
   /** Auth-recipe credentials by credential name (R3). Hosts that only issue bearer tokens may omit it. */

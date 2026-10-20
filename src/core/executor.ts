@@ -12,11 +12,12 @@ import {
   HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, ConversationRun, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation, type ConversationObservation,
+  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation, type ConversationObservation, type StandInObservation, type StandInArmObservation,
 } from '../protocol/index.ts';
 import { scrubber } from './privacy.ts';
 import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
 import { NativeJobError } from '../adapters/job/driver.ts';
+import { StandInError } from '../adapters/standin/server.ts';
 import { BrowserStepError } from '../adapters/browser/driver.ts';
 import { CaseBrowserSession } from '../adapters/browser/session.ts';
 import { hostFor, type HostOverrides } from '../hosts/registry.ts';
@@ -429,7 +430,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: scrub(Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential'))) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation | ConversationObservation;
+      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation | ConversationObservation | StandInObservation | StandInArmObservation;
       await beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
@@ -469,6 +470,16 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         observation = await new ConversationDriver(origin).run(command, credential, deadline, signal);
         uncertainOperations--;
         captured[stepId] = captureValues({ body: observation }, step.captures);
+      } else if (step.kind === 'standin.fault' || step.kind === 'standin.observe') {
+        if (!session?.standIns) throw new HttpStepError('stand_in_unavailable', 'The host did not start stand-ins; declare them under standIns in tracegrove.config.yaml');
+        try {
+          observation = step.kind === 'standin.fault' ? session.standIns.arm(step.command)
+            : await session.standIns.observe(step.command, o => evaluatePredicate(step.predicate, { body: o }).pass, step.pollIntervalMs, deadline, signal);
+        } catch (error) {
+          if (error instanceof StandInError) throw new HttpStepError(error.code, error.message);
+          throw error;
+        }
+        if (step.kind === 'standin.observe') captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
         if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
         const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));

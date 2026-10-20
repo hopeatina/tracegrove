@@ -1,0 +1,23 @@
+title: When the calendar automation is down, Max never claims the booking and asks for a callback
+risk: critical
+tags: [voice, booking, faults]
+steps:
+  - name: the automation is down
+    standin: automation
+    fail: { route: POST /webhook/book-appointment, status: 503, times: 5 }
+  - name: caller tries to book
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: I'd like to book a dental cleaning for my dog on Thursday at 11am. My dog's name is Pepper. I'm Ana Ruiz, 555-0177.
+          expect: { says: [couldn't confirm, call you back, 555-0177], notSays: [all set, booked for], calls: [book_appointment] }
+  - name: the front desk got a callback request
+    standin: automation
+    received: POST /webhook/callback-request
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.phone": 555-0177
+        "calls[0].json.pet": Pepper
+        "calls[0].json.why": booking_failed

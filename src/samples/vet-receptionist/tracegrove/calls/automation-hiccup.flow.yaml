@@ -1,0 +1,23 @@
+title: When the calendar automation fails once, Max retries and the caller is still booked
+risk: critical
+tags: [voice, booking, faults]
+steps:
+  - name: the automation returns 503 once
+    standin: automation
+    fail: { route: POST /webhook/book-appointment, status: 503, times: 1 }
+  - name: caller books a checkup for Luna
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Can I bring my cat in for a checkup on Wednesday at 2pm? My cat's name is Luna. This is Sam Ortiz, 555-0199.
+          expect: { says: [all set, Luna], calls: [book_appointment] }
+  - name: the retry landed after the failure
+    standin: automation
+    received: POST /webhook/book-appointment
+    expect:
+      calls: 2
+      json:
+        "calls[0].status": 503
+        "calls[1].status": 200
+        "calls[1].json.pet": Luna

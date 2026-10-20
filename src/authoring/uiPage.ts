@@ -162,7 +162,7 @@ ${BENCHMARK_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
- const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?kind(s.result):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null}));
+ const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null}));
   return{id:f.caseId,title:c?c.title:f.title,file:f.file,editable:state.flows.some(flow=>flow.caseId===f.caseId),fixtures:c||unavailable?[]:f.fixtures,state:unavailable?'unavailable':c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,requests:c?c.requests||[]:[],steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}

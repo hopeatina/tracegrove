@@ -1325,6 +1325,116 @@
                   "chat"
                 ],
                 "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "expect": {
+                    "additionalProperties": false,
+                    "description": "Checks over { count, calls: [{ method, path, json, status, faulted }] }.",
+                    "properties": {
+                      "absent": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "calls": {
+                        "description": "Exactly this many matching calls.",
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "json": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "present": {
+                        "items": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "fail": {
+                    "additionalProperties": false,
+                    "description": "Fault for the next matching calls: status (like 503), delayMs, or drop (close the connection).",
+                    "properties": {
+                      "delayMs": {
+                        "maximum": 60000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "drop": {
+                        "type": "boolean"
+                      },
+                      "route": {
+                        "pattern": "^(GET|POST|PUT|PATCH|DELETE) \\/\\S*$",
+                        "type": "string"
+                      },
+                      "status": {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      "times": {
+                        "default": 1,
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "route"
+                    ],
+                    "type": "object"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "received": {
+                    "description": "Read back only calls to this route.",
+                    "pattern": "^(GET|POST|PUT|PATCH|DELETE) \\/\\S*$",
+                    "type": "string"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "standin": {
+                    "description": "A stand-in declared under standIns.",
+                    "pattern": "^[a-z][a-z0-9_-]*$",
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "standin"
+                ],
+                "type": "object"
               }
             ]
           },
