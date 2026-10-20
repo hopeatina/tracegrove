@@ -67,6 +67,7 @@
             "reject",
             "challenge",
             "handoff",
+            "card",
             "seal",
             "unseal"
           ],

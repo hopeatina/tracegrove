@@ -65,6 +65,7 @@ import { readSavedRun } from '../authoring/runSource.ts';
 import { retainNativeImport } from '../authoring/nativeImports.ts';
 import { decide, defaultReviewer, readiness } from '../authoring/readiness.ts';
 import { renderHandoff } from '../authoring/handoff.ts';
+import { renderCard } from '../authoring/card.ts';
 import { renderReadiness } from './renderReadiness.ts';
 import { sealRun, unsealRun } from '../core/seal.ts';
 
@@ -143,6 +144,7 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   reject <case> --reason <text>                        the evidence passes but the behavior is not what was wanted
   challenge <case> --reason <text> [--step <name>]     dispute a check without weakening it; keeps the claim open
   handoff [--out <file.html>] [--client <name>]        a self-contained page for your client: claims, transcripts, readbacks, sign-off
+  card [<dir>...] [--commit <sha>] [--link <url>]       the PR proof card: Markdown saying which claims hold on this commit (reads saved runs)
   seal [--run latest|<dir>] --out <file> [--remove]    encrypt a run folder (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
 
@@ -799,6 +801,12 @@ async function main(argv: string[]): Promise<number> {
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, html);
       out(args, { path: target, ready: state.ready, counts: state.counts }, `${state.ready ? 'ready for handoff' : `not ready: ${state.claims.length - state.counts.ready} claim(s) open`}\nwrote ${target}`);
+      return 0;
+    }
+    case 'card': {
+      const card = renderCard({ dirs: args.flags._?.length ? args.flags._ : ['.'], commit: args.flags.commit ?? process.env.GITHUB_SHA ?? null, link: args.flags.link ?? null, title: args.flags.title ?? null });
+      if (args.flags.out) { mkdirSync(dirname(resolve(args.flags.out)), { recursive: true }); writeFileSync(resolve(args.flags.out), card.markdown); }
+      out(args, card, card.markdown.trimEnd());
       return 0;
     }
     case 'seal': {

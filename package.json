@@ -72,7 +72,8 @@
     "docs/images/voice-run.png",
     "SECURITY.md",
     "docs/images/try-voice.png",
-    "docs/images/try-bug-caught.png"
+    "docs/images/try-bug-caught.png",
+    "docs/pr-proof-card.md"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
