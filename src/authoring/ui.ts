@@ -1,3 +1,4 @@
+import { z } from 'zod';
 /**
  * `tracegrove ui`: a loopback-only web UI over one folder. It shows the config, flows and run
  * history, runs `tracegrove test`, starts discovery at the working tree or a git branch, and
@@ -21,6 +22,8 @@ import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
 import { heal, listHeals, undoHeal } from './heal.ts';
+import { DECISION_KINDS, decide, defaultReviewer, readiness } from './readiness.ts';
+import { renderHandoff } from './handoff.ts';
 import { projectStatus } from './status.ts';
 import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
 import { readRunSource, readSavedRun } from './runSource.ts';
@@ -191,6 +194,12 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/run-control') return send(200, { runId: active?.id ?? null, operation: active?.kind ?? null, cancelling: active?.cancelling ?? false, closing });
       if (req.method === 'GET' && url.pathname === '/api/live') return send(200, { run: RunActivity.parse(activity), agent: live.agent, heal: live.heal });
       if (req.method === 'GET' && url.pathname === '/api/status') return send(200, projectStatus(dir));
+      if (req.method === 'GET' && url.pathname === '/api/readiness') return send(200, readiness(dir));
+      if (req.method === 'GET' && url.pathname === '/api/handoff') return send(200, renderHandoff(dir, { preparedBy: defaultReviewer() }).html, 'text/html; charset=utf-8');
+      if (req.method === 'POST' && url.pathname === '/api/decide') {
+        const body = z.object({ case: z.string().min(1).max(200), decision: z.enum(DECISION_KINDS), reason: z.string().max(2000).default('') }).strict().parse(await readBody(req, res));
+        return send(200, decide(dir, { case: body.case, decision: body.decision, by: defaultReviewer(), reason: body.reason }));
+      }
       if (req.method === 'GET' && url.pathname === '/api/environments') {
         if (!existsSync(configPath())) return send(200, { schemaVersion: 'tracegrove.env-list/v1', selected: null, environments: [], doctor: {} });
         const list = envList(configPath());
