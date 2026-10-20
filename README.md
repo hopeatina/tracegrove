@@ -37,6 +37,7 @@ The call still sounds right. The readback from the clinic's own system is what f
 | Example | What happens | Bug to switch on |
 | --- | --- | --- |
 | `voice-receptionist` | A dental clinic phone agent books, cancels and transfers calls; each call is checked against the clinic's records | `drop_booking`: says booked, saves nothing |
+| `vet-receptionist` | An after-hours vet clinic agent books through an automation webhook and transfers emergencies; flows make the webhook fail and read back what it received | `ignore_automation_errors`: says "all set" when the booking never landed; `double_book` |
 | `support-chatbot` | A support bot handles refunds, privacy questions and a prompt-injection attempt | `leak_orders`: answers about other customers' orders |
 | `notes-api` | Create, read back, stranger denied, delete, confirm it's gone | `keep_on_delete`, `share_with_strangers` |
 | `notes-browser` | A Chromium page and an API readback in one flow, with a video | |
@@ -118,6 +119,7 @@ Voice speaks [RTVI](https://docs.pipecat.ai/client/rtvi-standard) over WebSocket
 ```bash
 npx tracegrove readiness                          # exits 0 only when every claim is ready
 npx tracegrove accept calls.books-a-cleaning --reason "Reviewed transcript and readback"
+npx tracegrove judge                              # advisory: grade conversations against each flow's rubric
 npx tracegrove handoff --client "Bright Smile Dental"
 ```
 
@@ -151,6 +153,17 @@ On staging, a run whose cleanup can't be confirmed fails. In production, any flo
 </details>
 
 <details>
+<summary><b>A proof card on every pull request</b></summary>
+
+```yaml
+- uses: hopeatina/tracegrove@codex/bootstrap   # runs your flows, comments on the PR
+```
+
+One comment per PR, updated in place: whether every claim held on this commit, the failing step if not, critical claims waiting for sign-off, and a link to the full report. tracegrove's own pull requests carry one. [PR proof card](docs/pr-proof-card.md).
+
+</details>
+
+<details>
 <summary><b>Security and client data</b></summary>
 
 - Runs on your machine or CI. No tracegrove server, account or telemetry.
@@ -161,6 +174,47 @@ On staging, a run whose cleanup can't be confirmed fails. In production, any flo
 [Security and data handling](docs/security.md) · [Reporting a vulnerability](SECURITY.md)
 
 </details>
+
+<details>
+<summary><b>Calendars, CRMs, webhooks and real call logs</b></summary>
+
+Declare the services your app calls under `standIns:` and tracegrove replaces each with a recording server for the run. Flows read back exactly what your app sent, and can make a service fail, stall or hang up:
+
+```yaml
+- name: the booking automation is down
+  standin: automation
+  fail: { route: POST /webhook/book-appointment, status: 503, times: 5 }
+- name: caller tries to book
+  voice:
+    endpoint: /voice
+    turns:
+      - say: Can I book Pepper for Thursday at 11am? I'm Ana, 555-0177.
+        expect: { says: [couldn't confirm, call you back], notSays: [all set] }
+- name: the front desk got a callback request
+  standin: automation
+  received: POST /webhook/callback-request
+  expect: { calls: 1 }
+```
+
+`tracegrove import-call call.json --out tracegrove/calls/refund.flow.yaml` turns a real Retell, Vapi or plain-text log into a draft flow. Phone numbers and emails are swapped for test values, and what the agent said is kept as comments so you choose what must hold. [Stand-ins](docs/stand-ins.md).
+
+</details>
+
+## What a pass proves, and what it doesn't
+
+| You might assume | What tracegrove actually checks |
+| --- | --- |
+| The booking really happened | Yes. A separate read from your backend or a stand-in confirms it; the agent's own reply never counts as proof. |
+| The agent works on a real phone line | No. Text goes in over RTVI, so speech recognition, voices, phone latency and interruptions aren't tested. |
+| The calendar, CRM or payment API accepts it | Only what your app sent. Stand-ins prove the request, not that the real service takes it; run a few flows against a sandbox [environment](docs/environments.md) for that. |
+| The agent handles whatever callers say | Only the conversations you scripted. `import-call` turns real calls into scripts, but coverage is as good as the scripts. |
+| The agent said the right thing, kindly | Only the phrases you listed (`says`, `notSays`) decide pass or fail. A `rubric:` gets graded by your agent with cited lines, but only as advice to the person who signs off. |
+| It works with hosted voice platforms | Pipecat and anything speaking RTVI, plus HTTP chat. Retell and Vapi transports are planned; today, test the backend they call. |
+| Discovery found every route | Routes found by reading code are marked unverified until a run reaches them. |
+| The evidence can't be tampered with | Every run is hash-chained and checked on read. It isn't signed by a third party yet. |
+| It runs on my stack | Node, FastAPI and Django apps today. Apps that need a build step first (Next.js, NestJS) can't be launched yet. |
+
+When a person disagrees with a passing claim, `tracegrove reject <claim> --reason "…"` records why, and the [PR card](docs/pr-proof-card.md) fails until it's fixed.
 
 ## Hand it to your coding agent
 
@@ -204,8 +258,10 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Adding tracegrove to your app |
 | [Voice and chat](docs/voice-and-chat.md) | Conversation steps, transports, checks |
+| [Stand-ins](docs/stand-ins.md) | Replace calendars, CRMs and webhooks; read back what was sent; inject failures |
 | [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
+| [PR proof card](docs/pr-proof-card.md) | The GitHub Action and `tracegrove card` |
 | [Security](docs/security.md) | Credentials, redaction, sealed runs |
 | [Agent guide](docs/agent-guide.md) | JSON contracts for coding agents |
 | [Browser driver](docs/browser-driver.md) · [MCP driver](docs/mcp-driver.md) · [Native jobs](docs/native-jobs.md) | Other surfaces |

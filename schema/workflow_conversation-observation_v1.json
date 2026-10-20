@@ -96,6 +96,11 @@
           },
           "result": {
             "$ref": "#/$defs/__schema0"
+          },
+          "spokenBefore": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -184,6 +189,11 @@
                 },
                 "result": {
                   "$ref": "#/$defs/__schema0"
+                },
+                "spokenBefore": {
+                  "maximum": 2147483647,
+                  "minimum": 0,
+                  "type": "integer"
                 }
               },
               "required": [

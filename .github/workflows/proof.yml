@@ -1,0 +1,38 @@
+name: proof card
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for the UI self-test
+        run: npx --no-install playwright install --with-deps chromium
+      - run: npm run build
+      - name: Run the examples and tracegrove's own UI self-test
+        run: |
+          for example in voice-receptionist support-chatbot notes-api notes-mcp report-jobs; do
+            node dist/cli/main.js try "$example" --out "proof/$example" --no-open || true
+          done
+          node dist/cli/main.js test --config dogfood || true
+      - uses: ./
+        with:
+          run: 'false'
+          tracegrove: node dist/cli/main.js
+          title: tracegrove on this PR
+          directories: |
+            proof/voice-receptionist
+            proof/support-chatbot
+            proof/notes-api
+            proof/notes-mcp
+            proof/report-jobs
+            dogfood

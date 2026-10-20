@@ -1,0 +1,28 @@
+title: A caller books a visit, and the booking reaches the clinic calendar exactly once
+risk: critical
+tags: [voice, booking]
+rubric:
+  - Repeats the day and time back before booking anything
+  - Asks for the pet's name, the owner's name and a callback number before booking
+  - Only says the visit is booked after the calendar automation confirmed it
+steps:
+  - name: caller books vaccines for Biscuit
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Hi, I need to book vaccines for my dog on Tuesday at 10am.
+          expect: { says: [Tuesday, 10 AM, pet's name], noCalls: [book_appointment] }
+        - say: My dog's name is Biscuit. I'm Dana Lee and my number is 555-0142.
+          expect: { says: [all set, Biscuit, Tuesday], calls: [book_appointment] }
+  - name: the calendar automation got one booking
+    standin: automation
+    received: POST /webhook/book-appointment
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.pet": Biscuit
+        "calls[0].json.owner": Dana Lee
+        "calls[0].json.phone": 555-0142
+        "calls[0].json.day": tuesday
+        "calls[0].json.reason": vaccines

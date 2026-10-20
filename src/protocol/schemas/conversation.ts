@@ -35,6 +35,8 @@ export const ConversationToolCall = z.object({
   name: z.string().min(1).max(128),
   arguments: JsonValue,
   result: JsonValue,
+  /** Characters of reply text the agent had produced when it started this call (RTVI only): 0 means it called before saying anything. */
+  spokenBefore: NonNegInt.optional(),
 }).strict();
 export type ConversationToolCall = z.infer<typeof ConversationToolCall>;
 

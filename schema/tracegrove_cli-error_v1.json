@@ -67,6 +67,9 @@
             "reject",
             "challenge",
             "handoff",
+            "card",
+            "import-call",
+            "judge",
             "seal",
             "unseal"
           ],

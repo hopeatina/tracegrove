@@ -29,6 +29,14 @@ describe('tracegrove try', () => {
     expect(facts).toMatchObject({ schemaVersion: 'tracegrove.try/v1', outcome: 'passed', bundleVerified: true, bug: null, caught: null });
   });
 
+  it('runs the vet receptionist against stand-in third parties', async () => {
+    const { exitCode, facts } = await run('vet-receptionist');
+    // Say which case and step broke, so a CI-only failure can be diagnosed from the assertion alone.
+    const why = exitCode === 0 ? '' : (() => { try { return readFileSync(join(facts.runDir as string, 'summary.json'), 'utf8').slice(0, 4000); } catch { return JSON.stringify(facts); } })();
+    expect(exitCode, why).toBe(0);
+    expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true });
+  }, 30_000);
+
   it.each(EXAMPLES.flatMap((e) => e.bugs.map((b) => [e.name, b.name, b.caughtBy] as const)))('%s --bug %s is caught at "%s"', async (example, bug, step) => {
     const { exitCode, facts } = await run(example, bug);
     expect(facts).toMatchObject({ outcome: 'assertion_failed', bundleVerified: true, bug });

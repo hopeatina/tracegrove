@@ -37,6 +37,8 @@ function stepInfo(step: Step, persona: string, assertions: CaseSpec['assertions'
   if (step.kind === 'observe') return { ...common, method: step.readback.method, path: step.readback.path };
   if (step.kind === 'ui.navigate') return { ...common, method: 'UI', path: step.path };
   if (step.kind === 'conversation.run') return { ...common, method: step.command.channel === 'voice' ? 'VOICE' : 'CHAT', path: `${step.command.endpoint} · ${step.command.turns.length} turn${step.command.turns.length === 1 ? '' : 's'}`, expectation: conversationExpectation(assertions, step.id) };
+  if (step.kind === 'standin.fault') return { ...common, method: 'FAULT', path: `${step.command.standIn} ${step.command.route.method} ${step.command.route.path}`, expectation: 'Fault armed' };
+  if (step.kind === 'standin.observe') return { ...common, method: 'STANDIN', path: `${step.command.standIn}${step.command.route ? ` ${step.command.route.method} ${step.command.route.path}` : ''}` };
   return { ...common, method: step.kind.startsWith('job.') ? 'JOB' : step.kind === 'mcp.call' ? 'MCP' : 'UI', path: step.id };
 }
 

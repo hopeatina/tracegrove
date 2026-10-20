@@ -44,8 +44,14 @@ function caseLines(p: Paint, c: CaseReport, last: boolean): string[] {
     const leaf = i === c.steps.length - 1 ? '└─' : '├─';
     const req = s.method ? `${s.method} ${s.path}` : '';
     const status = s.status !== null ? ` → ${s.status}` : s.result === 'not_run' ? ' · not run' : '';
-    lines.push(`${p.dim(`${stem}${leaf}`)} ${mark(p, c.failure?.step === s.name && s.result === 'completed' ? 'failed' : s.result)} ${s.name.padEnd(width)}  ${p.dim(`${req}${status}`)}`);
-    if (c.failure && c.failure.step === s.name && s.result !== 'not_run') {
+    const primary = c.failure?.step === s.name;
+    lines.push(`${p.dim(`${stem}${leaf}`)} ${mark(p, (primary || s.checks === 'fail') && s.result === 'completed' ? 'failed' : s.result)} ${s.name.padEnd(width)}  ${p.dim(`${req}${status}`)}`);
+    if (!primary && s.checks === 'fail') {
+      // A later check that also failed: say what it saw so it never reads as a pass.
+      const pad = `${p.dim(`${stem}${i === c.steps.length - 1 ? '   ' : '│  '}`)}    `;
+      for (const line of (s.observedText ?? s.expectation ?? 'check failed').split('\n').slice(0, 4)) lines.push(`${pad}${p.dim(line)}`);
+    }
+    if (c.failure && primary && s.result !== 'not_run') {
       const pad = `${p.dim(`${stem}${i === c.steps.length - 1 ? '   ' : '│  '}`)}    `;
       for (const line of c.failure.message.split('\n')) lines.push(`${pad}${p.red(line)}`);
       if (c.failure.observed) {

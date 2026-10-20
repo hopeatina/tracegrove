@@ -65,6 +65,7 @@
     "docs/benchmark-evidence.md",
     "docs/git-object-proof.md",
     "docs/voice-and-chat.md",
+    "docs/stand-ins.md",
     "docs/security.md",
     "docs/readiness-and-handoff.md",
     "docs/environments.md",
@@ -72,7 +73,8 @@
     "docs/images/voice-run.png",
     "SECURITY.md",
     "docs/images/try-voice.png",
-    "docs/images/try-bug-caught.png"
+    "docs/images/try-bug-caught.png",
+    "docs/pr-proof-card.md"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",

@@ -13,6 +13,7 @@ function boundary(kind: Step['kind'] | undefined): string {
   if (kind?.startsWith('job.')) return 'native_job';
   if (kind === 'mcp.call') return 'mcp';
   if (kind === 'conversation.run') return 'conversation';
+  if (kind?.startsWith('standin.')) return 'stand_in';
   if (kind === 'http.request' || kind === 'observe') return 'http';
   return 'unknown';
 }
