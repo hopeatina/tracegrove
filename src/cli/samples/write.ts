@@ -30,7 +30,7 @@ export function writeSample(samplesRoot: string, name: SampleName, output: strin
   if (existsSync(output) && readdirSync(output).length) throw new Blocked([{ code: 'sample_output_not_empty',
     detail: output, action: 'choose an empty output directory; existing files are never overwritten' }]);
   mkdirSync(output, { recursive: true });
-  if (name === 'voice-receptionist' || name === 'support-chatbot' || name === 'vet-receptionist' || name === 'saas-billing') {
+  if (name === 'voice-receptionist' || name === 'support-chatbot' || name === 'vet-receptionist' || name === 'saas-billing' || name === 'clinic-portal') {
     cpSync(join(samplesRoot, name), output, { recursive: true });
     return compileProject(join(output, 'tracegrove.config.yaml')).workflowConfigPath;
   }

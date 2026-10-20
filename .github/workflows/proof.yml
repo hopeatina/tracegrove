@@ -20,7 +20,7 @@ jobs:
       - run: npm run build
       - name: Run the examples and tracegrove's own UI self-test
         run: |
-          for example in voice-receptionist vet-receptionist support-chatbot saas-billing notes-api notes-mcp report-jobs; do
+          for example in voice-receptionist vet-receptionist support-chatbot saas-billing clinic-portal notes-api notes-mcp report-jobs; do
             node dist/cli/main.js try "$example" --out "proof/$example" --no-open || true
           done
           node dist/cli/main.js test --config dogfood || true

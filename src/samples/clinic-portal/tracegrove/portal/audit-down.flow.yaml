@@ -1,0 +1,11 @@
+title: When the audit log is down, staff can't open charts at all
+risk: critical
+tags: [portal, compliance, faults]
+steps:
+  - name: the audit log is down
+    standin: audit
+    fail: { route: POST /events, status: 503, times: 3 }
+  - name: nurse tries to open a chart
+    GET: /records/rec_7f3a
+    as: nurse
+    expect: { status: 503, absent: [record] }
