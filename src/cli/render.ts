@@ -44,7 +44,7 @@ function caseLines(p: Paint, c: CaseReport, last: boolean): string[] {
     const leaf = i === c.steps.length - 1 ? '└─' : '├─';
     const req = s.method ? `${s.method} ${s.path}` : '';
     const status = s.status !== null ? ` → ${s.status}` : s.result === 'not_run' ? ' · not run' : '';
-    lines.push(`${p.dim(`${stem}${leaf}`)} ${mark(p, s.result)} ${s.name.padEnd(width)}  ${p.dim(`${req}${status}`)}`);
+    lines.push(`${p.dim(`${stem}${leaf}`)} ${mark(p, c.failure?.step === s.name && s.result === 'completed' ? 'failed' : s.result)} ${s.name.padEnd(width)}  ${p.dim(`${req}${status}`)}`);
     if (c.failure && c.failure.step === s.name && s.result !== 'not_run') {
       const pad = `${p.dim(`${stem}${i === c.steps.length - 1 ? '   ' : '│  '}`)}    `;
       for (const line of c.failure.message.split('\n')) lines.push(`${pad}${p.red(line)}`);

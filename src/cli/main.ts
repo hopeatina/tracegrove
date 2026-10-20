@@ -62,6 +62,10 @@ import { configGet, configPatch, configSet, envAddPatch, parseValue } from '../a
 import { renderApproval, renderCapabilities, renderConfigEdit, renderDoctor, renderEnvList, renderEnvShow, renderExplain, renderWhoami } from './renderEnv.ts';
 import { readSavedRun } from '../authoring/runSource.ts';
 import { retainNativeImport } from '../authoring/nativeImports.ts';
+import { decide, defaultReviewer, readiness } from '../authoring/readiness.ts';
+import { renderHandoff } from '../authoring/handoff.ts';
+import { renderReadiness } from './renderReadiness.ts';
+import { sealRun, unsealRun } from '../core/seal.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -126,6 +130,17 @@ Environments (local, docker, staging, prod-readonly; see docs/environments.md):
   config get [<path>] | set <path> <value> | patch <json> [--dry-run]
                                                        validated, comment-preserving edits to tracegrove.config.yaml
   mcp [--max-calls <n>] [--max-test-runs <n>]          MCP stdio server: status, env_list, env_doctor, capabilities, explain, check, test, show_run, heal, draft
+
+Readiness and handoff (four states per claim: ran, evidence, still valid, sign-off):
+  readiness [--dir <dir>] [--json]                     every flow as a claim: what ran, what the evidence supports, whether it
+                                                       is still about this code, and who signed off; exit 0 only when ready
+  accept <case> [--by <name>] [--reason <text>]        sign off a supported, current claim (recorded in tracegrove/decisions.yaml)
+  waive <case> --reason <text>                         ship knowingly without this evidence; the claim stays unsupported
+  reject <case> --reason <text>                        the evidence passes but the behavior is not what was wanted
+  challenge <case> --reason <text> [--step <name>]     dispute a check without weakening it; keeps the claim open
+  handoff [--out <file.html>] [--client <name>]        a self-contained page for your client: claims, transcripts, readbacks, sign-off
+  seal [--run latest|<dir>] --out <file> [--remove]    encrypt a run folder (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)
+  unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -750,6 +765,45 @@ async function main(argv: string[]): Promise<number> {
       const schemas = exportJsonSchemas();
       for (const [name, schema] of Object.entries(schemas)) writeFileSync(join(output, `${name.replace(/[\/.]/g, '_')}.json`), `${JSON.stringify(schema, null, 2)}\n`);
       out(args, { output, count: Object.keys(schemas).length }, `exported ${Object.keys(schemas).length} schemas to ${output}`);
+      return 0;
+    }
+
+    case 'readiness': {
+      const state = readiness(flag(args, 'dir') ?? '.');
+      out(args, state, renderReadiness(state, paint()));
+      return state.ready ? 0 : 2;
+    }
+    case 'accept':
+    case 'waive':
+    case 'reject':
+    case 'challenge': {
+      const decision = ({ accept: 'accepted', waive: 'waived', reject: 'rejected', challenge: 'challenged' } as const)[args.command];
+      const flags = args.flags as { _: string[]; dir?: string; by?: string; reason?: string; step?: string };
+      const recorded = decide(flags.dir ?? '.', { case: flags._[0]!, decision, by: flags.by ?? defaultReviewer(), ...(flags.reason ? { reason: flags.reason } : {}), ...(flags.step ? { step: flags.step } : {}) });
+      out(args, recorded, `${recorded.case}: ${recorded.decision} by ${recorded.by}${recorded.reason ? ` (${recorded.reason})` : ''}\nrecorded in tracegrove/decisions.yaml; commit it with your flows\nnext: tracegrove readiness`);
+      return 0;
+    }
+    case 'handoff': {
+      const dir = flag(args, 'dir') ?? '.';
+      const { html, state } = renderHandoff(dir, { ...(args.flags.client ? { client: args.flags.client } : {}), preparedBy: args.flags.by ?? defaultReviewer() });
+      const target = resolve(args.flags.out ?? join(state.root, '.tracegrove', 'handoff', `${state.project}-${new Date().toISOString().slice(0, 10)}.html`));
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, html);
+      out(args, { path: target, ready: state.ready, counts: state.counts }, `${state.ready ? 'ready for handoff' : `not ready: ${state.claims.length - state.counts.ready} claim(s) open`}\nwrote ${target}`);
+      return 0;
+    }
+    case 'seal': {
+      const passphrase = process.env.TRACEGROVE_SEAL_KEY ?? '';
+      const root = projectRoot(flag(args, 'dir') ?? '.') ?? resolve(flag(args, 'dir') ?? '.');
+      const runDir = args.flags.run && existsSync(resolve(args.flags.run)) ? resolve(args.flags.run) : resolveRun(root, args.flags.run ?? 'latest');
+      if (!runDir) throw new Blocked([{ code: 'seal_run_missing', detail: args.flags.run ?? 'latest', action: 'run tracegrove test first, or pass --run <run folder>' }]);
+      const header = sealRun(runDir, resolve(args.flags.out), passphrase, { remove: args.flags.remove === true });
+      out(args, { file: resolve(args.flags.out), header, removed: args.flags.remove === true }, `sealed ${header.files} files from ${runDir}\n  -> ${resolve(args.flags.out)} (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)${args.flags.remove ? '\nplaintext run folder removed after the archive was opened successfully' : ''}`);
+      return 0;
+    }
+    case 'unseal': {
+      const result = unsealRun(resolve(args.flags._[0]!), resolve(args.flags.out), process.env.TRACEGROVE_SEAL_KEY ?? '');
+      out(args, result, `unsealed ${result.header.files} files into ${result.outDir}\nnext: tracegrove verify-bundle --bundle ${join(result.outDir, 'bundle')}`);
       return 0;
     }
 

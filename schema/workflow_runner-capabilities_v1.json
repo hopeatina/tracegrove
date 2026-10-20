@@ -194,6 +194,7 @@
         "computer_use",
         "mcp",
         "mcp_widget",
+        "conversation",
         "mobile"
       ],
       "type": "string"

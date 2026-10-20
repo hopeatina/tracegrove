@@ -13,19 +13,21 @@ import { materializeLogicalPayload } from '../core/generators.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntimeSync } from '../hosts/runtime.ts';
 import { SeedRecipe, parseAs } from '../protocol/index.ts';
-import { Action, AuthoringConfig, Fixture, Flow, HTTP_VERBS, type ConcreteFlowStep as FlowStep, type Expect, type HttpVerb } from './schema.ts';
+import { Action, AuthoringConfig, Fixture, Flow, HTTP_VERBS, type ConcreteFlowStep as FlowStep, type Expect, type HttpVerb, type ConversationExpect } from './schema.ts';
 import { expandFlow, loadActionLibrary, type ActionLibrary } from './actions.ts';
 import { compileBrowserStep } from './browser.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
 import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
 import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
+import { CONVERSATION_RUNNER_CAPABILITIES } from '../adapters/conversation/capabilities.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
 import { applicationLaunch } from './appLaunch.ts';
 import { describeSnapshot, resolveVerificationSource } from './verificationSource.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
 import { caseCapabilities } from '../core/capabilities.ts';
+import { redactionRules } from '../core/privacy.ts';
 import { flowEnabledIn, resolveEnvironment } from '../environments/resolve.ts';
 import type { ResolvedEnvironment } from '../environments/schema.ts';
 import { expectedRelease, targetBinding } from '../environments/binding.ts';
@@ -161,6 +163,25 @@ function predicateFor(expect: Expect | undefined): Json | null {
   return preds.length === 1 ? preds[0]! : { kind: 'all', predicates: preds };
 }
 
+function conversationPredicates(expect: ConversationExpect | undefined, textPath: string, toolsPath: string, latencyPath: string): Json[] {
+  if (!expect) return [];
+  const out: Json[] = [];
+  if (expect.says) out.push({ kind: 'json_path_includes', path: textPath, values: expect.says });
+  if (expect.notSays) out.push({ kind: 'json_path_excludes', path: textPath, values: expect.notSays });
+  if (expect.calls) out.push({ kind: 'json_path_includes', path: toolsPath, values: expect.calls });
+  if (expect.noCalls) out.push({ kind: 'json_path_excludes', path: toolsPath, values: expect.noCalls });
+  if (expect.within !== undefined) out.push({ kind: 'json_path_at_most', path: latencyPath, value: expect.within });
+  return out;
+}
+
+function conversationSummary(turns: Array<ConversationExpect | undefined>, whole: ConversationExpect | undefined): string {
+  const all = [...turns, whole].filter((e): e is ConversationExpect => !!e);
+  const says = all.flatMap((e) => e.says ?? []); const calls = all.flatMap((e) => e.calls ?? []);
+  const parts = [says.length ? `says ${says.map((v) => JSON.stringify(v)).join(', ')}` : '', calls.length ? `calls ${calls.join(', ')}` : '',
+    all.some((e) => e.notSays || e.noCalls) ? 'and avoids what it must not do' : ''].filter(Boolean);
+  return parts.length ? `Agent ${parts.join('; ')}` : 'Conversation completes';
+}
+
 function statusOf(expect: Expect | undefined): number | null {
   if (expect === undefined) return null;
   return typeof expect === 'number' ? expect : expect.status ?? null;
@@ -268,10 +289,12 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   const hasBrowser = selected.some(({ flow }) => flow.steps.some(step => 'browser' in step));
   const hasJobs = selected.some(({ flow }) => flow.steps.some(step => 'job' in step));
   const hasMcp = selected.some(({ flow }) => flow.steps.some(step => 'mcp' in step));
+  const hasConversation = selected.some(({ flow }) => flow.steps.some(step => 'voice' in step || 'chat' in step));
+  if (hasConversation && (hasMcp || hasJobs || hasBrowser)) fail('mixed_conversation_runner_unqualified', 'Voice and chat conversations are not qualified together with MCP, native job or browser runners', 'select separate flows with --grep');
   if (hasMcp && (hasJobs || hasBrowser)) fail('mixed_mcp_runner_unqualified', 'MCP, native job and browser runners are not qualified together', 'select separate flows with --grep');
   if (hasJobs && hasBrowser) fail('mixed_native_browser_unqualified', 'Native job and browser runners are not qualified together', 'run separate flows with --grep');
   if (hasJobs && (config.app.adapter !== 'node' || config.app.nativeJobs !== 'node_ipc/v1')) fail('native_job_bridge_required', 'Native job steps require an opted-in Node application', 'set app.nativeJobs: node_ipc/v1 and implement its handshake');
-  const runner = hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const runner = hasConversation ? CONVERSATION_RUNNER_CAPABILITIES : hasMcp ? MCP_RUNNER_CAPABILITIES : hasJobs ? NATIVE_JOB_RUNNER_CAPABILITIES : hasBrowser ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
 
   // ---- attested source identity (launched apps) or target binding (deployed, containerized) ----
   // Sources are relative to the launch cwd (the manage.py folder for django, else app.root).
@@ -364,11 +387,11 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     requiredCapabilities: binding.kind === 'url' ? ['network_origin:external', 'confirmed_cancel', 'artifact_delivery'] : ['container', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
     captureRequirements: [], sessionLifetimeMs: budgetMs + 60_000 + binding.readiness.timeoutMs, cleanupReserveMs: binding.kind === 'url' ? 15_000 : 60_000, binding,
   });
-  const runnerAdapter = hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
-  const surfaceKind = hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
+  const runnerAdapter = hasConversation ? 'conversation' : hasMcp ? 'mcp' : hasJobs ? 'native_job' : hasBrowser ? 'browser' : 'http';
+  const surfaceKind = hasConversation ? 'conversation' : hasMcp ? 'mcp' : hasJobs ? 'job' : hasBrowser ? 'web' : 'http_api';
   write(compiledDir, 'runner.yaml', { schemaVersion: 'workflow.runner-profile/v1', ref: { id: runner.ref.id, revision: '1' }, adapter: runnerAdapter, maxStepsPerCase: 50, cancellation: 'confirmed' });
-  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
-  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: false, fixtures: false }) });
+  write(compiledDir, 'surface/pack.yaml', { schemaVersion: 'workflow.surface-pack/v1', ref: { id: hasConversation ? 'tracegrove.pack.conversation' : hasMcp ? 'tracegrove.pack.mcp' : hasJobs ? 'tracegrove.pack.native-job' : hasBrowser ? 'tracegrove.pack.browser' : 'tracegrove.pack.http-api', revision: '1' }, kind: surfaceKind, protocol: runner.protocol, stepKinds: runner.operations, oracles: runner.oracles, captureFormats: runner.captureFormats });
+  write(compiledDir, 'surface/binding.yaml', { schemaVersion: 'workflow.surface-binding/v1', ref: ref('surface.http'), kind: surfaceKind, packRef: { $file: './pack.yaml' }, driverProfileRef: null, componentProfileRef: { $file: '../components.yaml' }, interaction: hasBrowser ? 'hybrid' : 'protocol', configurationSchemaRef: null, configurationRef: null, variantPolicyRef: null, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: false, fixtures: false, conversation: hasConversation }) });
   // A deployment is a test sandbox (or designated production when read-only); tracegrove cannot see its storage.
   const accountClass = binding?.kind === 'url' ? (binding.writes === 'none' ? 'designated_production' : 'test_sandbox') : 'local';
   const boundaryIds = launched ? ['application', 'storage'] : ['application'];
@@ -407,6 +430,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const info: CompiledStepInfo[] = [];
     const ids = new Set<string>();
     const browserFlow = flow.steps.some(step => 'browser' in step);
+    const conversationFlow = flow.steps.some(step => 'voice' in step || 'chat' in step);
     const methods = new Set<string>(browserFlow ? flow.browser!.allowMethods : []);
     const prefixes = new Set<string>(browserFlow ? flow.browser!.allowPaths : []);
     let creates = 0;
@@ -414,13 +438,37 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     const flowDefault = flow.as ?? defaultPersona;
     if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
     flow.steps.forEach((step: FlowStep, index: number) => {
-      const label = 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
+      const label = 'voice' in step ? 'voice_call' : 'chat' in step ? 'chat' : 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
       while (ids.has(id)) id = `${id}_${index + 1}`;
       ids.add(id);
       const where = `${rel} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
       const inputs: Record<string, Json> = {};
       const timeoutMs = step.timeoutMs ?? config.defaults.stepTimeoutMs;
+      if ('voice' in step || 'chat' in step) {
+        const channel = 'voice' in step ? 'voice' as const : 'chat' as const;
+        const spec = 'voice' in step ? step.voice : step.chat;
+        const transport = spec.transport ?? (channel === 'voice' ? 'rtvi' : 'http_chat');
+        const turns = spec.turns.map((turn) => ({ say: bindTemplates(turn.say, scope, inputs, where) as string }));
+        const { turns: _turns, transport: _transport, ...options } = spec;
+        const command = { channel, transport, ...options, turns };
+        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const predicates: Json[] = [];
+        spec.turns.forEach((turn, turnIndex) => predicates.push(...conversationPredicates(turn.expect, `body.turns[${turnIndex}].reply`, `body.turns[${turnIndex}].toolNames`, `body.turns[${turnIndex}].firstReplyMs`)));
+        predicates.push(...conversationPredicates(step.expect, 'body.replies', 'body.toolNames', 'body.maxFirstReplyMs'));
+        for (const [path, value] of Object.entries(step.expect?.json ?? {})) predicates.push({ kind: 'json_path_equals', path: `body.${path}`, value });
+        const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
+        steps.push({ id, kind: 'conversation.run', command, auth, captures, timeoutMs: step.timeoutMs ?? Math.max(timeoutMs, 30_000), inputs, retry: { attempts: 1 } });
+        assertions.push({ id: `${id}.expect`, required: true, environmentClasses: classes, stepId: id,
+          oracle: { name: predicates.length ? 'conversation.observation' : 'step.result', version: '1' },
+          predicate: predicates.length === 0 ? { kind: 'step_result', value: 'completed' } : predicates.length === 1 ? predicates[0]! : { kind: 'all', predicates: predicates.slice(0, 32) }, coverageTags: flow.tags });
+        if (predicates.length > 32) fail('conversation_expectation_limit', where, 'split the conversation: one step holds at most 32 checks');
+        methods.add('POST'); prefixes.add(spec.endpoint);
+        for (const name of Object.keys(step.save ?? {})) scope.saved.set(name, id);
+        info.push({ id, name: step.name ?? id, method: channel === 'voice' ? 'VOICE' : 'CHAT', path: `${spec.endpoint} · ${spec.turns.length} turn${spec.turns.length === 1 ? '' : 's'}`, as: step.as ?? defaultPersona, expectStatus: null,
+          expectation: conversationSummary(spec.turns.map((turn) => turn.expect), step.expect) });
+        return;
+      }
       if ('mcp' in step) {
         if (statusOf(step.expect) !== null) fail('mcp_http_expectation', where, 'use expect.json for MCP protocol observations');
         const command = { ...step.mcp, arguments: bindTemplates(step.mcp.arguments as Json, scope, inputs, where) };
@@ -530,19 +578,20 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     }
     write(compiledDir, `cases/${caseId}.yaml`, {
       schemaVersion: 'workflow.case/v1', ref: { id: caseId, revision: '1' }, purpose: flow.title, workflowId: caseId,
-      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: hasMcp ? 'integration' : browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
+      requirementRefs: [], sourceRefs: [], sourceAnalysisRef: null, risk: flow.risk, surface: hasMcp || conversationFlow ? 'integration' : browserFlow ? 'hybrid' : 'api', surfaceBindingRef: { $file: '../surface/binding.yaml' },
       proofClaim: launched
-        ? `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`
+        ? `The locally launched ${config.project} app, at the attested source digest, satisfies "${flow.title}" through its ${conversationFlow ? 'conversation and HTTP protocols' : hasMcp ? 'MCP and HTTP protocols' : browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}. Local application behavior, not deployment.`
         : `The ${config.project} ${binding!.kind === 'url' ? `deployment at ${binding!.origin}` : `${binding!.kind} target`} in environment ${environment.name} (${environment.class})${release ? `, reporting release ${release},` : ''} satisfies "${flow.title}" through its ${browserFlow ? 'browser and HTTP surfaces' : 'HTTP API'}, as the configured personas.`,
-      environmentClasses: classes, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: browserFlow, fixtures: given.size > 0 }),
+      environmentClasses: classes, requiredCapabilities: caseCapabilities({ mcp: hasMcp, browser: browserFlow, fixtures: given.size > 0, conversation: conversationFlow }),
       requiredBoundaries: boundaryIds.map(boundaryId => ({ boundaryId, mode: 'real' })),
       dependencyCases: [], personaRef: { $file: `../personas/${defaultPersona}.yaml` }, datasetRef: null, fixturePlanRef, navigationRef: null, preconditions: [],
       steps, assertions,
       effects: { mode: binding?.writes === 'none' ? 'read_only' : 'designated_writes', allowedHosts: [targetOrigin], allowedMethods: [...methods].sort(), allowedResourcePrefixes: [...prefixes].sort(), maxCreates: creates, maxMessages: 0, maxJobs: flow.effects?.maxJobs ?? 0, cleanupRecipeRef: null,
         ...(hasJobs ? { allowedJobQueues: [...new Set(flow.steps.flatMap(step => 'job' in step ? [step.job.queue] : []))] } : {}),
+        ...(conversationFlow ? { maxConversations: flow.steps.filter(step => 'voice' in step || 'chat' in step).length } : {}),
         ...(hasMcp ? { maxMcpCalls: flow.effects?.maxMcpCalls ?? 0, allowedMcpTools: flow.effects?.allowedMcpTools ?? [] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
-      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
+      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null, ...(config.privacy?.redact.length ? { redact: redactionRules(config.privacy.redact) } : {}) },
       baselineRef: null, generation: null,
     });
     suiteCases.push({ caseRef: `./${caseId}.yaml`, required: true, profiles: null });

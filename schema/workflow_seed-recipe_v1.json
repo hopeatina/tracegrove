@@ -149,6 +149,92 @@
           "additionalProperties": false,
           "properties": {
             "kind": {
+              "const": "json_path_includes",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "json_path_excludes",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "json_path_at_most",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
               "const": "step_result",
               "type": "string"
             },

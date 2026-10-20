@@ -52,6 +52,10 @@ export const AuthoringConfig = z.object({
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
   environments: z.record(Name, EnvironmentConfig).optional().describe('Where flows can run: local (default), docker, staging, prod-readonly. Each names a target, class, write policy, persona secret references and agent policy.'),
+  privacy: z.object({
+    redact: z.array(z.union([z.enum(['email', 'phone', 'card', 'ssn']), z.object({ name: Name, pattern: z.string().min(1).max(400) }).strict()])).max(16).default([])
+      .describe('Client data scrubbed from every observation before it is written: email, phone, card (Luhn-checked), ssn, or { name, pattern } regexes.'),
+  }).strict().optional().describe('Keep client data out of run folders and evidence. Credentials are never recorded either way.'),
   defaults: z.object({
     stepTimeoutMs: z.number().int().positive().max(120_000).default(5000),
     caseTimeoutMs: z.number().int().positive().max(600_000).default(30_000),
@@ -102,7 +106,36 @@ export const JobFlowStep = z.object({ name: z.string().min(1).max(120).optional(
 export const McpFlowStep = z.object({ name: z.string().min(1).max(120).optional(), mcp: McpToolCall,
   as: z.string().optional(), expect: Expect.optional(), save: z.record(Name, DotPath).optional(),
   timeoutMs: z.number().int().positive().max(120_000).optional() }).strict();
-export const ConcreteFlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep]);
+const Phrases = z.array(z.string().min(1).max(400)).min(1).max(32);
+/** What the agent should (and should not) say and do. Text checks ignore case and repeated spaces. */
+export const ConversationExpect = z.object({
+  says: Phrases.optional().describe('Phrases the agent must say (each one, anywhere in the reply).'),
+  notSays: Phrases.optional().describe('Phrases the agent must never say.'),
+  calls: z.array(z.string().min(1).max(128)).min(1).max(16).optional().describe('Tools the agent must call.'),
+  noCalls: z.array(z.string().min(1).max(128)).min(1).max(16).optional().describe('Tools the agent must not call.'),
+  within: z.number().int().positive().max(60_000).optional().describe('Milliseconds: the agent starts replying within this time.'),
+}).strict();
+export type ConversationExpect = z.infer<typeof ConversationExpect>;
+const ConversationSpec = z.object({
+  endpoint: Path.describe('WebSocket (voice) or POST (chat) path on the app.'),
+  transport: z.enum(['rtvi', 'http_chat']).optional().describe('voice defaults to rtvi (Pipecat-style WebSocket); chat defaults to http_chat.'),
+  turns: z.array(z.object({ say: z.string().min(1).max(2000).describe('What the caller says; {saved} placeholders work.'), expect: ConversationExpect.optional() }).strict()).min(1).max(20),
+  messageField: z.string().optional(), sessionField: z.string().optional(), replyPath: z.string().optional(), toolsPath: z.string().optional(),
+  settleMs: z.number().int().min(50).max(10_000).optional(),
+  turnTimeoutMs: z.number().int().min(100).max(60_000).optional(),
+}).strict();
+const conversationStep = {
+  name: z.string().min(1).max(120).optional(),
+  as: z.string().optional(),
+  expect: ConversationExpect.extend({ json: z.record(DotPath, Json).optional() }).strict().optional().describe('Checks over the whole conversation.'),
+  save: z.record(Name, DotPath).optional().describe('name: dot.path into the conversation, like toolCalls[0].result.id.'),
+  timeoutMs: z.number().int().positive().max(120_000).optional(),
+};
+/** A phone-style call with a voice agent: the runner plays the caller, turn by turn. */
+export const VoiceFlowStep = z.object({ ...conversationStep, voice: ConversationSpec }).strict();
+/** A chat with a chatbot endpoint, one POST per turn under one session id. */
+export const ChatFlowStep = z.object({ ...conversationStep, chat: ConversationSpec }).strict();
+export const ConcreteFlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep, VoiceFlowStep, ChatFlowStep]);
 export type ConcreteFlowStep = z.infer<typeof ConcreteFlowStep>;
 const ActionId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z][A-Za-z0-9_-]*)*$/, 'an action id is its path under actions/ with dots, like notes.create');
 /** Call a reusable action (tracegrove/actions/<area>/<name>.action.yaml) in place of writing its steps again. */

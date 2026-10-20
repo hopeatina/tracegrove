@@ -18,12 +18,25 @@ export const CheckedRunReport = TestRunReport.extend({ sourceChecked: z.boolean(
 export type CheckedRunReport = z.infer<typeof CheckedRunReport>;
 const ISSUE = 'Saved evidence is missing or could not be verified. No product result is available.';
 
-function stepInfo(step: Step, persona: string): CompiledStepInfo {
+/** What a conversation step was checked for, rebuilt from its sealed assertions. */
+function conversationExpectation(assertions: CaseSpec['assertions'], stepId: string): string {
+  type P = CaseSpec['assertions'][number]['predicate'];
+  const flat = (p: P): P[] => p.kind === 'all' ? p.predicates.flatMap(flat) : [p];
+  const own = assertions.filter((a) => a.stepId === stepId).flatMap((a) => flat(a.predicate));
+  const values = (kind: string, tools: boolean) => own.flatMap((p) => (p.kind === 'json_path_includes' || p.kind === 'json_path_excludes') && p.kind === kind && /toolNames$/.test(p.path) === tools ? p.values : []);
+  const says = values('json_path_includes', false); const calls = values('json_path_includes', true);
+  const parts = [says.length ? `says ${says.map((v) => JSON.stringify(v)).join(', ')}` : '', calls.length ? `calls ${calls.join(', ')}` : '',
+    own.some((p) => p.kind === 'json_path_excludes') ? 'and avoids what it must not do' : ''].filter(Boolean);
+  return parts.length ? `Agent ${parts.join('; ')}` : 'Conversation completes';
+}
+
+function stepInfo(step: Step, persona: string, assertions: CaseSpec['assertions'] = []): CompiledStepInfo {
   const common = { id: step.id, name: step.id.replaceAll('_', ' '), as: persona, expectStatus: null };
   if (step.kind === 'http.request') return { ...common, method: step.method, path: step.path, expectStatus: step.expectStatus,
     ...(step.expectStatus !== null ? { expectation: `Status ${step.expectStatus}` } : {}) };
   if (step.kind === 'observe') return { ...common, method: step.readback.method, path: step.readback.path };
   if (step.kind === 'ui.navigate') return { ...common, method: 'UI', path: step.path };
+  if (step.kind === 'conversation.run') return { ...common, method: step.command.channel === 'voice' ? 'VOICE' : 'CHAT', path: `${step.command.endpoint} · ${step.command.turns.length} turn${step.command.turns.length === 1 ? '' : 's'}`, expectation: conversationExpectation(assertions, step.id) };
   return { ...common, method: step.kind.startsWith('job.') ? 'JOB' : step.kind === 'mcp.call' ? 'MCP' : 'UI', path: step.id };
 }
 
@@ -48,7 +61,7 @@ export function readRunSource(runDir: string, input: unknown): CheckedRunReport 
       const spec = CaseSpec.parse(bundle.documents[refKey(receipt.caseRef)]);
       const hint = report.cases.find(c => c.caseId === spec.ref.id)?.file;
       const flow: CompiledFlowInfo = { caseId: spec.ref.id, file: RepositoryPath.safeParse(hint).success ? hint! : '', title: spec.purpose,
-        tags: [], risk: spec.risk, fixtures: [], steps: spec.steps.map(step => stepInfo(step, spec.personaRef.id)) };
+        tags: [], risk: spec.risk, fixtures: [], steps: spec.steps.map(step => stepInfo(step, spec.personaRef.id, spec.assertions)) };
       const verified = caseReport(receipt, flow);
       // Requests are read from the sealed events, bound to the receipt's events digest.
       try { verified.requests = verifiedObservedRequests(receipt, readBoundedFile(join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId), 'events.jsonl'), 16 * 1024 * 1024)); } catch { verified.requests = []; }

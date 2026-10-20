@@ -1,22 +1,73 @@
+<div align="center">
+
 # tracegrove
 
-**Check what your local app actually did, not just the response it returned.** Tracegrove runs authored behavior checks against an app it launches locally, makes separate requests to observe the resulting state, and saves evidence you can inspect and verify again. It is for engineers testing stateful Node, FastAPI, and Django APIs, including authorization and cleanup behavior.
+**End-to-end tests that check what your app actually did, not just what it said.**
 
-In the synthetic Notes sample, an owner creates a note and reads it back, a stranger's read is denied, the owner deletes the note, and another read confirms it is gone. The saved run below held 2/2 scenarios and 10/10 steps; its evidence was freshly verified. This is a crop of the real local sample UI, not a hosted run.
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-2f4a3a)](LICENSE)
+[![npm](https://img.shields.io/npm/v/tracegrove?color=2f4a3a)](https://www.npmjs.com/package/tracegrove)
+[![Node 22](https://img.shields.io/badge/node-22.x-2f4a3a)](#requirements)
 
-![Tracegrove Notes sample run: create 201, independent read 200, stranger read 403, delete 204, final read 404, and verified evidence](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/images/notes-run.png)
+[Quickstart](#quickstart) · [Voice and chat agents](#voice-agents-and-chatbots) · [Readiness and handoff](#readiness-sign-off-and-client-handoff) · [Security](#security-and-client-data) · [Docs](#documentation)
 
-## Try it on a sample API
+</div>
 
-You need Node.js >=22.22.0 and <23, npm, a POSIX shell, writable temporary storage, and local loopback sockets. Use a provisioned Node 22 runtime; Node 24 has not been qualified. This sample needs no Docker, browser, Python, cloud account, or coding agent. Install from npm in an empty directory:
+---
+
+Tracegrove launches your app (or points at a deployed one), drives it the way a user would, and then **reads the result back separately** to confirm the change really happened. Every run leaves evidence on disk that anyone can re-verify later without rerunning the app.
+
+It is built for the bugs that pass ordinary tests: the booking your voice agent confirmed but never saved, the delete that returned `204` but left the row, the record a stranger can still read.
+
+```yaml
+# tracegrove/notes/create-read-delete.flow.yaml
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Fresh note }
+    expect: { status: 201 }
+    save: { noteId: note.id }
+  - name: read back           # a separate request proves the write landed
+    GET: /notes/{noteId}
+    observe: true
+    expect: { status: 200, json: { note.title: Fresh note } }
+  - name: intruder is denied  # same note, different persona
+    GET: /notes/{noteId}
+    as: intruder
+    expect: { status: 403, absent: [note] }
+```
+
+## What it can test
+
+| Surface | How | Start with |
+| --- | --- | --- |
+| **HTTP APIs** (Node, FastAPI, Django) | real requests as test personas, independent readbacks, cleanup checks | `sample-config --sample notes-api` |
+| **Voice agents** | talks to the agent over RTVI (the Pipecat protocol), checks what it said and which tools it called, then reads your backend | `--sample voice-receptionist` |
+| **Chatbots** | multi-turn HTTP chat with the same checks | `--sample support-chatbot` |
+| **Web UIs** | Playwright Chromium steps paired with an API readback, with recordings | `--sample notes-browser` |
+| **MCP servers** | tool calls over Streamable HTTP | `--sample notes-mcp` |
+| **Background jobs** | native job runners and their outputs | `--sample report-jobs` |
+| **Deployed environments** | the same flows against Docker, staging or read-only production, with credentials from your secret store | [environments](docs/environments.md) |
+
+And around every run:
+
+- **Readiness**: each flow is a claim with four separate answers (did it run, what the evidence supports, whether it is still current, who signed off), so "green" can't hide a stale or unreviewed result.
+- **Client handoff**: one HTML report with transcripts, readbacks and sign-offs that you can send to a client.
+- **Privacy**: phone numbers, emails, cards and your own patterns are redacted before anything is written; runs can be sealed with AES-256-GCM.
+- **Agent-friendly**: every command has `--json`, stable exit codes, and an MCP server (`tracegrove mcp`). Claude Code or Codex can draft and repair flows, but can never quietly weaken a check.
+
+## Quickstart
+
+### Requirements
+
+Node.js 22 (`>=22.22.0 <23`), npm, a POSIX shell and local loopback. The Notes sample needs no Docker, browser, Python or cloud account. Windows is not supported in 0.x.
 
 ```bash
 mkdir tracegrove-demo && cd tracegrove-demo
 npm init -y
-npm install --save-dev --save-exact tracegrove@0.3.2
+npm install --save-dev --save-exact tracegrove
 ```
 
-Run this block in the same directory. It creates a synthetic Notes API with isolated data and in-memory test personas, checks the plan and flows, runs two scenarios, and verifies the saved evidence. The `TRACEGROVE_CLI` override is for maintainers testing a local build.
+Then run this block in the same directory. It writes a synthetic Notes API with in-memory test personas, checks the flows, runs two scenarios, and verifies the saved evidence:
 
 <!-- onboarding-quickstart:start -->
 ```bash
@@ -33,110 +84,169 @@ printf 'Evidence retained at %s\n' "$TRACEGROVE_RUN"
 ```
 <!-- onboarding-quickstart:end -->
 
-Success means `doctor` reports `blocked: false`, `check` reports `ok: true`, `test` reports `outcome: passed` and `bundleVerified: true`, and `verify-bundle` reports `ok: true`. Read `$TRACEGROVE_RUN/summary.md` for the step report or run `node "$TRACEGROVE_CLI" ui --dir "$TRACEGROVE_DEMO"` for the local UI. The run also contains `summary.json`, `junit.xml`, and `bundle/`. Keep the evidence directory if you need the receipts; after exporting it, remove the temporary sample with `rm -rf "$TRACEGROVE_DEMO"` in that same shell. A passing sample does not qualify your app or host.
+Success looks like `doctor` → `blocked: false`, `check` → `ok: true`, `test` → `outcome: passed` with `bundleVerified: true`, and `verify-bundle` → `ok: true`. Open the results with `node "$TRACEGROVE_CLI" ui --dir "$TRACEGROVE_DEMO"`, or read `$TRACEGROVE_RUN/summary.md`.
 
-To explore, select the `gone` step in the UI and compare the owner's `DELETE 204` with the following `GET 404`. In a disposable copy of the sample, change that final expected status to `200` and rerun `test`: it reports an assertion failure and retains a failed run for inspection. Restore the expectation before running the passing sample again.
+![Tracegrove Notes sample run: create 201, independent read 200, stranger read 403, delete 204, final read 404, and verified evidence](docs/images/notes-run.png)
 
-## What the check proves
+> **Try breaking it.** In a copy of the sample, change the final `gone` step to expect `200` and rerun `test`. It fails with an assertion error and keeps the failed run so you can inspect it.
 
-The sample flow sends a `POST`, saves the new ID, and issues a separate `GET` with `observe: true`. Later it checks an intruder's read, deletes the note, and independently checks that the note is gone. This excerpt is from the packaged [Notes flow](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/samples/notes-api/tracegrove/notes/create-read-delete.flow.yaml):
-
-```yaml
-steps:
-  - name: create
-    POST: /notes
-    json: { title: Fresh note, body: Written through the real API. }
-    expect: { status: 201 }
-    save: { noteId: note.id }
-  - name: read back
-    GET: /notes/{noteId}
-    observe: true
-    expect: { status: 200, json: { note.title: Fresh note, note.body: Written through the real API. } }
-  - name: intruder is denied
-    GET: /notes/{noteId}
-    as: intruder
-    expect: { status: 403, absent: [note] }
-  - name: delete
-    DELETE: /notes/{noteId}
-    expect: 204
-  - name: gone
-    GET: /notes/{noteId}
-    observe: true
-    expect: 404
-```
-
-The same run at phone width makes the sequence readable on a narrow screen. Its selected final read observed `404` after the delete. The UI shows the status; the authored expectation and saved bundle supply the check.
-
-![Phone-width view of the same Notes run: create 201, read back 200, intruder denied 403, delete 204, gone 404, and selected final observation 404](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/images/notes-run-mobile.png)
-
-Verification rechecks saved file integrity and recomputes the verdict without rerunning the app. Bundles are unsigned: a receiving system still needs to trust who produced them.
-
-## Use it with your app
-
-Install `tracegrove@0.3.2` as an exact development dependency in your repository, then run `npx --no-install tracegrove init`. It creates `tracegrove.config.yaml` and a starter flow. Review the generated `node`, `fastapi`, or `django` adapter, app entry, health route, source paths, and personas. Write flows at `tracegrove/<area>/<behavior>.flow.yaml`, following the sample's separate reads for effects you care about. Then run:
+### Use it on your own app
 
 ```bash
-npx --no-install tracegrove check --json
-npx --no-install tracegrove test --json
-npx --no-install tracegrove ui
+npm install --save-dev --save-exact tracegrove
+npx --no-install tracegrove init     # writes tracegrove.config.yaml and a starter flow
+npx --no-install tracegrove check    # compile flows without starting the app
+npx --no-install tracegrove test     # launch the app, run flows, save evidence
+npx --no-install tracegrove ui       # browse runs locally
 ```
 
-`check` compiles without starting the app. `test` launches it and writes `.tracegrove/runs/<run>/`; `ui` presents the saved run locally. Use `npx --no-install tracegrove verify-bundle --bundle <runDir>/bundle --json` on a retained bundle. Inspect the first failed run before retrying; a failed assertion differs from a blocked prerequisite.
+`init` picks an adapter (`node`, `fastapi`, `django`) and writes a config like this. Review it, especially the health route and personas:
 
-Your app must accept the per-run test persona tokens provided through `TRACEGROVE_TOKENS`, or use another reviewed test-only authentication path. Keep that path disabled in production. The adapters start the app on an assigned local port with an owned data directory. Django's migration step must point at a database inside `TRACEGROVE_DATA_DIR`; check its settings before running so it cannot migrate another database. Tracegrove does not provision a database or cloud runner for you.
+```yaml
+project: notes
+app:
+  adapter: node
+  entry: server.js
+  health: /health
+  inject: { port: PORT, dataDir: NOTES_DATA_DIR, tokens: TRACEGROVE_TOKENS }
+personas:
+  owner:    { subject: user-1 }
+  intruder: { subject: user-2 }
+```
 
-Press Ctrl-C once to request cancellation and wait for cleanup. If cleanup is unconfirmed, inspect the receipts before another attempt.
+Your app gets a fresh data directory and a set of test persona tokens on every run. It needs a test-only way to accept those tokens; keep that path off in production. Flows live at `tracegrove/<area>/<behavior>.flow.yaml`. See [Getting started](docs/getting-started.md).
 
-[Getting started with your app](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/getting-started.md) · [Verified bundles and cleanup](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/verified-bundles.md) · [Recovery inspection](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/local-execution-recovery.md)
+## Voice agents and chatbots
 
-## Environments: local, Docker, staging, production
+A voice step holds a real conversation with your agent and checks the reply on every turn. The readback after it checks your backend.
 
-The same flows can run against a container, a Compose project, a deployed staging URL, or production (read only). Each environment declares where persona credentials come from (`env:`, `file:`, `aws-sm://`, `aws-ssm://`, `op://`, or a short-lived `orgx-broker://` persona). The config holds references only; secret values never reach the config, bundles, run folders, or logs. Each environment also has a safety class that decides what a run may write, how cleanup is judged, and whether a coding agent may run it.
+```yaml
+title: A caller books a cleaning by phone, and the booking really exists
+risk: critical
+steps:
+  - name: caller books a cleaning
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Hi, I'd like to book a cleaning on Tuesday at 3pm.
+          expect: { says: [cleaning, Tuesday, 3 PM], noCalls: [book_appointment], within: 1500 }
+        - say: Sure, my name is Dana Lee and my number is 555-0142.
+          expect: { says: [all set, confirmation number], calls: [book_appointment] }
+    save: { appointmentId: "toolCalls[0].result.appointment.id" }
+  - name: front desk sees the booking
+    GET: /appointments/{appointmentId}
+    observe: true
+    expect: { status: 200, json: { appointment.status: booked, appointment.patient: Dana Lee } }
+```
+
+```bash
+npx --no-install tracegrove sample-config --sample voice-receptionist --output ./voice-demo
+npx --no-install tracegrove test --config ./voice-demo/tracegrove.config.yaml
+```
+
+Turn on the sample's `RECEPTIONIST_BUG=drop_booking` and the agent still says "You're all set", but the run fails at **front desk sees the booking: status 404 != 200**.
+
+<img src="docs/images/voice-run.png" alt="Tracegrove UI showing a voice scenario: the caller's line and the agent's reply as chat bubbles, the expected phrases, and the backend readback that followed" width="860">
+
+- **Voice** speaks [RTVI](https://docs.pipecat.ai/client/rtvi-standard) over WebSocket, so Pipecat bots work as is. Other platforms can expose a text test endpoint that drives the same agent and tools.
+- **Chat** posts `{ message, sessionId }` and reads `reply` and `toolCalls`; every field name is configurable.
+- Checks: `says`, `notSays`, `calls`, `noCalls`, `within` (ms to first reply), per turn or for the whole conversation.
+- Text injection skips speech recognition, audio and telephony. It tests the agent's decisions and their effects, which is where most failures are.
+
+Full guide: [docs/voice-and-chat.md](docs/voice-and-chat.md).
+
+## Readiness, sign-off and client handoff
+
+```bash
+npx --no-install tracegrove readiness                 # every flow as a claim; exits 0 only when all are ready
+npx --no-install tracegrove accept calls.books-a-cleaning --reason "Reviewed transcript and readback"
+npx --no-install tracegrove handoff --client "Bright Smile Dental"
+```
+
+<img src="docs/images/readiness.png" alt="Readiness tab: four claims, each with ran, evidence, still valid and sign-off states; the critical booking claim is waiting for a person to sign off" width="860">
+
+Routine claims are accepted automatically once the evidence supports them. Claims marked `risk: critical` need a person. A sign-off is bound to the exact check and code it saw: change either and the claim asks again. You can `waive`, `reject` or `challenge` a claim with a reason, but nothing loosens a check silently. Decisions are saved in `tracegrove/decisions.yaml` next to your flows.
+
+`handoff` writes one self-contained HTML page with every claim, transcript, readback and sign-off, plus an honest "what this does not cover" section. Details: [docs/readiness-and-handoff.md](docs/readiness-and-handoff.md).
+
+## Security and client data
+
+- **Runs locally.** No tracegrove server, account or telemetry. Evidence stays on your disk.
+- **Credentials are references.** The config says where a secret lives (`env:`, `file:`, `aws-sm://`, `aws-ssm://`, `op://`); the value is resolved at run time, held in memory, sent only as an `Authorization` header, and scrubbed from anything written.
+- **Client data can be redacted** before it is saved:
+
+  ```yaml
+  privacy:
+    redact: [phone, email, card, ssn, { name: member_id, pattern: "MBR-[0-9]{6}" }]
+  ```
+
+- **Runs can be encrypted at rest** with `tracegrove seal --run latest --out run.tgseal --remove` (AES-256-GCM, key from `TRACEGROVE_SEAL_KEY`).
+
+Full details and limits: [docs/security.md](docs/security.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Environments
+
+The same flows run against local, Docker, staging or production. Each environment says where persona credentials come from and what a run may write. On staging, a run whose cleanup can't be confirmed fails; under `production_observation`, any flow that writes is blocked before it starts.
 
 ```yaml
 environments:
   staging:
     target: { url: https://staging.example.com, health: /api/health }
-    whoami: { GET: /api/me, subject: user.id }
     personas:
       owner:    { from: "aws-sm://myapp/staging/personas#owner" }
-      stranger: { from: "aws-sm://myapp/staging/personas#stranger" }
+      stranger: { from: "op://Engineering/myapp-staging/stranger-token" }
 ```
 
 ```bash
-npx --no-install tracegrove env doctor staging      # reachable, ready, secrets resolvable, personas are who you think
-npx --no-install tracegrove explain --env staging   # what runs, as whom, what it writes and cleans up
-npx --no-install tracegrove test --env staging      # or TRACEGROVE_ENV=staging
+npx --no-install tracegrove env doctor staging   # reachable, secrets resolve, personas are who you think
+npx --no-install tracegrove test --env staging
 ```
 
-Flows opt in with `envs: [local, staging]`. On staging, a run whose cleanup cannot be confirmed fails. Under `production_observation`, a flow that writes is blocked before it starts. Agents under `agents: ask` exit `2` with `approval_required` until a person runs `tracegrove approve --env staging`. `tracegrove mcp` exposes the same commands to MCP clients. See [docs/environments.md](docs/environments.md) and the runnable [examples/staging-notes](examples/staging-notes/).
-
-## Where it runs
-
-| Placement | Current status |
-| --- | --- |
-| Local macOS | The installed Notes sample passed on a Mac. Broader Mac qualification is open. Provide the Node range, writable storage, loopback, and your app's test-only setup. |
-| Linux CI | The repository's Ubuntu CI exercises Node, FastAPI, Django, browser, and evidence lanes. Pin dependencies, provision Python for Python apps and Chromium for browser flows, and retain run artifacts. |
-| Codex or another cloud sandbox | Conditional on allowed package installation, local child processes and loopback, writable owned storage, required runtimes, and evidence export. Tracegrove does not provide a hosted runner. |
-| OrgX-triggered environment | No built-in trigger or runner integration. An authorized external orchestrator would need to provide the pinned source/build, permitted host/network, scoped synthetic identities, isolated data and cleanup, and artifact/result mapping. |
-| Windows | Process-tree execution is unsupported in this 0.x release. |
+See [docs/environments.md](docs/environments.md).
 
 ## For coding agents and CI
 
-Browser flows use pinned Playwright Chromium and can pair DOM assertions with an independent API read and a recording. Native jobs and MCP Streamable HTTP have separate guides; they are optional, not part of the Notes quickstart. Deployed URLs, containers and Compose projects are environments (above). Arbitrary shell launchers and a general cloud runner are not current CLI targets.
-
-Use `status --json` to find the next action, `discover --json` to compare routes and flows, `check --json` to compile, and `test --json` to execute. The `test` summary uses `tracegrove.run-summary/v1` and includes `outcome`, `runDir`, `bundleVerified`, `cases`, and `blockers`. `doctor` uses `tracegrove.doctor/v1`; top-level JSON errors use `tracegrove.cli-error/v1`. Keep the first failed run and its evidence when diagnosing a retry.
+Every command takes `--json`. `status --json` says what to do next; `test --json` returns a `tracegrove.run-summary/v1` with `outcome`, `runDir`, `bundleVerified`, `cases` and `blockers`. `tracegrove mcp` exposes the same commands over MCP.
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | Passed or clean |
-| 1 | Assertion failed |
-| 2 | Blocked or inconclusive |
-| 3 | Infrastructure failed |
-| 4 | Cancelled |
+| `0` | Passed or clean |
+| `1` | Assertion failed |
+| `2` | Blocked or inconclusive (fix setup, don't retry blindly) |
+| `3` | Infrastructure failed |
+| `4` | Cancelled |
 
-`draft` runs a configured Claude Code or Codex CLI and may edit flow files. `heal` runs the suite and may retain bounded setup or flow edits after its checks. Commit or stash your work before either command; review every proposed diff. `heal --dry-run` inspects without keeping edits. An agent verdict or a successful compile does not prove that a changed test still expresses your intent.
+`draft` asks Claude Code or Codex to write flows; `heal` asks it to repair them. Both may edit files, so commit first and review the diff. An agent may tighten a flow or challenge a check, but it never weakens an assertion to get green.
 
-[Agent command and JSON guide](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/agent-guide.md) · [Browser driver](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/browser-driver.md) · [Native jobs](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/native-jobs.md) · [MCP driver](https://cdn.jsdelivr.net/npm/tracegrove@0.3.2/docs/mcp-driver.md)
+[Agent guide](docs/agent-guide.md) · [Verified bundles](docs/verified-bundles.md) · [Browser driver](docs/browser-driver.md) · [MCP driver](docs/mcp-driver.md) · [Native jobs](docs/native-jobs.md)
 
-Apache-2.0 licensed.
+## Where it runs
+
+| Placement | Status |
+| --- | --- |
+| macOS | The Notes sample passes on a Mac. Broader qualification is open. |
+| Linux CI | The repository's Ubuntu CI runs the Node, FastAPI, Django, browser, voice/chat and evidence lanes. |
+| Cloud sandboxes (Codex, Claude Code on the web) | Works where local child processes, loopback and writable storage are allowed. There is no hosted runner. |
+| Windows | Not supported in 0.x. |
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [Getting started](docs/getting-started.md) | Adding tracegrove to your app |
+| [Voice and chat](docs/voice-and-chat.md) | Conversation steps, transports, checks |
+| [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
+| [Security](docs/security.md) | Credentials, redaction, sealed runs |
+| [Environments](docs/environments.md) | Docker, staging, production, secret stores |
+| [Agent guide](docs/agent-guide.md) | JSON contracts for coding agents |
+| [Verified bundles](docs/verified-bundles.md) | What the evidence proves and doesn't |
+| [Architecture](docs/architecture.md) | The compiler, planner, executor and reducer |
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and the test commands, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+## License
+
+[Apache-2.0](LICENSE)

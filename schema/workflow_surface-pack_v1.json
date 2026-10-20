@@ -20,6 +20,7 @@
         "integration",
         "mcp",
         "mcp_widget",
+        "conversation",
         "ios",
         "android"
       ],
@@ -46,6 +47,7 @@
         "computer_use",
         "mcp",
         "mcp_widget",
+        "conversation",
         "mobile"
       ],
       "type": "string"

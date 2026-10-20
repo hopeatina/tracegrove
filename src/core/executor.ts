@@ -9,11 +9,12 @@ import { join, resolve } from 'node:path';
 import {
   ActionRegistry, AuthRecipe, BoundaryObservation, BudgetReservation, CampaignFixturePlan, CaseFixturePlan, CaseSpec,
   CredentialLease, EnvironmentBinding, EnvironmentPlan, ExecutionReceipt, FidelityPlan, FixtureManifest,
-  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, Persona, RoutingDecision, SeedRecipe,
+  HostPlan, IntelligencePolicy, LogicalPayload, MockResponses, NativeJobAction, McpToolCall, ConversationRun, Persona, RoutingDecision, SeedRecipe,
   SelectionManifest, SurfaceBinding, digestOfValue, freeze, parseAs, refKey, sameDigest, selfDigest, verifySelfDigest,
   type CampaignResult, type Ref, type RunRequest, type Scope, type Step, type StepObservation,
-  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation,
+  type TargetTuple, type VariableSource, type BrowserObservation, type RunnerCapabilities, type NativeJobObservation, type McpToolObservation, type ConversationObservation,
 } from '../protocol/index.ts';
+import { scrubber } from './privacy.ts';
 import { HttpDriver, HttpStepError, bearerFor, captureValues, redactObservation, type HttpObservation } from '../adapters/http/driver.ts';
 import { NativeJobError } from '../adapters/job/driver.ts';
 import { BrowserStepError } from '../adapters/browser/driver.ts';
@@ -214,6 +215,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const log = new EventLog(executionId, attemptId, generation, (event) => ctx.onEvent?.({ kind: event.kind, stepId: event.stepId, redactedPayload: event.redactedPayload, at: event.at }));
   const startedAt = nowIso();
   const cellDeadline = ctx.campaignDeadline.child(spec.limits.deadlineMs);
+  const scrub = scrubber(spec.capture.redact) ?? (<T,>(value: T) => value);
   const blockedReasons: string[] = [];
   const beforeEffect = async () => {
     try { await ctx.beforeEffect?.(); }
@@ -249,7 +251,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
     // Every request the app served, attributed to the step that was running when it arrived.
-    session.traffic?.subscribe(({ stepId, ...request }) => { log.emit('app.request', stepId, { ...request, phase: stepId ? 'step' : 'setup' }); });
+    session.traffic?.subscribe(({ stepId, ...request }) => { log.emit('app.request', stepId, scrub({ ...request, phase: stepId ? 'step' : 'setup' })); });
   } catch (error) {
     if (error instanceof Blocked) {
       blockedReasons.push(...error.reasons.map((r) => r.code));
@@ -424,17 +426,18 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const stepStart = nowIso();
     const stepStartedMs = monotonicMs();
     session?.traffic?.setStep(stepId);
-    const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
+    const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: scrub(Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential'))) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
-      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation;
+      let observation: HttpObservation | BrowserObservation | NativeJobObservation | McpToolObservation | ConversationObservation;
       await beforeEffect();
       if (step.kind === 'http.request') {
         observation = await driver!.request({ origin, method: step.method, path: step.path, headers: step.headers, body: step.body, auth: step.auth, variables, deadline, signal });
         await credentialStillLive(observation.status, step.auth);
         if (step.expectStatus !== null && observation.status !== step.expectStatus) {
-          const finished = log.emit('step.finished', stepId, { result: 'failed', reason: 'unexpected_status', observation: redactObservation(observation) }, { requestId: observation.requestId });
-          stepObservations.push({ stepId, result: 'failed', reasonCode: `unexpected_status:${observation.status}`, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(redactObservation(observation)), output: redactObservation(observation), timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: observation.durationMs } });
+          const recorded = scrub(redactObservation(observation));
+          const finished = log.emit('step.finished', stepId, { result: 'failed', reason: 'unexpected_status', observation: recorded }, { requestId: observation.requestId });
+          stepObservations.push({ stepId, result: 'failed', reasonCode: `unexpected_status:${observation.status}`, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(recorded), output: recorded, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: observation.durationMs } });
           halted = true;
           continue;
         }
@@ -457,6 +460,15 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
           uncertainOperations--;
           captured[stepId] = captureValues({ body: observation }, step.captures);
         }
+      } else if (step.kind === 'conversation.run') {
+        const command = ConversationRun.parse({ ...step.command, turns: applyTemplateDeep(step.command.turns, variables) });
+        const credential = bearerFor(step, sessionCredentials(session, authRecipe.credentialName));
+        const { ConversationDriver } = await import('../adapters/conversation/driver.ts');
+        integrationOperations++;
+        uncertainOperations++;
+        observation = await new ConversationDriver(origin).run(command, credential, deadline, signal);
+        uncertainOperations--;
+        captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') {
         if (!session?.nativeJobs) throw new NativeJobError('native_job_unavailable', 'The host did not establish a native job channel');
         const command = NativeJobAction.parse(applyTemplateDeep(step.command, variables));
@@ -471,7 +483,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       } else {
         throw new HttpStepError('unsupported_operation', `${step.kind} is not implemented by the HTTP runner`);
       }
-      const output = 'requestId' in observation ? redactObservation(observation) : observation;
+      const output = scrub(('requestId' in observation ? redactObservation(observation) : observation) as Record<string, unknown>);
       const toolError = 'kind' in observation && observation.kind === 'mcp_tool' && observation.isError;
       const result = toolError ? 'failed' as const : 'completed' as const;
       const finished = log.emit('step.finished', stepId, { result, observation: output }, { requestId: 'requestId' in observation ? observation.requestId : null });

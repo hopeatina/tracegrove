@@ -4,7 +4,7 @@
  * Producer flags are redundant checks, never authority.
  */
 import {
-  AssertionObservation, BrowserObservation, NativeJobObservation, McpToolObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
+  AssertionObservation, BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
   type Assertion, type CaseSpec, type EnvironmentBinding, type ExecutionReceipt, type Outcome,
   type PredicateT, type Ref, type SelectionManifest, type StepObservation, type TargetTuple, type Scope,
 } from '../protocol/index.ts';
@@ -38,6 +38,15 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   return digestOfValue(a).hex === digestOfValue(b).hex;
 }
 
+const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
+/** Case- and whitespace-insensitive: substring of a string, or equal to an element of a list. */
+function textHas(haystack: unknown, needle: string): boolean {
+  const want = normalizeText(needle);
+  if (typeof haystack === 'string') return normalizeText(haystack).includes(want);
+  if (Array.isArray(haystack)) return haystack.some((item) => typeof item === 'string' ? normalizeText(item) === want : textHas(item, needle));
+  return false;
+}
+
 export type ObservationView = { status?: number | undefined; body?: unknown; browser?: BrowserObservation; stepResult?: StepObservation['result'] | undefined };
 
 export function evaluatePredicate(predicate: PredicateT, view: ObservationView): { pass: boolean; actual: unknown; reason: string | null } {
@@ -54,6 +63,20 @@ export function evaluatePredicate(predicate: PredicateT, view: ObservationView):
       const got = getPath(view, predicate.path);
       const count = Array.isArray(got.value) ? got.value.length : got.present ? 1 : 0;
       return { pass: count === predicate.count, actual: count, reason: count === predicate.count ? null : `count ${count} != ${predicate.count}` };
+    }
+    case 'json_path_includes':
+    case 'json_path_excludes': {
+      const got = getPath(view, predicate.path);
+      const found = predicate.values.filter((value) => textHas(got.value, value));
+      const pass = predicate.kind === 'json_path_includes' ? got.present && found.length === predicate.values.length : found.length === 0;
+      const missing = predicate.values.filter((value) => !found.includes(value));
+      return { pass, actual: got.present ? got.value : null, reason: pass ? null : !got.present && predicate.kind === 'json_path_includes' ? `${predicate.path} absent`
+        : predicate.kind === 'json_path_includes' ? `${predicate.path} lacks ${missing.map((v) => JSON.stringify(v)).join(', ')}` : `${predicate.path} contains ${found.map((v) => JSON.stringify(v)).join(', ')}` };
+    }
+    case 'json_path_at_most': {
+      const got = getPath(view, predicate.path);
+      const pass = typeof got.value === 'number' && got.value <= predicate.value;
+      return { pass, actual: got.present ? got.value : null, reason: pass ? null : typeof got.value === 'number' ? `${predicate.path} ${got.value} > ${predicate.value}` : `${predicate.path} is not a number` };
     }
     case 'step_result': return { pass: view.stepResult === predicate.value, actual: view.stepResult ?? null, reason: view.stepResult === predicate.value ? null : `step ${view.stepResult ?? 'unobserved'} != ${predicate.value}` };
     case 'all': {
@@ -95,6 +118,11 @@ export function evaluateAssertions(spec: CaseSpec, environmentClass: Environment
       const expected = spec.steps.find(item => item.id === assertion.stepId);
       if (!mcp.success || expected?.kind !== 'mcp.call' || mcp.data.tool !== expected.command.tool || mcp.data.endpoint !== expected.command.endpoint) { result = 'not_observed'; reasonCode = 'invalid_mcp_observation'; }
       else { const evaluation = evaluatePredicate(assertion.predicate, { body: mcp.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
+    } else if (assertion.oracle.name === 'conversation.observation') {
+      const conversation = ConversationObservation.safeParse(step.output);
+      const expected = spec.steps.find(item => item.id === assertion.stepId);
+      if (!conversation.success || expected?.kind !== 'conversation.run' || conversation.data.endpoint !== expected.command.endpoint) { result = 'not_observed'; reasonCode = 'invalid_conversation_observation'; }
+      else { const evaluation = evaluatePredicate(assertion.predicate, { body: conversation.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
     } else if (assertion.oracle.name === 'job.observation') {
       const job = NativeJobObservation.safeParse(step.output);
       if (!job.success) { result = 'not_observed'; reasonCode = 'invalid_native_job_observation'; }

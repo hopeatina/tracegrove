@@ -1,0 +1,13 @@
+title: An after-hours request is turned away without booking anything
+tags: [voice, booking, negative]
+steps:
+  - name: caller asks for Saturday night
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Can I come in for a checkup Saturday at 9pm? My name is Sam Ortiz, 555-0199.
+          expect: { says: [Monday through Friday, 8 AM to 5 PM], noCalls: [book_appointment], notSays: [all set, confirmation number] }
+  - name: nothing was booked for that caller
+    GET: /appointments?phone=555-0199
+    expect: { status: 200, json: { count: 0 } }

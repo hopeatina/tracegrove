@@ -1,0 +1,14 @@
+project: pine-and-pour-chat
+app:
+  adapter: node
+  entry: app/chatbot.mjs
+  health: /health
+  sources: [app/**]
+  inject:
+    port: PORT
+    dataDir: SHOP_DATA_DIR
+    tokens: SHOP_TOKENS
+personas:
+  customer: { subject: alice }
+  other_customer: { subject: bob }
+  support: { subject: support-team }

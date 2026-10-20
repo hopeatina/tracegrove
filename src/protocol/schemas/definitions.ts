@@ -8,6 +8,7 @@ import { BrowserAction, BrowserLocator } from './browser.ts';
 import { GitSnapshotBinding } from './gitSources.ts';
 import { NativeJobAction } from './nativeJob.ts';
 import { McpToolCall } from './mcp.ts';
+import { ConversationRun } from './conversation.ts';
 import { TargetBinding } from './targetBinding.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
@@ -50,6 +51,9 @@ export const Predicate: z.ZodType<PredicateT> = z.lazy(() =>
     z.object({ kind: z.literal('json_path_present'), path: JsonPath }).strict(),
     z.object({ kind: z.literal('json_path_absent'), path: JsonPath }).strict(),
     z.object({ kind: z.literal('json_path_count'), path: JsonPath, count: NonNegInt }).strict(),
+    z.object({ kind: z.literal('json_path_includes'), path: JsonPath, values: z.array(z.string().min(1).max(LIMITS.shortText)).min(1).max(32) }).strict(),
+    z.object({ kind: z.literal('json_path_excludes'), path: JsonPath, values: z.array(z.string().min(1).max(LIMITS.shortText)).min(1).max(32) }).strict(),
+    z.object({ kind: z.literal('json_path_at_most'), path: JsonPath, value: z.number().finite() }).strict(),
     z.object({ kind: z.literal('step_result'), value: z.enum(['completed', 'failed', 'not_run', 'cancelled']) }).strict(),
     z.object({ kind: z.literal('all'), predicates: z.array(Predicate).min(1).max(32) }).strict(),
   ]),
@@ -60,6 +64,9 @@ export type PredicateT =
   | { kind: 'json_path_present'; path: string }
   | { kind: 'json_path_absent'; path: string }
   | { kind: 'json_path_count'; path: string; count: number }
+  | { kind: 'json_path_includes'; path: string; values: string[] }
+  | { kind: 'json_path_excludes'; path: string; values: string[] }
+  | { kind: 'json_path_at_most'; path: string; value: number }
   | { kind: 'step_result'; value: 'completed' | 'failed' | 'not_run' | 'cancelled' }
   | { kind: 'all'; predicates: PredicateT[] };
 
@@ -127,14 +134,16 @@ export const JobObserveStep = z.object({ ...jobCommon, kind: z.literal('job.obse
 export const JobCancelStep = z.object({ ...jobCommon, kind: z.literal('job.cancel'), command: NativeJobAction.options[2] }).strict();
 export const McpCallStep = z.object({ ...stepCommon, kind: z.literal('mcp.call'), command: McpToolCall,
   auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
-export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, JobSubmitStep, JobObserveStep, JobCancelStep, McpCallStep, UnsupportedStep]);
+export const ConversationStep = z.object({ ...stepCommon, kind: z.literal('conversation.run'), command: ConversationRun,
+  auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
+export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, JobSubmitStep, JobObserveStep, JobCancelStep, McpCallStep, ConversationStep, UnsupportedStep]);
 export type Step = z.infer<typeof Step>;
 
 export const Assertion = z.object({
   id: IdString,
   required: z.boolean(),
   environmentClasses: z.array(EnvironmentClass).min(1).max(4),
-  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'job.observation', 'mcp.observation', 'step.result']), version: z.literal('1') }).strict(),
+  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'job.observation', 'mcp.observation', 'conversation.observation', 'step.result']), version: z.literal('1') }).strict(),
   stepId: IdString,
   predicate: Predicate,
   coverageTags: idList(32),
@@ -152,6 +161,7 @@ export const ActionEnvelope = z.object({
   allowedJobQueues: idList(32).optional(),
   allowedMcpTools: z.array(McpToolCall.shape.tool).max(64).optional(),
   maxMcpCalls: NonNegInt.optional(),
+  maxConversations: NonNegInt.optional(),
   cleanupRecipeRef: RefSchema.nullable(),
 }).strict();
 
@@ -198,6 +208,8 @@ export const CaseSpec = z.object({
     video: z.enum(['required', 'failure', 'optional']),
     redactionPolicyRef: RefSchema.nullable(),
     retentionPolicyRef: RefSchema.nullable(),
+    /** Client-data patterns scrubbed from every observation before it is recorded. */
+    redact: z.array(z.object({ name: IdString, pattern: z.string().min(1).max(LIMITS.shortText) }).strict()).max(16).optional(),
   }).strict(),
   baselineRef: RefSchema.nullable(),
   generation: z.object({
@@ -367,8 +379,8 @@ export type FidelityPlan = z.infer<typeof FidelityPlan>;
 
 export const SurfacePack = z.object({
   ...defined('workflow.surface-pack/v1'),
-  kind: z.enum(['web', 'http_api', 'job', 'integration', 'mcp', 'mcp_widget', 'ios', 'android']),
-  protocol: z.enum(['playwright', 'cdp', 'http', 'native_job', 'integration', 'computer_use', 'mcp', 'mcp_widget', 'mobile']),
+  kind: z.enum(['web', 'http_api', 'job', 'integration', 'mcp', 'mcp_widget', 'conversation', 'ios', 'android']),
+  protocol: z.enum(['playwright', 'cdp', 'http', 'native_job', 'integration', 'computer_use', 'mcp', 'mcp_widget', 'conversation', 'mobile']),
   stepKinds: idList(32).min(1),
   oracles: idList(32).min(1),
   captureFormats: idList(16),
@@ -377,7 +389,7 @@ export type SurfacePack = z.infer<typeof SurfacePack>;
 
 export const SurfaceBinding = z.object({
   ...defined('workflow.surface-binding/v1'),
-  kind: z.enum(['web', 'http_api', 'job', 'integration', 'mcp', 'mcp_widget', 'ios', 'android']),
+  kind: z.enum(['web', 'http_api', 'job', 'integration', 'mcp', 'mcp_widget', 'conversation', 'ios', 'android']),
   packRef: RefSchema,
   driverProfileRef: RefSchema.nullable(),
   componentProfileRef: RefSchema,
@@ -450,7 +462,7 @@ export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 
 export const RunnerProfile = z.object({
   ...defined('workflow.runner-profile/v1'),
-  adapter: z.enum(['http', 'browser', 'native_job', 'mcp']),
+  adapter: z.enum(['http', 'browser', 'native_job', 'mcp', 'conversation']),
   maxStepsPerCase: PositiveInt,
   cancellation: z.enum(['confirmed', 'best_effort']),
 }).strict();
@@ -513,7 +525,7 @@ export const RunnerCapabilities = z.object({
   surfacePackRefs: refList(16),
   hostConstraintRef: RefSchema.nullable(),
   cancellation: z.enum(['confirmed', 'best_effort']),
-  protocol: z.enum(['playwright', 'cdp', 'http', 'native_job', 'integration', 'computer_use', 'mcp', 'mcp_widget', 'mobile']),
+  protocol: z.enum(['playwright', 'cdp', 'http', 'native_job', 'integration', 'computer_use', 'mcp', 'mcp_widget', 'conversation', 'mobile']),
   conformanceReceiptRef: RefSchema.nullable(),
 }).strict();
 export type RunnerCapabilities = z.infer<typeof RunnerCapabilities>;

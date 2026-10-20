@@ -24,8 +24,9 @@ import { readLocalSettings } from '../authoring/localSettings.ts';
 import { detectAgent, type AgentIdentity } from '../environments/agents.ts';
 import { capabilityMatrix, envList, explain } from '../environments/commands.ts';
 import { runEnvDoctor } from '../environments/doctorCache.ts';
+import { decide, readiness } from '../authoring/readiness.ts';
 
-export const MCP_TOOLS = ['status', 'env_list', 'env_doctor', 'capabilities', 'explain', 'check', 'test', 'show_run', 'heal', 'draft'] as const;
+export const MCP_TOOLS = ['status', 'env_list', 'env_doctor', 'capabilities', 'explain', 'check', 'test', 'show_run', 'heal', 'draft', 'readiness', 'challenge_check'] as const;
 export type McpCeilings = { maxCalls: number; maxRuns: number };
 export const DEFAULT_CEILINGS: McpCeilings = { maxCalls: 200, maxRuns: 10 };
 const RUN_TOOLS = new Set(['test', 'heal', 'draft']);
@@ -85,6 +86,10 @@ export function createTracegroveMcpServer(input: { configPath?: string; ceilings
     async (args, signal) => heal({ dir: root, agent: args.useAgent === true, dryRun: args.dryRun === true, signal }), false);
   tool('draft', 'Have the configured coding agent draft flows for uncovered routes into tracegrove/discovered/, then check them.', { intent: z.string().max(2000).optional(), branch: z.string().optional() },
     async (args, signal) => draftWithAgent({ dir: root, branch: args.branch ?? null, intent: args.intent ?? null, signal }), false);
+
+  tool('readiness', 'Every flow as a claim with four separate states: execution (did it run), assessment (what the evidence supports), validity (still about this code and check) and decision (who signed off). Critical claims need a person; agents cannot accept or waive.', {}, () => readiness(root));
+  tool('challenge_check', 'Dispute a check you believe is wrong, with a reason, without changing it. The claim stays open for a person; never edit a flow to weaken an assertion instead.', { case: z.string().min(1), reason: z.string().min(1).max(2000), step: z.string().max(200).optional() },
+    args => decide(root, { case: args.case, decision: 'challenged', by: `agent:${agent.agent ?? 'mcp-client'}`, reason: args.reason, ...(args.step ? { step: args.step } : {}) }), false);
 
   for (const [id, schema] of Object.entries(exportAuthoringSchemas())) {
     server.registerResource(`schema ${id}`, `tracegrove://schema/${id}`, { mimeType: 'application/schema+json', description: `JSON Schema for ${id}` },

@@ -59,7 +59,15 @@
             "capabilities",
             "config",
             "approve",
-            "mcp"
+            "mcp",
+            "readiness",
+            "accept",
+            "waive",
+            "reject",
+            "challenge",
+            "handoff",
+            "seal",
+            "unseal"
           ],
           "type": "string"
         },

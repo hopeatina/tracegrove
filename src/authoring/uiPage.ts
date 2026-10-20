@@ -48,6 +48,8 @@ textarea{padding:12px;resize:vertical;min-height:88px;width:100%}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .stats{display:flex;flex-wrap:wrap;gap:12px 40px;margin-top:20px}.stats b{font-size:22px;font-weight:500;margin-right:6px}
 .pill{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:6px;font-size:12px;line-height:16px;font-weight:500}
+.tx{display:flex;flex-direction:column;gap:6px;margin-top:4px}.tx-c{align-self:flex-end;background:var(--sel);padding:6px 10px;border-radius:10px;max-width:88%;white-space:normal}.tx-a{align-self:flex-start;background:var(--moss-bg);padding:6px 10px;border-radius:10px;max-width:88%;white-space:normal}.tx-t{align-self:flex-start;color:var(--ink3);overflow-wrap:anywhere}.tx .who{display:block;font-size:11px;color:var(--ink3)}
+.claim-states{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
 .p-pass{background:var(--moss-bg);color:var(--moss)}.p-fail{background:var(--verm-bg);color:var(--verm-ink)}.p-warn{background:var(--ochre-bg);color:var(--ochre-ink)}.p-info{background:var(--indigo-bg);color:var(--indigo)}.p-none{background:var(--sel);color:var(--ink3)}
 .state{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .c-pass{color:var(--moss)}.c-fail{color:var(--verm)}.c-warn,.c-unavailable{color:var(--ochre)}.c-none{color:var(--muted)}
@@ -132,7 +134,7 @@ ${BENCHMARK_CSS}
 <div class="page" id="main"></div>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
-const TABS=['Run','Discover','Heal','History','Compare','Imports','Map','Benchmark','Environments','Settings'];
+const TABS=['Run','Readiness','Discover','Heal','History','Compare','Imports','Map','Benchmark','Environments','Settings'];
 let tab=START_BRANCH?'Discover':'Run';let state=null;
 const ui={run:null,runName:null,sel:null,step:null,running:false,activeRunId:null,cancelling:false,disc:null,source:START_BRANCH||'',draft:null,agent:null,agentPhase:-1,videoTimes:{},live:null,heal:null,heals:[],healing:false,healError:null,envs:null,env:(()=>{try{return localStorage.getItem('tracegrove.env')||'local'}catch{return 'local'}})(),doctoring:null};
 function h(tag,attrs,...kids){const el=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,v===true?'':v)}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
@@ -272,7 +274,7 @@ function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=
   x.reportedName&&!sameName(x)?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
     h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
 
-  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
   s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
   recording(s),
   !current?h('p',{class:'small muted'},'This recorded scenario has no current flow to run or prune.'):null,
@@ -499,6 +501,31 @@ function envTab(){const list=ui.envs&&ui.envs.environments||[];
      h('tr',{},h('th',{},'Target'),h('td',{class:'mono small'},e.target)),h('tr',{},h('th',{},'Writes'),h('td',{},e.writes)),h('tr',{},h('th',{},'Agents'),h('td',{},e.agents)),
      ...e.personas.map(p=>h('tr',{},h('th',{},'as '+p.persona),h('td',{class:'mono small'},p.ref+' · '+p.auth+(p.subject?' · expects '+p.subject:'')))))),
     checks.filter(c=>c.state!=='pass').length?h('ul',{class:'small',style:'margin:8px 0 0;padding-left:18px'},checks.filter(c=>c.state!=='pass').map(c=>h('li',{},h('span',{class:c.required?'c-fail':'c-warn'},c.check+': '),c.detail,c.fix?h('div',{class:'mono muted'},'run: '+c.fix):null))):null)})]}
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function transcript(t,method){const lines=t.split(String.fromCharCode(10));return h('div',{class:'tx'},lines.map(l=>l.startsWith('caller: ')?h('div',{class:'tx-c'},h('span',{class:'who'},method==='VOICE'?'Caller':'Customer'),l.slice(8)):l.startsWith('agent: ')?h('div',{class:'tx-a'},h('span',{class:'who'},'Agent'),l.slice(7)):h('div',{class:'tx-t mono small'},l.trim())))}
+async function loadReadiness(){ui.readyLoading=true;try{ui.ready=await api('/api/readiness')}catch(e){ui.ready={error:e}}ui.readyLoading=false;if(tab==='Readiness')render()}
+async function decideClaim(c,decision){let reason='';if(decision!=='accepted'){reason=window.prompt(decision==='waived'?'Why is it OK to hand this off without this evidence?':decision==='rejected'?'What is wrong with the behavior?':'What is wrong with this check? (The check is not changed; the claim stays open.)')||'';if(!reason.trim())return}
+ try{const r=await api('/api/decide',{case:c.caseId,decision,reason});toast(r.case+': '+r.decision)}catch(e){toast(e.reasons?e.reasons[0].detail:e.error||'Not recorded')}ui.ready=null;loadReadiness()}
+const STATE_TONE={supported:'p-pass',current:'p-pass',completed:'p-pass',accepted:'p-pass',auto:'p-pass',contradicted:'p-fail',rejected:'p-fail',challenged:'p-fail',none:'p-none',not_run:'p-none'};
+function statePill(v,label){return h('span',{class:'pill '+(STATE_TONE[v]||'p-warn')},label||v.replace(/_/g,' '))}
+function readinessTab(){const r=ui.ready;if(!r||ui.readyLoading){if(!r&&!ui.readyLoading)loadReadiness();return[h('p',{class:'muted'},'Checking claims…')]}
+ if(r.error)return[blocked(r.error)];const open=r.claims.length-r.counts.ready;
+ return[h('section',{style:'margin-bottom:20px'},h('span',{class:'label'},'Readiness'),h('h1',{style:'margin-top:6px'},r.ready?'Ready for handoff.':'Not ready: '+open+' of '+r.claims.length+' claims open.'),
+  h('p',{class:'small muted'},'Each flow is a claim with four separate answers: did it run, what does the evidence support, is that evidence still about this code and this check, and who signed off. Routine claims are accepted when supported; critical ones need a person.'),
+  h('div',{class:'row'},h('a',{class:'btn sm',href:'/api/handoff',target:'_blank',rel:'noopener'},'Open handoff report'),h('button',{class:'btn ghost sm',on:{click:()=>{ui.ready=null;loadReadiness()}}},'Refresh'))),
+  h('div',{class:'kpis',style:'margin-bottom:16px'},...[['Claims',r.counts.claims],['Supported',r.counts.supported],['Contradicted',r.counts.contradicted],['Out of date',r.counts.stale],['Awaiting sign-off',r.counts.pending]].map(([k,v])=>h('div',{class:'kpi'},h('b',{},String(v)),h('span',{},k)))),
+  ...r.claims.map(c=>h('div',{class:'card fade',style:'margin-bottom:12px'},
+   h('div',{class:'row',style:'justify-content:space-between;align-items:baseline'},h('h2',{style:'margin:0'},c.title),h('span',{class:'mono small muted'},c.caseId+' · '+c.risk)),
+   h('div',{class:'claim-states'},h('div',{},h('div',{class:'label'},'Ran'),statePill(c.execution)),h('div',{},h('div',{class:'label'},'Evidence'),statePill(c.assessment)),
+    h('div',{},h('div',{class:'label'},'Still valid'),statePill(c.validity)),h('div',{},h('div',{class:'label'},'Sign-off'),statePill(c.decision,c.decision==='auto'?'accepted by policy':null),c.decidedBy&&c.decision!=='auto'?h('span',{class:'small muted',style:'margin-left:6px'},c.decidedBy):null)),
+   c.reason?h('p',{class:'small'},c.reason):null,c.failure?h('p',{class:'small c-fail'},c.failure):null,
+   h('div',{class:'small muted'},'Evidence channels: '+c.channels.join(', ')+(c.run?' · run '+c.run:'')),
+   c.next?h('div',{class:'mono small',style:'margin-top:6px'},'next: '+c.next.command+'  ',h('span',{class:'muted'},c.next.why)):null,
+   h('div',{class:'row',style:'margin-top:10px;gap:8px'},
+    c.assessment==='supported'&&c.validity==='current'&&c.decision!=='accepted'?h('button',{class:'btn sm',on:{click:()=>decideClaim(c,'accepted')}},'Accept'):null,
+    !c.ready?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'waived')}},'Waive'):null,
+    c.assessment==='supported'?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'rejected')}},'Reject'):null,
+    h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'challenged')}},'Challenge check'),
+    h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=c.caseId;ui.step=null;render()}}},'Open scenario'))))]}
+function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

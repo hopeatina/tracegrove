@@ -10,3 +10,7 @@
 - Raw frames and CLI JSON are retained in the local ignored `artifacts/qa/readme032/` directory for release review. The shipped crops show only the synthetic Notes project and statuses. Neither image claims the UI displays the full assertion payload; the authored flow and bundle are the check sources.
 
 To reproduce: build, generate `notes-api` in a fresh directory, run `test --config <dir>/tracegrove.config.yaml --json`, confirm the passed bundle with `verify-bundle`, start `ui --dir <dir>` on loopback, select `gone`, and capture both viewport widths. The exact times and run IDs will change.
+
+# Voice and readiness screenshots
+
+`voice-run.png` and `readiness.png` are full-page captures (1280 wide) of `tracegrove ui` viewing a real local run of the synthetic `voice-receptionist` sample, 2026-10-20, Linux, Node 22, headless Chromium. The run held 4/4 scenarios and 10/10 steps with `bundleVerified: true`. The Readiness capture shows `calls.books-a-cleaning` (risk `critical`) pending a person's sign-off and the three standard claims accepted by policy. No real people, phone numbers or clinics appear; all names and 555 numbers are synthetic.

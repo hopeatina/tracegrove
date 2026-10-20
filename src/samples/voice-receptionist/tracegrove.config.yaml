@@ -1,0 +1,13 @@
+project: bright-smile-voice
+app:
+  adapter: node
+  entry: app/receptionist.mjs
+  health: /health
+  sources: [app/**]
+  inject:
+    port: PORT
+    dataDir: CLINIC_DATA_DIR
+    tokens: CLINIC_TOKENS
+personas:
+  front_desk: { subject: bright-smile }
+  other_clinic: { subject: green-valley }

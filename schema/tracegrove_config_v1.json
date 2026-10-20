@@ -705,6 +705,51 @@
       },
       "type": "object"
     },
+    "privacy": {
+      "additionalProperties": false,
+      "description": "Keep client data out of run folders and evidence. Credentials are never recorded either way.",
+      "properties": {
+        "redact": {
+          "default": [],
+          "description": "Client data scrubbed from every observation before it is written: email, phone, card (Luhn-checked), ssn, or { name, pattern } regexes.",
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "email",
+                  "phone",
+                  "card",
+                  "ssn"
+                ],
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "maxLength": 400,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "pattern"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "maxItems": 16,
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "project": {
       "description": "Short project name, shown in reports and run summaries.",
       "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
