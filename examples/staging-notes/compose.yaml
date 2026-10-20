@@ -1,0 +1,12 @@
+# tracegrove brings this up under a run-owned project name and passes persona tokens through
+# NOTES_TOKENS from its own client environment (never written to disk or to this file).
+services:
+  notes:
+    image: tracegrove-staging-notes:dev
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - NOTES_DIR=/tmp/notes
+      - NOTES_BUILD=compose
+      - NOTES_TOKENS
+    ports: ["127.0.0.1::8080"]

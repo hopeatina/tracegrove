@@ -31,6 +31,7 @@ export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
 export * from './primitives.ts';
 export * from './schemas/definitions.ts';
+export * from './schemas/targetBinding.ts';
 export * from './schemas/execution.ts';
 export * from './schemas/config.ts';
 export * from './schemas/protocol.ts';

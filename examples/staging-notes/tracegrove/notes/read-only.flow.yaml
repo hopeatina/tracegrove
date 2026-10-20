@@ -1,0 +1,16 @@
+title: The signed-in owner can read their notes; anonymous callers cannot
+tags: [notes, smoke, readonly]
+envs: [local, staging, prod-readonly]
+steps:
+  - name: who am I
+    GET: /me
+    expect: { status: 200, json: { user.id: alice } }
+
+  - name: owner lists notes
+    GET: /notes
+    expect: { status: 200, present: [notes] }
+
+  - name: anonymous is rejected
+    GET: /notes
+    as: none
+    expect: 401

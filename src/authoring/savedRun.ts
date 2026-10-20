@@ -16,6 +16,9 @@ const summary = z.object({ schemaVersion: z.literal('tracegrove.run-summary/v1')
   executionId: text.nullable(), sourceDigest: text, runDir: text, stateDir: text.optional(), bundleVerified: z.boolean().nullable(), blockers: z.array(z.object({ code: text, detail: text, action: text })).max(256),
   cases: z.array(z.object({ caseId: text, file: text, title: text, outcome: text, durationMs: z.number().finite(), steps: z.array(step).max(512), failure: z.object({ step: text, message: text, observed: text.nullable(), code: text.optional() }).nullable(), videos: z.array(z.object({ digest: text, byteCount: z.number().int().nonnegative(), mediaType: z.literal('video/webm') })).max(64).optional(), requests: z.array(ObservedRequest).max(MAX_OBSERVED_PER_CASE).optional() })).max(1024),
   totals: z.object({ passed: z.number().int(), failed: z.number().int(), other: z.number().int() }),
+  /** Unsealed annotation; the sealed receipts carry the environment class. */
+  environment: z.object({ name: text, class: text, kind: text, origin: text.nullable(), writes: text, expectedRelease: text.nullable(),
+    agent: z.object({ name: text.nullable(), policy: text, decision: z.enum(['allowed', 'approved', 'human']), approvedBy: text.optional(), approvedAt: text.optional() }).nullable() }).optional(),
 });
 type EvidenceStatus = 'verified' | 'missing' | 'invalid' | 'mismatch';
 const messages: Record<EvidenceStatus, string> = {
@@ -40,8 +43,8 @@ function ownedRunDirectory(root: string, name: string): string {
 export function readSavedRunSummary(root: string, name: string): TestRunReport {
   try {
     const parsed = summary.parse(JSON.parse(readBoundedFile(join(ownedRunDirectory(root, name), 'summary.json'), 8 * 1024 * 1024).toString('utf8')));
-    const { stateDir, ...report } = parsed;
-    return { ...report, ...(stateDir === undefined ? {} : { stateDir }), cases: parsed.cases.map(c => ({ ...c, videos: c.videos ?? [], requests: c.requests ?? [], steps: c.steps.map(s => ({ ...s, observedText: s.observedText ?? null })) })) };
+    const { stateDir, environment, ...report } = parsed;
+    return { ...report, ...(stateDir === undefined ? {} : { stateDir }), ...(environment === undefined ? {} : { environment: environment as TestRunReport['environment'] & object }), cases: parsed.cases.map(c => ({ ...c, videos: c.videos ?? [], requests: c.requests ?? [], steps: c.steps.map(s => ({ ...s, observedText: s.observedText ?? null })) })) };
   }
   catch { throw new Error('Saved run summary is unavailable or invalid.'); }
 }

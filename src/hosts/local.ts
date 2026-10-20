@@ -5,7 +5,6 @@
  */
 import { fork, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { HostCapabilityObservation, HostLease, IdentityAttestation, digestOfValue, freeze, parseAs, sameRef, sameScope, verifySelfDigest, type LaunchRecipe, type GitCommitObservation } from '../protocol/index.ts';
@@ -13,11 +12,12 @@ import { verifyGitSnapshotProofMetadata } from '../source/gitObjectProof.ts';
 import { Deadline, sleep } from '../core/deadline.ts';
 import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
-import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
+import { defineHost, type ExecutorHost, type HostCapabilities, type HostSession, type HostStartContext } from './types.ts';
 import { observeApplicationRuntime } from './runtime.ts';
 import { SnapshotLaunchObservation, SnapshotLaunchFailure, identityFromEntries, sourceIdentityDigest } from './sourceIdentity.ts';
 import { NativeJobDriver } from '../adapters/job/driver.ts';
 import { startTrafficProxy, type TrafficRecorder } from './trafficProxy.ts';
+import { issueHostCredentials } from '../credentials/resolvers/hostIssued.ts';
 export { sourceIdentityDigest } from './sourceIdentity.ts';
 
 export function buildCapabilityObservation(input: { hostPlanRef: HostLease['hostPlanRef']; leaseRef: HostLease['ref'] | null; scope: HostStartContext['scope']; executionId: string; supported: string[]; unsupported: string[] }): HostCapabilityObservation {
@@ -84,6 +84,11 @@ async function waitReady(origin: string, path: string, deadline: Deadline, signa
   throw new InfrastructureFailure(`application did not become ready at ${origin}${path} within the readiness timeout`, 'app_not_ready');
 }
 
+export const LOCAL_CAPABILITIES = {
+  supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence'],
+  unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
+} as const satisfies HostCapabilities;
+
 export class LocalProcessHost implements ExecutorHost {
   async start(context: HostStartContext): Promise<HostSession> {
     if (process.platform === 'win32') throw new Blocked([{ code: 'local_process_tree_unsupported', detail: 'the local host requires POSIX process-group termination' }]);
@@ -100,17 +105,7 @@ export class LocalProcessHost implements ExecutorHost {
     if (launch.nativeJobs && runtime.family !== 'node') throw new Blocked([{ code: 'native_job_runtime_unsupported', detail: 'The native job bridge requires a Node application' }]);
     const dataDir = join(context.workspaceDir, 'data');
     mkdirSync(dataDir, { recursive: true });
-    const credentials = new Map<string, string>();
-    const tokenMap: Record<string, string> = {};
-    for (const issued of launch.issuedCredentials) {
-      if (!context.credentialNames.includes(issued.name)) continue;
-      const secret = randomBytes(24).toString('base64url');
-      credentials.set(issued.name, secret);
-      tokenMap[secret] = issued.subject;
-    }
-    for (const name of context.credentialNames) {
-      if (!credentials.has(name)) throw new Blocked([{ code: 'credential_not_issuable', detail: `host ${context.hostPlan.ref.id} cannot issue ${name}`, owner: 'operator', action: 'declare the credential in the launch recipe' }]);
-    }
+    const { credentials, tokenMap } = issueHostCredentials(launch.issuedCredentials, context.credentialNames, context.hostPlan.ref.id);
     const assigned = launch.portMode === 'assigned';
     const assignedPort = assigned ? await freeLoopbackPort() : 0;
     const values = { port: String(assignedPort), dataDir };
@@ -222,8 +217,8 @@ export class LocalProcessHost implements ExecutorHost {
     }), 'identity attestation');
     const observation = buildCapabilityObservation({
       hostPlanRef: context.hostPlan.ref, leaseRef: lease.ref, scope: context.scope, executionId: context.executionId,
-      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence', ...(nativeJobs ? ['native_job'] : [])],
-      unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
+      supported: [...LOCAL_CAPABILITIES.supported, ...(nativeJobs ? ['native_job'] : [])],
+      unsupported: [...LOCAL_CAPABILITIES.unsupported],
     });
     let stopResult: Promise<{ confirmed: boolean; detail: string }> | null = null;
     const session: HostSession = {
@@ -283,3 +278,5 @@ export class LocalProcessHost implements ExecutorHost {
     }
   }
 }
+
+export const localProcessHost = defineHost({ kind: 'local_process', capabilities: LOCAL_CAPABILITIES, create: () => new LocalProcessHost() });

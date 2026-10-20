@@ -44,7 +44,14 @@
             "source-resolve",
             "recovery-status",
             "source-materialize",
-            "schema"
+            "schema",
+            "env",
+            "whoami",
+            "explain",
+            "capabilities",
+            "config",
+            "approve",
+            "mcp"
           ],
           "type": "string"
         },
@@ -114,13 +121,33 @@
               "input_unavailable",
               "access_denied",
               "infrastructure_failure",
-              "unexpected_failure"
+              "unexpected_failure",
+              "unknown_environment",
+              "invalid_environment",
+              "no_flows_for_environment",
+              "approval_required",
+              "approval_requires_human",
+              "agent_policy_denied",
+              "invalid_config_path",
+              "config_edit_invalid"
             ],
+            "type": "string"
+          },
+          "fix": {
+            "maxLength": 512,
             "type": "string"
           },
           "message": {
             "maxLength": 512,
             "minLength": 1,
+            "type": "string"
+          },
+          "owner": {
+            "enum": [
+              "developer",
+              "operator",
+              "agent"
+            ],
             "type": "string"
           },
           "recovery": {

@@ -139,7 +139,12 @@ export type CellReductionInput = {
   criticalCleanupConfirmed: boolean;
   infrastructureFailure: boolean;
   blockedReasons: string[];
+  /** Additive: deployed classes treat unconfirmed cleanup as a failed run, not an inconclusive one. */
+  environmentClass?: EnvironmentBinding['class'];
 };
+
+/** Classes whose cleanup must be confirmed or the run fails (the run touched a shared deployment). */
+export const CLEANUP_FAILS_RUN: ReadonlySet<string> = new Set(['deployed_preview', 'deployed_canary']);
 
 export function reduceCell(input: CellReductionInput): { outcome: Outcome; reasonCodes: string[]; proofEligible: boolean; coverage: Coverage } {
   const reasons: string[] = [...input.blockedReasons];
@@ -153,10 +158,14 @@ export function reduceCell(input: CellReductionInput): { outcome: Outcome; reaso
   if (missingSteps.length > 0) reasons.push(`missing_step_observation:${missingSteps.join('/')}`);
   if (requiredAssertions.length === 0) reasons.push('zero_required_assertions');
 
+  const deployedCleanupUnconfirmed = !!input.environmentClass && CLEANUP_FAILS_RUN.has(input.environmentClass) && (input.unknownMutations > 0 || !input.criticalCleanupConfirmed);
   let outcome: Outcome;
   if (failedRequired.length > 0) {
     outcome = 'assertion_failed';
     reasons.push(...failedRequired.map((a) => `assertion_failed:${a.assertionId}`));
+  } else if (deployedCleanupUnconfirmed) {
+    outcome = 'assertion_failed';
+    reasons.push('deployed_cleanup_unconfirmed', input.unknownMutations > 0 ? 'unknown_mutations_remain' : 'critical_cleanup_unconfirmed');
   } else if (input.blockedReasons.length > 0) {
     outcome = 'blocked';
   } else if (input.cancelled) {

@@ -302,6 +302,7 @@ function verifySnapshot(snapshot: BundleSnapshot): Inspection {
       criticalCleanupConfirmed: receipt.cleanup.critical.every((k) => receipt.cleanup.confirmed.includes(k)),
       infrastructureFailure: receipt.outcome === 'infrastructure_failed',
       blockedReasons: receipt.outcome === 'blocked' ? receipt.reasonCodes : [],
+      environmentClass: receipt.environment.class,
     });
     if (reduction.outcome !== receipt.outcome) problems.push(`receipt ${name} outcome ${receipt.outcome} but re-reduction gives ${reduction.outcome}`);
     receipts.push(receipt);

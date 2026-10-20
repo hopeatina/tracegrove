@@ -1,0 +1,88 @@
+# Staging scenario for tracegrove environments. The same notes API runs four ways:
+#   local          tracegrove launches it from app/ (the default)
+#   docker         one container built from ./Dockerfile; compose: the same image via compose.yaml
+#   staging        a standalone deployment tracegrove does not launch (scripts/start-staging.sh)
+#   prod-readonly  a production deployment it may only read
+# Persona secrets come from AWS Secrets Manager / SSM, 1Password, a dotenv file, the OrgX persona broker,
+# Clerk or an OAuth client; this file holds references only, never values.
+project: staging-notes
+app:
+  adapter: node
+  entry: app/app.mjs
+  health: /health
+  sources: [app/**]
+  env:
+    NOTES_BUILD: local
+  inject:
+    port: PORT
+    dataDir: NOTES_DIR
+    tokens: NOTES_TOKENS
+personas:
+  owner: { subject: alice }
+  stranger: { subject: bob }
+
+environments:
+  docker:
+    target:
+      container: { image: "tracegrove-staging-notes:dev", port: 8080, env: { PORT: "8080", HOST: 0.0.0.0, NOTES_DIR: /tmp/notes, NOTES_BUILD: container }, tokensEnv: NOTES_TOKENS }
+      health: /health
+  compose:
+    target: { compose: compose.yaml, service: notes, port: 8080, tokensEnv: NOTES_TOKENS }
+
+  # A deployed preview: personas from AWS Secrets Manager, identity proven through /me.
+  staging:
+    target:
+      url: http://127.0.0.1:4811
+      health: /health
+      release: { field: build, expect: "2026.10.19-rc1" }
+    whoami: { GET: /me, subject: user.id }
+    personas:
+      owner: { from: "aws-sm://notes/staging/personas#owner" }
+      stranger: { from: "aws-sm://notes/staging/personas#stranger" }
+    budget: { maxRequests: 200 }
+
+  # Someone rotated the stranger secret and pasted the owner's token into it.
+  staging-rotated:
+    target: { url: http://127.0.0.1:4811, health: /health, release: { field: build, expect: "2026.10.19-rc1" } }
+    whoami: { GET: /me, subject: user.id }
+    personas:
+      owner: { from: "aws-sm://notes/staging/personas-rotated#owner" }
+      stranger: { from: "aws-sm://notes/staging/personas-rotated#stranger" }
+
+  # Short-lived personas minted by the OrgX broker in a run-owned workspace, revoked at cleanup.
+  staging-broker:
+    target: { url: http://127.0.0.1:4811, health: /health }
+    whoami: { GET: /me, subject: user.id }
+    network: { allow: ["127.0.0.1:4810"] }
+    personas:
+      owner: { from: "orgx-broker://staging?role=owner&ttl=600" }
+      stranger: { from: "orgx-broker://staging?role=member&ttl=600" }
+
+  # A preview whose DELETE answers 204 but keeps the row: cleanup cannot be confirmed.
+  staging-flaky:
+    target: { url: http://127.0.0.1:4812, health: /health }
+    whoami: { GET: /me, subject: user.id }
+    personas:
+      owner: { from: "aws-ssm:///notes/staging/owner-token" }
+      stranger: { from: "aws-ssm:///notes/staging/stranger-token" }
+
+  # Sign-in recipes: Clerk testing tokens for the owner, an OAuth client for the stranger.
+  staging-sso:
+    target: { url: http://127.0.0.1:4811, health: /health }
+    whoami: { GET: /me, subject: user.id }
+    network: { allow: ["127.0.0.1:4810"] }
+    personas:
+      owner:
+        from: "aws-sm://notes/staging/clerk#secretKey"
+        auth: { kind: clerk_testing, frontendApi: "http://127.0.0.1:4810", backendApi: "http://127.0.0.1:4810", userId: user_alice }
+      stranger:
+        from: "file:.env.staging#STRANGER_CLIENT_SECRET"
+        auth: { kind: oauth_client_credentials, tokenUrl: "http://127.0.0.1:4810/oauth/token", clientId: stranger-ci }
+
+  # Production: reads only, as a 1Password-held observer token. Agents may not run here.
+  prod-readonly:
+    target: { url: http://127.0.0.1:4813, health: /health, release: { field: build } }
+    class: production_observation
+    whoami: { GET: /me, subject: user.id }
+    personas:
+      owner: { from: "op://notes-prod/observer/token" }

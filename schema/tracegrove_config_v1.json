@@ -151,6 +151,498 @@
       },
       "type": "object"
     },
+    "environments": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "agents": {
+            "description": "allow, ask (agents need a human approval) or deny. Defaults from the class.",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "type": "string"
+          },
+          "budget": {
+            "additionalProperties": false,
+            "properties": {
+              "maxRequests": {
+                "default": 500,
+                "maximum": 1000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxSpendCents": {
+                "default": 0,
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "class": {
+            "description": "isolated_candidate (local, docker), deployed_preview (staging), deployed_canary or production_observation. Defaults from the target.",
+            "enum": [
+              "isolated_candidate",
+              "deployed_preview",
+              "deployed_canary",
+              "production_observation"
+            ],
+            "type": "string"
+          },
+          "endpoints": {
+            "additionalProperties": {
+              "format": "uri",
+              "type": "string"
+            },
+            "description": "Extra origins this environment admits (API, MCP, realtime), by name.",
+            "propertyNames": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "network": {
+            "additionalProperties": false,
+            "description": "Hostnames recipes and drivers may contact besides the target and endpoints.",
+            "properties": {
+              "allow": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "personas": {
+            "additionalProperties": {
+              "additionalProperties": false,
+              "properties": {
+                "auth": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "bearer"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "description": "Authorization: Bearer <secret>.",
+                          "properties": {
+                            "kind": {
+                              "const": "bearer",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "<name>: <prefix><secret>.",
+                          "properties": {
+                            "kind": {
+                              "const": "header",
+                              "type": "string"
+                            },
+                            "name": {
+                              "maxLength": 64,
+                              "pattern": "^[A-Za-z0-9-]+$",
+                              "type": "string"
+                            },
+                            "prefix": {
+                              "default": "",
+                              "maxLength": 32,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "POST a login form; keep the named session cookie. The secret is the password, or JSON {username,password}.",
+                          "properties": {
+                            "cookie": {
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9_.-]+$",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "form_login",
+                              "type": "string"
+                            },
+                            "passwordField": {
+                              "default": "password",
+                              "maxLength": 64,
+                              "type": "string"
+                            },
+                            "path": {
+                              "maxLength": 400,
+                              "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                              "type": "string"
+                            },
+                            "username": {
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "usernameField": {
+                              "default": "username",
+                              "maxLength": 64,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "path",
+                            "cookie"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "OAuth 2.0 client credentials grant; the secret is the client secret.",
+                          "properties": {
+                            "audience": {
+                              "maxLength": 512,
+                              "type": "string"
+                            },
+                            "clientId": {
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "oauth_client_credentials",
+                              "type": "string"
+                            },
+                            "scope": {
+                              "maxLength": 512,
+                              "type": "string"
+                            },
+                            "tokenUrl": {
+                              "format": "uri",
+                              "maxLength": 2048,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "tokenUrl",
+                            "clientId"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Clerk testing token plus a sign-in ticket exchanged for a session token; the secret is the Clerk secret key.",
+                          "properties": {
+                            "backendApi": {
+                              "default": "https://api.clerk.com",
+                              "format": "uri",
+                              "maxLength": 2048,
+                              "type": "string"
+                            },
+                            "frontendApi": {
+                              "format": "uri",
+                              "maxLength": 2048,
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "clerk_testing",
+                              "type": "string"
+                            },
+                            "userId": {
+                              "maxLength": 128,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "frontendApi",
+                            "userId"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Supabase password grant; the secret is the password. The anon key is public by design.",
+                          "properties": {
+                            "anonKey": {
+                              "maxLength": 4096,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "email": {
+                              "maxLength": 320,
+                              "minLength": 3,
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "supabase_password",
+                              "type": "string"
+                            },
+                            "url": {
+                              "format": "uri",
+                              "maxLength": 2048,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "url",
+                            "anonKey",
+                            "email"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    }
+                  ],
+                  "default": "bearer",
+                  "description": "Auth recipe that turns the secret into request credentials: bearer, header, form_login, oauth_client_credentials, clerk_testing or supabase_password."
+                },
+                "from": {
+                  "description": "Where the persona secret comes from. A reference, never a value.",
+                  "maxLength": 400,
+                  "minLength": 1,
+                  "pattern": "^(?:host_issued|env:[A-Za-z_][A-Za-z0-9_]*|file:[^#\\s]+#[A-Za-z_][A-Za-z0-9_.-]*|aws-sm:\\/\\/[^\\s#]+(?:#[A-Za-z0-9_.-]+)?|aws-ssm:\\/\\/[^\\s]+|op:\\/\\/[^\\s]+|orgx-broker:\\/\\/[A-Za-z0-9._-]+(?:\\?[^\\s#]*)?)$",
+                  "type": "string"
+                },
+                "subject": {
+                  "description": "Expected signed-in subject; defaults to the persona subject under personas:.",
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from"
+              ],
+              "type": "object"
+            },
+            "description": "Where each persona credential comes from in this environment. Launched targets default to host-issued tokens.",
+            "propertyNames": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "launch": {
+                    "const": "app",
+                    "description": "Launch the app from app: on this machine (the default local environment).",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "launch"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "health": {
+                    "default": "/health",
+                    "description": "GET path that answers 2xx when the deployment is ready.",
+                    "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                    "type": "string"
+                  },
+                  "readyTimeoutMs": {
+                    "default": 20000,
+                    "exclusiveMinimum": 0,
+                    "maximum": 300000,
+                    "type": "integer"
+                  },
+                  "release": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expect": {
+                        "description": "Expected release; a different deployment blocks the run with identity_mismatch.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "field": {
+                        "description": "Health-body field holding the deployed release, e.g. build or version.",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "field"
+                    ],
+                    "type": "object"
+                  },
+                  "url": {
+                    "description": "Deployed origin tracegrove does not launch, e.g. https://staging.example.com.",
+                    "format": "uri",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "compose": {
+                    "description": "Compose file, relative to this config.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "health": {
+                    "default": "/health",
+                    "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Container port the service listens on.",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "readyTimeoutMs": {
+                    "default": 120000,
+                    "exclusiveMinimum": 0,
+                    "maximum": 300000,
+                    "type": "integer"
+                  },
+                  "service": {
+                    "description": "Service that serves the app.",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                    "type": "string"
+                  },
+                  "tokensEnv": {
+                    "default": "TRACEGROVE_TOKENS",
+                    "description": "Env var the compose file passes through to the app for host-issued persona tokens.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "compose",
+                  "service",
+                  "port"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "container": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "env": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "default": {},
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "image": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "port": {
+                        "maximum": 65535,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "tokensEnv": {
+                        "default": "TRACEGROVE_TOKENS",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "image",
+                      "port"
+                    ],
+                    "type": "object"
+                  },
+                  "health": {
+                    "default": "/health",
+                    "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                    "type": "string"
+                  },
+                  "readyTimeoutMs": {
+                    "default": 60000,
+                    "exclusiveMinimum": 0,
+                    "maximum": 300000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "container"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "whoami": {
+            "additionalProperties": false,
+            "description": "Endpoint that returns the signed-in identity, and the dot path of its subject. Lets doctor prove each persona is who you think.",
+            "properties": {
+              "GET": {
+                "pattern": "^\\/(?!\\/)[^?#\\s]*$",
+                "type": "string"
+              },
+              "subject": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "GET",
+              "subject"
+            ],
+            "type": "object"
+          },
+          "writes": {
+            "description": "none: only GET/HEAD and read tools. owned_namespace: writes only to records the run creates and deletes. Defaults from the class.",
+            "enum": [
+              "none",
+              "owned_namespace"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "description": "Where flows can run: local (default), docker, staging, prod-readonly. Each names a target, class, write policy, persona secret references and agent policy.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
     "personas": {
       "additionalProperties": {
         "additionalProperties": false,

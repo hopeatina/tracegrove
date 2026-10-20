@@ -15,14 +15,16 @@ import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
+import { describeBlock } from '../core/blockCodes.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
+import { detectAgent, enforceAgentPolicy, type AgentIdentity, type PolicyDecision } from '../environments/agents.ts';
 
 export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
   caseId: string; file: string; title: string; outcome: string; durationMs: number;
-  steps: StepReport[]; failure: { step: string; message: string; observed: string | null; code?: string | undefined } | null;
+  steps: StepReport[]; failure: { step: string; message: string; observed: string | null; fix?: string | null; code?: string | undefined } | null;
   videos?: RunVideo[];
   /** What the app served during this case, from the sealed proxy events. */
   requests?: ObservedRequest[];
@@ -31,11 +33,21 @@ export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
   project: string; outcome: string; exitCode: number; startedAt: string; finishedAt: string;
   executionId: string | null; sourceDigest: string; runDir: string; stateDir?: string; bundleVerified: boolean | null;
-  blockers: Array<{ code: string; detail: string; action: string }>;
+  blockers: Array<{ code: string; detail: string; action: string; owner?: string; fix?: string | null; docs?: string | null }>;
   cases: CaseReport[];
   totals: { passed: number; failed: number; other: number };
   sourceBinding?: VerificationSourceBinding | null;
+  /** Where this ran. Absent in reports written before environments existed (always local then). */
+  environment?: RunEnvironment;
 };
+export type RunEnvironment = { name: string; class: string; kind: string; origin: string | null; writes: string; expectedRelease: string | null;
+  agent: { name: string | null; policy: string; decision: PolicyDecision['decision']; approvedBy?: string; approvedAt?: string } | null };
+
+/** A badge for any run that is not an isolated candidate (staging, canary, production observation). */
+export function environmentBadge(environment: RunEnvironment | undefined): string | null {
+  if (!environment || environment.class === 'isolated_candidate') return environment && environment.name !== 'local' ? `${environment.name} · ${environment.kind}` : null;
+  return `${environment.name.toUpperCase()} · ${environment.class}${environment.writes === 'none' ? ' · read-only' : ''}`;
+}
 
 const OUTCOME_LABEL: Record<string, string> = { passed: 'pass', assertion_failed: 'fail', blocked: 'blocked', infrastructure_failed: 'error', inconclusive: 'inconclusive', cancelled: 'cancelled' };
 
@@ -86,7 +98,9 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const expected = receipt.assertions.find((a) => a.assertionId === `${failedStep.stepId}.expect`);
     const want = stepInfo.get(failedStep.stepId)?.expectStatus;
     failure = { step: name, message: status ? `expected status ${want ?? '?'}, got ${status[1]}` : failedStep.reasonCode ?? 'failed', observed: observedLine(failedStep.output) };
-    if (!status && expected?.reasonCode) failure.message = `${failure.message} (${expected.reasonCode})`;
+    if (!status && expected?.reasonCode && expected.reasonCode !== failedStep.reasonCode) failure.message = `${failure.message} (${expected.reasonCode})`;
+    const caseLevel = receipt.reasonCodes.filter(code => code !== failedStep.reasonCode && !code.startsWith('unexpected_status') && !code.startsWith('assertion_'));
+    if (caseLevel.length) failure.message = `${failure.message}\nalso: ${caseLevel.join(', ')}`;
   } else if (failedAssertion) {
     const stepId = failedAssertion.assertionId.replace(/\.expect$/, '');
     const step = receipt.steps.find((s) => s.stepId === stepId);
@@ -121,7 +135,8 @@ export function renderJunit(report: TestRunReport): string {
 }
 
 export function renderText(report: TestRunReport, root: string): string {
-  const lines = [`tracegrove · ${report.project} · app sha ${report.sourceDigest.slice(0, 12)}`, `input request: ${sourceLabel(report.sourceBinding)}`, ''];
+  const badge = environmentBadge(report.environment);
+  const lines = [`tracegrove · ${report.project} · ${report.environment && report.environment.kind !== 'launch' ? 'target' : 'app'} sha ${report.sourceDigest.slice(0, 12)}${badge ? ` · [${badge}]` : ''}`, `input request: ${sourceLabel(report.sourceBinding)}`, ''];
   for (const b of report.blockers) lines.push(`  BLOCKED  ${b.code}: ${b.detail}`, `           fix: ${b.action}`);
   for (const c of report.cases) {
     const label = (OUTCOME_LABEL[c.outcome] ?? c.outcome).toUpperCase().padEnd(7);
@@ -139,7 +154,8 @@ export function renderText(report: TestRunReport, root: string): string {
 }
 
 export function renderMarkdown(report: TestRunReport): string {
-  const lines = [`# tracegrove run: ${report.outcome}`, '', `- Project: \`${report.project}\``, `- Started: ${report.startedAt}`, `- App source digest: \`${report.sourceDigest}\``, `- Execution: \`${report.executionId ?? 'none'}\``, `- Evidence bundle verified: ${report.bundleVerified === null ? 'n/a' : report.bundleVerified ? 'yes' : '**no**'}`, ''];
+  const lines = [`# tracegrove run: ${report.outcome}`, '', `- Project: \`${report.project}\``,
+    ...(report.environment ? [`- Environment: \`${report.environment.name}\` (${report.environment.class}, writes ${report.environment.writes}${report.environment.origin ? `, ${report.environment.origin}` : ''})`] : []), `- Started: ${report.startedAt}`, `- App source digest: \`${report.sourceDigest}\``, `- Execution: \`${report.executionId ?? 'none'}\``, `- Evidence bundle verified: ${report.bundleVerified === null ? 'n/a' : report.bundleVerified ? 'yes' : '**no**'}`, ''];
   lines.push(`Input request: ${sourceLabel(report.sourceBinding)}`, '');
   if (report.blockers.length) {
     lines.push('## Blocked', '', ...report.blockers.map((b) => `- **${b.code}**: ${b.detail}. Fix: ${b.action}`), '');
@@ -159,13 +175,16 @@ export function renderMarkdown(report: TestRunReport): string {
 
 export type TestOptions = CompileOptions & {
   configPath: string;
+  /** Who is running: detected from the process environment unless given (see environments/agents.ts). */
+  agent?: AgentIdentity;
   signal?: AbortSignal;
   onEvent?: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => void;
 };
 
 export async function runTests(options: TestOptions): Promise<{ report: TestRunReport; compiled: CompileResult }> {
   const startedAt = new Date();
-  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot, sourceRepositoryRole: options.sourceRepositoryRole });
+  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot, sourceRepositoryRole: options.sourceRepositoryRole, env: options.env });
+  const policy = enforceAgentPolicy(compiled.root, compiled.environment, options.agent ?? detectAgent(process.env));
   const project = loadProject(compiled.workflowConfigPath);
   const scope = localScope();
   const bundle: FrozenBundle = plan({ project, profileName: 'real', scope });
@@ -182,7 +201,8 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     } finally { ledger?.close(); }
   }
   let outcome = summary?.outcome ?? 'blocked';
-  const runPath = (result: string) => join(runsDir, `${stamp(startedAt)}_${OUTCOME_LABEL[result] ?? result}_${(summary?.executionId ?? 'plan').replace(/[^A-Za-z0-9]/g, '').slice(-6)}`);
+  const envPart = compiled.environment.name === 'local' ? '' : `${compiled.environment.name.replace(/[^A-Za-z0-9-]/g, '')}_`;
+  const runPath = (result: string) => join(runsDir, `${stamp(startedAt)}_${OUTCOME_LABEL[result] ?? result}_${envPart}${(summary?.executionId ?? 'plan').replace(/[^A-Za-z0-9]/g, '').slice(-6)}`);
   let runDir = runPath(outcome);
   createDurableDirectory(runDir);
   writeFileSync(join(runDir, 'request.json'), `${JSON.stringify(bundle, null, 2)}\n`);
@@ -207,8 +227,29 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     const events = join(runDir, 'bundle', 'cells', r.selectionCellId, 'events.jsonl');
     if (bundleVerified && existsSync(events)) report.requests = verifiedObservedRequests(r, readFileSync(events));
     if (report.outcome !== 'passed' && existsSync(events)) {
-      const hostFailed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; redactedPayload: { error?: string; code?: string } }).find((e) => e.kind === 'host.failed');
+      const parsed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; stepId?: string | null; redactedPayload: { error?: string; reasons?: Array<{ code: string; detail: string }>; entityKey?: string; code?: string; message?: string } });
+      const hostFailed = parsed.find((e) => e.kind === 'host.failed');
+      const hostBlocked = parsed.find((e) => e.kind === 'host.blocked');
+      const fixtureFailed = parsed.find((e) => e.kind === 'fixture.failed');
       if (hostFailed) report.failure = { step: '(app startup)', message: hostFailed.redactedPayload.error ?? 'host failed', observed: null, code: hostFailed.redactedPayload.code ?? 'infrastructure' };
+      else if (hostBlocked?.redactedPayload.reasons?.length) {
+        const reasons = hostBlocked.redactedPayload.reasons;
+        report.failure = { step: '(before steps)', message: reasons.map(r => `${r.code}: ${r.detail}`).join('\n'), observed: null,
+          fix: describeBlock(reasons[0]!.code, { env: compiled.environment.name, persona: reasons[0]!.detail.match(/persona (\w+)/)?.[1] }).fix };
+      } else if (fixtureFailed && report.steps.every(step => step.result === 'not_run')) {
+        const code = fixtureFailed.redactedPayload.code ?? 'fixture_failed';
+        report.failure = { step: `(fixture ${fixtureFailed.redactedPayload.entityKey ?? ''})`.replace(' )', ')'), message: `${code}: ${fixtureFailed.redactedPayload.message ?? ''}`, observed: null,
+          fix: describeBlock(code, { env: compiled.environment.name }).fix ?? 'tracegrove show --run latest --json' };
+        const others = r.reasonCodes.filter(c => c !== code && c !== 'step_not_run');
+        if (others.length) report.failure.message += `\nalso: ${others.join(', ')}`;
+      } else if (report.failure) {
+        // A failed step with no observation (the request never produced one) keeps its sealed message.
+        const failed = report.steps.find(step => step.name === report.failure!.step && step.reason);
+        const finished = failed && parsed.find((e) => e.kind === 'step.finished' && e.stepId === failed.id && e.redactedPayload.message);
+        if (finished && !report.failure.observed) report.failure.observed = String(finished.redactedPayload.message).slice(0, 500);
+        const code = r.reasonCodes.find(c => describeBlock(c).fix !== null);
+        if (code) report.failure.fix = describeBlock(code, { env: compiled.environment.name }).fix;
+      }
     }
     return report;
   });
@@ -218,7 +259,9 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(),
     executionId: summary?.executionId ?? null, sourceDigest: compiled.sourceDigest, runDir, stateDir, bundleVerified,
     sourceBinding: compiled.sourceBinding,
-    blockers: bundle.blockers.map((b) => ({ code: b.code, detail: b.detail, action: b.action })),
+    environment: { name: compiled.environment.name, class: compiled.environment.class, kind: compiled.environment.kind, origin: compiled.target?.origin ?? null, writes: compiled.environment.writes,
+      expectedRelease: compiled.target?.expectedRelease ?? null, agent: policy.agent ? { name: policy.agent, policy: policy.policy, decision: policy.decision, ...(policy.approval ? { approvedBy: policy.approval.approvedBy, approvedAt: policy.approval.approvedAt } : {}) } : null },
+    blockers: bundle.blockers.map((b) => { const described = describeBlock(b.code, { env: compiled.environment.name }, b.action); return { code: b.code, detail: b.detail, action: b.action, owner: described.owner, fix: described.fix, docs: described.docs }; }),
     cases,
     totals: { passed: cases.filter((c) => c.outcome === 'passed').length, failed: cases.filter((c) => c.outcome === 'assertion_failed').length, other: cases.filter((c) => c.outcome !== 'passed' && c.outcome !== 'assertion_failed').length },
   };

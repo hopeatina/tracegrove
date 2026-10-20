@@ -136,6 +136,7 @@ export function checkCellEvidence(input: {
     infrastructureFailure: r.steps.some((s) => isInfrastructureStepFailure(s.reasonCode))
       || events.toString('utf8').split('\n').some((line) => line.includes('"kind":"host.failed"') || line.includes('"kind":"browser.failed"')),
     blockedReasons: r.outcome === 'blocked' ? r.reasonCodes : [],
+    environmentClass: r.environment.class,
   });
   if (reduction.outcome !== r.outcome || reduction.proofEligible !== r.proofEligible) problem(`recorded outcome ${r.outcome} differs from evidence reduction ${reduction.outcome}`);
   if (digestOfValue(reduction.coverage).hex !== digestOfValue(r.coverage).hex) problem('coverage differs from evidence');
