@@ -6,6 +6,7 @@ Use the installed binary through `npx --no-install tracegrove` so CI never fetch
 | --- | --- | --- |
 | `status --json` | Reads the current project and run state | `tracegrove.status/v1` and ordered `next` commands |
 | `discover --json` | Compares scanned routes, authored flows and the requests the last verified run served | `routes` with `provenance` and `observedBy`, `ambiguities` with a question for an agent; no app launch |
+| `discover --jsonl` | The same discovery as one typed event per line, in drafting order, then a `coverage` line | `domain.found`, `surface.found` (with `risk.score`, `risk.why`, `risk.pii`), `flow.declared`, `surface.observed`, `flow.proven`, `flow.failed`, `question.asked`; the coverage line lists `riskyUntested` |
 | `discover --save` | Records what discovery knows in `tracegrove/catalog.yaml` (commit it) | Routes with handler file, actions and the verified run that confirmed them |
 | `check --json` | Compiles authoring files | `ok` and located issues; may evaluate trusted TypeScript authoring modules |
 | `doctor --dir . --json` | Checks the native plan without app launch | `tracegrove.doctor/v1`, `checks`, `errors`, `blocked`, `execution: not_started` |
@@ -29,5 +30,7 @@ The same short flows compile into the strict `workflow.*/v1` corpus. The browser
 ## Reusable actions and the catalog
 
 A step sequence more than one flow needs (sign in, create a resource, open a page) belongs in `tracegrove/actions/<area>/<verb>.action.yaml`, which is the action `<area>.<verb>`. It declares `inputs` (a default, or `null` when required), `outputs` (names its steps save), `routes` (quoted `"METHOD /path/{param}"`), `sources` (the handler files) and `steps`, and may call other actions. A flow calls it with `- use: notes.create`, `with: { title: X }`, optional `as:` and `save: { mine: noteId }`. Compile expands every call into ordinary steps named `<call> › <step>`, so runs, evidence and heal treat them like hand-written steps; saved names other than outputs stay private to each call.
+
+Discovery groups routes into areas named after the code that declares them: the file (`billing.mjs` → `billing`), or its folder when the file name says nothing (`orders/views.py` → `orders`). Only when neither helps does it fall back to the first URL segment, and it says so. Routes are ranked by risk: writes over reads, money and permission changes first, personal data flagged. `discover`, the MCP tool and the UI's Discover tab all show the same coverage strip and the riskiest untested routes, so start drafting there.
 
 `tracegrove/catalog.yaml` is what discovery has learned: each route, where it is handled, which actions exercise it and which verified run confirmed it. `draft` updates it after it proves new flows, and `discover --save` writes it on demand. Discovery reads it back, so a fresh clone with no runs still knows its routes, and a file the static scan cannot read stops being a question once an action that names it is confirmed by traffic. Agents are shown the action library and told to reuse it and to add new actions rather than repeat steps; an action they write counts as proven only when a flow using it passes.

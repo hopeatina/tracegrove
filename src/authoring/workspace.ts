@@ -8,6 +8,8 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, compileProject, configInDirectory, loadAuthoringConfig, loadProjectActions, type CompiledFlowInfo } from './compile.ts';
 import { discover, templateOfObserved, type Discovery, type Knowledge, type ObservedRun } from './discover.ts';
+import { discoveryFeed, type Feed } from './discoveryEvents.ts';
+import { readiness } from './readiness.ts';
 import { mergeCatalog, readCatalog, writeCatalog } from './catalog.ts';
 import { actionIdFor, type ActionLibrary } from './actions.ts';
 import { resolveRun, runTests, type TestRunReport } from './run.ts';
@@ -51,6 +53,14 @@ export function discoverProject(dir: string, branch: string | null): Discovery {
     }
   } catch { /* uncompilable flows cover nothing; check reports why */ }
   return discover(scanRoot, flows, branch, globs, observed, knowledge);
+}
+
+/** Discovery plus its event feed and coverage strip, with run results when the project has saved runs. */
+export function discoverLive(dir: string, branch: string | null): Discovery & Feed {
+  const d = discoverProject(dir, branch);
+  let claims: Array<{ caseId: string; title: string; assessment: string }> = [];
+  try { claims = readiness(resolve(dir)).claims.map((c) => ({ caseId: c.caseId, title: c.title, assessment: c.validity === 'current' ? c.assessment : 'none' })); } catch { /* no config or no runs: discovery alone */ }
+  return { ...d, ...discoveryFeed(d, claims) };
 }
 
 /** The catalog and action library, with which flows use each action. */

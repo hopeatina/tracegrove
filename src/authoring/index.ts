@@ -5,7 +5,7 @@ export { AuthoringConfig, Flow, FlowStep, HttpFlowStep, BrowserFlowStep, JobFlow
 export { discover, draftFlow, gitInfo, scanSource, type Discovery, type Route } from './discover.ts';
 export { startUi, type UiServer } from './ui.ts';
 export { buildAgentCommand, buildDraftPrompt, detectAgents, readLocalSettings, resolveAgentSettings, runAgent, writeLocalSettings, DEFAULT_MODELS, type AgentSettings, type AgentRunResult } from './agent.ts';
-export { checkProject, discoverProject, draftWithAgent, type CheckResult, type DraftResult } from './workspace.ts';
+export { checkProject, discoverLive, discoverProject, draftWithAgent, type CheckResult, type DraftResult } from './workspace.ts';
 export { RunActivity, runActivity } from './activity.ts';
 export { heal, undoHeal, listHeals, classify, guardFlowEdit, type HealReport, type HealFinding, type HealChange, type HealOptions } from './heal.ts';
 export { projectStatus, projectRoot, type ProjectStatus, type NextAction } from './status.ts';
@@ -16,3 +16,4 @@ export { StepReport, CaseReport, TestRunReport, SavedRunName } from './runReport
 export { readSavedRun, readRunSource, CheckedRunReport } from './runSource.ts';
 export { compareSavedRuns, SavedRunPair } from './runComparison.ts';
 export { NativeImportName, NativeImportEntry, listNativeImports, readNativeImport, retainNativeImport } from './nativeImports.ts';
+export { discoveryFeed, domainOf, riskOf, type Coverage, type DiscoveryEvent, type Feed, type Risk } from './discoveryEvents.ts';

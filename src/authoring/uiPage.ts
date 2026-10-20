@@ -318,17 +318,35 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
   h('div',{class:'rulehead'},h('span',{class:'label'},'Routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted','data-testid':'route-summary'},d.routes.length+' recognized · '+seen+' served in a run · '+d.uncovered+' untested'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
   d?h('p',{class:'small muted','data-testid':'observed-source',style:'margin:-4px 0 12px'},d.observed?('Served means the app answered that route during the verified run '+d.observed.run+(d.observed.stale?', before the latest source change. Run again to refresh.':'.')):'No verified run yet, so no route is confirmed by traffic. Run all to confirm them.'):null,
   h('div',{class:'row',style:'margin-bottom:12px'},chips,g.isRepo?null:h('span',{class:'small muted'},'Not a git repo, so only the working tree.')),
-  !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?h('div',{},d.routes.map(r=>routeRow(r))):
+  d&&d.coverage?coverageStrip(d):null,
+  !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?(d.events?areas(d):h('div',{},d.routes.map(r=>routeRow(r)))):
    h('div',{class:'empty'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},'No routes recognized here.'),h('div',{class:'small'},'Describe the behavior above and the agent drafts flows from the code instead.'))),
   d&&d.actions&&d.actions.length?library(d.actions):null,
+  d&&d.events&&d.events.length?feed(d.events):null,
   h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Two sources. The static scan reads FastAPI, Django, Express and plain node:http handlers from source text, which is a hint. The recording proxy in front of the app sees every request a run causes, including the ones a browser page makes, which is evidence.'),
    h('p',{},'Routes seen only in traffic have no source location yet. Routing the scan cannot read is listed above as a question for the agent.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
   ui.draft?draftCard():null);
  return[intent,reach]}
-function routeRow(r){const served=r.observedBy.length>0,declared=r.coveredBy.length>0,covered=served||declared;
+/* Coverage strip: where the app stands, and the riskiest routes nothing tests yet. */
+function coverageStrip(d){const c=d.coverage;const stat=(n,label,cls)=>h('span',{},h('b',{class:cls||null},String(n)),h('span',{class:'small muted'},label));
+ return h('div',{'data-testid':'coverage-strip',style:'margin:0 0 16px'},h('div',{class:'stats',style:'margin-top:0'},stat(c.domains,c.domains===1?'area':'areas'),stat(c.surfaces,'routes'),stat(c.observed,'served in a run'),stat(c.declared,'declared'),stat(c.untested,'untested',c.untested?'c-fail':null),
+   c.proven||c.failed?stat(c.proven,'scenarios proven','c-pass'):null,c.failed?stat(c.failed,'failing','c-fail'):null),
+  c.riskyUntested.length?h('div',{class:'card',style:'margin-top:14px','data-testid':'risky-untested'},h('span',{class:'label'},'Riskiest untested, draft these first'),
+   c.riskyUntested.map(x=>{const r=d.routes.find(y=>y.method===x.method&&y.path===x.path);return h('div',{class:'row',style:'justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)'},
+    h('span',{},h('span',{class:'mono small'},x.method+' '+x.path),h('span',{class:'small muted',style:'margin-left:10px'},x.risk.why.join(', '))),r?h('button',{class:'btn ghost sm',on:{click:()=>draftOne(r)}},'Draft'):null)})):null)}
+/* Routes grouped by the area of code that declares them, riskiest area and route first. */
+function areas(d){const risk=new Map();const out=[];let group=null;
+ for(const e of d.events){if(e.kind==='domain.found'){group={e,routes:[]};out.push(group)}else if(e.kind==='surface.found'&&group){const r=d.routes.find(y=>y.method===e.method&&y.path===e.path);if(r){risk.set(r,e.risk);group.routes.push(r)}}}
+ return h('div',{'data-testid':'areas'},out.map(g=>h('section',{style:'margin-bottom:14px','data-testid':'area'},
+  h('div',{class:'row small',style:'gap:8px;margin:4px 0'},h('b',{style:'font-weight:500'},g.e.domain),h('span',{class:'muted'},g.routes.length+' route'+(g.routes.length===1?'':'s')+(g.e.from==='url'?' · grouped by URL':''))),
+  g.routes.map(r=>routeRow(r,risk.get(r))))))}
+/* What discovery did, in plain words, in the order it happened. */
+function feed(events){return h('details',{class:'more','data-testid':'discovery-feed'},h('summary',{},'What discovery did ('+events.length+' steps)'),
+ h('div',{class:'log','aria-live':'polite'},events.map((e,i)=>h('div',{class:'fade',style:'animation-delay:'+Math.min(i*40,1200)+'ms'},(e.kind==='question.asked'?'? ':e.kind==='flow.failed'?'✗ ':e.kind==='flow.proven'?'✓ ':'')+e.summary))))}
+function routeRow(r,risk){const served=r.observedBy.length>0,declared=r.coveredBy.length>0,covered=served||declared;
  const note=served?'served during '+r.observedBy.join(', '):r.confirmedEarlier?'confirmed earlier in run '+r.confirmedEarlier.run+(declared?'; declared by '+r.coveredBy.join(', '):''):declared?'declared by '+r.coveredBy.join(', ')+', not seen in a verified run yet':'no flow reaches it';
  return h('div',{class:'route fade','data-testid':'route'},h('span',{class:'dot s '+(served?'pass':declared?'warn':'fail'),'aria-hidden':'true'}),
- h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,r.provenance==='traffic'?h('span',{class:'pill p-info',style:'margin-left:8px'},'traffic only'):r.provenance==='catalog'?h('span',{class:'pill p-info',style:'margin-left:8px'},'from catalog'):null,(r.actions||[]).map(a=>h('span',{class:'pill p-pass mono',style:'margin-left:8px'},a)),h('div',{class:'small '+(covered?'muted':'c-fail')},note)),
+ h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,r.provenance==='traffic'?h('span',{class:'pill p-info',style:'margin-left:8px'},'traffic only'):r.provenance==='catalog'?h('span',{class:'pill p-info',style:'margin-left:8px'},'from catalog'):null,(r.actions||[]).map(a=>h('span',{class:'pill p-pass mono',style:'margin-left:8px'},a)),risk&&risk.score>=3?h('span',{class:'pill '+(covered?'p-none':'p-warn'),style:'margin-left:8px',title:'risk '+risk.score},risk.why.join(', ')):risk&&risk.pii?h('span',{class:'pill p-none',style:'margin-left:8px'},'personal data'):null,h('div',{class:'small '+(covered?'muted':'c-fail')},note)),
  h('span',{class:'where mono small muted',style:'overflow-wrap:anywhere'},r.file?r.file+(r.line?':'+r.line:''):'not in scanned source'),covered||r.method==='ANY'?h('span'):h('button',{class:'btn ghost sm',on:{click:()=>draftOne(r)}},'Draft'))}
 /* Reusable actions: the step sequences flows compose with use:, and the routes each one reaches. */
 function library(actions){return h('section',{style:'margin-top:24px','aria-label':'Reusable actions','data-testid':'action-library'},
