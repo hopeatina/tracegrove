@@ -4,7 +4,7 @@
  * Producer flags are redundant checks, never authority.
  */
 import {
-  AssertionObservation, BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
+  AssertionObservation, BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CampaignResult, Coverage, digestOfValue, freeze, parseAs,
   type Assertion, type CaseSpec, type EnvironmentBinding, type ExecutionReceipt, type Outcome,
   type PredicateT, type Ref, type SelectionManifest, type StepObservation, type TargetTuple, type Scope,
 } from '../protocol/index.ts';
@@ -123,6 +123,11 @@ export function evaluateAssertions(spec: CaseSpec, environmentClass: Environment
       const expected = spec.steps.find(item => item.id === assertion.stepId);
       if (!conversation.success || expected?.kind !== 'conversation.run' || conversation.data.endpoint !== expected.command.endpoint) { result = 'not_observed'; reasonCode = 'invalid_conversation_observation'; }
       else { const evaluation = evaluatePredicate(assertion.predicate, { body: conversation.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
+    } else if (assertion.oracle.name === 'standin.observation') {
+      const standIn = StandInObservation.safeParse(step.output);
+      const expected = spec.steps.find(item => item.id === assertion.stepId);
+      if (!standIn.success || expected?.kind !== 'standin.observe' || standIn.data.standIn !== expected.command.standIn) { result = 'not_observed'; reasonCode = 'invalid_stand_in_observation'; }
+      else { const evaluation = evaluatePredicate(assertion.predicate, { body: standIn.data }); result = evaluation.pass ? 'pass' : 'fail'; actual = evaluation.actual; reasonCode = evaluation.reason; }
     } else if (assertion.oracle.name === 'job.observation') {
       const job = NativeJobObservation.safeParse(step.output);
       if (!job.success) { result = 'not_observed'; reasonCode = 'invalid_native_job_observation'; }

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "delayMs": {
+      "maximum": 60000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "drop": {
+      "type": "boolean"
+    },
+    "route": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^\\/[A-Za-z0-9_.~:/{}*-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "path"
+      ],
+      "type": "object"
+    },
+    "standIn": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "status": {
+      "maximum": 599,
+      "minimum": 100,
+      "type": "integer"
+    },
+    "times": {
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "standIn",
+    "route",
+    "times"
+  ],
+  "type": "object"
+}

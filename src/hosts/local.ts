@@ -14,6 +14,7 @@ import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
 import { defineHost, type ExecutorHost, type HostCapabilities, type HostSession, type HostStartContext } from './types.ts';
 import { observeApplicationRuntime } from './runtime.ts';
+import { StandIns } from '../adapters/standin/server.ts';
 import { SnapshotLaunchObservation, SnapshotLaunchFailure, identityFromEntries, sourceIdentityDigest } from './sourceIdentity.ts';
 import { NativeJobDriver } from '../adapters/job/driver.ts';
 import { startTrafficProxy, type TrafficRecorder } from './trafficProxy.ts';
@@ -111,7 +112,9 @@ export class LocalProcessHost implements ExecutorHost {
     const values = { port: String(assignedPort), dataDir };
     const launchEnv = assigned ? Object.fromEntries(Object.entries(launch.env).map(([k, v]) => [k, substitute(v, values)])) : launch.env;
     const launchArgs = assigned ? launch.args.map((arg) => substitute(arg, values)) : launch.args;
-    const env: Record<string, string> = { ...launchEnv, ...(launch.nativeJobs ? { TRACEGROVE_NATIVE_JOBS: launch.nativeJobs } : {}), PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
+    // Stand-ins start before the app so their URLs are in its environment from the first request.
+    const standIns = launch.standIns?.length ? await StandIns.start(launch.standIns) : undefined;
+    const env: Record<string, string> = { ...launchEnv, ...(standIns ? standIns.env() : {}), ...(launch.nativeJobs ? { TRACEGROVE_NATIVE_JOBS: launch.nativeJobs } : {}), PATH: process.env.PATH ?? '', ...(assigned && process.env.HOME ? { HOME: process.env.HOME } : {}), [launch.portEnv]: String(assignedPort), [launch.dataDirEnv]: dataDir, [launch.credentialsEnv]: JSON.stringify(tokenMap) };
     const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js';
     const child: ChildProcess = fork(new URL(`./localSupervisor.${extension}`, import.meta.url), [], {
       cwd, env: { PATH: process.env.PATH ?? '' }, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -230,10 +233,12 @@ export class LocalProcessHost implements ExecutorHost {
       ],
       dataDir,
       ...(nativeJobs ? { nativeJobs } : {}),
+      ...(standIns ? { standIns } : {}),
       stop(reason: string) {
         if (stopResult) return stopResult;
         stopResult = (async () => {
         await recorder.close().catch(() => undefined);
+        await standIns?.close().catch(() => undefined);
         const exited = new Promise<boolean>((resolveExit) => {
           if (child.exitCode !== null || child.signalCode !== null) return resolveExit(true);
           child.once('exit', () => resolveExit(true));
@@ -259,6 +264,7 @@ export class LocalProcessHost implements ExecutorHost {
     return session;
     } catch (error) {
       await traffic?.close().catch(() => undefined);
+      await standIns?.close().catch(() => undefined);
       // Disconnect lets the trusted owner kill its application group and remove
       // the owned workspace, including when startup failed before readiness.
       if (child.connected) child.disconnect();

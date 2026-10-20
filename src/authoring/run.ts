@@ -13,7 +13,7 @@ import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -55,6 +55,8 @@ function observedLine(output: unknown): string | null {
   if (conversation.success) return conversationLine(conversation.data);
   const mcp = McpToolObservation.safeParse(output);
   if (mcp.success) return `MCP ${mcp.data.endpoint} ${mcp.data.tool} -> ${mcp.data.isError ? 'tool error' : 'result'} ${excerpt(mcp.data.structuredContent ?? mcp.data.content)}`;
+  const standIn = StandInObservation.safeParse(output);
+  if (standIn.success) return standInLine(standIn.data);
   const browser = BrowserObservation.safeParse(output);
   if (browser.success) return browser.data.text === null ? `${browser.data.kind} -> ${browser.data.status ?? 'completed'}` : excerpt(browser.data.text);
   const o = output as { method?: string; url?: string; status?: number; body?: unknown; bodyText?: string | null };
@@ -67,6 +69,13 @@ function conversationLine(observation: ConversationObservation): string {
     ...turn.toolCalls.map((call) => `  tool ${call.name}(${excerpt(call.arguments, 160)}) -> ${excerpt(call.result, 160)}`)].join('\n')).join('\n');
 }
 
+function standInLine(o: StandInObservation): string {
+  const where = o.route ? ` ${o.route.method} ${o.route.path}` : '';
+  return [`${o.standIn}${where} received ${o.count} call${o.count === 1 ? '' : 's'}`,
+    ...o.calls.slice(0, 5).map((c, i) => `  ${i + 1}. ${c.method} ${c.path} ${excerpt(c.json ?? c.text ?? '', 90)} -> ${c.status === 0 ? 'dropped' : c.status}${c.faulted ? ' (fault)' : ''}`),
+    ...(o.calls.length > 5 ? [`  … ${o.calls.length - 5} more`] : [])].join('\n');
+}
+
 export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined): CaseReport {
   const stepInfo = new Map((flow?.steps ?? []).map((s) => [s.id, s]));
   const steps: StepReport[] = receipt.steps.map((s) => {
@@ -76,9 +85,12 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const job = NativeJobObservation.safeParse(s.output);
     const mcp = McpToolObservation.safeParse(s.output);
     const conversation = ConversationObservation.safeParse(s.output);
+    const standIn = StandInObservation.safeParse(s.output);
+    const own = receipt.assertions.filter((a) => a.assertionId.replace(/\.expect$/, '') === s.stepId);
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
       declared: !!info, expectStatus: info?.expectStatus ?? null, ...(info?.expectation ? { expectation: info.expectation } : {}),
-      ...(conversation.success ? { observedText: conversationLine(conversation.data) } : mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
+      ...(own.length && s.result === 'completed' ? { checks: own.every((a) => a.result === 'pass') ? 'pass' as const : 'fail' as const } : {}),
+      ...(standIn.success ? { observedText: standInLine(standIn.data) } : conversation.success ? { observedText: conversationLine(conversation.data) } : mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
   const order = new Map(receipt.steps.map((s, index) => [s.stepId, index]));
@@ -101,7 +113,9 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
   } else if (failedAssertion) {
     const stepId = failedAssertion.assertionId.replace(/\.expect$/, '');
     const step = receipt.steps.find((s) => s.stepId === stepId);
-    failure = { step: stepInfo.get(stepId)?.name ?? stepId, message: failedAssertion.reasonCode ?? `assertion ${failedAssertion.result}`, observed: observedLine(step?.output) };
+    const standIn = StandInObservation.safeParse(step?.output);
+    const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
+    failure = { step: stepInfo.get(stepId)?.name ?? stepId, message: counted ?? failedAssertion.reasonCode ?? `assertion ${failedAssertion.result}`, observed: observedLine(step?.output) };
   } else if (receipt.outcome !== 'passed') {
     failure = { step: '(case)', message: receipt.reasonCodes.join(', ') || receipt.outcome, observed: null };
   }

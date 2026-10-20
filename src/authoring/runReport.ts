@@ -7,7 +7,9 @@ const Text = z.string().max(65536);
 export const SavedRunName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/, 'run name must be one local path segment');
 export const StepReport = z.object({ id: Text, name: Text, method: Text, path: Text, result: Text, status: z.number().int().nullable(),
   durationMs: z.number().nonnegative().nullable(), reason: Text.nullable(), observedText: Text.nullable().optional(),
-  declared: z.boolean().optional(), expectStatus: z.number().int().nullable().optional(), expectation: Text.optional() }).strict();
+  declared: z.boolean().optional(), expectStatus: z.number().int().nullable().optional(), expectation: Text.optional(),
+  /** 'fail' when a check on this step's evidence failed, even though the step itself completed. */
+  checks: z.enum(['pass', 'fail']).optional() }).strict();
 export type StepReport = z.infer<typeof StepReport>;
 export const CaseReport = z.object({ caseId: Text, file: Text, title: Text, outcome: Text, durationMs: z.number().nonnegative(), steps: z.array(StepReport).max(10000),
   failure: z.object({ step: Text, message: Text, observed: Text.nullable(), fix: Text.nullable().optional(), code: Text.optional() }).strict().nullable(), videos: z.array(RunVideo).max(10000).optional(),
