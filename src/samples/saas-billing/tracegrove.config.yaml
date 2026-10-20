@@ -1,0 +1,25 @@
+project: plotline-billing
+app:
+  adapter: node
+  entry: app/billing.mjs
+  health: /health
+  sources: [app/**]
+  env:
+    WEBHOOK_SECRET: whsec_test_plotline
+  inject:
+    port: PORT
+    dataDir: BILLING_DATA_DIR
+    tokens: BILLING_TOKENS
+standIns:
+  payments:              # the card processor (Stripe-like)
+    env: PAYMENTS_URL
+    idempotencyKey: idempotencyKey
+    respond:
+      POST /v1/charges: { status: 200, json: { id: ch_test_1, status: succeeded } }
+  email:                 # the transactional email provider
+    env: EMAIL_URL
+    respond:
+      POST /send: 202
+personas:
+  owner: { subject: alice }
+  other_tenant: { subject: bob }

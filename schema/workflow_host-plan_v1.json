@@ -1048,6 +1048,12 @@
                     "pattern": "^[A-Z_][A-Z0-9_]*$",
                     "type": "string"
                   },
+                  "idempotencyKey": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+                    "type": "string"
+                  },
                   "name": {
                     "maxLength": 64,
                     "minLength": 1,

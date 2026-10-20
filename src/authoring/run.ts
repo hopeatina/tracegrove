@@ -13,7 +13,8 @@ import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CaseSpec, type ExecutionReceipt } from '../protocol/index.ts';
+import { getPath } from '../core/reducer.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -83,7 +84,23 @@ function standInLine(o: StandInObservation): string {
     ...(o.calls.length > 5 ? [`  … ${o.calls.length - 5} more`] : [])].join('\n');
 }
 
-export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined): CaseReport {
+type Assertions = CaseSpec['assertions'];
+const brief = (value: unknown) => { const text = JSON.stringify(value) ?? 'nothing'; return text.length > 80 ? `${text.slice(0, 77)}…` : text; };
+
+/** "body.x differs" says where, not what: add the observed and expected values from the sealed spec and evidence. */
+function explainDiffers(message: string, output: unknown, assertions: Assertions, stepId: string): string {
+  const m = message.match(/^(\S+) differs$/);
+  if (!m) return message;
+  type P = Assertions[number]['predicate'];
+  const flat = (p: P): P[] => p.kind === 'all' ? p.predicates.flatMap(flat) : [p];
+  const predicate = assertions.filter((a) => a.stepId === stepId).flatMap((a) => flat(a.predicate)).find((p) => p.kind === 'json_path_equals' && p.path === m[1]);
+  if (!predicate || predicate.kind !== 'json_path_equals') return message;
+  const o = output as { status?: unknown; body?: unknown } | null;
+  const got = [getPath({ body: output }, m[1]!), getPath({ status: o?.status, body: o?.body }, m[1]!)].find((g) => g.present);
+  return `${m[1]} is ${got ? brief(got.value) : 'missing'}, expected ${brief(predicate.value)}`;
+}
+
+export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined, assertions: Assertions = []): CaseReport {
   const stepInfo = new Map((flow?.steps ?? []).map((s) => [s.id, s]));
   const steps: StepReport[] = receipt.steps.map((s) => {
     const info = stepInfo.get(s.stepId);
@@ -113,7 +130,7 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const status = failedStep.reasonCode?.match(/^unexpected_status:(\d+)$/);
     const expected = receipt.assertions.find((a) => a.assertionId === `${failedStep.stepId}.expect`);
     const want = stepInfo.get(failedStep.stepId)?.expectStatus;
-    failure = { step: name, message: status ? `expected status ${want ?? '?'}, got ${status[1]}` : failedStep.reasonCode ?? 'failed', observed: observedLine(failedStep.output) };
+    failure = { step: name, message: status ? `expected status ${want ?? '?'}, got ${status[1]}` : failedStep.reasonCode ? explainDiffers(failedStep.reasonCode, failedStep.output, assertions, failedStep.stepId) : 'failed', observed: observedLine(failedStep.output) };
     if (!status && expected?.reasonCode && expected.reasonCode !== failedStep.reasonCode) failure.message = `${failure.message} (${expected.reasonCode})`;
     const caseLevel = receipt.reasonCodes.filter(code => code !== failedStep.reasonCode && !code.startsWith('unexpected_status') && !code.startsWith('assertion_'));
     if (caseLevel.length) failure.message = `${failure.message}\nalso: ${caseLevel.join(', ')}`;
@@ -122,7 +139,8 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const step = receipt.steps.find((s) => s.stepId === stepId);
     const standIn = StandInObservation.safeParse(step?.output);
     const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
-    failure = { step: stepInfo.get(stepId)?.name ?? stepId, message: counted ?? failedAssertion.reasonCode ?? `assertion ${failedAssertion.result}`, observed: observedLine(step?.output) };
+    const message = counted ?? (failedAssertion.reasonCode ? explainDiffers(failedAssertion.reasonCode, step?.output, assertions, stepId) : `assertion ${failedAssertion.result}`);
+    failure = { step: stepInfo.get(stepId)?.name ?? stepId, message, observed: observedLine(step?.output) };
   } else if (receipt.outcome !== 'passed') {
     failure = { step: '(case)', message: receipt.reasonCodes.join(', ') || receipt.outcome, observed: null };
   }
@@ -246,7 +264,8 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
   }
   const flowsById = new Map(compiled.flows.map((f) => [f.caseId, f]));
   const cases = (summary?.receipts ?? []).map((r) => {
-    const report = caseReport(r, flowsById.get(r.caseRef.id));
+    const spec = project.suiteCases.map((entry) => project.corpus.getAs(CaseSpec, entry.ref)).find((c) => c.ref.id === r.caseRef.id);
+    const report = caseReport(r, flowsById.get(r.caseRef.id), spec?.assertions ?? []);
     // A host that never started explains every not_run step; surface its sealed message.
     const events = join(runDir, 'bundle', 'cells', r.selectionCellId, 'events.jsonl');
     if (bundleVerified && existsSync(events)) report.requests = verifiedObservedRequests(r, readFileSync(events));

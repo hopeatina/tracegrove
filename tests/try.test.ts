@@ -37,6 +37,12 @@ describe('tracegrove try', () => {
     expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true });
   }, 30_000);
 
+  it('runs the SaaS billing example with a payments stand-in that dedupes idempotency keys', async () => {
+    const { exitCode, facts } = await run('saas-billing');
+    expect(exitCode, JSON.stringify(facts)).toBe(0);
+    expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true, totals: { passed: 4 } });
+  }, 30_000);
+
   it.each(EXAMPLES.flatMap((e) => e.bugs.map((b) => [e.name, b.name, b.caughtBy] as const)))('%s --bug %s is caught at "%s"', async (example, bug, step) => {
     const { exitCode, facts } = await run(example, bug);
     expect(facts).toMatchObject({ outcome: 'assertion_failed', bundleVerified: true, bug });

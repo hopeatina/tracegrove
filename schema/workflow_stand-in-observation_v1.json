@@ -63,6 +63,17 @@
               }
             ]
           },
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "method": {
             "maxLength": 16,
             "type": "string"
@@ -79,6 +90,9 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "repeat": {
+            "type": "boolean"
           },
           "status": {
             "maximum": 9007199254740991,
@@ -113,6 +127,11 @@
       "type": "array"
     },
     "count": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "distinct": {
       "maximum": 2147483647,
       "minimum": 0,
       "type": "integer"

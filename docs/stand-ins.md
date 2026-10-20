@@ -68,6 +68,37 @@ npx tracegrove try vet-receptionist --bug ignore_automation_errors
 npx tracegrove try vet-receptionist --bug double_book
 ```
 
+## Idempotency keys
+
+Payment providers dedupe retries by an idempotency key. Tell the stand-in which body field carries it, and every call records its `key` and whether it `repeat`s an earlier call to the same route; readbacks also get `distinct`, the number of calls the provider would treat as separate:
+
+```yaml
+standIns:
+  payments:
+    env: PAYMENTS_URL
+    idempotencyKey: idempotencyKey
+    respond:
+      POST /v1/charges: { status: 200, json: { id: ch_1 } }
+```
+
+```yaml
+  - name: the processor returns 500 once
+    standin: payments
+    fail: { route: POST /v1/charges, status: 500, times: 1 }
+  - name: owner upgrades
+    POST: /subscription
+    json: { plan: business }
+    expect: 200
+  - name: the retry reused the idempotency key
+    standin: payments
+    received: POST /v1/charges
+    expect:
+      calls: 2
+      json: { "calls[1].repeat": true, distinct: 1 }
+```
+
+`tracegrove try saas-billing --bug double_charge` shows the failure this catches: `body.calls[1].repeat is false, expected true`.
+
 ## What it proves and what it doesn't
 
 A passing stand-in check proves your app sent those requests, with those bodies, in that run, and how it behaved when the service failed in the way you declared. It does not prove the real service accepts that payload, or that its real failures look like yours. Pair stand-in flows with a few flows against the real sandbox (an n8n test workflow, a Stripe test key) in a staging [environment](environments.md).

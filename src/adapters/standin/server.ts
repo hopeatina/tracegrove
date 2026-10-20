@@ -31,6 +31,12 @@ function routeMatches(pattern: string, path: string): boolean {
   return p.length === a.length;
 }
 
+/** The idempotency key at a dotted body path, as text; null when absent. */
+function keyOf(json: unknown, path: string): string | null {
+  const value = path.split('.').reduce<unknown>((at, part) => at && typeof at === 'object' ? (at as Record<string, unknown>)[part] : undefined, json);
+  return typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 400) : null;
+}
+
 const readBody = (req: IncomingMessage) => new Promise<string>((resolve, reject) => {
   let size = 0; const chunks: Buffer[] = [];
   req.on('data', (chunk: Buffer) => { size += chunk.length; if (size <= MAX_BODY) chunks.push(chunk); });
@@ -66,8 +72,11 @@ export class StandIn {
     if (armed) armed.remaining--;
     const response = this.spec.responses.find(r => r.method === method && routeMatches(r.path, url.pathname));
     const status = armed?.fault.status ?? response?.status ?? 404;
+    const keyed = this.spec.idempotencyKey ? keyOf(json, this.spec.idempotencyKey) : undefined;
+    const repeat = keyed ? this.calls.some(c => c.key === keyed && c.method === method && c.path === url.pathname) : false;
     if (this.calls.length < MAX_CALLS) this.calls.push({ method, path: url.pathname, query: Object.fromEntries(url.searchParams), json: json as Call['json'],
-      text: json === null && text ? text.slice(0, MAX_BODY) : null, status: armed?.fault.drop ? 0 : status, faulted: Boolean(armed), at: new Date().toISOString() });
+      text: json === null && text ? text.slice(0, MAX_BODY) : null, status: armed?.fault.drop ? 0 : status, faulted: Boolean(armed), at: new Date().toISOString(),
+      ...(this.spec.idempotencyKey ? { key: keyed ?? null, repeat } : {}) });
     if (armed?.fault.delayMs) await new Promise(resolve => setTimeout(resolve, armed.fault.delayMs));
     if (armed?.fault.drop) { req.socket.destroy(); return; }
     const body = armed?.fault.status !== undefined ? { error: 'stand_in_fault', status } : response ? response.json ?? {} : { error: 'stand_in_route_not_declared', method, path: url.pathname };
@@ -76,7 +85,8 @@ export class StandIn {
 
   observe(route: StandInQuery['route']): StandInObservation {
     const calls = this.calls.filter(c => !route || (c.method === route.method && routeMatches(route.path, c.path)));
-    return { kind: 'stand_in', standIn: this.spec.name, route, count: calls.length, calls: calls.map(c => ({ ...c, query: { ...c.query } })), attempts: 0 };
+    return { kind: 'stand_in', standIn: this.spec.name, route, count: calls.length, calls: calls.map(c => ({ ...c, query: { ...c.query } })), attempts: 0,
+      ...(this.spec.idempotencyKey ? { distinct: calls.filter(c => !c.repeat).length } : {}) };
   }
 
   async close(): Promise<void> {

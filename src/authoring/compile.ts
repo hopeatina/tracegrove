@@ -382,7 +382,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       // Declared stand-ins start for every launched run, since the app may need their URLs just to boot.
       ...(Object.keys(config.standIns ?? {}).length ? { standIns: Object.entries(config.standIns ?? {}).map(([name, standIn]) => ({ name, env: standIn.env,
         responses: Object.entries(standIn.respond).map(([route, answer]) => { const [method, path] = route.split(' ');
-          return { method, path, ...(typeof answer === 'number' ? { status: answer } : answer) }; }) })) } : {}),
+          return { method, path, ...(typeof answer === 'number' ? { status: answer } : answer) }; }),
+        ...(standIn.idempotencyKey ? { idempotencyKey: standIn.idempotencyKey } : {}) })) } : {}),
     },
     mockResponsesRef: null, transportPolicy: 'in_process', isolationPolicy: 'fresh_directory_and_port', networkRules: ['loopback_only'],
     requestedResources: { cpu: 1, memoryMb: 512, diskMb: 256 }, requiredCapabilities: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', ...(hasJobs ? ['native_job'] : [])],

@@ -1,0 +1,27 @@
+title: Upgrading to Team charges the server's price once and the invoice is only visible to its account
+risk: critical
+tags: [billing, payments, authz]
+rubric:
+  - The amount charged comes from the price list, not from the request
+steps:
+  - name: owner upgrades to Team, sending a tampered price
+    POST: /subscription
+    json: { plan: team, price: 1 }
+    expect: { status: 200, json: { account.plan: team } }
+    save: { invoiceId: invoice.id }
+  - name: the card was charged the Team price once
+    standin: payments
+    received: POST /v1/charges
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.amount": 4900
+        "calls[0].json.customer": acme
+  - name: the account is on Team
+    GET: /account
+    observe: true
+    expect: { status: 200, json: { account.plan: team, account.dunning: false } }
+  - name: the other tenant can't see the invoice
+    GET: /invoices/{invoiceId}
+    as: other_tenant
+    expect: { status: 404, absent: [invoice] }

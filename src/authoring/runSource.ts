@@ -64,7 +64,7 @@ export function readRunSource(runDir: string, input: unknown): CheckedRunReport 
       const hint = report.cases.find(c => c.caseId === spec.ref.id)?.file;
       const flow: CompiledFlowInfo = { caseId: spec.ref.id, file: RepositoryPath.safeParse(hint).success ? hint! : '', title: spec.purpose,
         tags: [], risk: spec.risk, fixtures: [], steps: spec.steps.map(step => stepInfo(step, spec.personaRef.id, spec.assertions)) };
-      const verified = caseReport(receipt, flow);
+      const verified = caseReport(receipt, flow, spec.assertions);
       // Requests are read from the sealed events, bound to the receipt's events digest.
       try { verified.requests = verifiedObservedRequests(receipt, readBoundedFile(join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId), 'events.jsonl'), 16 * 1024 * 1024)); } catch { verified.requests = []; }
       return verified;
