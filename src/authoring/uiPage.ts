@@ -181,7 +181,7 @@ function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg
   const box=y=>({x0:px-half,x1:px+half,y0:y-11,y1:y+3}),hit=b=>placed.some(q=>b.x0<q.x1&&q.x0<b.x1&&b.y0<q.y1&&q.y0<b.y1);
   let ly=py-(rows-1)*gap*.86-r-8;if(hit(box(ly)))ly=py+r+15;placed.push(box(ly));minY=Math.min(minY,ly-12);
   labels.append(sv('text',{x:px.toFixed(1),y:ly.toFixed(1),'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},text))});
- const res=new Map();for(const c of sc)for(const x of c.steps){if(!x.path||x.method==='UI')continue;const k=resource(x.path);const v=res.get(k)||{fail:false,pass:false};if(x.result==='fail')v.fail=true;if(x.result==='pass')v.pass=true;res.set(k,v)}
+ const res=new Map();for(const c of sc)for(const x of c.steps){if(!x.path||!x.path.startsWith('/')||['UI','JOB','MCP'].includes(x.method))continue;const k=resource(x.path);const v=res.get(k)||{fail:false,pass:false};if(x.result==='fail')v.fail=true;if(x.result==='pass')v.pass=true;res.set(k,v)}
  const keys=[...res.keys()].slice(0,8);keys.forEach((k,i)=>{const m=keys.length;const a=m===1?Math.PI/2:0.3+(Math.PI-0.6)*(m-1-i)/(m-1);const tx=CX+Math.cos(a)*Math.min(270,80+60*m),ty=SOIL+18+Math.sin(a)*56;const v=res.get(k);
   roots.append(sv('path',{class:'root',d:line([[CX,SOIL+1],[(CX+tx)/2,SOIL+10+Math.sin(a)*20],[tx,ty]]),'stroke-width':1.6}),sv('circle',{class:'tip '+(v.fail?'fail':v.pass?'':'none'),cx:tx.toFixed(1),cy:ty.toFixed(1),r:3.6}),
    sv('text',{x:tx.toFixed(1),y:(ty+16+(i%2)*12).toFixed(1),'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
