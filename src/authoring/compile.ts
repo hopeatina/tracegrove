@@ -379,7 +379,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       portMode: 'assigned', runtime: launch.runtime,
       ...(sourceSnapshot ? { sourceSnapshot } : {}),
       ...(hasJobs ? { nativeJobs: config.app.nativeJobs } : {}),
-      ...(hasStandIns ? { standIns: Object.entries(config.standIns ?? {}).map(([name, standIn]) => ({ name, env: standIn.env,
+      // Declared stand-ins start for every launched run, since the app may need their URLs just to boot.
+      ...(Object.keys(config.standIns ?? {}).length ? { standIns: Object.entries(config.standIns ?? {}).map(([name, standIn]) => ({ name, env: standIn.env,
         responses: Object.entries(standIn.respond).map(([route, answer]) => { const [method, path] = route.split(' ');
           return { method, path, ...(typeof answer === 'number' ? { status: answer } : answer) }; }) })) } : {}),
     },

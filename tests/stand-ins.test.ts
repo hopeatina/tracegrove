@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { tryExample } from '../src/cli/try.ts';
+import { runTests } from '../src/authoring/run.ts';
 import { Deadline } from '../src/core/deadline.ts';
 import { StandInError, StandIns } from '../src/adapters/standin/server.ts';
 import { StandInFault } from '../src/protocol/index.ts';
@@ -54,3 +59,15 @@ describe('stand-ins', () => {
     expect(() => standIns.arm(StandInFault.parse({ standIn: 'billing', route: { method: 'POST', path: '/x' }, times: 1, status: 500 }))).toThrow(StandInError);
   });
 });
+
+it('starts declared stand-ins for flows that never touch them, so the app can boot', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'tracegrove-standin-boot-'));
+  try {
+    const out = join(root, 'vet');
+    await tryExample({ example: 'vet-receptionist', bug: null, out, open: false, port: null, json: true, samplesRoot: join(import.meta.dirname, '../src/samples'), write: () => {} });
+    for (const file of readdirSync(join(out, 'tracegrove/calls'))) unlinkSync(join(out, 'tracegrove/calls', file));
+    writeFileSync(join(out, 'tracegrove/calls/greeting.flow.yaml'), 'title: Max answers the phone\nsteps:\n  - as: none\n    voice:\n      endpoint: /voice\n      turns:\n        - say: Hello?\n          expect: { says: [Riverbend] }\n');
+    const { report } = await runTests({ configPath: join(out, 'tracegrove.config.yaml') });
+    expect(report.outcome).toBe('passed');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}, 30_000);
