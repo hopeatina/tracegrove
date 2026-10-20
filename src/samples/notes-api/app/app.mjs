@@ -53,7 +53,7 @@ const server = createServer(async (req, res) => {
     if (id) {
       const note = readNote(id);
       if (!note) return send(res, 404, { error: 'not_found' });
-      if (bug === 'share_with_strangers' && req.method === 'GET') return send(res, 200, { note });
+      if (bug === 'share_with_strangers' && req.method === 'GET') return send(res, 200, { note: { ...note } });
       if (note.ownerId !== userId) return send(res, 403, { error: 'forbidden' });
       if (req.method === 'GET') return send(res, 200, { note });
       if (req.method === 'DELETE' && bug === 'keep_on_delete') return send(res, 204);
