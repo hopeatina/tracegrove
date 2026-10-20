@@ -174,6 +174,47 @@ One comment per PR, updated in place: whether every claim held on this commit, t
 
 </details>
 
+<details>
+<summary><b>Calendars, CRMs, webhooks and real call logs</b></summary>
+
+Declare the services your app calls under `standIns:` and tracegrove replaces each with a recording server for the run. Flows read back exactly what your app sent, and can make a service fail, stall or hang up:
+
+```yaml
+- name: the booking automation is down
+  standin: automation
+  fail: { route: POST /webhook/book-appointment, status: 503, times: 5 }
+- name: caller tries to book
+  voice:
+    endpoint: /voice
+    turns:
+      - say: Can I book Pepper for Thursday at 11am? I'm Ana, 555-0177.
+        expect: { says: [couldn't confirm, call you back], notSays: [all set] }
+- name: the front desk got a callback request
+  standin: automation
+  received: POST /webhook/callback-request
+  expect: { calls: 1 }
+```
+
+`tracegrove import-call call.json --out tracegrove/calls/refund.flow.yaml` turns a real Retell, Vapi or plain-text log into a draft flow. Phone numbers and emails are swapped for test values, and what the agent said is kept as comments so you choose what must hold. [Stand-ins](docs/stand-ins.md).
+
+</details>
+
+## What a pass proves, and what it doesn't
+
+| You might assume | What tracegrove actually checks |
+| --- | --- |
+| The booking really happened | Yes. A separate read from your backend or a stand-in confirms it; the agent's own reply never counts as proof. |
+| The agent works on a real phone line | No. Text goes in over RTVI, so speech recognition, voices, phone latency and interruptions aren't tested. |
+| The calendar, CRM or payment API accepts it | Only what your app sent. Stand-ins prove the request, not that the real service takes it; run a few flows against a sandbox [environment](docs/environments.md) for that. |
+| The agent handles whatever callers say | Only the conversations you scripted. `import-call` turns real calls into scripts, but coverage is as good as the scripts. |
+| The agent said the right thing, kindly | Only the phrases you listed (`says`, `notSays`). Tone and judgment need a person's sign-off; graded rubrics are planned. |
+| It works with hosted voice platforms | Pipecat and anything speaking RTVI, plus HTTP chat. Retell and Vapi transports are planned; today, test the backend they call. |
+| Discovery found every route | Routes found by reading code are marked unverified until a run reaches them. |
+| The evidence can't be tampered with | Every run is hash-chained and checked on read. It isn't signed by a third party yet. |
+| It runs on my stack | Node, FastAPI and Django apps today. Apps that need a build step first (Next.js, NestJS) can't be launched yet. |
+
+When a person disagrees with a passing claim, `tracegrove reject <claim> --reason "…"` records why, and the [PR card](docs/pr-proof-card.md) fails until it's fixed.
+
 ## Hand it to your coding agent
 
 Give Claude Code or Codex the tracegrove tools, then paste one prompt. The tools work in a repo that has never seen tracegrove.

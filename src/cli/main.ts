@@ -5,7 +5,7 @@
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { tryExample } from './try.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
@@ -66,6 +66,7 @@ import { retainNativeImport } from '../authoring/nativeImports.ts';
 import { decide, defaultReviewer, readiness } from '../authoring/readiness.ts';
 import { renderHandoff } from '../authoring/handoff.ts';
 import { renderCard } from '../authoring/card.ts';
+import { importCall } from '../authoring/importCall.ts';
 import { renderReadiness } from './renderReadiness.ts';
 import { sealRun, unsealRun } from '../core/seal.ts';
 
@@ -145,6 +146,7 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   challenge <case> --reason <text> [--step <name>]     dispute a check without weakening it; keeps the claim open
   handoff [--out <file.html>] [--client <name>]        a self-contained page for your client: claims, transcripts, readbacks, sign-off
   card [<dir>...] [--commit <sha>] [--link <url>]       the PR proof card: Markdown saying which claims hold on this commit (reads saved runs)
+  import-call <log> [--out <flow.yaml>]                 draft a flow from a real call or chat log (Retell, Vapi, messages JSON, or text)
   seal [--run latest|<dir>] --out <file> [--remove]    encrypt a run folder (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
 
@@ -807,6 +809,20 @@ async function main(argv: string[]): Promise<number> {
       const card = renderCard({ dirs: args.flags._?.length ? args.flags._ : ['.'], commit: args.flags.commit ?? process.env.GITHUB_SHA ?? null, link: args.flags.link ?? null, title: args.flags.title ?? null });
       if (args.flags.out) { mkdirSync(dirname(resolve(args.flags.out)), { recursive: true }); writeFileSync(resolve(args.flags.out), card.markdown); }
       out(args, card, card.markdown.trimEnd());
+      return 0;
+    }
+    case 'import-call': {
+      const file = resolve(args.flags._![0]!);
+      const imported = importCall(readFileSync(file, 'utf8'), { name: args.flags.name, channel: args.flags.channel, endpoint: args.flags.endpoint, keepClientData: args.flags['keep-client-data'] });
+      if (args.flags.out) {
+        const target = resolve(args.flags.out);
+        if (existsSync(target) && !args.flags.force) throw new Blocked([{ code: 'flow_exists', detail: args.flags.out, action: 'choose another --out, or pass --force to replace it' }]);
+        mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, imported.yaml);
+      }
+      const { yaml, ...facts } = imported;
+      out(args, { ...facts, out: args.flags.out ?? null, yaml }, args.flags.out
+        ? `✓ drafted ${args.flags.out} from ${imported.turns.filter((t) => t.role === 'caller').length} caller turns${imported.replaced.length ? ` (swapped ${imported.replaced.map((r) => `${r.count} ${r.kind}`).join(', ')} for test values)` : ''}\nnext: add the phrases that must hold, then tracegrove test --grep ${basename(args.flags.out).replace(/\.flow\.ya?ml$/, '')}`
+        : yaml.trimEnd());
       return 0;
     }
     case 'seal': {

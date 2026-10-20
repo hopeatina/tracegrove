@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { tryExample } from '../src/cli/try.ts';
 import { CARD_MARKER, renderCard } from '../src/authoring/card.ts';
+import { decide, readiness } from '../src/authoring/readiness.ts';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -29,4 +30,18 @@ it('says every claim holds, or names the failing one with a repository path, fro
     file: relative(process.cwd(), join(bad, 'tracegrove/notes/create-read-delete.flow.yaml')) })]);
   expect(failed.markdown).toContain('| notes (notes-api) | 2 | ✅ all hold |');
   expect(failed.markdown).toContain('[Full report](https://example.com/report)');
+}, 60_000);
+
+it('fails the card when a person rejects a passing claim, and shows why', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'tracegrove-card-')); roots.push(root);
+  const good = await example(root, 'notes-api');
+  const [first, second] = readiness(good).claims;
+  decide(good, { case: first!.caseId, decision: 'rejected', by: 'Krittiya', reason: 'a deleted note should also disappear from search' });
+  const card = renderCard({ dirs: [good] });
+  expect(card).toMatchObject({ verdict: 'fails', totals: { rejected: 1, contradicted: 0 }, disputes: [expect.objectContaining({ decision: 'rejected', by: 'Krittiya' })] });
+  expect(card.markdown).toContain('is wrong, says Krittiya: a deleted note should also disappear from search');
+  expect(card.markdown).toContain('1 of 2 claims fail');
+
+  decide(good, { case: second!.caseId, decision: 'challenged', by: 'Krittiya', reason: 'this list check passes with an empty list' });
+  expect(renderCard({ dirs: [good] }).disputes.map((d) => d.decision)).toEqual(['rejected', 'challenged']);
 }, 60_000);

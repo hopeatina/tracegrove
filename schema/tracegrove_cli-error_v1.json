@@ -68,6 +68,7 @@
             "challenge",
             "handoff",
             "card",
+            "import-call",
             "seal",
             "unseal"
           ],

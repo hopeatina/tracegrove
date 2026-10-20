@@ -5,7 +5,7 @@ Most agents and apps succeed or fail at the edges: the calendar webhook, the CRM
 - check exactly what your app sent (the booking, the callback request, the transfer), with a separate read that does not trust your app's own reply;
 - make the service fail, answer slowly or hang up, and check that your app tells the truth to the caller and recovers.
 
-Stand-ins run only when tracegrove starts your app (`adapter: node`, `fastapi`, `django` or `command`). Each attempt gets fresh stand-ins, so calls never leak between flows.
+Stand-ins run only when tracegrove starts your app (`adapter: node`, `fastapi` or `django`). Each attempt gets fresh stand-ins, so calls never leak between flows.
 
 ## Declare them
 
