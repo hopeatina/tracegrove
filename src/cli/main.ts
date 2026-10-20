@@ -5,7 +5,7 @@
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
@@ -36,7 +36,7 @@ import { compileProject, findConfig } from '../authoring/compile.ts';
 import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
-import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
+import { checkProject, discoverProject, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
@@ -88,7 +88,8 @@ Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walk
   ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
 
 Agent-friendly commands (every one takes --json and never starts the app):
-  discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
+  discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
+                                                       --save records what is known in tracegrove/catalog.yaml
   check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them and run each one end to end, sending failures back
@@ -262,11 +263,14 @@ async function main(argv: string[]): Promise<number> {
 
     case 'discover': {
       const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
+      const saved = args.flags.save === true ? saveCatalog(flag(args, 'dir') ?? '.', result) : null;
       const observed = result.observed ? `observed traffic from run ${result.observed.run}${result.observed.stale ? ' (source changed since)' : ''}` : 'no verified run yet, so nothing is observed';
-      const state = (r: typeof result.routes[number]) => r.observedBy.length ? 'observed ' : r.coveredBy.length ? 'declared ' : 'UNCOVERED';
+      const state = (r: typeof result.routes[number]) => r.observedBy.length ? 'observed ' : r.confirmedEarlier ? 'earlier  ' : r.coveredBy.length ? 'declared ' : 'UNCOVERED';
       out(args, result, [
         `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered; ${observed}${result.changedFiles.length ? `; ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}`,
-        ...result.routes.map((r) => `  ${state(r)} ${r.method.padEnd(6)} ${r.path}  ${r.file ? `${r.file}:${r.line}` : '(seen only in traffic)'}${r.changed ? '  (changed)' : ''}`),
+        ...result.routes.map((r) => `  ${state(r)} ${r.method.padEnd(6)} ${r.path}  ${r.file ? `${r.file}${r.line ? `:${r.line}` : ''}` : '(seen only in traffic)'}${r.actions.length ? `  [${r.actions.join(', ')}]` : ''}${r.changed ? '  (changed)' : ''}`),
+        ...(result.actions.length ? ['', `${result.actions.length} reusable action(s):`, ...result.actions.map((a) => `  ${a.id.padEnd(24)} ${a.routes.join(', ') || '(no routes)'}  used by ${a.usedBy.length} flow(s)`)] : []),
+        ...(saved ? ['', `catalog: ${saved.routes} route(s) recorded in ${relative(resolve(flag(args, 'dir') ?? '.'), saved.path)}`] : []),
         ...(result.ambiguities.length ? ['', `${result.ambiguities.length} place(s) discovery cannot read; \`tracegrove draft\` asks the agent to resolve them and proves the answer:`, ...result.ambiguities.slice(0, 12).map((a) => `  ? ${a.detail}`)] : []),
       ].join('\n'));
       return 0;
@@ -319,7 +323,9 @@ async function main(argv: string[]): Promise<number> {
         const proveText = prove === null ? 'prove: skipped (--no-prove); next: tracegrove test --grep discovered'
           : prove.flows.length === 0 ? 'prove: no new flow files to run'
           : [`prove: ran each new flow end to end${prove.rounds ? `, ${prove.rounds} repair round(s)` : ''}`,
-            ...prove.flows.map((f) => `  ${mark[f.outcome]} ${f.file}${f.served.length ? `  (served ${f.served.length} route(s))` : ''}${f.detail ? `\n                  ${f.detail}` : ''}`)].join('\n');
+            ...prove.flows.map((f) => `  ${mark[f.outcome]} ${f.file}${f.served.length ? `  (served ${f.served.length} route(s))` : ''}${f.detail ? `\n                  ${f.detail}` : ''}`),
+            ...prove.actions.map((a) => `  ${a.outcome === 'proven' ? '✓ proven     ' : a.outcome === 'unused' ? '· unused     ' : '✗ unproven   '} ${a.file}  (action ${a.id}${a.usedBy.length ? `, used by ${a.usedBy.join(', ')}` : ''})`),
+            ...(result.catalog ? [`catalog: ${result.catalog.routes} route(s) recorded in ${relative(resolve(flag(args, 'dir') ?? '.'), result.catalog.path)}`] : [])].join('\n');
         out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\n${proveText}`);
         const proven = prove === null || prove.flows.every((f) => f.outcome === 'proven');
         return agent.exitCode === 0 && check.ok ? (proven ? 0 : 1) : 2;

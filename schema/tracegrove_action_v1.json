@@ -1,0 +1,951 @@
+{
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "__schema1": {
+      "anyOf": [
+        {
+          "maxLength": 64000,
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "maxItems": 5000,
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "propertyNames": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "as": {
+      "description": "Default persona for this action's steps.",
+      "type": "string"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/__schema0"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "default": {},
+      "description": "name: default value, or null when a caller must supply it.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "outputs": {
+      "default": [],
+      "description": "Saved values the action hands back to its caller.",
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "routes": {
+      "default": [],
+      "description": "Routes this action exercises, as METHOD /path/{param}; checked against traffic when it runs.",
+      "items": {
+        "pattern": "^(GET|POST|PUT|PATCH|DELETE|HEAD|ANY) \\/",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "sources": {
+      "default": [],
+      "description": "Files that handle those routes, relative to the app root; recorded in the catalog once traffic confirms the routes.",
+      "items": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "steps": {
+      "items": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "DELETE": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "GET": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "HEAD": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "PATCH": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "POST": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "PUT": {
+                    "pattern": "^\\/",
+                    "type": "string"
+                  },
+                  "as": {
+                    "description": "Persona name, or none for an unauthenticated call.",
+                    "type": "string"
+                  },
+                  "expect": {
+                    "anyOf": [
+                      {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "absent": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "count": {
+                            "additionalProperties": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "json": {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "description": "Dot paths into the response body and their exact values.",
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "present": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "status": {
+                            "maximum": 599,
+                            "minimum": 100,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "headers": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "json": {
+                    "$ref": "#/$defs/__schema0",
+                    "description": "Request body; {name} placeholders use saved values."
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "observe": {
+                    "description": "Independent readback (GET/HEAD) polled until expect holds.",
+                    "type": "boolean"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "description": "name: dot.path into the response body.",
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "browser": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "navigate",
+                            "type": "string"
+                          },
+                          "path": {
+                            "format": "starts_with",
+                            "maxLength": 4096,
+                            "minLength": 1,
+                            "pattern": "^\\/.*",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "path"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "click",
+                            "type": "string"
+                          },
+                          "target": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "role",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "enum": [
+                                      "button",
+                                      "link",
+                                      "textbox",
+                                      "checkbox",
+                                      "heading",
+                                      "status"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "role",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "label",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "testId",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "target"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "fill",
+                            "type": "string"
+                          },
+                          "target": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "role",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "enum": [
+                                      "button",
+                                      "link",
+                                      "textbox",
+                                      "checkbox",
+                                      "heading",
+                                      "status"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "role",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "label",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "testId",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "value": {
+                            "maxLength": 8192,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "target",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "read",
+                            "type": "string"
+                          },
+                          "target": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "role",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "enum": [
+                                      "button",
+                                      "link",
+                                      "textbox",
+                                      "checkbox",
+                                      "heading",
+                                      "status"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "role",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "label",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "by": {
+                                    "const": "testId",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "maxLength": 512,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "by",
+                                  "name"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "target"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "expect": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "status": {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      "text": {
+                        "maxLength": 8192,
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "browser"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "as": {
+                    "type": "string"
+                  },
+                  "expect": {
+                    "anyOf": [
+                      {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "absent": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "count": {
+                            "additionalProperties": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "json": {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "description": "Dot paths into the response body and their exact values.",
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "present": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "status": {
+                            "maximum": 599,
+                            "minimum": 100,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "job": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action": {
+                            "const": "submit",
+                            "type": "string"
+                          },
+                          "payload": {
+                            "$ref": "#/$defs/__schema1"
+                          },
+                          "queue": {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                            "type": "string"
+                          },
+                          "requestKey": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "queue",
+                          "requestKey",
+                          "payload"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action": {
+                            "const": "read",
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "queue": {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "queue",
+                          "jobId"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action": {
+                            "const": "cancel",
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "queue": {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "queue",
+                          "jobId"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "job"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "as": {
+                    "type": "string"
+                  },
+                  "expect": {
+                    "anyOf": [
+                      {
+                        "maximum": 599,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "absent": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "count": {
+                            "additionalProperties": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "json": {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "description": "Dot paths into the response body and their exact values.",
+                            "propertyNames": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "present": {
+                            "items": {
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "status": {
+                            "maximum": 599,
+                            "minimum": 100,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "mcp": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "arguments": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema1"
+                        },
+                        "propertyNames": {
+                          "maxLength": 128,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "endpoint": {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "pattern": "^\\/(?!\\/)[A-Za-z0-9_./-]*$",
+                        "type": "string"
+                      },
+                      "tool": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9_.-]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "endpoint",
+                      "tool",
+                      "arguments"
+                    ],
+                    "type": "object"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "mcp"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "as": {
+                "description": "Persona for the action's steps that do not set their own.",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "save": {
+                "additionalProperties": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                  "type": "string"
+                },
+                "description": "outer name: action output. Without it every output keeps its own name.",
+                "propertyNames": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "use": {
+                "description": "Action id: its file path under actions/, dotted (actions/notes/create.action.yaml is notes.create).",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]*(\\.[A-Za-z][A-Za-z0-9_-]*)*$",
+                "type": "string"
+              },
+              "with": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "default": {},
+                "description": "Inputs; values may use {saved} placeholders from earlier steps.",
+                "propertyNames": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "use"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 30,
+      "minItems": 1,
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 400,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "steps"
+  ],
+  "type": "object"
+}

@@ -13,7 +13,8 @@ import { materializeLogicalPayload } from '../core/generators.ts';
 import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntimeSync } from '../hosts/runtime.ts';
 import { SeedRecipe, parseAs } from '../protocol/index.ts';
-import { AuthoringConfig, Fixture, Flow, HTTP_VERBS, type Expect, type FlowStep, type HttpVerb } from './schema.ts';
+import { Action, AuthoringConfig, Fixture, Flow, HTTP_VERBS, type ConcreteFlowStep as FlowStep, type Expect, type HttpVerb } from './schema.ts';
+import { expandFlow, loadActionLibrary, type ActionLibrary } from './actions.ts';
 import { compileBrowserStep } from './browser.ts';
 import { HTTP_RUNNER_CAPABILITIES } from '../adapters/http/capabilities.ts';
 import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts';
@@ -33,7 +34,7 @@ const ORIGIN = `launch://${APP_ID}`;
 const PROFILE = 'real';
 
 export type CompiledStepInfo = { id: string; name: string; method: string; path: string; as: string; expectStatus: number | null; expectation?: string };
-export type CompiledFlowInfo = { caseId: string; file: string; title: string; tags: string[]; risk: string; steps: CompiledStepInfo[]; fixtures: string[] };
+export type CompiledFlowInfo = { caseId: string; file: string; title: string; tags: string[]; risk: string; steps: CompiledStepInfo[]; fixtures: string[]; uses?: string[] };
 export type CompileResult = {
   root: string;
   configPath: string;
@@ -69,6 +70,13 @@ function readAuthoring<T extends z.ZodType>(schema: T, path: string, root: strin
     throw new Blocked(issues.map((detail) => ({ code: 'invalid_authoring_file', detail, owner: 'test author', action: `edit ${rel}` })));
   }
   return parsed.data;
+}
+
+/** The project's reusable actions, for discovery and agents; compile expands the same library. */
+export function loadProjectActions(configPath: string): ActionLibrary {
+  const root = dirname(resolve(configPath));
+  const config = loadAuthoringConfig(resolve(configPath));
+  return loadActionLibrary(resolve(root, config.testDir), (file) => readAuthoring(Action, file, root));
 }
 
 /** One project has one config; never silently choose between YAML and TypeScript. */
@@ -228,7 +236,9 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     if (seen.has(caseId)) fail('duplicate_case_id', `${relative(root, file)} derives ${caseId}, which another flow already uses`, 'rename one of the files');
     seen.add(caseId);
   }
-  const parsedFlows = indexedFlows.map(row => ({ ...row, flow: readAuthoring(Flow, row.file, root) }));
+  // Reusable actions expand into ordinary steps before anything else sees the flow.
+  const library = loadActionLibrary(testDir, (file) => readAuthoring(Action, file, root));
+  const parsedFlows = indexedFlows.map(row => ({ ...row, flow: expandFlow(readAuthoring(Flow, row.file, root), library, relative(root, row.file)) }));
   const selected = parsedFlows.filter(({ caseId, flow, file }) =>
     (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
@@ -479,7 +489,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       baselineRef: null, generation: null,
     });
     suiteCases.push({ caseRef: `./${caseId}.yaml`, required: true, profiles: null });
-    flows.push({ caseId, file: rel, title: flow.title, tags: flow.tags, risk: flow.risk, steps: info, fixtures: [...given.keys()] });
+    flows.push({ caseId, file: rel, title: flow.title, tags: flow.tags, risk: flow.risk, steps: info, fixtures: [...given.keys()], ...(flow.uses.length ? { uses: flow.uses } : {}) });
   }
   write(compiledDir, 'cases/suite.yaml', { schemaVersion: 'workflow.suite/v1', id: `${config.project}.suite`, cases: suiteCases });
   write(compiledDir, 'workflow.yaml', {

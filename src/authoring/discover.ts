@@ -15,14 +15,23 @@ import { matchesTemplate, type ObservedRequest } from './traffic.ts';
 export type Route = { method: string; path: string; file: string; line: number; framework: 'fastapi' | 'django' | 'express' | 'node' };
 export type FlowRef = { caseId: string; method: string; path: string };
 /** static: read from source text (a hint). traffic: only seen in requests the app served (evidence, no source location). */
-export type RouteProvenance = 'static' | 'traffic';
+export type RouteProvenance = 'static' | 'traffic' | 'catalog';
 export type CoveredRoute = Omit<Route, 'framework' | 'file' | 'line'> & {
   framework: Route['framework'] | 'observed'; file: string | null; line: number | null; provenance: RouteProvenance;
   /** flows whose steps declare this route */
   coveredBy: string[];
   /** scenarios whose requests reached this route in the last verified run */
   observedBy: string[];
+  /** reusable actions that exercise this route */
+  actions: string[];
+  /** an earlier verified run recorded in the catalog, when no recent run reached the route */
+  confirmedEarlier: { run: string; cases: string[] } | null;
   changed: boolean;
+};
+/** What earlier discovery and agents left behind: the committed catalog and the action library. */
+export type Knowledge = {
+  catalog: import('./schema.ts').Catalog | null;
+  actions: Array<{ id: string; title: string; file: string; routes: string[]; sources: string[]; inputs: string[]; outputs: string[]; usedBy: string[] }>;
 };
 export type Ambiguity = {
   id: string;
@@ -43,6 +52,8 @@ export type Discovery = {
   /** the verified run the observed coverage comes from, if any */
   observed: { run: string; stale: boolean; requests: number } | null;
   ambiguities: Ambiguity[];
+  /** the reusable action library, with the routes each one exercises */
+  actions: Knowledge['actions'];
 };
 
 const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '__pycache__', '.tracegrove', 'dist', 'build', '.next', 'coverage', 'migrations']);
@@ -167,7 +178,7 @@ export function templateOfObserved(path: string): string {
 
 const shape = (path: string) => normalizePath(path).replace(/\{[^}]*\}/g, '{}');
 
-export function discover(dir: string, flows: FlowRef[], branch: string | null, globs?: string[], observed?: ObservedRun | null): Discovery {
+export function discover(dir: string, flows: FlowRef[], branch: string | null, globs?: string[], observed?: ObservedRun | null, knowledge?: Knowledge): Discovery {
   const info = gitInfo(dir);
   const ref = branch ? safeRef(branch) : null;
   if (ref && !info.isRepo) throw new Blocked([{ code: 'not_a_git_repo', detail: dir, owner: 'operator', action: 'drop --branch, or point at a git checkout' }]);
@@ -198,7 +209,7 @@ export function discover(dir: string, flows: FlowRef[], branch: string | null, g
       if (seen.has(key)) continue;
       seen.add(key);
       const coveredBy = [...new Set(flows.filter((f) => shape(f.path) === shape(route.path) && (route.method === 'ANY' || f.method === route.method)).map((f) => f.caseId))];
-      routes.push({ ...route, provenance: 'static', coveredBy, observedBy: observedBy(route.method, route.path), changed: changed.has(route.file) });
+      routes.push({ ...route, provenance: 'static', coveredBy, observedBy: observedBy(route.method, route.path), actions: [], confirmedEarlier: null, changed: changed.has(route.file) });
     }
   }
   // Requests the app served that match no scanned route: real routes the scan missed.
@@ -213,18 +224,61 @@ export function discover(dir: string, flows: FlowRef[], branch: string | null, g
   }
   for (const u of unlisted.values()) {
     const coveredBy = [...new Set(flows.filter((f) => shape(f.path) === shape(u.path) && f.method === u.method).map((f) => f.caseId))];
-    routes.push({ method: u.method, path: u.path, file: null, line: null, framework: 'observed', provenance: 'traffic', coveredBy, observedBy: [...u.cases], changed: false });
+    routes.push({ method: u.method, path: u.path, file: null, line: null, framework: 'observed', provenance: 'traffic', coveredBy, observedBy: [...u.cases], actions: [], confirmedEarlier: null, changed: false });
     // A flow that names the route, plus the app serving it, leaves nothing to decide; only its source location is unknown.
-    if (coveredBy.length === 0) ambiguities.push({ id: `unlisted:${u.method} ${u.path}`, kind: 'unlisted_traffic', file: null, line: null,
+    if (coveredBy.length === 0 && !knows(knowledge, u.method, u.path)) ambiguities.push({ id: `unlisted:${u.method} ${u.path}`, kind: 'unlisted_traffic', file: null, line: null,
       detail: `The app served ${u.method} ${u.path} during ${[...u.cases].join(', ')}, but the static scan found no such route.`,
       ask: `Find the handler that serves ${u.method} ${u.path}, and say which file defines it and what the path's parameters are.` });
   }
+  const resolved = applyKnowledge(routes, ambiguities, knowledge, flows);
   const tested = (r: CoveredRoute) => r.coveredBy.length + r.observedBy.length;
   routes.sort((a, b) => Number(b.changed) - Number(a.changed) || Number(tested(a) > 0) - Number(tested(b) > 0) || a.path.localeCompare(b.path));
   return { source: ref ? `branch ${ref}` : 'working tree', branch: ref, base: info.base, files: source.files.length, changedFiles, routes,
     uncovered: routes.filter((r) => tested(r) === 0).length,
     observed: observed ? { run: observed.run, stale: observed.stale, requests: requests.length } : null,
-    ambiguities: ambiguities.slice(0, 50) };
+    ambiguities: resolved.slice(0, 50), actions: knowledge?.actions ?? [] };
+}
+
+const splitRoute = (route: string) => { const at = route.indexOf(' '); return { method: route.slice(0, at), path: route.slice(at + 1) }; };
+const sameRoute = (a: { method: string; path: string }, b: { method: string; path: string }) =>
+  (a.method === b.method || a.method === 'ANY' || b.method === 'ANY') && (shape(a.path) === shape(b.path) || matchesTemplate(a.path, b.path) || matchesTemplate(b.path, a.path));
+
+/** A route the catalog or an action already accounts for is known, not a question. */
+function knows(knowledge: Knowledge | undefined, method: string, path: string): boolean {
+  if (!knowledge) return false;
+  return knowledge.actions.some((a) => a.routes.some((r) => sameRoute(splitRoute(r), { method, path })))
+    || (knowledge.catalog?.routes ?? []).some((r) => r.file !== null && sameRoute(splitRoute(r.route), { method, path }));
+}
+
+/**
+ * Fold in what earlier discovery learned: catalog routes the scan cannot see come back with their
+ * handler file, routes gain the actions that exercise them, and a file whose routing the scan cannot
+ * read stops being a question once a confirmed route is known to live there.
+ */
+function applyKnowledge(routes: CoveredRoute[], ambiguities: Ambiguity[], knowledge: Knowledge | undefined, flows: FlowRef[]): Ambiguity[] {
+  if (!knowledge) return ambiguities;
+  for (const entry of knowledge.catalog?.routes ?? []) {
+    const { method, path } = splitRoute(entry.route);
+    const existing = routes.find((r) => sameRoute(r, { method, path }));
+    if (existing) {
+      if (existing.file === null && entry.file) { existing.file = entry.file; existing.line = entry.line; }
+      if (existing.observedBy.length === 0 && entry.confirmed) existing.confirmedEarlier = { run: entry.confirmed.run, cases: entry.confirmed.cases };
+      continue;
+    }
+    const coveredBy = [...new Set(flows.filter((f) => sameRoute({ method: f.method, path: f.path }, { method, path })).map((f) => f.caseId))];
+    routes.push({ method, path, file: entry.file, line: entry.line, framework: 'observed', provenance: 'catalog', coveredBy, observedBy: [], actions: [],
+      confirmedEarlier: entry.confirmed ? { run: entry.confirmed.run, cases: entry.confirmed.cases } : null, changed: false });
+  }
+  for (const route of routes) {
+    route.actions = knowledge.actions.filter((a) => a.routes.some((r) => sameRoute(splitRoute(r), route))).map((a) => a.id);
+    // An action that names its handler file, plus traffic confirming the route, says where the route lives.
+    if (route.file === null && route.observedBy.length) {
+      const source = knowledge.actions.find((a) => route.actions.includes(a.id) && a.sources.length)?.sources[0];
+      if (source) route.file = source;
+    }
+  }
+  const confirmedFiles = new Set(routes.filter((r) => r.file && r.provenance !== 'static' && (r.observedBy.length || r.confirmedEarlier)).map((r) => r.file!));
+  return ambiguities.filter((a) => !(a.kind === 'unreadable_routing' && a.file && confirmedFiles.has(a.file)));
 }
 
 /** A starting flow for one route; placeholders the author must fill are marked TODO. */

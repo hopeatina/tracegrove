@@ -114,6 +114,8 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
     .map((r) => `- ${r.method} ${r.path}  (${r.file}:${r.line}${r.changed ? ', changed on this branch' : ''}${r.coveredBy.length ? `, covered by ${r.coveredBy.join(', ')}` : ', uncovered'})`);
   const example = exampleFlow(input.testDir);
   const ambiguities = input.discovery.ambiguities.slice(0, 12).map((a) => `- ${a.detail} ${a.ask}`);
+  const actionsDir = relative(input.root, join(input.testDir, 'actions')) || 'tracegrove/actions';
+  const library = input.discovery.actions.slice(0, 60).map((a) => `- ${a.id}: ${a.title}${a.inputs.length ? `; inputs ${a.inputs.join(', ')}` : ''}${a.outputs.length ? `; outputs ${a.outputs.join(', ')}` : ''}${a.routes.length ? `; routes ${a.routes.join(', ')}` : ''}  (${a.file})`);
   const personas = input.config ? Object.keys(input.config.personas) : [];
   return [
     'You are drafting behaviour tests for tracegrove, a workflow verifier that drives a real running app through HTTP and Chromium.',
@@ -121,10 +123,14 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
     `Discovery (${input.discovery.source}${input.discovery.base ? `, base ${input.discovery.base}` : ''}): ${input.discovery.routes.length} routes, ${input.discovery.uncovered} uncovered.`,
     input.discovery.changedFiles.length ? `Files changed on this branch: ${input.discovery.changedFiles.slice(0, 30).join(', ')}` : '',
     'Routes worth a flow:', ...(routes.length ? routes : ['- (none uncovered; strengthen existing flows only if the intent asks)']),
+    '',
+    library.length ? 'Reusable actions already in this repo (call them with a `use:` step; do not rewrite their steps):' : `No reusable actions exist yet in ${actionsDir}/.`,
+    ...library,
     ...(ambiguities.length ? ['', 'Where discovery is unsure (resolve these by reading the code; tracegrove confirms your answer by running the flows you write and recording which routes the app actually served):', ...ambiguities] : []),
     '',
     'Rules:',
-    `1. Write new flows only under ${outDir}/ as <area>/<behavior>.flow.yaml (kebab-case, one behaviour per file). Never edit application code or existing flows outside ${outDir}/.`,
+    `1. Write new flows only under ${outDir}/ as <area>/<behavior>.flow.yaml (kebab-case, one behaviour per file). Never edit application code, existing flows outside ${outDir}/, or existing actions.`,
+    `1b. Build for reuse. A step sequence another flow would repeat (sign in, create a resource, open a page) becomes an action: ${actionsDir}/<area>/<verb>.action.yaml with title, inputs (name: default, or null when required), outputs (names its steps save), routes (each "METHOD /path/{param}" it calls), sources (the files that handle those routes), and steps. Flows call it as \`- use: <area>.<verb>\` with \`with: { input: value }\` and optional \`as:\` and \`save: { flowName: output }\`. Actions may use other actions. Prefer one small action per resource operation over one large one.`,
     '2. Read the route handlers to learn real request bodies, status codes and ownership rules before writing a step.',
     '3. A flow has title, tags, steps. An HTTP step is `- name: ...` plus one verb key (GET/POST/PUT/PATCH/DELETE: /path/{var}), optional json, as: <persona>, expect: <status | { status, json: {dot.path: value}, present: [paths], absent: [paths], count: {path: n} }>, save: { var: dot.path }.',
     '3b. Browser flows must declare browser: { allowPaths: [/page, /assets, /api], allowMethods: [GET, HEAD] }. Browser steps use browser: { kind: navigate, path: /page }, browser: { kind: click, target: { by: role, role: button, name: Submit } }, browser: { kind: fill, target: { by: label, name: Note }, value: text }, or browser: { kind: read, target: { by: testId, name: result } } with expect: { text: exact text }. Navigation may expect: { status: 200 }. Read polls until its text holds. Browser steps use the default persona and require a recording. Do not invent scripts, selectors, other browser commands, or job/MCP/native steps. Keep independent API readback where possible.',
@@ -161,7 +167,7 @@ function listFlows(dir: string): Map<string, number> {
     for (const name of readdirSync(d)) {
       const path = join(d, name);
       const st = statSync(path);
-      if (st.isDirectory()) walk(path); else if (name.endsWith('.flow.yaml')) found.set(path, st.mtimeMs);
+      if (st.isDirectory()) walk(path); else if (name.endsWith('.flow.yaml') || name.endsWith('.action.yaml')) found.set(path, st.mtimeMs);
     }
   };
   walk(dir);

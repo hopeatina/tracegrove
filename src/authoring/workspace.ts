@@ -4,10 +4,12 @@
  * coding agent followed by tracegrove's own check.
  */
 import { readdirSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { Blocked } from '../core/errors.ts';
-import { CONFIG_FILE, compileProject, configInDirectory, loadAuthoringConfig, type CompiledFlowInfo } from './compile.ts';
-import { discover, templateOfObserved, type Discovery, type ObservedRun } from './discover.ts';
+import { CONFIG_FILE, compileProject, configInDirectory, loadAuthoringConfig, loadProjectActions, type CompiledFlowInfo } from './compile.ts';
+import { discover, templateOfObserved, type Discovery, type Knowledge, type ObservedRun } from './discover.ts';
+import { mergeCatalog, readCatalog, writeCatalog } from './catalog.ts';
+import { actionIdFor, type ActionLibrary } from './actions.ts';
 import { resolveRun, runTests, type TestRunReport } from './run.ts';
 import { readSavedRun } from './savedRun.ts';
 import { buildDraftPrompt, buildRepairPrompt, resolveAgentSettings, runAgent, type AgentOverrides, type AgentRunResult, type ProveFailure } from './agent.ts';
@@ -34,6 +36,7 @@ export function discoverProject(dir: string, branch: string | null): Discovery {
   let scanRoot = root;
   let globs: string[] | undefined;
   let observed: ObservedRun | null = null;
+  let knowledge: Knowledge | undefined;
   try {
     const configPath = configInDirectory(root);
     if (configPath) {
@@ -44,9 +47,37 @@ export function discoverProject(dir: string, branch: string | null): Discovery {
       scanRoot = compiled.sourceRoot;
       globs = compiled.config.app.sources ?? undefined;
       observed = latestObservedRun(root, compiled.sourceDigest);
+      knowledge = projectKnowledge(configPath, compiled.flows);
     }
   } catch { /* uncompilable flows cover nothing; check reports why */ }
-  return discover(scanRoot, flows, branch, globs, observed);
+  return discover(scanRoot, flows, branch, globs, observed, knowledge);
+}
+
+/** The catalog and action library, with which flows use each action. */
+export function projectKnowledge(configPath: string, compiledFlows: CompiledFlowInfo[]): Knowledge {
+  const config = loadAuthoringConfig(configPath);
+  const testDir = resolve(dirname(configPath), config.testDir);
+  let library: ActionLibrary = new Map();
+  try { library = loadProjectActions(configPath); } catch { /* check reports invalid actions */ }
+  return {
+    catalog: readCatalog(testDir),
+    actions: [...library].map(([id, { action, file }]) => ({ id, title: action.title, file: relative(dirname(configPath), file), routes: action.routes, sources: action.sources,
+      inputs: Object.keys(action.inputs), outputs: action.outputs, usedBy: compiledFlows.filter((f) => f.uses?.includes(id)).map((f) => f.caseId) })),
+  };
+}
+
+/** Record what discovery knows now in tracegrove/catalog.yaml. */
+export function saveCatalog(dir: string, discovery?: Discovery): { path: string; routes: number } | null {
+  const root = resolve(dir);
+  const configPath = configInDirectory(root);
+  if (!configPath) return null;
+  const config = loadAuthoringConfig(configPath);
+  const testDir = resolve(root, config.testDir);
+  const found = discovery ?? discoverProject(root, null);
+  let digest: string | null = null;
+  try { digest = compileProject(configPath).sourceDigest; } catch { digest = null; }
+  const catalog = mergeCatalog(readCatalog(testDir), found, digest);
+  return { path: writeCatalog(testDir, catalog), routes: catalog.routes.length };
 }
 
 /**
@@ -96,8 +127,12 @@ export type DraftResult = {
   agent: AgentRunResult; check: CheckResult;
   discovery: { source: string; routes: number; uncovered: number; ambiguities: number };
   /** null when proving was skipped (--no-prove) */
-  prove: { rounds: number; flows: ProvedFlow[] } | null;
+  prove: { rounds: number; flows: ProvedFlow[]; actions: ProvedAction[] } | null;
+  /** the catalog after this draft, when proving ran */
+  catalog: { path: string; routes: number } | null;
 };
+/** An action is proven when a flow that uses it was proven end to end. */
+export type ProvedAction = { file: string; id: string; outcome: 'proven' | 'unproven' | 'unused'; usedBy: string[] };
 
 export const DRAFT_REPAIR_ROUNDS = 2;
 
@@ -119,11 +154,11 @@ export async function draftWithAgent(input: DraftInput): Promise<DraftResult> {
   const agent = await runAgent({ root, testDir, settings, prompt, ...relay });
   const summary = { source: discovery.source, routes: discovery.routes.length, uncovered: discovery.uncovered, ambiguities: discovery.ambiguities.length };
   let check = checkProject(root);
-  if (input.prove === false || agent.exitCode !== 0 || input.signal?.aborted) return { agent, check, discovery: summary, prove: null };
+  if (input.prove === false || agent.exitCode !== 0 || input.signal?.aborted) return { agent, check, discovery: summary, prove: null, catalog: null };
   const configPath = configInDirectory(root);
   const files = agent.files.filter((f) => f.endsWith('.flow.yaml'));
   const flows: ProvedFlow[] = files.map((file) => ({ file, caseIds: [], outcome: 'not_run', repairs: 0, detail: null, served: [], run: null }));
-  if (!configPath || flows.length === 0) return { agent, check, discovery: summary, prove: { rounds: 0, flows } };
+  if (!configPath || flows.length === 0) return { agent, check, discovery: summary, prove: { rounds: 0, flows, actions: provedActions(configPath, agent.files, flows) }, catalog: null };
   let rounds = 0;
   for (;;) {
     const failures: ProveFailure[] = [];
@@ -151,7 +186,24 @@ export async function draftWithAgent(input: DraftInput): Promise<DraftResult> {
     check = checkProject(root);
     if (!check.ok) break;
   }
-  return { agent, check: checkProject(root), discovery: summary, prove: { rounds, flows } };
+  // What this draft confirmed becomes the starting point for the next discovery and agent.
+  const catalog = flows.some((f) => f.outcome === 'proven') ? saveCatalog(root) : null;
+  return { agent, check: checkProject(root), discovery: summary, prove: { rounds, flows, actions: provedActions(configPath, agent.files, flows) }, catalog };
+}
+
+function provedActions(configPath: string | null, files: string[], flows: ProvedFlow[]): ProvedAction[] {
+  const written = files.filter((f) => f.endsWith('.action.yaml'));
+  if (!configPath || written.length === 0) return [];
+  let compiled: CompiledFlowInfo[] = [];
+  try { compiled = compileProject(configPath).flows; } catch { compiled = []; }
+  const config = loadAuthoringConfig(configPath);
+  const actionsDir = resolve(dirname(configPath), config.testDir, 'actions');
+  const proven = new Set(flows.filter((f) => f.outcome === 'proven').flatMap((f) => f.caseIds));
+  return written.map((file) => {
+    const id = actionIdFor(actionsDir, resolve(dirname(configPath), file));
+    const usedBy = compiled.filter((f) => f.uses?.includes(id)).map((f) => f.caseId);
+    return { file, id, usedBy, outcome: usedBy.length === 0 ? 'unused' : usedBy.some((c) => proven.has(c)) ? 'proven' : 'unproven' };
+  });
 }
 
 async function proveFile(configPath: string, root: string, file: string, signal?: AbortSignal): Promise<{ flow: Omit<ProvedFlow, 'repairs'>; failures: ProveFailure[] }> {
