@@ -1,4 +1,37 @@
 {
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -754,6 +787,61 @@
       "description": "Short project name, shown in reports and run summaries.",
       "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
       "type": "string"
+    },
+    "standIns": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "env": {
+            "description": "Environment variable the app reads for this service's base URL, like CALENDAR_URL.",
+            "pattern": "^[A-Z_][A-Z0-9_]*$",
+            "type": "string"
+          },
+          "respond": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maximum": 599,
+                  "minimum": 100,
+                  "type": "integer"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "json": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "status": {
+                      "default": 200,
+                      "maximum": 599,
+                      "minimum": 100,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "default": {},
+            "description": "Answers by route; /{id} matches one segment and /* the rest. Undeclared routes get 404.",
+            "propertyNames": {
+              "pattern": "^(GET|POST|PUT|PATCH|DELETE) \\/\\S*$",
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "env"
+        ],
+        "type": "object"
+      },
+      "description": "Third parties the app calls (calendar, CRM, payments, automation webhooks), replaced by recording servers on loopback. Flows can make them fail and read back what the app sent.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_-]*$",
+        "type": "string"
+      },
+      "type": "object"
     },
     "testDir": {
       "default": "tracegrove",

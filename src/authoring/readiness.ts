@@ -69,7 +69,7 @@ export function readDecisions(root: string, testDir = 'tracegrove'): Decision[] 
   return DecisionsFile.parse(parse(readFileSync(path, 'utf8')) ?? { schemaVersion: 'tracegrove.decisions/v1' }).decisions;
 }
 
-const CHANNEL: Record<string, string> = { GET: 'http readback', HEAD: 'http readback', POST: 'http', PUT: 'http', PATCH: 'http', DELETE: 'http', UI: 'browser', MCP: 'mcp', JOB: 'native job', VOICE: 'voice', CHAT: 'chat' };
+const CHANNEL: Record<string, string> = { GET: 'http readback', HEAD: 'http readback', POST: 'http', PUT: 'http', PATCH: 'http', DELETE: 'http', UI: 'browser', MCP: 'mcp', JOB: 'native job', VOICE: 'voice', CHAT: 'chat', FAULT: 'fault injection', STANDIN: 'third-party readback' };
 
 type RunCase = { run: string; ranAt: string; outcome: string; caseDigest: string | null; sourceDigest: string; failure: string | null };
 

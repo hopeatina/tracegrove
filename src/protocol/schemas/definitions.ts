@@ -9,6 +9,7 @@ import { GitSnapshotBinding } from './gitSources.ts';
 import { NativeJobAction } from './nativeJob.ts';
 import { McpToolCall } from './mcp.ts';
 import { ConversationRun } from './conversation.ts';
+import { StandInFault, StandInQuery, StandInSpec } from './standIn.ts';
 import { TargetBinding } from './targetBinding.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
@@ -136,14 +137,18 @@ export const McpCallStep = z.object({ ...stepCommon, kind: z.literal('mcp.call')
   auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
 export const ConversationStep = z.object({ ...stepCommon, kind: z.literal('conversation.run'), command: ConversationRun,
   auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
-export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, JobSubmitStep, JobObserveStep, JobCancelStep, McpCallStep, ConversationStep, UnsupportedStep]);
+/** Arm a fault on a stand-in third party, or read back what the app sent it (polled until the predicate holds). */
+export const StandInFaultStep = z.object({ ...stepCommon, kind: z.literal('standin.fault'), command: StandInFault }).strict();
+export const StandInObserveStep = z.object({ ...stepCommon, kind: z.literal('standin.observe'), command: StandInQuery, predicate: Predicate, pollIntervalMs: PositiveMillis,
+  captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) }).strict();
+export const Step = z.discriminatedUnion('kind', [HttpRequestStep, ObserveStep, BrowserNavigateStep, BrowserActionStep, BrowserObserveStep, JobSubmitStep, JobObserveStep, JobCancelStep, McpCallStep, ConversationStep, StandInFaultStep, StandInObserveStep, UnsupportedStep]);
 export type Step = z.infer<typeof Step>;
 
 export const Assertion = z.object({
   id: IdString,
   required: z.boolean(),
   environmentClasses: z.array(EnvironmentClass).min(1).max(4),
-  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'job.observation', 'mcp.observation', 'conversation.observation', 'step.result']), version: z.literal('1') }).strict(),
+  oracle: z.object({ name: z.enum(['http.observation', 'browser.observation', 'job.observation', 'mcp.observation', 'conversation.observation', 'standin.observation', 'step.result']), version: z.literal('1') }).strict(),
   stepId: IdString,
   predicate: Predicate,
   coverageTags: idList(32),
@@ -457,6 +462,7 @@ export const LaunchRecipe = z.object({
   runtime: ShortText.optional(), // compiler-observed hint; launch attestation uses a fresh interpreter probe
   sourceSnapshot: GitSnapshotBinding.optional(),
   nativeJobs: z.literal('node_ipc/v1').optional(),
+  standIns: z.array(StandInSpec).max(16).optional(),
 }).strict();
 export type LaunchRecipe = z.infer<typeof LaunchRecipe>;
 
@@ -465,6 +471,7 @@ export const RunnerProfile = z.object({
   adapter: z.enum(['http', 'browser', 'native_job', 'mcp', 'conversation']),
   maxStepsPerCase: PositiveInt,
   cancellation: z.enum(['confirmed', 'best_effort']),
+  standIns: z.boolean().optional(),
 }).strict();
 export type RunnerProfile = z.infer<typeof RunnerProfile>;
 

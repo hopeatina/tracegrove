@@ -1,4 +1,40 @@
 {
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "maxLength": 64000,
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "maxItems": 5000,
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -1001,6 +1037,72 @@
                 "cwd"
               ],
               "type": "object"
+            },
+            "standIns": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "env": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[A-Z_][A-Z0-9_]*$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "pattern": "^[a-z][a-z0-9_-]*$",
+                    "type": "string"
+                  },
+                  "responses": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "json": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "method": {
+                          "enum": [
+                            "GET",
+                            "POST",
+                            "PUT",
+                            "PATCH",
+                            "DELETE"
+                          ],
+                          "type": "string"
+                        },
+                        "path": {
+                          "maxLength": 512,
+                          "minLength": 1,
+                          "pattern": "^\\/[A-Za-z0-9_.~:/{}*-]*$",
+                          "type": "string"
+                        },
+                        "status": {
+                          "maximum": 599,
+                          "minimum": 100,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "method",
+                        "path",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 64,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "name",
+                  "env",
+                  "responses"
+                ],
+                "type": "object"
+              },
+              "maxItems": 16,
+              "type": "array"
             }
           },
           "required": [

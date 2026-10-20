@@ -1,0 +1,18 @@
+project: riverbend-vet-voice
+app:
+  adapter: node
+  entry: app/receptionist.mjs
+  health: /health
+  sources: [app/**]
+standIns:
+  automation:            # the n8n workflow that puts bookings on the clinic calendar
+    env: AUTOMATION_URL
+    respond:
+      POST /webhook/book-appointment: { status: 200, json: { eventId: evt_riverbend_1 } }
+      POST /webhook/callback-request: 202
+  phone:                 # the telephony API that transfers calls
+    env: PHONE_URL
+    respond:
+      POST /calls/transfer: { status: 200, json: { transferred: true } }
+personas:
+  front_desk: { subject: riverbend }

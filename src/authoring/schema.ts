@@ -41,6 +41,12 @@ export const AuthoringConfig = z.object({
       tokens: z.string().default('TRACEGROVE_TOKENS'),
     }).strict().default({ port: 'PORT', dataDir: 'TRACEGROVE_DATA_DIR', tokens: 'TRACEGROVE_TOKENS' }),
   }).strict(),
+  standIns: z.record(z.string().regex(/^[a-z][a-z0-9_-]*$/), z.object({
+    env: z.string().regex(/^[A-Z_][A-Z0-9_]*$/).describe('Environment variable the app reads for this service\'s base URL, like CALENDAR_URL.'),
+    respond: z.record(z.string().regex(/^(GET|POST|PUT|PATCH|DELETE) \/\S*$/, 'use "METHOD /path", like "POST /events"'),
+      z.union([Status, z.object({ status: Status.default(200), json: Json.optional() }).strict()])).default({})
+      .describe('Answers by route; /{id} matches one segment and /* the rest. Undeclared routes get 404.'),
+  }).strict()).optional().describe('Third parties the app calls (calendar, CRM, payments, automation webhooks), replaced by recording servers on loopback. Flows can make them fail and read back what the app sent.'),
   personas: z.record(Name, z.object({ subject: z.string().min(1),
     ...Persona.pick({ locale: true, timezone: true, viewport: true, inputMode: true, reducedMotion: true }).partial().shape,
   }).strict())
@@ -135,7 +141,21 @@ const conversationStep = {
 export const VoiceFlowStep = z.object({ ...conversationStep, voice: ConversationSpec }).strict();
 /** A chat with a chatbot endpoint, one POST per turn under one session id. */
 export const ChatFlowStep = z.object({ ...conversationStep, chat: ConversationSpec }).strict();
-export const ConcreteFlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep, VoiceFlowStep, ChatFlowStep]);
+const RouteText = z.string().regex(/^(GET|POST|PUT|PATCH|DELETE) \/\S*$/, 'use "METHOD /path", like "POST /events"');
+/** Make a stand-in fail, answer slowly or hang up for its next calls; or read back what the app sent it. */
+export const StandInFlowStep = z.object({
+  name: z.string().min(1).max(120).optional(),
+  standin: z.string().regex(/^[a-z][a-z0-9_-]*$/).describe('A stand-in declared under standIns.'),
+  fail: z.object({ route: RouteText, times: z.number().int().min(1).max(100).default(1), status: Status.optional(), delayMs: z.number().int().min(1).max(60_000).optional(), drop: z.boolean().optional() }).strict().optional()
+    .describe('Fault for the next matching calls: status (like 503), delayMs, or drop (close the connection).'),
+  received: RouteText.optional().describe('Read back only calls to this route.'),
+  expect: z.object({ calls: z.number().int().nonnegative().optional().describe('Exactly this many matching calls.'),
+    json: z.record(DotPath, Json).optional(), present: z.array(DotPath).optional(), absent: z.array(DotPath).optional() }).strict().optional()
+    .describe('Checks over { count, calls: [{ method, path, json, status, faulted }] }.'),
+  save: z.record(Name, DotPath).optional(),
+  timeoutMs: z.number().int().positive().max(120_000).optional(),
+}).strict().refine(s => Boolean(s.fail) !== Boolean(s.expect), 'a stand-in step either arms a fault (fail:) or reads back (expect:)');
+export const ConcreteFlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep, VoiceFlowStep, ChatFlowStep, StandInFlowStep]);
 export type ConcreteFlowStep = z.infer<typeof ConcreteFlowStep>;
 const ActionId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z][A-Za-z0-9_-]*)*$/, 'an action id is its path under actions/ with dots, like notes.create');
 /** Call a reusable action (tracegrove/actions/<area>/<name>.action.yaml) in place of writing its steps again. */

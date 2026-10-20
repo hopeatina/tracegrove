@@ -4,11 +4,12 @@ import { BROWSER_RUNNER_CAPABILITIES } from '../adapters/browser/capabilities.ts
 import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts';
 import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
 import { CONVERSATION_RUNNER_CAPABILITIES } from '../adapters/conversation/capabilities.ts';
+import { withStandIns } from '../adapters/standin/capabilities.ts';
 import { Blocked } from './errors.ts';
 
 export function runnerCapabilitiesFor(profile: RunnerProfile): RunnerCapabilities {
-  const caps = { ...(profile.adapter === 'mcp' ? MCP_RUNNER_CAPABILITIES : profile.adapter === 'conversation' ? CONVERSATION_RUNNER_CAPABILITIES : profile.adapter === 'native_job' ? NATIVE_JOB_RUNNER_CAPABILITIES : profile.adapter === 'browser' ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES),
-    maxStepsPerCase: profile.maxStepsPerCase, cancellation: profile.cancellation };
+  const adapter = profile.adapter === 'mcp' ? MCP_RUNNER_CAPABILITIES : profile.adapter === 'conversation' ? CONVERSATION_RUNNER_CAPABILITIES : profile.adapter === 'native_job' ? NATIVE_JOB_RUNNER_CAPABILITIES : profile.adapter === 'browser' ? BROWSER_RUNNER_CAPABILITIES : HTTP_RUNNER_CAPABILITIES;
+  const caps = { ...(profile.standIns ? withStandIns(adapter) : adapter), maxStepsPerCase: profile.maxStepsPerCase, cancellation: profile.cancellation };
   const base = { ...caps, ref: { id: caps.ref.id, revision: caps.ref.revision } };
   return { ...caps, ref: { ...base.ref, digest: digestOfValue(base) } };
 }

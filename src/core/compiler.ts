@@ -132,8 +132,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     if (!stepsById.has(assertion.stepId)) reasons.push({ code: 'assertion_unknown_step', detail: `${assertion.id} -> ${assertion.stepId}` });
     const assertedStep = stepsById.get(assertion.stepId);
     if (assertion.oracle.name === 'browser.observation' && !assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: browser oracle needs a browser step` });
-    if (assertion.oracle.name === 'http.observation' && (assertedStep?.kind.startsWith('ui.') || assertedStep?.kind.startsWith('job.') || assertedStep?.kind === 'mcp.call' || assertedStep?.kind === 'conversation.run')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle needs an HTTP step` });
+    if (assertion.oracle.name === 'http.observation' && (assertedStep?.kind.startsWith('ui.') || assertedStep?.kind.startsWith('job.') || assertedStep?.kind.startsWith('standin.') || assertedStep?.kind === 'mcp.call' || assertedStep?.kind === 'conversation.run')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle needs an HTTP step` });
     if (assertion.oracle.name === 'conversation.observation' && assertedStep?.kind !== 'conversation.run') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: conversation oracle needs a conversation step` });
+    if (assertion.oracle.name === 'standin.observation' && assertedStep?.kind !== 'standin.observe') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: stand-in oracle needs a stand-in readback` });
     if (assertion.oracle.name === 'mcp.observation' && assertedStep?.kind !== 'mcp.call') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: MCP oracle needs an MCP call` });
     if (assertion.oracle.name === 'job.observation' && !assertedStep?.kind.startsWith('job.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: job oracle needs a native job step` });
   }

@@ -37,6 +37,7 @@ The call still sounds right. The readback from the clinic's own system is what f
 | Example | What happens | Bug to switch on |
 | --- | --- | --- |
 | `voice-receptionist` | A dental clinic phone agent books, cancels and transfers calls; each call is checked against the clinic's records | `drop_booking`: says booked, saves nothing |
+| `vet-receptionist` | An after-hours vet clinic agent books through an automation webhook and transfers emergencies; flows make the webhook fail and read back what it received | `ignore_automation_errors`: says "all set" when the booking never landed; `double_book` |
 | `support-chatbot` | A support bot handles refunds, privacy questions and a prompt-injection attempt | `leak_orders`: answers about other customers' orders |
 | `notes-api` | Create, read back, stranger denied, delete, confirm it's gone | `keep_on_delete`, `share_with_strangers` |
 | `notes-browser` | A Chromium page and an API readback in one flow, with a video | |
@@ -215,6 +216,7 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Adding tracegrove to your app |
 | [Voice and chat](docs/voice-and-chat.md) | Conversation steps, transports, checks |
+| [Stand-ins](docs/stand-ins.md) | Replace calendars, CRMs and webhooks; read back what was sent; inject failures |
 | [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
 | [PR proof card](docs/pr-proof-card.md) | The GitHub Action and `tracegrove card` |
