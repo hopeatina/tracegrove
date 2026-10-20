@@ -76,9 +76,17 @@ export const COMMAND_SCHEMAS = {
   'recovery-status': z.object({ ...common, 'state-dir': Text, execution: Text }).strict(),
   'source-materialize': z.object({ ...common, input: Text, repository: Text, root: Text, side: z.enum(['base', 'head']), output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
+  readiness: z.object({ ...common, dir: Text.optional() }).strict(),
+  accept: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text.optional() }).strict(),
+  waive: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
+  reject: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
+  challenge: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text, step: Text.optional() }).strict(),
+  handoff: z.object({ ...common, dir: Text.optional(), out: Text.optional(), client: Text.optional(), by: Text.optional() }).strict(),
+  seal: z.object({ ...common, dir: Text.optional(), run: Text.optional(), out: Text, remove: Bool }).strict(),
+  unseal: z.object({ ...common, _: Positionals(1, 1), out: Text }).strict(),
 } as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 /** Most positional words each command accepts (its schema's `_` array validates the rest). */
-const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3 };
+const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, waive: 1, reject: 1, challenge: 1, unseal: 1 };
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];

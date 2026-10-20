@@ -27,6 +27,7 @@ import { applicationLaunch } from './appLaunch.ts';
 import { describeSnapshot, resolveVerificationSource } from './verificationSource.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
 import { caseCapabilities } from '../core/capabilities.ts';
+import { redactionRules } from '../core/privacy.ts';
 import { flowEnabledIn, resolveEnvironment } from '../environments/resolve.ts';
 import type { ResolvedEnvironment } from '../environments/schema.ts';
 import { expectedRelease, targetBinding } from '../environments/binding.ts';
@@ -590,7 +591,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
         ...(conversationFlow ? { maxConversations: flow.steps.filter(step => 'voice' in step || 'chat' in step).length } : {}),
         ...(hasMcp ? { maxMcpCalls: flow.effects?.maxMcpCalls ?? 0, allowedMcpTools: flow.effects?.allowedMcpTools ?? [] } : {}) },
       limits: { deadlineMs: config.defaults.caseTimeoutMs, maxProviderRequests: 0, maxTokens: 0, costCeilingCents: 0, maxBrowserActions: browserFlow ? flow.browser!.maxActions : 0, maxArtifactBytes: browserFlow ? flow.browser!.maxArtifactBytes : 1048576, diagnosticRetries: 0, concurrencyGroup: config.project },
-      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null },
+      capture: { stepEvents: true, networkMetadata: true, trace: 'optional', video: browserFlow ? 'required' : 'optional', redactionPolicyRef: null, retentionPolicyRef: null, ...(config.privacy?.redact.length ? { redact: redactionRules(config.privacy.redact) } : {}) },
       baselineRef: null, generation: null,
     });
     suiteCases.push({ caseRef: `./${caseId}.yaml`, required: true, profiles: null });

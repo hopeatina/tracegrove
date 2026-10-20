@@ -38,6 +38,9 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
   if (spec.capture.video === 'required' && !capabilities.captureFormats.includes('video/webm')) reasons.push({ code: 'required_video_unsupported', detail: 'runner does not advertise video capture' });
   const browserSteps = spec.steps.filter(step => step.kind.startsWith('ui.'));
   const jobSteps = spec.steps.filter(step => step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel');
+  for (const rule of spec.capture.redact ?? []) {
+    try { new RegExp(rule.pattern, 'g'); } catch { reasons.push({ code: 'redaction_pattern_invalid', detail: `${rule.name}: not a valid regular expression` }); }
+  }
   const conversationSteps = spec.steps.filter(step => step.kind === 'conversation.run');
   if (conversationSteps.length > (spec.effects.maxConversations ?? 0)) reasons.push({ code: 'conversation_limit', detail: 'Conversations exceed the explicitly declared effect ceiling' });
   for (const step of conversationSteps) {

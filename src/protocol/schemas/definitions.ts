@@ -208,6 +208,8 @@ export const CaseSpec = z.object({
     video: z.enum(['required', 'failure', 'optional']),
     redactionPolicyRef: RefSchema.nullable(),
     retentionPolicyRef: RefSchema.nullable(),
+    /** Client-data patterns scrubbed from every observation before it is recorded. */
+    redact: z.array(z.object({ name: IdString, pattern: z.string().min(1).max(LIMITS.shortText) }).strict()).max(16).optional(),
   }).strict(),
   baselineRef: RefSchema.nullable(),
   generation: z.object({

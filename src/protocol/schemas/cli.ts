@@ -23,7 +23,8 @@ export const CliCommandName = z.enum([
   'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases', 'rerun', 'inspect', 'export', 'verify-bundle', 'compare',
   'workflow-map', 'workflows', 'usage', 'benchmark', 'pools', 'import-observations', 'observations', 'result-ingest', 'results',
   'awr-prepare', 'awr-inspect', 'awr-deliver', 'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve',
-  'recovery-status', 'source-materialize', 'schema', 'setup', 'env', 'whoami', 'explain', 'capabilities', 'config', 'approve', 'mcp']);
+  'recovery-status', 'source-materialize', 'schema', 'setup', 'env', 'whoami', 'explain', 'capabilities', 'config', 'approve', 'mcp',
+  'readiness', 'accept', 'waive', 'reject', 'challenge', 'handoff', 'seal', 'unseal']);
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
   command: CliCommandName.nullable(),

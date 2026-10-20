@@ -9,3 +9,4 @@ __pycache__/
 .venv/
 /artifacts/qa/
 .tracegrove/
+.scratch/

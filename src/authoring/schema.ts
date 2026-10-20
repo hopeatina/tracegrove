@@ -52,6 +52,10 @@ export const AuthoringConfig = z.object({
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
   environments: z.record(Name, EnvironmentConfig).optional().describe('Where flows can run: local (default), docker, staging, prod-readonly. Each names a target, class, write policy, persona secret references and agent policy.'),
+  privacy: z.object({
+    redact: z.array(z.union([z.enum(['email', 'phone', 'card', 'ssn']), z.object({ name: Name, pattern: z.string().min(1).max(400) }).strict()])).max(16).default([])
+      .describe('Client data scrubbed from every observation before it is written: email, phone, card (Luhn-checked), ssn, or { name, pattern } regexes.'),
+  }).strict().optional().describe('Keep client data out of run folders and evidence. Credentials are never recorded either way.'),
   defaults: z.object({
     stepTimeoutMs: z.number().int().positive().max(120_000).default(5000),
     caseTimeoutMs: z.number().int().positive().max(600_000).default(30_000),
