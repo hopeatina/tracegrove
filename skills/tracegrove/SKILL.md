@@ -11,6 +11,18 @@ failed (the app or the flow is wrong), `2` blocked (a prerequisite is missing), 
 If the `tracegrove` MCP server is connected, call its tools (`env_doctor`, `explain`, `test`, `heal`)
 instead of the shell commands. They return the same JSON.
 
+## Starting from nothing
+
+If `status` says there is no `tracegrove.config.yaml`, set the repo up before anything else:
+
+1. `init` (or `tracegrove init --json`). Read `detection`: if the adapter is `command` or the reason says it
+   guessed, check the start command before going on. Add the returned `snippet` to the app's test-mode auth
+   so personas work, guarded so it can never run in production.
+2. `discover` (or `tracegrove discover --json`). Draft flows for uncovered routes in risk order: writes over
+   reads, money and permissions first. Every write gets a separate readback, and every owned resource gets
+   a check that another persona is denied.
+3. `check`, then `test` on `local`, then the loop below.
+
 ## Pick the environment
 
 1. `tracegrove env list --json`. Use the environment the user named. Otherwise use `local`. Never pick

@@ -16,6 +16,10 @@ Use the installed binary through `npx --no-install tracegrove` so CI never fetch
 | `setup browsers` | Installs the pinned headless shell and ffmpeg, then records a one-second test video | `probe.ok`, or a typed `browser_unavailable` / `video_encoder_missing` |
 | `heal` | May retain bounded setup/flow edits | `tracegrove.heal/v1`; inspect saved diff and backups |
 
+## MCP
+
+`tracegrove mcp` serves the same results as MCP tools: `status`, `init`, `discover`, `check`, `test`, `show_run`, `heal`, `draft`, `readiness`, `challenge_check` and the environment tools. It starts in a repo with no config, so an agent can begin with `status`, then `init` and `discover`. Tools that need a config return `config_not_found` until `init` has run. The Claude Code plugin (`/plugin install tracegrove --marketplace hopeatina/tracegrove`) adds the server and the tracegrove skill together; for Codex, `codex mcp add tracegrove -- npx -y tracegrove mcp`.
+
 Exit codes: 0 clean/passed; 1 assertion failure; 2 blocked/inconclusive; 3 infrastructure failure; 4 cancellation. A top-level JSON error uses `tracegrove.cli-error/v1`, with a public class, bounded reason codes and recovery actions. Normal reports and artifacts may contain application data; protect them with your usual workspace access controls. `--json=false` selects prose errors, while `--jsonl` keeps its event stream.
 
 Agent drafting uses the configured Claude Code or Codex CLI and its existing permissions. Tracegrove's prompt is not a filesystem sandbox. The default models are explicit in the adapter, and one Claude model-alias retry is recorded when used. A requested `maxBudgetUsd` is supported by the Claude adapter; the Codex adapter blocks it rather than ignoring a spending limit. Commit or stash work before drafting or healing, review proposed changes, and preserve the original failed run. A passing compiled flow is not proof of intended behavior.

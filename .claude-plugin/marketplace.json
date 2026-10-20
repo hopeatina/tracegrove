@@ -1,0 +1,16 @@
+{
+  "name": "tracegrove",
+  "owner": {
+    "name": "Hope Atina"
+  },
+  "metadata": {
+    "description": "tracegrove's Claude Code plugin: end-to-end verification tools and agent rules."
+  },
+  "plugins": [
+    {
+      "name": "tracegrove",
+      "source": "./",
+      "description": "The tracegrove MCP tools plus the skill for setting up and running end-to-end flows."
+    }
+  ]
+}

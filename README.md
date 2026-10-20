@@ -164,20 +164,36 @@ On staging, a run whose cleanup can't be confirmed fails. In production, any flo
 
 ## Hand it to your coding agent
 
-Add tracegrove's tools to Claude Code:
+Give Claude Code or Codex the tracegrove tools, then paste one prompt. The tools work in a repo that has never seen tracegrove.
 
-```bash
-claude mcp add tracegrove -- npx -y tracegrove mcp
-```
-
-Then paste this:
+<details open>
+<summary><b>Claude Code</b></summary>
 
 ```text
-Set up tracegrove end-to-end tests for this repo. Run `npx tracegrove init`, then use the
-tracegrove MCP tools: status, check and test. Write flows for the riskiest workflows first
-(writes, money, permissions), each with a separate readback, and fix setup until they pass.
-Never weaken an assertion to get green; use challenge_check if you think one is wrong.
-Finish with the readiness summary.
+/plugin install tracegrove --marketplace hopeatina/tracegrove
+```
+
+The plugin adds the MCP tools and the rules the agent follows. Tools only: `claude mcp add tracegrove -- npx -y tracegrove mcp`.
+
+</details>
+
+<details>
+<summary><b>Codex</b></summary>
+
+```bash
+codex mcp add tracegrove -- npx -y tracegrove mcp
+```
+
+</details>
+
+Then paste:
+
+```text
+Set up tracegrove end-to-end tests for this repo with the tracegrove MCP tools. Call status,
+then init if there is no config, then discover. Write flows for the riskiest workflows first
+(writes, money, permissions), each with a separate readback and a check that another user is
+denied. Run them and fix setup until they pass. Never weaken an assertion to get green; use
+challenge_check if you think one is wrong. Finish with the readiness summary.
 ```
 
 Every command also takes `--json`, with stable exit codes: `0` passed, `1` a check failed, `2` blocked (fix setup, don't retry), `3` infrastructure failed, `4` cancelled. [Agent guide](docs/agent-guide.md).
