@@ -1,10 +1,18 @@
 name: tracegrove
 on:
+  # Branches with an open PR are tested once, by the pull_request event; push only covers the main branch.
   push:
+    branches: [codex/bootstrap]
   pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Set the repository variable CI_RUNNER to a self-hosted runner label (e.g. tracegrove-mac) to run here
+    # instead of on hosted minutes. Pull requests from forks always use a hosted runner.
+    runs-on: ${{ (vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true) && vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
