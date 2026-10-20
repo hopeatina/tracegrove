@@ -1,0 +1,15 @@
+# tracegrove testing tracegrove: flows against the `tracegrove ui` server, served by serve.mjs
+# over a fresh copy of the notes sample. Build first (npm run build), then: tracegrove test --config dogfood/tracegrove.config.yaml
+project: tracegrove-ui
+app:
+  adapter: node
+  root: ..
+  entry: dogfood/serve.mjs
+  health: /api/status
+  sources: [src/authoring/**, dogfood/serve.mjs]
+personas:
+  operator: { subject: operator }
+  stranger: { subject: stranger }
+defaults:
+  stepTimeoutMs: 20000
+  caseTimeoutMs: 90000

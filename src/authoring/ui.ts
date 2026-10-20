@@ -2,8 +2,8 @@
  * `tracegrove ui`: a loopback-only web UI over one folder. It shows the config, flows and run
  * history, runs `tracegrove test`, starts discovery at the working tree or a git branch, and
  * hands drafting to Claude Code or Codex using the settings saved in .tracegrove/settings.json.
- * Writes need the per-session token in a custom header (blocks cross-site form posts) and
- * every request must carry the loopback Host header (blocks DNS rebinding).
+ * Writes need the per-session token in a custom header or as a bearer token (either blocks
+ * cross-site form posts) and every request must carry the loopback Host header (blocks DNS rebinding).
  */
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -42,9 +42,10 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   return text ? JSON.parse(text) as Record<string, unknown> : {};
 }
 
-export async function startUi(options: { dir: string; branch?: string | null; port?: number }): Promise<UiServer> {
+export async function startUi(options: { dir: string; branch?: string | null; port?: number; token?: string }): Promise<UiServer> {
   const dir = resolve(options.dir);
-  const token = randomBytes(18).toString('base64url');
+  // A fixed token is for harnesses that drive the UI over HTTP (the dogfood grove); the CLI never sets one.
+  const token = options.token && options.token.length >= 16 ? options.token : randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
   let active: { id: string; kind: 'run' | 'heal' | 'draft'; controller: AbortController; cancelling: boolean } | null = null;
   let closing = false;
@@ -126,7 +127,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     };
     if (req.headers.host !== `127.0.0.1:${port}` && req.headers.host !== `localhost:${port}`) return send(421, { error: 'unexpected host' });
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
-    if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token) return send(403, { error: 'missing session token' });
+    if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
     if (closing && req.method === 'POST') return send(409, { error: 'UI is closing; new work is not admitted.' });
     try {
       if (req.method === 'GET' && url.pathname === '/') {

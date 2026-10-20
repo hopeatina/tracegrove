@@ -1,0 +1,26 @@
+title: Writes without the session token change nothing
+risk: critical
+tags: [ui, security]
+steps:
+  - name: no token
+    POST: /api/prune
+    as: none
+    json: { file: tracegrove/notes/list.flow.yaml }
+    expect: { status: 403, json: { error: missing session token } }
+
+  - name: wrong token
+    POST: /api/prune
+    as: stranger
+    json: { file: tracegrove/notes/list.flow.yaml }
+    expect: 403
+
+  - name: path escape refused
+    POST: /api/prune
+    json: { file: tracegrove/../../escape.flow.yaml }
+    expect: 400
+
+  - name: grove untouched
+    GET: /api/overview
+    as: none
+    observe: true
+    expect: { status: 200, count: { flows: 2, pruned: 0 } }

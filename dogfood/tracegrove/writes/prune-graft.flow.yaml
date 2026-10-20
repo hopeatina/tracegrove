@@ -1,0 +1,29 @@
+title: Pruning a flow takes it out of the grove and grafting puts it back
+tags: [ui, prune]
+steps:
+  - name: prune list
+    POST: /api/prune
+    json: { file: tracegrove/notes/list.flow.yaml }
+    expect: { status: 200, json: { pruned: true } }
+
+  - name: one flow left
+    GET: /api/overview
+    as: none
+    observe: true
+    expect: { status: 200, count: { flows: 1, pruned: 1 } }
+
+  - name: prune twice is refused
+    POST: /api/prune
+    json: { file: tracegrove/notes/list.flow.yaml }
+    expect: 404
+
+  - name: graft it back
+    POST: /api/prune
+    json: { file: tracegrove/notes/list.flow.yaml, graft: true }
+    expect: { status: 200, json: { pruned: false } }
+
+  - name: both flows again
+    GET: /api/overview
+    as: none
+    observe: true
+    expect: { status: 200, count: { flows: 2, pruned: 0 } }

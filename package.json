@@ -60,6 +60,7 @@
     "test": "vitest run",
     "test:conformance": "vitest run conformance/",
     "test:django": "vitest run --config vitest.django.config.ts",
+    "test:dogfood": "npm run build && node dist/cli/main.js test --config dogfood/tracegrove.config.yaml",
     "test:container": "node scripts/container-conformance.mjs",
     "schema:export": "node --import tsx scripts/export-schemas.ts",
     "schema:check": "node --import tsx scripts/export-schemas.ts --check && node --import tsx scripts/export-environment-examples.ts --check",

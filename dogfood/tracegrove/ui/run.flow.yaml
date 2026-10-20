@@ -1,0 +1,20 @@
+title: Run all from the UI holds both scenarios and lands in history
+risk: critical
+tags: [ui, run]
+steps:
+  - name: run all
+    POST: /api/test
+    json: {}
+    timeoutMs: 60000
+    expect: { status: 200, json: { outcome: passed } }
+
+  - name: history has the run
+    GET: /api/overview
+    as: none
+    observe: true
+    expect: { status: 200, count: { runs: 1 }, json: { running: false } }
+
+  - name: activity settled
+    GET: /api/activity
+    as: none
+    expect: { status: 200, json: { status: finished } }

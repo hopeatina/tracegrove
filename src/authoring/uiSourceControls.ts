@@ -5,12 +5,6 @@ function sourceDescription(binding){
  if(binding.kind==='working_tree')return 'Working tree · file hashes captured for each run';
  return 'Local snapshot · commit '+binding.commit+' · '+binding.files+' files · '+binding.bytes+' bytes · '+binding.ref.digest.hex;
 }
-function sourceBanner(){const source=state.verificationSource;
- return h('section',{class:'card',style:'margin-bottom:20px;overflow-wrap:anywhere','aria-label':'Verification input'},
-  h('div',{class:'row'},h('b',{},'Next run input'),h('span',{class:'small muted'},source.status==='blocked'?'Blocked — review selection':sourceDescription(source.binding)),
-   h('button',{class:'btn ghost',on:{click:()=>{tab='Settings';render()}}},'Change input')),
-  ui.run?h('p',{class:'small muted'},'Recorded run request: '+(ui.run.sourceChecked?sourceDescription(ui.run.sourceBinding):'Unavailable — saved evidence could not establish the input.')):null);
-}
 function sourceSettings(){
  const source=state.verificationSource;let candidate=null;let busy=false;
  const status=h('div',{id:'source-status',role:'status','aria-live':'polite',tabindex:'-1',style:'overflow-wrap:anywhere'});
@@ -28,13 +22,14 @@ function sourceSettings(){
   catch(e){status.replaceChildren(blocked(e));status.focus()}
   finally{busy=false;check.disabled=false;working.disabled=false;path.disabled=false;candidate=null;apply.disabled=true}
  }
- return h('section',{class:'card',style:'margin-bottom:24px;overflow-wrap:anywhere'},h('span',{class:'label'},'Verification input'),
+ return h('section',{class:'card',style:'overflow-wrap:anywhere'},h('span',{class:'label'},'Verification input'),
   h('h2',{style:'margin:6px 0'},'Choose what the next run launches'),
-  h('p',{class:'small muted'},sourceDescription(source.binding)),source.error?blocked(source.error):null,
-  h('p',{class:'small muted'},'Keep one set of scenarios here. Select application files from your working tree or a materialized snapshot. This local preference leaves the team config unchanged.'),
-  h('label',{for:'snapshot-path'},'Snapshot manifest'),path,
+  h('p',{class:'row small',style:'gap:8px;margin:0 0 14px'},h('span',{class:'dot s '+(source.status==='blocked'?'fail':'pass')}),sourceDescription(source.binding)),source.error?blocked(source.error):null,
+  h('label',{for:'snapshot-path',class:'small muted'},'Snapshot manifest'),path,
   h('div',{class:'row',style:'margin-top:12px'},check,apply,working),status,
-  h('p',{class:'small muted'},'Checking launches nothing. Saving pins the exact manifest; changed bytes block the next run. These are local content checks, not remote or deployed revision attestations. Dependencies and environment remain external.'),
-  h('p',{class:'small muted'},'The Discover branch selector only scans routes; it does not change verification input.'));
+  h('details',{class:'more'},h('summary',{},'How input works'),h('div',{class:'small muted'},
+   h('p',{},'Keep one set of scenarios here. Select application files from your working tree or a materialized snapshot. This local preference leaves the team config unchanged.'),
+   h('p',{},'Checking launches nothing. Saving pins the exact manifest; changed bytes block the next run. These are local content checks, not remote or deployed revision attestations. Dependencies and environment remain external.'),
+   h('p',{},'The Discover branch selector only scans routes; it does not change verification input.'))));
 }
 `;
