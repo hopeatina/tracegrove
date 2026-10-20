@@ -48,7 +48,10 @@ function caseLines(p: Paint, c: CaseReport, last: boolean): string[] {
     if (c.failure && c.failure.step === s.name && s.result !== 'not_run') {
       const pad = `${p.dim(`${stem}${i === c.steps.length - 1 ? '   ' : '│  '}`)}    `;
       for (const line of c.failure.message.split('\n')) lines.push(`${pad}${p.red(line)}`);
-      if (c.failure.observed) lines.push(`${pad}${p.dim(c.failure.observed.length > 160 ? `${c.failure.observed.slice(0, 160)}…` : c.failure.observed)}`);
+      if (c.failure.observed) {
+        const observed = c.failure.observed.length > 240 ? `${c.failure.observed.slice(0, 240)}…` : c.failure.observed;
+        for (const line of observed.split('\n')) lines.push(`${pad}${p.dim(line)}`);
+      }
     }
   });
   return lines;
@@ -79,7 +82,7 @@ export function runNext(report: TestRunReport): NextAction[] {
   ];
 }
 
-export function renderTree(report: TestRunReport, root: string, p: Paint): string {
+export function renderTree(report: TestRunReport, root: string, p: Paint, options: { next?: boolean } = {}): string {
   const badge = environmentBadge(report.environment);
   const deployed = report.environment && report.environment.class !== 'isolated_candidate';
   const lines = [`${p.moss('tracegrove')} ${p.dim('·')} ${p.bold(report.project)} ${p.dim(`· ${report.environment && report.environment.kind !== 'launch' ? 'target' : 'app'} ${report.sourceDigest.slice(0, 12)}`)}${badge ? ` ${deployed ? p.amber(`[${badge}]`) : p.dim(`[${badge}]`)}` : ''}`,
@@ -89,7 +92,7 @@ export function renderTree(report: TestRunReport, root: string, p: Paint): strin
   const t = report.totals;
   const tally = report.bundleVerified === false ? p.amber('results unavailable') : `${p.moss(`${t.passed} passed`)}, ${t.failed ? p.red(`${t.failed} failed`) : `${t.failed} failed`}${t.other ? `, ${p.amber(`${t.other} other`)}` : ''}`;
   lines.push('', `${tally} ${p.dim('·')} run ${relative(root, report.runDir) || report.runDir}${report.bundleVerified === false ? ` ${p.red('· BUNDLE INVALID')}` : ''}`);
-  const next = nextLines(p, runNext(report), 2);
+  const next = options.next === false ? [] : nextLines(p, runNext(report), 2);
   if (next.length) lines.push(...next);
   return lines.join('\n');
 }
@@ -153,7 +156,7 @@ export function progressLine(stream: NodeJS.WriteStream = process.stderr): { upd
   if (!stream.isTTY) return { update: () => {}, done: () => {} };
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let i = 0; let text = ''; const started = Date.now();
-  const draw = () => { const cols = stream.columns ?? 80; const line = `${frames[i++ % frames.length]} ${text} \x1b[2m${Math.round((Date.now() - started) / 1000)}s\x1b[0m`; stream.write(`\r\x1b[2K${line.slice(0, cols + 8)}`); };
+  const draw = () => { const cols = stream.columns || 80; const line = `${frames[i++ % frames.length]} ${text} \x1b[2m${Math.round((Date.now() - started) / 1000)}s\x1b[0m`; stream.write(`\r\x1b[2K${line.slice(0, cols + 8)}`); };
   const timer = setInterval(draw, 120); timer.unref();
   return { update: (next) => { text = next; draw(); }, done: () => { clearInterval(timer); stream.write('\r\x1b[2K'); } };
 }

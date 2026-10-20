@@ -14,3 +14,7 @@ To reproduce: build, generate `notes-api` in a fresh directory, run `test --conf
 # Voice and readiness screenshots
 
 `voice-run.png` and `readiness.png` are full-page captures (1280 wide) of `tracegrove ui` viewing a real local run of the synthetic `voice-receptionist` sample, 2026-10-20, Linux, Node 22, headless Chromium. The run held 4/4 scenarios and 10/10 steps with `bundleVerified: true`. The Readiness capture shows `calls.books-a-cleaning` (risk `critical`) pending a person's sign-off and the three standard claims accepted by policy. No real people, phone numbers or clinics appear; all names and 555 numbers are synthetic.
+
+# Terminal captures
+
+`try-voice.png` and `try-bug-caught.png` are the real colored output of `tracegrove try voice-receptionist` and `tracegrove try voice-receptionist --bug drop_booking` (built CLI, 2026-10-20, Linux, Node 22), captured through a pseudo-terminal and rendered in a terminal frame. Only the spinner frames were removed and the run folder name was shortened to `runs/latest`.

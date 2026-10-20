@@ -32,6 +32,7 @@ export const COMMAND_SCHEMAS = {
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-prove': Bool }).strict(),
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
+  try: z.object({ ...common, _: Positionals(0, 1).optional(), bug: Text.optional(), out: Text.optional(), 'no-open': Bool, port: Text.optional() }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
   setup: z.object({ ...common, 'dry-run': Bool, 'check-only': Bool }).strict(),
   doctor: z.object({ ...common, config: Text.optional(), dir: Text.optional(), profile: Text.optional() }).strict(),
@@ -86,7 +87,7 @@ export const COMMAND_SCHEMAS = {
   unseal: z.object({ ...common, _: Positionals(1, 1), out: Text }).strict(),
 } as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 /** Most positional words each command accepts (its schema's `_` array validates the rest). */
-const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, waive: 1, reject: 1, challenge: 1, unseal: 1 };
+const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, try: 1, waive: 1, reject: 1, challenge: 1, unseal: 1 };
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];

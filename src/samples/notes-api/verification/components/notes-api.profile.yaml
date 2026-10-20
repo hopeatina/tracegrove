@@ -10,6 +10,6 @@ components:
       kind: source_digest
       sourceDigest:
         algorithm: sha256
-        hex: e5218f7d91fbd86adac23fad45a169bc5827bc7a1aa673447aab0221e6918d03
+        hex: 060c1c1bffd9b72036491effd04c119536c5115543c8b928502a5a33ce3da229
       runtime: node22
     exclusionReason: null
