@@ -11,7 +11,7 @@ export const CliErrorCode = z.enum([
   'prerequisite_unavailable', 'state_conflict', 'invalid_document', 'invalid_json',
   'input_unavailable', 'access_denied', 'infrastructure_failure', 'unexpected_failure',
   // environments (additive)
-  'unknown_environment', 'invalid_environment', 'no_flows_for_environment', 'approval_required', 'approval_requires_human', 'agent_policy_denied',
+  'unknown_environment', 'invalid_environment', 'environment_value_missing', 'no_flows_for_environment', 'approval_required', 'approval_requires_human', 'agent_policy_denied',
   'invalid_config_path', 'config_edit_invalid',
   ...NativeObservationErrorCode.options,
 ]);

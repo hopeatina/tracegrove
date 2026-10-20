@@ -35,6 +35,7 @@ const blockedReasons: Partial<Record<Reason['code'], Reason>> = {
   invalid_port: reason('invalid_port', 'The selected port is invalid.', 'Choose a valid port or omit the port option.'),
   unknown_environment: reason('unknown_environment', 'The selected environment is not declared.', 'Run tracegrove env list and choose a declared environment.'),
   invalid_environment: reason('invalid_environment', 'The selected environment configuration is invalid.', 'Fix the environment in tracegrove.config.yaml; tracegrove env show explains each field.'),
+  environment_value_missing: reason('environment_value_missing', 'The environment reads a value from a variable that is not set.', 'Set the variable (in CI, from the deployment, such as the preview URL), or choose another environment.'),
   no_flows_for_environment: reason('no_flows_for_environment', 'No selected flow is enabled for this environment.', 'Opt flows in with envs: [<env>]; flows default to local only.'),
   approval_required: reason('approval_required', 'Agent runs in this environment need a person to approve them first.', 'Ask a person to run the approval command, then run again.'),
   approval_requires_human: reason('approval_requires_human', 'Approvals must be granted by a person, not an agent.', 'Ask a person to run the approval command.'),

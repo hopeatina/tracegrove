@@ -259,6 +259,74 @@ denied) with the reason and fix for each gap. For example, url targets have no b
 transport, so browser and MCP flows stay local. The planner blocks a flow that needs a missing capability
 with `capability_not_provided_by_host`.
 
+## Finding environments you already have {#detect}
+
+Most repos already describe where they run. `tracegrove env detect` reads those files and proposes environments:
+
+```text
+$ npx tracegrove env detect
+Found 3 environment(s) in this repo's deploy files:
+  docker       compose web:3000  local, launched by tracegrove
+               from docker-compose.yml: service web listens on 3000; tracegrove starts it with docker compose
+  production   https://notes-prod.fly.dev  production, read-only, agents denied
+               from fly.toml: Fly app notes-prod
+  preview      env:PREVIEW_URL  preview, agents ask first
+               from vercel.json: Vercel builds a preview per pull request; CI passes its address in PREVIEW_URL
+```
+
+| File | Proposes |
+| --- | --- |
+| `compose.yaml`, `docker-compose.yml` | `docker`: the service that builds or is named app/web/api, on its container port. Databases and proxies are skipped. |
+| `fly.toml`, `fly.<stage>.toml` | `https://<app>.fly.dev` |
+| `render.yaml` | `https://<web service>.onrender.com` |
+| `vercel.json`, `.vercel/project.json`, `netlify.toml` | `preview` with `url: env:PREVIEW_URL` |
+| `.env.<stage>` | the first `*_URL` key such as `APP_URL` or `NEXT_PUBLIC_SITE_URL`. Only URL-shaped keys are read. `.env.example`, `.env.local` and `.env.test` are ignored. |
+
+A deployment whose name doesn't say staging, preview, dev or qa is proposed as `production_observation`: read-only, and closed to agents. Change it only on purpose.
+
+Then add one without flags:
+
+```bash
+npx tracegrove env add            # in a terminal: pick one, name it, say where each persona's credential lives
+npx tracegrove env add docker     # take the detected `docker` as it is
+```
+
+## Per-PR previews {#previews}
+
+A preview deployment gets a new address on every pull request, so its target reads the address when the run starts:
+
+```yaml
+environments:
+  preview:
+    target:
+      url: env:PREVIEW_URL
+      release: { field: commit, expect: env:GITHUB_SHA }   # optional: refuse a preview built from another commit
+    personas:
+      owner: { from: env:PREVIEW_OWNER_TOKEN }
+```
+
+If `PREVIEW_URL` is not set the run stops with `environment_value_missing`. With `release.expect` set, a preview still serving an older commit stops the run with `identity_mismatch` instead of testing the wrong build. On GitHub, Vercel, Netlify and Render report each preview as a deployment, so the card can run when it is ready:
+
+```yaml
+# .github/workflows/preview.yml
+on: deployment_status
+permissions: { contents: read, pull-requests: write }
+jobs:
+  proof:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment != 'Production'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ github.event.deployment.sha }}' }
+      - uses: hopeatina/tracegrove@codex/bootstrap
+        env: { PREVIEW_OWNER_TOKEN: '${{ secrets.PREVIEW_OWNER_TOKEN }}', GITHUB_SHA: '${{ github.event.deployment.sha }}' }
+        with:
+          env: preview
+          preview-url: ${{ github.event.deployment_status.target_url }}
+```
+
+Flows run in a preview only when they list it: `envs: [local, preview]`.
+
 ## Config edits and `env add`
 
 ```bash
