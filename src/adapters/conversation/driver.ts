@@ -128,7 +128,7 @@ export class ConversationDriver {
         const t0 = monotonicMs();
         send('send-text', { content: turn.say, options: { run_immediately: true, audio_response: true } });
         const tts: string[] = []; const llm: string[] = []; const outputs: string[] = [];
-        const calls = new Map<string, { name: string; arguments: unknown; result: unknown }>();
+        const calls = new Map<string, { name: string; arguments: unknown; result: unknown; spokenBefore: number }>();
         let first: number | null = null; let last: number | null = null; let speaking = false;
         let ended: TurnRecord['ended'] = 'timeout';
         const turnEnd = t0 + command.turnTimeoutMs;
@@ -147,8 +147,10 @@ export class ConversationDriver {
             if (message.type.startsWith('llm-function-call')) {
               const id = String(data.tool_call_id ?? data.function_name ?? calls.size);
               const name = String(data.function_name ?? data.name ?? calls.get(id)?.name ?? 'unknown').slice(0, 128);
-              const prior = calls.get(id) ?? { name, arguments: null, result: null };
-              calls.set(id, { name, arguments: data.arguments ?? data.args ?? prior.arguments, result: data.result ?? prior.result });
+              // How much the agent had already said when the call began: did it claim success before the tool answered?
+              const said = Math.max(tts.join(' ').trim().length, llm.join('').trim().length, outputs.join(' ').trim().length);
+              const prior = calls.get(id) ?? { name, arguments: null, result: null, spokenBefore: said };
+              calls.set(id, { name, arguments: data.arguments ?? data.args ?? prior.arguments, result: data.result ?? prior.result, spokenBefore: prior.spokenBefore });
             }
             if (message.type === 'bot-stopped-speaking' && speaking) { ended = 'stopped'; break; }
           }
@@ -160,7 +162,7 @@ export class ConversationDriver {
           await waitFor(Math.min(turnEnd - now, last !== null && !speaking ? command.settleMs - (now - last) : turnEnd - now));
         }
         const reply = (tts.length ? tts.join(' ') : outputs.length ? outputs.join(' ') : llm.join('')).replace(/\s+/g, ' ').trim();
-        const toolCalls = [...calls.values()].slice(0, 16).map((call) => ({ name: call.name, arguments: (call.arguments ?? null) as ConversationToolCall['arguments'], result: (call.result ?? null) as ConversationToolCall['result'] }));
+        const toolCalls = [...calls.values()].slice(0, 16).map((call) => ({ name: call.name, arguments: (call.arguments ?? null) as ConversationToolCall['arguments'], result: (call.result ?? null) as ConversationToolCall['result'], spokenBefore: call.spokenBefore }));
         turns.push({ index, say: turn.say, reply: reply.slice(0, MAX_REPLY), firstReplyMs: first === null ? null : Math.round(first), durationMs: Math.round(monotonicMs() - t0),
           toolCalls, toolNames: toolCalls.map((call) => call.name), ended });
         if (closed) break;

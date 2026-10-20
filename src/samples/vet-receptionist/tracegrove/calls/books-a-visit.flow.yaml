@@ -1,6 +1,10 @@
 title: A caller books a visit, and the booking reaches the clinic calendar exactly once
 risk: critical
 tags: [voice, booking]
+rubric:
+  - Repeats the day and time back before booking anything
+  - Asks for the pet's name, the owner's name and a callback number before booking
+  - Only says the visit is booked after the calendar automation confirmed it
 steps:
   - name: caller books vaccines for Biscuit
     as: none

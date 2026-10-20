@@ -212,6 +212,8 @@ export const Flow = z.object({
   title: z.string().min(1).max(400),
   risk: z.enum(['critical', 'standard', 'exploratory']).default('standard'),
   tags: z.array(Name).default([]),
+  rubric: z.array(z.string().min(1).max(400)).max(20).optional()
+    .describe('What a good conversation does, in plain words. `tracegrove judge` grades saved runs against it; advisory, never pass/fail.'),
   envs: z.array(Name).min(1).max(16).optional().describe('Environments this flow may run in. Defaults to [local]; list staging etc. to opt in.'),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),

@@ -58,6 +58,9 @@ export function renderCard(input: CardInput): Card {
   for (const f of failures) lines.push(`- **${f.project} › ${f.title}** failed: ${cell(f.failure).slice(0, 300)}  \n  \`${f.file}\``);
   for (const d of disputes) lines.push(`- **${d.project} › ${d.title}** ${d.decision === 'rejected' ? 'is wrong' : 'has a disputed check'}, says ${d.by ?? 'a reviewer'}: ${cell(d.reason).slice(0, 300) || '(no reason given)'}  \n  \`${d.file}\``);
   if (failures.length || disputes.length) lines.push('');
+  const flagged = all.filter(({ claim }) => claim.judged?.notMet && claim.assessment !== 'contradicted');
+  for (const { project, claim } of flagged) lines.push(`- ${states.length > 1 ? `${project} › ` : ''}${claim.title}: the judge says ${claim.judged!.notMet} of ${claim.judged!.total} rubric items not met (advisory): ${cell(claim.judged!.notMetItems.join('; ')).slice(0, 300)}`);
+  if (flagged.length) lines.push('');
   if (states.length > 1) {
     lines.push('| Project | Claims | Result |', '| --- | --- | --- |');
     for (const s of states) {
@@ -66,8 +69,8 @@ export function renderCard(input: CardInput): Card {
     }
     lines.push('');
   }
-  lines.push('<details><summary>Every claim</summary>', '', '| Claim | Checks | Evidence | Sign-off |', '| --- | --- | --- | --- |');
-  for (const { project, claim } of all) lines.push(`| ${cell(states.length > 1 ? `${project} › ${claim.title}` : claim.title)} | ${claim.channels.join(', ')} | ${evidence(claim)} | ${cell(signOff(claim))} |`);
+  lines.push('<details><summary>Every claim</summary>', '', '| Claim | Checks | Evidence | Judge | Sign-off |', '| --- | --- | --- | --- | --- |');
+  for (const { project, claim } of all) lines.push(`| ${cell(states.length > 1 ? `${project} › ${claim.title}` : claim.title)} | ${claim.channels.join(', ')} | ${evidence(claim)} | ${claim.judged ? `${claim.judged.met}/${claim.judged.total}` : ''} | ${cell(signOff(claim))} |`);
   lines.push('', '</details>', '');
   const footer = [input.link ? `[Full report](${input.link})` : null, 'Each run starts the app fresh, checks every effect with a separate read, and seals the evidence. Verified with [tracegrove](https://github.com/hopeatina/tracegrove).'].filter(Boolean);
   lines.push(`<sub>${footer.join(' · ')}</sub>`);

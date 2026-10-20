@@ -65,8 +65,15 @@ function observedLine(output: unknown): string | null {
 }
 
 function conversationLine(observation: ConversationObservation): string {
-  return observation.turns.map((turn) => [`caller: ${turn.say}`, `agent: ${turn.reply || '(no reply)'}${turn.firstReplyMs !== null ? `  [${turn.firstReplyMs} ms]` : ''}`,
-    ...turn.toolCalls.map((call) => `  tool ${call.name}(${excerpt(call.arguments, 160)}) -> ${excerpt(call.result, 160)}`)].join('\n')).join('\n');
+  return observation.turns.map((turn) => {
+    const tool = (call: ConversationObservation['turns'][number]['toolCalls'][number], when: string) => `  ${when}tool ${call.name}(${excerpt(call.arguments, 160)}) -> ${excerpt(call.result, 160)}`;
+    // Where the agent's speech and its tool calls interleave is evidence too: "booked" said before the booking answered is a bug.
+    const before = turn.toolCalls.filter((call) => call.spokenBefore === 0);
+    const after = turn.toolCalls.filter((call) => call.spokenBefore !== 0);
+    return [`caller: ${turn.say}`, ...before.map((call) => tool(call, 'before replying, ')),
+      `agent: ${turn.reply || '(no reply)'}${turn.firstReplyMs !== null ? `  [${turn.firstReplyMs} ms]` : ''}`,
+      ...after.map((call) => tool(call, call.spokenBefore === undefined ? 'during this turn, ' : `after saying "${excerpt(turn.reply.slice(Math.max(0, call.spokenBefore - 40), call.spokenBefore), 60)}", `))].join('\n');
+  }).join('\n');
 }
 
 function standInLine(o: StandInObservation): string {

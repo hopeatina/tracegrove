@@ -82,6 +82,7 @@ export const COMMAND_SCHEMAS = {
   waive: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   reject: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   challenge: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text, step: Text.optional() }).strict(),
+  judge: z.object({ ...common, run: Text.optional(), grep: Text.optional(), agent: Text.optional(), show: Text.optional() }).strict(),
   'import-call': z.object({ ...common, _: Positionals(1, 1), out: Text.optional(), name: Text.optional(), channel: z.enum(['voice', 'chat']).optional(), endpoint: Text.optional(), 'keep-client-data': Bool, force: Bool }).strict(),
   card: z.object({ ...common, _: Positionals(0, 32).optional(), commit: Text.optional(), link: Text.optional(), title: Text.optional(), out: Text.optional() }).strict(),
   handoff: z.object({ ...common, dir: Text.optional(), out: Text.optional(), client: Text.optional(), by: Text.optional() }).strict(),

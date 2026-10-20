@@ -119,6 +119,7 @@ Voice speaks [RTVI](https://docs.pipecat.ai/client/rtvi-standard) over WebSocket
 ```bash
 npx tracegrove readiness                          # exits 0 only when every claim is ready
 npx tracegrove accept calls.books-a-cleaning --reason "Reviewed transcript and readback"
+npx tracegrove judge                              # advisory: grade conversations against each flow's rubric
 npx tracegrove handoff --client "Bright Smile Dental"
 ```
 
@@ -207,7 +208,7 @@ Declare the services your app calls under `standIns:` and tracegrove replaces ea
 | The agent works on a real phone line | No. Text goes in over RTVI, so speech recognition, voices, phone latency and interruptions aren't tested. |
 | The calendar, CRM or payment API accepts it | Only what your app sent. Stand-ins prove the request, not that the real service takes it; run a few flows against a sandbox [environment](docs/environments.md) for that. |
 | The agent handles whatever callers say | Only the conversations you scripted. `import-call` turns real calls into scripts, but coverage is as good as the scripts. |
-| The agent said the right thing, kindly | Only the phrases you listed (`says`, `notSays`). Tone and judgment need a person's sign-off; graded rubrics are planned. |
+| The agent said the right thing, kindly | Only the phrases you listed (`says`, `notSays`) decide pass or fail. A `rubric:` gets graded by your agent with cited lines, but only as advice to the person who signs off. |
 | It works with hosted voice platforms | Pipecat and anything speaking RTVI, plus HTTP chat. Retell and Vapi transports are planned; today, test the backend they call. |
 | Discovery found every route | Routes found by reading code are marked unverified until a run reaches them. |
 | The evidence can't be tampered with | Every run is hash-chained and checked on read. It isn't signed by a third party yet. |

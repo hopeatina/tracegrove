@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
 import { compileProject, configInDirectory } from './compile.ts';
+import { readJudgment, summarize, type JudgmentSummary } from './judge.ts';
 import { loadProject } from '../core/corpus.ts';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { readSavedRun } from './runSource.ts';
@@ -49,6 +50,8 @@ export type Claim = {
   run: string | null; ranAt: string | null;
   failure: string | null;
   channels: string[];
+  /** Advisory: how the judge graded this claim's run against the flow's rubric. Never changes the assessment. */
+  judged: JudgmentSummary | null;
   ready: boolean;
   next: { command: string; why: string } | null;
 };
@@ -121,6 +124,7 @@ export function readiness(dir: string): Readiness {
     else if (assessment === 'supported' && validity === 'current' && risk !== 'critical') decision = 'auto';
     if (decision === 'accepted' && assessment !== 'supported') decision = 'pending'; // an acceptance never outlives the evidence it saw
     const ready = decision === 'waived' || (assessment === 'supported' && validity === 'current' && (decision === 'accepted' || decision === 'auto'));
+    const judged = ran ? readJudgment(root, ran.run, flow.caseId) : null;
     const grep = `tracegrove test --grep ${flow.caseId}`;
     const next = ready ? null
       : decision === 'challenged' ? { command: `tracegrove show`, why: `the check is disputed${mine?.reason ? `: ${mine.reason}` : ''}; fix the flow or resolve the challenge with accept/reject` }
@@ -130,11 +134,12 @@ export function readiness(dir: string): Readiness {
       : assessment === 'contradicted' ? { command: 'tracegrove heal', why: ran?.failure ?? 'the evidence contradicts the claim' }
       : assessment === 'inconclusive' ? { command: 'tracegrove show', why: `${ran?.outcome ?? 'inconclusive'}: the run could not decide` }
       : decision === 'rejected' ? { command: grep, why: `rejected by ${mine?.by ?? 'a reviewer'}${mine?.reason ? `: ${mine.reason}` : ''}` }
-      : { command: `tracegrove accept ${flow.caseId}`, why: `${risk} claim: a person signs off` };
+      : { command: `tracegrove accept ${flow.caseId}`, why: `${risk} claim: a person signs off${judged && summarize(judged).notMet ? `; the judge flagged ${summarize(judged).notMet} rubric item${summarize(judged).notMet === 1 ? '' : 's'}` : ''}` };
     return { caseId: flow.caseId, title: flow.title, file: flow.file, risk, execution, assessment, validity, decision,
       decidedBy: decision === 'auto' ? 'policy: supported routine claim' : mine?.by ?? null, reason: mine?.reason || null,
       run: ran?.run ?? null, ranAt: ran?.ranAt ?? null, failure: assessment === 'contradicted' || assessment === 'inconclusive' ? ran?.failure ?? null : null,
-      channels: [...new Set(flow.steps.map((s) => CHANNEL[s.method] ?? s.method.toLowerCase()))], ready, next };
+      channels: [...new Set(flow.steps.map((s) => CHANNEL[s.method] ?? s.method.toLowerCase()))], judged: judged ? summarize(judged) : null, ready,
+      next: !next && judged && summarize(judged).notMet ? { command: `tracegrove judge --show ${flow.caseId}`, why: `the judge says ${summarize(judged).notMet} rubric item${summarize(judged).notMet === 1 ? ' was' : 's were'} not met; read its notes before signing off` } : next };
   });
   const order = (c: Claim) => (c.ready ? 3 : 0) + (c.decision === 'waived' ? 1 : 0) + (c.assessment === 'contradicted' ? -1 : 0);
   claims.sort((a, b) => order(a) - order(b) || a.caseId.localeCompare(b.caseId));

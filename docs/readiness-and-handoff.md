@@ -43,10 +43,32 @@ Every decision is bound to the exact check and source it was made on. Edit the f
 | Command | Use it when | Effect |
 | --- | --- | --- |
 | `waive <case> --reason …` | You are shipping knowingly without this evidence | Claim counts as ready, but stays marked unsupported and the report shows the waiver |
-| `reject <case> --reason …` | The check passes but the behavior is not what the client wants | Claim is not ready |
+| `reject <case> --reason …` | The check passes but the behavior is not what the client wants | Claim is not ready, and the [PR card](pr-proof-card.md) fails with your reason |
 | `challenge <case> --reason … [--step …]` | You think the check itself is wrong | Claim stays open; the check is not changed |
 
 A challenge is the rule for people and coding agents alike: anyone can dispute a check and say why, but nobody silently loosens it. Fix the flow in a reviewed change, rerun, and decide again.
+
+## Graded rubrics
+
+Phrase checks catch "never said Tuesday". They can't catch "booked it, but never repeated the time back". For that, list what a good conversation does in the flow:
+
+```yaml
+title: A caller books a visit
+risk: critical
+rubric:
+  - Repeats the day and time back before booking anything
+  - Asks for the pet's name, the owner's name and a callback number before booking
+  - Only says the visit is booked after the calendar automation confirmed it
+```
+
+After a run, `tracegrove judge` asks your configured agent (Claude Code or Codex) to grade the saved run against the rubric. It sees only the numbered evidence: every step, the transcript and the readbacks. Each item comes back met, not met or unclear, with the lines it relied on. A verdict without a cited line is counted as unclear.
+
+```bash
+npx tracegrove judge                     # grade the latest run
+npx tracegrove judge --show books-a-visit  # each item, why, and the cited lines
+```
+
+Judgments are advisory. They never turn a pass into a fail or the other way round. They show up where a person decides: `readiness` adds them to the next step for that claim, and the PR card lists rubric items that weren't met and adds a Judge column. When someone accepts or rejects a judged claim, tracegrove records whether they agreed with the judge, and `judge` prints the running agreement. Until people agree with it on nearly every sign-off, treat it as a second pair of eyes and nothing more.
 
 ## Evidence channels
 

@@ -185,6 +185,16 @@
       ],
       "type": "string"
     },
+    "rubric": {
+      "description": "What a good conversation does, in plain words. `tracegrove judge` grades saved runs against it; advisory, never pass/fail.",
+      "items": {
+        "maxLength": 400,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 20,
+      "type": "array"
+    },
     "steps": {
       "items": {
         "anyOf": [

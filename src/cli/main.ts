@@ -67,6 +67,7 @@ import { decide, defaultReviewer, readiness } from '../authoring/readiness.ts';
 import { renderHandoff } from '../authoring/handoff.ts';
 import { renderCard } from '../authoring/card.ts';
 import { importCall } from '../authoring/importCall.ts';
+import { judge, readJudgment } from '../authoring/judge.ts';
 import { renderReadiness } from './renderReadiness.ts';
 import { sealRun, unsealRun } from '../core/seal.ts';
 
@@ -146,6 +147,7 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   challenge <case> --reason <text> [--step <name>]     dispute a check without weakening it; keeps the claim open
   handoff [--out <file.html>] [--client <name>]        a self-contained page for your client: claims, transcripts, readbacks, sign-off
   card [<dir>...] [--commit <sha>] [--link <url>]       the PR proof card: Markdown saying which claims hold on this commit (reads saved runs)
+  judge [--run <name>] [--grep <id>] [--show <claim>]    grade saved conversations against each flow's rubric (advisory notes, never pass/fail)
   import-call <log> [--out <flow.yaml>]                 draft a flow from a real call or chat log (Retell, Vapi, messages JSON, or text)
   seal [--run latest|<dir>] --out <file> [--remove]    encrypt a run folder (AES-256-GCM, key from TRACEGROVE_SEAL_KEY)
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
@@ -809,6 +811,24 @@ async function main(argv: string[]): Promise<number> {
       const card = renderCard({ dirs: args.flags._?.length ? args.flags._ : ['.'], commit: args.flags.commit ?? process.env.GITHUB_SHA ?? null, link: args.flags.link ?? null, title: args.flags.title ?? null });
       if (args.flags.out) { mkdirSync(dirname(resolve(args.flags.out)), { recursive: true }); writeFileSync(resolve(args.flags.out), card.markdown); }
       out(args, card, card.markdown.trimEnd());
+      return 0;
+    }
+    case 'judge': {
+      if (args.flags.show) {
+        const claim = readiness('.').claims.find((c) => c.caseId === args.flags.show || c.caseId.endsWith(args.flags.show!));
+        const found = claim?.run ? readJudgment(readiness('.').root, claim.run, claim.caseId) : null;
+        if (!found) throw new Blocked([{ code: 'judgment_not_found', detail: args.flags.show, action: 'run tracegrove judge after tracegrove test' }]);
+        const mark = { met: '✓', not_met: '✗', unclear: '?' } as const;
+        out(args, found, [`${found.caseId} · run ${found.run} · judged by ${found.judge.provider}${found.judge.model ? ` (${found.judge.model})` : ''}`, '',
+          ...found.items.flatMap((i) => [`${mark[i.verdict]} ${i.item}`, `    ${i.why}`, ...i.lines.slice(0, 3).map((n) => `    ${n}: ${found.evidence[n - 1] ?? ''}`.slice(0, 200))])].join('\n'));
+        return 0;
+      }
+      const result = await judge('.', { ...(args.flags.run ? { run: args.flags.run } : {}), ...(args.flags.grep ? { grep: args.flags.grep } : {}), agent: args.flags.agent ?? null });
+      const lines = [`judged run ${result.run}: ${result.judged.length} scenario${result.judged.length === 1 ? '' : 's'} with a rubric${result.skipped.length ? `, ${result.skipped.length} without` : ''}`,
+        ...result.judged.map((j) => `${j.summary.notMet ? '✗' : j.summary.unclear ? '?' : '✓'} ${j.caseId}  ${j.summary.met}/${j.summary.total} met${j.summary.notMet ? `; not met: ${j.summary.notMetItems.join('; ')}` : ''}`),
+        result.agreement.decided ? `people agreed with the judge on ${result.agreement.agreed} of ${result.agreement.decided} sign-offs` : 'no sign-offs on judged runs yet, so agreement is unknown',
+        'advisory: checks decide pass or fail; read the notes with tracegrove judge --show <claim>'];
+      out(args, result, lines.join('\n'));
       return 0;
     }
     case 'import-call': {
