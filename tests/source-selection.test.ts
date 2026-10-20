@@ -37,7 +37,7 @@ it('previews without writes or launches, saves an exact ref, and uses shared sce
   expect(report.outcome, JSON.stringify(report.blockers)).toBe('passed');
   expect(report.sourceBinding).toEqual(candidate.binding);
   const saved = readSavedRun(p.root, report.runDir.split('/').at(-1)!);
-  expect(saved.savedEvidence.status).toBe('verified');
+  expect(saved.evidenceStatus).toBe('verified');
   expect(readRunSource(saved.runDir, saved)).toMatchObject({ sourceChecked: true, sourceBinding: candidate.binding, bundleVerified: true });
   expect(readFileSync(p.configPath, 'utf8')).toBe(original);
   expect(readLocalSettings(p.root).agent).toEqual({ provider: 'none', maxBudgetUsd: 0.25 });

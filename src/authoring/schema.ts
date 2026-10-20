@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { ActionEnvelope, BrowserCommand, NativeJobAction, McpToolCall, Persona, HexSha256 } from '../protocol/index.ts';
+import { EnvironmentConfig } from '../environments/schema.ts';
 
 export const HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const;
 export type HttpVerb = typeof HTTP_VERBS[number];
@@ -50,6 +51,7 @@ export const AuthoringConfig = z.object({
     model: z.string().min(1).max(120).optional().describe('Explicit model passed to the agent CLI. Defaults: claude-haiku-5-5 for claude; gpt-6-luna for codex.'),
     maxBudgetUsd: z.number().positive().max(100).optional().describe('Spend cap per draft run, passed to Claude Code as --max-budget-usd.'),
   }).strict().optional().describe('Agent settings. .tracegrove/settings.json (written by tracegrove ui) and CLI flags override these per developer.'),
+  environments: z.record(Name, EnvironmentConfig).optional().describe('Where flows can run: local (default), docker, staging, prod-readonly. Each names a target, class, write policy, persona secret references and agent policy.'),
   defaults: z.object({
     stepTimeoutMs: z.number().int().positive().max(120_000).default(5000),
     caseTimeoutMs: z.number().int().positive().max(600_000).default(30_000),
@@ -100,14 +102,64 @@ export const JobFlowStep = z.object({ name: z.string().min(1).max(120).optional(
 export const McpFlowStep = z.object({ name: z.string().min(1).max(120).optional(), mcp: McpToolCall,
   as: z.string().optional(), expect: Expect.optional(), save: z.record(Name, DotPath).optional(),
   timeoutMs: z.number().int().positive().max(120_000).optional() }).strict();
-export const FlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep]);
+export const ConcreteFlowStep = z.union([HttpFlowStep, BrowserFlowStep, JobFlowStep, McpFlowStep]);
+export type ConcreteFlowStep = z.infer<typeof ConcreteFlowStep>;
+const ActionId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z][A-Za-z0-9_-]*)*$/, 'an action id is its path under actions/ with dots, like notes.create');
+/** Call a reusable action (tracegrove/actions/<area>/<name>.action.yaml) in place of writing its steps again. */
+export const UseFlowStep = z.object({
+  name: z.string().min(1).max(120).optional(),
+  use: ActionId.describe('Action id: its file path under actions/, dotted (actions/notes/create.action.yaml is notes.create).'),
+  with: z.record(Name, Json).default({}).describe('Inputs; values may use {saved} placeholders from earlier steps.'),
+  as: z.string().optional().describe('Persona for the action\'s steps that do not set their own.'),
+  save: z.record(Name, Name).optional().describe('outer name: action output. Without it every output keeps its own name.'),
+}).strict();
+export type UseFlowStep = z.infer<typeof UseFlowStep>;
+export const FlowStep = z.union([ConcreteFlowStep, UseFlowStep]);
 export type FlowStep = z.infer<typeof FlowStep>;
+
+/**
+ * A reusable sequence of steps with named inputs and outputs: the unit discovery and agents build up
+ * so later flows compose existing work instead of rewriting it. Actions may call other actions.
+ */
+export const Action = z.object({
+  $schema: z.string().optional(),
+  title: z.string().min(1).max(400),
+  inputs: z.record(Name, Json.nullable()).default({}).describe('name: default value, or null when a caller must supply it.'),
+  outputs: z.array(Name).default([]).describe('Saved values the action hands back to its caller.'),
+  as: z.string().optional().describe('Default persona for this action\'s steps.'),
+  routes: z.array(z.string().regex(/^(GET|POST|PUT|PATCH|DELETE|HEAD|ANY) \//)).default([]).describe('Routes this action exercises, as METHOD /path/{param}; checked against traffic when it runs.'),
+  sources: z.array(z.string().max(512)).max(16).default([]).describe('Files that handle those routes, relative to the app root; recorded in the catalog once traffic confirms the routes.'),
+  steps: z.array(FlowStep).min(1).max(30),
+}).strict();
+export type Action = z.infer<typeof Action>;
+
+/**
+ * What discovery has learned, committed beside the flows so a fresh clone, a later discovery or the
+ * next agent starts from it: every route with where it is handled, which actions exercise it, and
+ * whether a verified run confirmed it. tracegrove rewrites it; it is never evidence by itself.
+ */
+export const CatalogRoute = z.object({
+  route: z.string().regex(/^(GET|POST|PUT|PATCH|DELETE|HEAD|ANY) \//),
+  source: z.enum(['static', 'traffic', 'agent']).describe('static: read from source; traffic: seen in a verified run; agent: stated by an action\'s sources and confirmed by traffic.'),
+  file: z.string().nullable().default(null),
+  line: z.number().int().positive().nullable().default(null),
+  actions: z.array(z.string()).default([]),
+  confirmed: z.object({ run: z.string(), sourceDigest: z.string(), cases: z.array(z.string()).max(32) }).strict().nullable().default(null),
+}).strict();
+export const Catalog = z.object({
+  $schema: z.string().optional(),
+  schemaVersion: z.literal('tracegrove.catalog/v1'),
+  routes: z.array(CatalogRoute).max(2000).default([]),
+}).strict();
+export type Catalog = z.infer<typeof Catalog>;
+export type CatalogRoute = z.infer<typeof CatalogRoute>;
 
 export const Flow = z.object({
   $schema: z.string().optional(),
   title: z.string().min(1).max(400),
   risk: z.enum(['critical', 'standard', 'exploratory']).default('standard'),
   tags: z.array(Name).default([]),
+  envs: z.array(Name).min(1).max(16).optional().describe('Environments this flow may run in. Defaults to [local]; list staging etc. to opt in.'),
   as: z.string().optional().describe('Default persona for this flow.'),
   given: z.record(Name, z.string()).default({}).describe('alias: fixture name (tracegrove/fixtures/<name>.fixture.yaml).'),
   effects: ActionEnvelope.pick({ maxJobs: true, maxMcpCalls: true, allowedMcpTools: true }).partial().optional().describe('Explicit job and MCP effect ceilings; tool annotations do not grant authority.'),
@@ -158,6 +210,8 @@ export function exportAuthoringSchemas(): Record<string, unknown> {
     'tracegrove.config/v1': z.toJSONSchema(AuthoringConfig, opts),
     'tracegrove.flow/v1': z.toJSONSchema(Flow, opts),
     'tracegrove.fixture/v1': z.toJSONSchema(Fixture, opts),
+    'tracegrove.action/v1': z.toJSONSchema(Action, opts),
+    'tracegrove.catalog/v1': z.toJSONSchema(Catalog, opts),
     'tracegrove.run-video/v1': z.toJSONSchema(RunVideo, opts),
   };
 }

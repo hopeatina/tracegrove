@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { CliErrorReport } from './schemas/cli.ts';
 import { RecoveryStatusReport } from './schemas/recoveryStatus.ts';
+import { ReplayComparison } from './schemas/replayComparison.ts';
+import { AttemptInventoryReport } from './schemas/attemptInventory.ts';
+import { RegressionAdmission } from './schemas/regression.ts';
+import { ImportedObservations } from './schemas/importedObservations.ts';
+import { WorkflowKnowledge, WorkflowKnowledgePage } from './schemas/workflowKnowledge.ts';
+import { PersonaPoolDefinition, PersonaPoolStatus } from './schemas/personaPool.ts';
+import { BenchmarkReport } from './schemas/benchmark.ts';
 import * as C from './schemas/capability.ts';
 import * as L from './schemas/capabilityLifecycle.ts';
 import * as P from './schemas/portableEnvironment.ts';
@@ -26,11 +33,19 @@ import { ScenarioDefinition, ScenarioProjection, QualificationRoundAdmission, Qu
 export * from './schemas/capability.ts';
 export * from './schemas/cli.ts';
 export * from './schemas/recoveryStatus.ts';
+export * from './schemas/replayComparison.ts';
+export * from './schemas/attemptInventory.ts';
+export * from './schemas/regression.ts';
+export * from './schemas/importedObservations.ts';
+export * from './schemas/workflowKnowledge.ts';
+export * from './schemas/personaPool.ts';
+export * from './schemas/benchmark.ts';
 export * from './schemas/capabilityLifecycle.ts';
 export * from './schemas/portableEnvironment.ts';
 export * from './canonical.ts';
 export * from './primitives.ts';
 export * from './schemas/definitions.ts';
+export * from './schemas/targetBinding.ts';
 export * from './schemas/execution.ts';
 export * from './schemas/config.ts';
 export * from './schemas/protocol.ts';
@@ -49,6 +64,12 @@ export * from './schemas/scenario.ts';
 
 /** Every versioned document schema, keyed by its `schemaVersion` literal. */
 export const SCHEMA_REGISTRY = {
+  'workflow.persona-pool/v1':PersonaPoolDefinition,
+  'tracegrove.persona-pool-status/v1':PersonaPoolStatus,
+  'tracegrove.workflow-knowledge/v1': WorkflowKnowledge,
+  'tracegrove.workflow-knowledge-page/v1': WorkflowKnowledgePage,
+  'tracegrove.imported-observations/v1': ImportedObservations,
+  'workflow.regression-admission/v1': RegressionAdmission,
   'workflow.result-ingest/v1': ResultIngestReceipt,
   'workflow.evidence-projection/v1': WorkflowEvidenceProjection,
   'workflow.config/v1': WorkflowConfig,
@@ -108,8 +129,11 @@ export const SCHEMA_REGISTRY = {
 export type SchemaVersion = keyof typeof SCHEMA_REGISTRY;
 
 export const NON_DOCUMENT_SCHEMAS = {
+  'tracegrove.benchmark/v1': BenchmarkReport,
   'tracegrove.cli-error/v1': CliErrorReport,
   'tracegrove.recovery-status/v1': RecoveryStatusReport,
+  'tracegrove.replay-comparison/v1': ReplayComparison,
+  'tracegrove.attempt-inventory/v1': AttemptInventoryReport,
   'workflow.portable-environment-profile/v1': P.PortableEnvironmentProfile,
   'workflow.portable-environment-intent/v1': P.PortableEnvironmentIntent,
   'workflow.portable-preflight/v1': P.PortablePreflightReport,

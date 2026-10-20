@@ -11,6 +11,14 @@ import { checkProject, discoverProject } from './workspace.ts';
 import { detectAgents, resolveAgentSettings } from './agent.ts';
 import { listHeals } from './heal.ts';
 import type { AuthoringConfig } from './schema.ts';
+import { environmentNames, resolveEnvironment, selectEnvironment } from '../environments/resolve.ts';
+import { readLocalSettings } from './localSettings.ts';
+import { readSavedRun, type CheckedRunReport } from './runSource.ts';
+
+/** Last `env doctor` result per environment, cached under .tracegrove/doctor/ (no secret values). */
+export const doctorCachePath = (root: string, env: string) => join(root, '.tracegrove', 'doctor', `${env}.json`);
+export type EnvironmentStatus = { name: string; kind: string; class: string; writes: string; agents: string; selected: boolean;
+  doctor: { status: 'ready' | 'blocked' | 'not_run'; checkedAt: string | null; failing: string[] }; next: NextAction };
 
 export type NextAction = { command: string; why: string };
 export type ProjectStatus = {
@@ -19,10 +27,12 @@ export type ProjectStatus = {
   config: { found: boolean; path: string; project: string | null; adapter: string | null };
   flows: number;
   check: { ok: boolean; issues: number; first: string | null };
-  latestRun: { name: string; outcome: string; totals: TestRunReport['totals']; finishedAt: string; failing: string[] } | null;
+  latestRun: { name: string; outcome: string; totals: TestRunReport['totals']; finishedAt: string; failing: string[]; evidenceStatus: CheckedRunReport['evidenceStatus'] } | null;
   agent: { provider: string; model: string | null; installed: boolean };
   coverage: { routes: number; uncovered: number; changed: number } | null;
   latestHeal: { id: string; outcome: string; kept: number } | null;
+  /** Additive: each environment with its last doctor state and the next command for it. */
+  environments?: EnvironmentStatus[];
   next: NextAction[];
 };
 
@@ -46,11 +56,10 @@ export function projectStatus(dir: string): ProjectStatus {
   const check = found ? checkProject(root) : { ok: false, flows: [], issues: [] };
   let latestRun: ProjectStatus['latestRun'] = null;
   const runDir = found ? resolveRun(root, 'latest') : null;
-  if (runDir && existsSync(join(runDir, 'summary.json'))) {
-    try {
-      const r = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
-      latestRun = { name: basename(runDir), outcome: r.outcome, totals: r.totals, finishedAt: r.finishedAt, failing: r.cases.filter((c) => c.outcome !== 'passed').map((c) => c.caseId) };
-    } catch { latestRun = null; }
+  if (runDir) {
+    const r = readSavedRun(runDir);
+    latestRun = { name: basename(runDir), outcome: r.outcome, totals: r.totals, finishedAt: r.finishedAt,
+      failing: r.cases.filter((c) => c.outcome !== 'passed').map((c) => c.caseId), evidenceStatus: r.evidenceStatus };
   }
   let settings = { provider: 'claude', model: null as string | null };
   try { settings = resolveAgentSettings(root, config); } catch { /* invalid settings show up in check */ }
@@ -66,23 +75,46 @@ export function projectStatus(dir: string): ProjectStatus {
   if (!found) next.push({ command: 'tracegrove init', why: 'detect the framework and write tracegrove.config.yaml plus a first flow' });
   else if (!check.ok) next.push({ command: 'tracegrove heal', why: `${check.issues.length} authoring or setup issue(s); heal fixes what it can and explains the rest` }, { command: 'tracegrove check', why: 'see every issue with its file and fix' });
   else if (!latestRun) next.push({ command: 'tracegrove test', why: 'run every flow against the real app for the first time' });
+  else if (latestRun.evidenceStatus === 'invalid') next.push({ command: `tracegrove show --run ${latestRun.name}`, why: 'saved evidence is unavailable; inspect or restore it before relying on results or attempting repairs' });
   else if (latestRun.outcome !== 'passed') next.push({ command: 'tracegrove heal', why: `${latestRun.failing.length} case(s) not passing; heal fixes setup and drifted tests and reports product bugs` }, { command: 'tracegrove show', why: 'read the failure in full' });
   if (found && coverage && coverage.uncovered > 0) next.push(installed
     ? { command: 'tracegrove draft', why: `${coverage.uncovered} route(s) have no flow; ${settings.provider} drafts them, check verifies` }
     : { command: 'tracegrove discover', why: `${coverage.uncovered} route(s) have no flow yet` });
   if (found && !installed && settings.provider !== 'none') next.push({ command: 'tracegrove settings', why: `${settings.provider} is not installed; agent drafting and healing are off` });
   if (found) next.push({ command: 'tracegrove ui', why: 'see the grove: flows, runs, coverage and heals in the browser' });
+  const environments = config ? environmentStatus(root, config) : [];
 
   return {
     schemaVersion: 'tracegrove.status/v1', root,
     config: { found, path, project: config?.project ?? null, adapter: config?.app.adapter ?? null },
     flows: check.flows.length, check: { ok: check.ok, issues: check.issues.length, first: check.issues[0] ? `${check.issues[0].code}: ${check.issues[0].detail}` : null },
-    latestRun, agent: { provider: settings.provider, model: settings.model, installed }, coverage, latestHeal, next,
+    latestRun, agent: { provider: settings.provider, model: settings.model, installed }, coverage, latestHeal,
+    ...(environments.length > 1 ? { environments } : {}), next,
   };
+}
+
+export function environmentStatus(root: string, config: AuthoringConfig): EnvironmentStatus[] {
+  let selected = 'local';
+  try { selected = selectEnvironment({ settings: readLocalSettings(root) }).name; } catch { selected = 'local'; }
+  return environmentNames(config).flatMap(name => {
+    let environment;
+    try { environment = resolveEnvironment(config, name); } catch { return []; }
+    let doctor: EnvironmentStatus['doctor'] = { status: 'not_run', checkedAt: null, failing: [] };
+    try {
+      const cached = JSON.parse(readFileSync(doctorCachePath(root, name), 'utf8')) as { status: 'ready' | 'blocked'; checkedAt: string; checks: Array<{ check: string; required: boolean; state: string }> };
+      doctor = { status: cached.status, checkedAt: cached.checkedAt, failing: cached.checks.filter(c => c.required && c.state !== 'supported').map(c => c.check) };
+    } catch { /* never checked */ }
+    const flag = name === 'local' ? '' : ` --env ${name}`;
+    const next: NextAction = environment.kind === 'launch' ? { command: `tracegrove test${flag}`, why: 'run flows against the launched app' }
+      : doctor.status === 'ready' ? { command: `tracegrove explain${flag}`, why: `doctor passed ${doctor.checkedAt ? ageOf(doctor.checkedAt) : ''}; see what a run would do` }
+        : { command: `tracegrove env doctor ${name}`, why: doctor.status === 'blocked' ? `blocked on ${doctor.failing.join(', ')}` : 'check reachability, persona secrets and identity before the first run' };
+    return [{ name, kind: environment.kind, class: environment.class, writes: environment.writes, agents: environment.agents, selected: name === selected, doctor, next }];
+  });
 }
 
 export function ageOf(iso: string, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (!Number.isFinite(s)) return 'time unavailable';
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.round(s / 60)}m ago`;
   if (s < 86_400) return `${Math.round(s / 3600)}h ago`;

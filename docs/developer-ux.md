@@ -305,6 +305,14 @@ schemas. `--json false` and `--json=false` keep prose errors, and `--jsonl` keep
 stream and top-level error behavior. Successful reports, doctor reports and artifacts are outside
 this error envelope's omission policy; this change establishes no artifact redaction guarantee.
 
+## Compare retained attempts
+
+`tracegrove compare --baseline <bundle> --candidate <bundle> --json` compares freshly
+verified evidence without launching the application or loading current configuration.
+It retains selection additions/removals and distinguishes changed contracts and
+execution contexts from recorded pass/failure transitions. See [replay comparison](replay-comparison.md)
+for the typed report, exit contract and qualification boundary.
+
 ## Found along the way
 
 - The bundle verifier re-derived "infrastructure failed" only from step reason codes, so any run whose app never started produced a bundle that failed its own verification. The PR fixes this by also reading the sealed `host.failed` event; that evidence can only move a cell away from passed.

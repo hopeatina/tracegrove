@@ -7,6 +7,7 @@ import {
   Cents, DigestSchema, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt,
   RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList, GitObjectId,
 } from '../primitives.ts';
+import { SECRET_RESOLVER_KINDS } from './targetBinding.ts';
 import { AccountClass, BoundaryMode, BoundaryRule, ComponentIdentity, ComponentKind, EnvironmentClass, FidelityLane, Limits } from './definitions.ts';
 import { GitCommitObservation } from './gitSources.ts';
 
@@ -123,6 +124,7 @@ export const RunRequest = z.object({
   reviewRef: RefSchema.nullable(),
   scenarioRefs: refList(),
   qualificationRoundRef: RefSchema.nullable(),
+  regressionAdmissionRef: RefSchema.optional(),
   effectiveConfigRef: RefSchema,
   sourceSelectionRef: RefSchema.nullable(),
   executionHostRef: RefSchema.nullable(),
@@ -450,7 +452,7 @@ export const PerformanceObservation = z.object({
   cellId: IdString,
   valueMs: NonNegInt.nullable(),
   censored: z.boolean(),
-  warm: z.boolean(),
+  warm: z.boolean().nullable(), // null = cache/startup temperature was not observed
   strata: z.record(z.string().max(64), ShortText),
 }).strict();
 
@@ -562,6 +564,11 @@ export const CredentialLease = z.object({
   credentialName: IdString.nullable(),
   issuedBy: z.enum(['local_launcher', 'environment', 'none']),
   expiresAt: IsoDateTime,
+  /** Additive: how each persona credential was obtained. References and expiry only, never values. */
+  resolved: z.array(z.object({
+    persona: IdString, credentialName: IdString, resolver: z.enum(SECRET_RESOLVER_KINDS), ref: z.string().min(1).max(LIMITS.shortText),
+    recipe: z.string().min(1).max(64), expiresAt: IsoDateTime.nullable(), subject: z.string().max(256).nullable(), expectedSubject: z.string().max(256).nullable(),
+  }).strict()).max(32).optional(),
 }).strict(); // Never contains the secret; the controller keeps it in memory for the attempt.
 export type CredentialLease = z.infer<typeof CredentialLease>;
 

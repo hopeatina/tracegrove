@@ -92,3 +92,22 @@ it.each(['draft', 'test'] as const)('admits one %s when two authenticated bodies
   expect(readFileSync(held.started, 'utf8').trim().split('\n')).toHaveLength(1);
   if (kind === 'test') expect(firstResponse.body).toMatchObject({ outcome: 'passed', bundleVerified: true });
 });
+
+it('admits a harness-fixed session token as a bearer token and refuses any other credential', async () => {
+  const root = sample(); const token = 'dogfood-session-token-0123';
+  const server = await startUi({ dir: root, token }); servers.push(server);
+  const prune = (headers: Record<string, string>) => fetch(`http://127.0.0.1:${server.port}/api/prune`, { method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ file: 'tracegrove/notes/list.flow.yaml' }) });
+  expect((await prune({})).status).toBe(403);
+  expect((await prune({ authorization: 'Bearer wrong-token-0123456789' })).status).toBe(403);
+  expect((await prune({ authorization: token })).status).toBe(403);
+  expect(existsSync(join(root, 'tracegrove/notes/list.flow.yaml'))).toBe(true);
+  expect((await prune({ authorization: `Bearer ${token}` })).status).toBe(200);
+  expect(existsSync(join(root, 'tracegrove/notes/list.flow.yaml.pruned'))).toBe(true);
+});
+
+it('ignores a fixed token too short to be a session secret', async () => {
+  const root = sample(); const server = await startUi({ dir: root, token: 'short' }); servers.push(server);
+  const response = await fetch(`http://127.0.0.1:${server.port}/api/prune`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer short' }, body: JSON.stringify({ file: 'tracegrove/notes/list.flow.yaml' }) });
+  expect(response.status).toBe(403);
+});

@@ -1,0 +1,25 @@
+title: A note is readable by its owner and invisible to another tenant
+risk: critical
+tags: [notes, authz]
+envs: [local, docker, compose, staging, staging-rotated, staging-broker, staging-flaky, staging-sso, prod-readonly]
+given:
+  mine: my-note
+steps:
+  - name: owner reads it
+    GET: /notes/{mine.noteId}
+    expect: { status: 200, json: { note.title: Isolation probe } }
+
+  - name: stranger is denied
+    GET: /notes/{mine.noteId}
+    as: stranger
+    expect: { status: 403, absent: [note] }
+
+  - name: stranger's list does not include it
+    GET: /notes
+    as: stranger
+    expect: { status: 200, count: { notes: 0 } }
+
+  - name: anonymous is rejected
+    GET: /notes/{mine.noteId}
+    as: none
+    expect: 401

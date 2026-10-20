@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NativeObservationErrorCode } from './importedObservations.ts';
 
 /** Public top-level failures only. No exception text, arguments, paths, stacks or candidate output. */
 export const CliErrorCode = z.enum([
@@ -9,15 +10,23 @@ export const CliErrorCode = z.enum([
   'run_not_found', 'execution_not_found', 'invalid_request_file', 'invalid_port',
   'prerequisite_unavailable', 'state_conflict', 'invalid_document', 'invalid_json',
   'input_unavailable', 'access_denied', 'infrastructure_failure', 'unexpected_failure',
+  // environments (additive)
+  'unknown_environment', 'invalid_environment', 'no_flows_for_environment', 'approval_required', 'approval_requires_human', 'agent_policy_denied',
+  'invalid_config_path', 'config_edit_invalid',
+  ...NativeObservationErrorCode.options,
 ]);
-const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512), recovery: z.string().min(1).max(512) }).strict();
+const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512), recovery: z.string().min(1).max(512),
+  /** Additive: who owns the fix and a runnable command, from the block-code table (environment names only, never values). */
+  owner: z.enum(['developer', 'operator', 'agent']).optional(), fix: z.string().max(512).optional() }).strict();
+export const CliCommandName = z.enum([
+  'help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft', 'settings', 'sample-config',
+  'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases', 'rerun', 'inspect', 'export', 'verify-bundle', 'compare',
+  'workflow-map', 'workflows', 'usage', 'benchmark', 'pools', 'import-observations', 'observations', 'result-ingest', 'results',
+  'awr-prepare', 'awr-inspect', 'awr-deliver', 'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve',
+  'recovery-status', 'source-materialize', 'schema', 'setup', 'env', 'whoami', 'explain', 'capabilities', 'config', 'approve', 'mcp']);
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
-  command: z.enum(['help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
-    'settings', 'sample-config', 'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
-    'rerun', 'inspect', 'export', 'verify-bundle', 'result-ingest', 'results', 'awr-prepare', 'awr-inspect', 'awr-deliver',
-    'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve', 'recovery-status',
-    'source-materialize', 'schema']).nullable(),
+  command: CliCommandName.nullable(),
   errorClass: z.enum(['blocked', 'conflict', 'invalid_input', 'infrastructure_failure', 'unexpected_failure']),
   exitCode: z.union([z.literal(2), z.literal(3)]),
   reasons: z.array(Reason).min(1).max(32), omittedReasonCount: z.number().int().nonnegative(),

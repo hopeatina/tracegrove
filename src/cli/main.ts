@@ -5,7 +5,7 @@
  * 3 infrastructure failure, 4 cancelled. Non-execution commands exit 0 for their own success only.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
@@ -20,6 +20,14 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readFrozenBundle } from '../core/frozenBundle.ts';
 import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
+import { compareReplays } from '../core/replayComparison.ts';
+import { WorkflowKnowledgeSnapshot } from '../core/workflowKnowledge.ts';
+import { inspectPersonaPools } from '../core/coordination.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
+import { inspectAttemptInventory } from '../core/attemptInventory.ts';
+import { inspectBenchmark } from '../core/benchmark.ts';
+import { formatBenchmark } from './benchmark.ts';
+import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
@@ -36,7 +44,8 @@ import { compileProject, findConfig } from '../authoring/compile.ts';
 import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
-import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
+import { checkProject, discoverProject, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
+import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
 import { heal, undoHeal } from '../authoring/heal.ts';
@@ -44,6 +53,15 @@ import { projectRoot, projectStatus } from '../authoring/status.ts';
 import { runActivity } from '../authoring/activity.ts';
 import { paint, progressLine, renderHeal, renderStatus, renderTree } from './render.ts';
 import { previewVerificationSource, savedVerificationSource } from '../authoring/verificationSource.ts';
+import { readLocalSettings as readEnvSettings } from '../authoring/localSettings.ts';
+import { resolveEnvironment, selectEnvironment } from '../environments/resolve.ts';
+import { detectAgent, grantApproval } from '../environments/agents.ts';
+import { capabilityMatrix, envList, envShow, explain, whoamiCommand } from '../environments/commands.ts';
+import { runEnvDoctor } from '../environments/doctorCache.ts';
+import { configGet, configPatch, configSet, envAddPatch, parseValue } from '../authoring/configEdit.ts';
+import { renderApproval, renderCapabilities, renderConfigEdit, renderDoctor, renderEnvList, renderEnvShow, renderExplain, renderWhoami } from './renderEnv.ts';
+import { readSavedRun } from '../authoring/runSource.ts';
+import { retainNativeImport } from '../authoring/nativeImports.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -53,6 +71,15 @@ function flag(args: Args, name: string): string | null {
 function out(args: Args, value: unknown, text: string): void {
   if (('json' in args.flags && args.flags.json) || ('jsonl' in args.flags && args.flags.jsonl)) process.stdout.write(`${JSON.stringify(value)}\n`);
   else process.stdout.write(`${text}\n`);
+}
+
+/** flag > TRACEGROVE_ENV > .tracegrove/settings.json > local */
+function envFor(args: Args, root: string): string {
+  let settings = {}; try { settings = readEnvSettings(root); } catch { settings = {}; }
+  return selectEnvironment({ flag: flag(args, 'env'), settings }).name;
+}
+function positionals(args: Args): string[] {
+  return ((args.flags as { _?: string[] })._ ?? []);
 }
 
 function stateDirFor(projectRoot: string): string {
@@ -73,6 +100,7 @@ Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walk
   (no command)                                         where this project stands and what to run next
   init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
+       [--env <name>] [--agent <name>]                 run in a declared environment (default: TRACEGROVE_ENV, settings, local)
        [--heal]                                        on failure, heal and re-run (see heal)
        [--source-snapshot <snapshot.json>]              verify and launch an owner-bound private source copy
        [--source-repository-role <role>]                bind the verified resolver head to a repository role
@@ -86,11 +114,26 @@ Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walk
           [--source-repository-role <role>]            bind a single resolver-head repository
   ui [--dir <dir>] [--branch <branch>] [--port <n>]    local web UI: config, flows, runs, discovery, agent drafts, settings
 
+Environments (local, docker, staging, prod-readonly; see docs/environments.md):
+  env list                                             targets, classes, write and agent policy, persona secret references
+  env show [<env>]                                     one environment, each persona probed (resolvable/expired/missing), no values
+  env doctor [<env>] [--no-whoami]                     reachability, readiness, persona secrets, whoami identity, network, cleanup
+  env add <env> --url <https://…> --persona p=<ref>    validated shortcut that writes environments.<env> (also --class --writes --agents --dry-run)
+  whoami [--env <env>] [--as <persona>]                sign each persona in and show who the deployment thinks it is
+  explain [<case>] [--env <env>]                       dry plan: which flows run, as whom, what they write and clean up, what is skipped
+  capabilities [--env <env>]                           capability × environment matrix with the reason and fix for each gap
+  approve --env <env> [--ttl <min>] [--uses <n>]       a person approves the next agent run(s) where agents: ask
+  config get [<path>] | set <path> <value> | patch <json> [--dry-run]
+                                                       validated, comment-preserving edits to tracegrove.config.yaml
+  mcp [--max-calls <n>] [--max-test-runs <n>]          MCP stdio server: status, env_list, env_doctor, capabilities, explain, check, test, show_run, heal, draft
+
 Agent-friendly commands (every one takes --json and never starts the app):
-  discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
+  discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
+                                                       --save records what is known in tracegrove/catalog.yaml
   check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
-        [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
+        [--agent claude|codex] [--model <m>]           then check them and run each one end to end, sending failures back
+        [--no-prove]                                   for up to 2 repairs (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
            [--source-snapshot <snapshot.json> | --working-tree]  save the next run's input; never edits team config
   test, list, show and compile take --config <tracegrove.config.yaml|tracegrove.config.ts>; the commands above use --dir.
@@ -98,6 +141,8 @@ Agent-friendly commands (every one takes --json and never starts the app):
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
+  setup browsers [--dry-run] [--check-only]            install the pinned Playwright headless shell and ffmpeg, then record
+                                                       a one-second test video to prove browser flows can run here
   doctor [--dir <dir>|--config <yaml>] [--profile <name>]\n                                                       inspect native setup and plan; never launch the app
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
        [--work-binding <json>]                        freeze an existing work ID and requirement refs before execution
@@ -112,6 +157,17 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
+  workflow-map --bundle <bundle> [--cell <cell>]       derive cited recorded navigation, prerequisites and coverage
+  workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
+       [--route <path> --case <id> --workflow <id> --surface <surface> --tag <tag> --limit <1..100> --cursor <cursor>]
+  usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
+  benchmark --state-dir <dir> --axis runner|model      compare recorded cohorts across all checkpoint admissions
+  pools --snapshot <json> [--pool <id>]                inspect recorded persona pool availability; no reservation or credentials
+  import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
+       [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
+       [--producer <name> --producer-version <v>]      declare missing producer metadata explicitly
+  observations --archive <dir>                        recheck imported bytes and show producer-reported attempts
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
   awr-prepare --sink <dir> --id <result-id> --destination <json>
                                                        freeze a redacted AWR export and exact destination; no network
@@ -188,13 +244,15 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'compile': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'), { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined });
-      out(args, compiled, `compiled ${compiled.flows.length} flow(s) into ${compiled.compiledDir}\napp source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const compiled = compileProject(configPath, { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, env: envFor(args, dirname(configPath)) });
+      out(args, compiled, `compiled ${compiled.flows.length} flow(s) for ${compiled.environment.name} (${compiled.environment.class}) into ${compiled.compiledDir}\n${compiled.target ? `target digest ${compiled.sourceDigest.slice(0, 12)}${compiled.target.origin ? ` · ${compiled.target.origin}` : ''}` : `app source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)`}\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
       return 0;
     }
 
     case 'list': {
-      const compiled = compileProject(findConfig(flag(args, 'config') ?? '.'));
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const compiled = compileProject(configPath, { env: envFor(args, dirname(configPath)) });
       out(args, compiled.flows, compiled.flows.map((f) => `${f.caseId}  [${f.tags.join(', ')}]  ${f.file}\n  ${f.title}\n${f.steps.map((s) => `    - ${s.name}: ${s.method} ${s.path}${s.as !== Object.keys(compiled.config.personas)[0] ? ` (as ${s.as})` : ''}`).join('\n')}`).join('\n'));
       return 0;
     }
@@ -208,7 +266,7 @@ async function main(argv: string[]): Promise<number> {
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
         live.update('Compiling flows and starting the app');
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env: envFor(args, dirname(configPath)), agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
           onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
             if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
             else live.update(runActivity(event).label);
@@ -230,14 +288,94 @@ async function main(argv: string[]): Promise<number> {
       }
     }
 
+    case 'env': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const root = dirname(configPath);
+      const [sub, name] = positionals(args);
+      const p = paint();
+      if (sub === 'list') {
+        const result = { ...envList(configPath), selected: envFor(args, root) };
+        out(args, result, renderEnvList(result.environments, p, result.selected));
+        return 0;
+      }
+      if (sub === 'show') {
+        const result = await envShow(configPath, name ?? envFor(args, root));
+        out(args, result, renderEnvShow(result, p));
+        return 0;
+      }
+      if (sub === 'doctor') {
+        const report = await runEnvDoctor({ configPath, env: name ?? envFor(args, root), identity: args.flags['no-whoami'] !== true, agent: detectAgent(process.env, flag(args, 'agent')) });
+        out(args, report, renderDoctor(report, p));
+        return report.exitCode;
+      }
+      if (sub === 'add') {
+        if (!name) throw new Blocked([{ code: 'missing_argument', detail: 'env add needs a name', owner: 'agent', action: 'tracegrove env add staging --url https://staging.example.com --persona owner=env:OWNER_TOKEN' }]);
+        const patch = envAddPatch({ name, url: flag(args, 'url'), personas: (args.flags as { persona?: string[] }).persona ?? [], class: flag(args, 'class'), writes: flag(args, 'writes'), agents: flag(args, 'agents'), health: flag(args, 'health'), whoami: flag(args, 'whoami') });
+        const result = configPatch(configPath, patch, { dryRun: args.flags['dry-run'] === true });
+        out(args, result, `${renderConfigEdit(result, p)}${result.written ? `\nnext: tracegrove env doctor ${name}` : ''}`);
+        return 0;
+      }
+      throw new Blocked([{ code: 'invalid_argument', detail: `env ${sub ?? ''}: use list, show, doctor or add`, owner: 'agent', action: 'tracegrove env list' }]);
+    }
+
+    case 'whoami': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const result = await whoamiCommand(configPath, envFor(args, dirname(configPath)), flag(args, 'as'), new AbortController().signal);
+      out(args, result, renderWhoami(result, paint()));
+      return result.exitCode;
+    }
+
+    case 'explain': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
+      const result = explain(configPath, { env: envFor(args, dirname(configPath)), caseId: positionals(args)[0] ?? null, grep: flag(args, 'grep') ?? undefined, tags, agent: detectAgent(process.env, flag(args, 'agent')) });
+      out(args, result, renderExplain(result, paint()));
+      return result.wouldRun ? 0 : 2;
+    }
+
+    case 'capabilities': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const result = capabilityMatrix(configPath, flag(args, 'env'));
+      out(args, result, renderCapabilities(result, paint()));
+      return 0;
+    }
+
+    case 'approve': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const environment = resolveEnvironment(loadAuthoringConfig(configPath), args.flags.env);
+      const approval = grantApproval(dirname(configPath), environment, { identity: detectAgent(process.env), ...(flag(args, 'ttl') ? { ttlMinutes: Number(flag(args, 'ttl')) } : {}), ...(flag(args, 'uses') ? { uses: Number(flag(args, 'uses')) } : {}) });
+      out(args, approval, renderApproval(approval, paint()));
+      return 0;
+    }
+
+    case 'config': {
+      const configPath = findConfig(flag(args, 'config') ?? '.');
+      const [sub, path, value] = positionals(args);
+      const dryRun = args.flags['dry-run'] === true;
+      if (sub === 'get') { const result = configGet(configPath, path); out(args, result, typeof result.value === 'object' ? JSON.stringify(result.value, null, 2) : String(result.value)); return 0; }
+      if (sub === 'set' && path && value !== undefined) { const result = configSet(configPath, path, parseValue(value), { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0; }
+      if (sub === 'unset' && path) { const result = configSet(configPath, path, null, { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0; }
+      if (sub === 'patch' && path) {
+        let patch: unknown; try { patch = JSON.parse(path); } catch { throw new Blocked([{ code: 'config_edit_invalid', detail: 'config patch takes a JSON merge patch', owner: 'agent', action: `tracegrove config patch '{"environments":{"staging":{"agents":"ask"}}}' --dry-run` }]); }
+        const result = configPatch(configPath, patch, { dryRun }); out(args, result, renderConfigEdit(result, paint())); return 0;
+      }
+      throw new Blocked([{ code: 'invalid_argument', detail: 'use config get [<path>], config set <path> <value>, config unset <path> or config patch <json>', owner: 'agent', action: 'tracegrove config get environments' }]);
+    }
+
+    case 'mcp': {
+      const { serveMcp } = await import('../mcp/server.ts');
+      await serveMcp({ configPath: findConfig(flag(args, 'config') ?? '.'), ceilings: { ...(flag(args, 'max-calls') ? { maxCalls: Number(flag(args, 'max-calls')) } : {}), ...(flag(args, 'max-test-runs') ? { maxRuns: Number(flag(args, 'max-test-runs')) } : {}) } });
+      return 0;
+    }
+
     case 'show': {
       const configPath = findConfig(flag(args, 'config') ?? '.');
       const root = dirname(configPath);
       const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
-      if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
-      const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
+      if (!runDir) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
+      const report = readSavedRun(runDir);
       out(args, report, renderTree(report, root, paint()));
-      return 0;
+      return report.bundleVerified === false ? 2 : 0;
     }
 
     case 'ui': {
@@ -258,7 +396,16 @@ async function main(argv: string[]): Promise<number> {
 
     case 'discover': {
       const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
-      out(args, result, `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered${result.changedFiles.length ? `, ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}\n${result.routes.map((r) => `  ${r.coveredBy.length ? 'covered  ' : 'UNCOVERED'} ${r.method.padEnd(6)} ${r.path}  ${r.file}:${r.line}${r.changed ? '  (changed)' : ''}`).join('\n')}`);
+      const saved = args.flags.save === true ? saveCatalog(flag(args, 'dir') ?? '.', result) : null;
+      const observed = result.observed ? `observed traffic from run ${result.observed.run}${result.observed.stale ? ' (source changed since)' : ''}` : 'no verified run yet, so nothing is observed';
+      const state = (r: typeof result.routes[number]) => r.observedBy.length ? 'observed ' : r.confirmedEarlier ? 'earlier  ' : r.coveredBy.length ? 'declared ' : 'UNCOVERED';
+      out(args, result, [
+        `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered; ${observed}${result.changedFiles.length ? `; ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}`,
+        ...result.routes.map((r) => `  ${state(r)} ${r.method.padEnd(6)} ${r.path}  ${r.file ? `${r.file}${r.line ? `:${r.line}` : ''}` : '(seen only in traffic)'}${r.actions.length ? `  [${r.actions.join(', ')}]` : ''}${r.changed ? '  (changed)' : ''}`),
+        ...(result.actions.length ? ['', `${result.actions.length} reusable action(s):`, ...result.actions.map((a) => `  ${a.id.padEnd(24)} ${a.routes.join(', ') || '(no routes)'}  used by ${a.usedBy.length} flow(s)`)] : []),
+        ...(saved ? ['', `catalog: ${saved.routes} route(s) recorded in ${relative(resolve(flag(args, 'dir') ?? '.'), saved.path)}`] : []),
+        ...(result.ambiguities.length ? ['', `${result.ambiguities.length} place(s) discovery cannot read; \`tracegrove draft\` asks the agent to resolve them and proves the answer:`, ...result.ambiguities.slice(0, 12).map((a) => `  ? ${a.detail}`)] : []),
+      ].join('\n'));
       return 0;
     }
 
@@ -301,11 +448,20 @@ async function main(argv: string[]): Promise<number> {
       live.update('Discovering routes and briefing the agent');
       try {
         const result = await draftWithAgent({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch'), intent: flag(args, 'intent'), overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
-          ...(args.flags.json ? {} : { onActivity: (line: string) => live.update(`agent · ${line.replaceAll(`${resolve(flag(args, 'dir') ?? '.')}/`, '')}`) }) });
+          prove: args.flags['no-prove'] !== true,
+          ...(args.flags.json ? {} : { onActivity: (line: string) => live.update(`agent · ${line.replaceAll(`${resolve(flag(args, 'dir') ?? '.')}/`, '')}`), onProve: (line: string) => live.update(`prove · ${line}`) }) });
         live.done();
-        const { agent, check } = result;
-        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written:\n${agent.files.map((f) => `  ${f}`).join('\n') || '  (none)'}\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\nnext: tracegrove test --grep discovered`);
-        return agent.exitCode === 0 && check.ok ? 0 : 2;
+        const { agent, check, prove } = result;
+        const mark = { proven: '✓ proven     ', failed: '✗ failed     ', product_bug: '! product bug', not_run: '· not run    ' } as const;
+        const proveText = prove === null ? 'prove: skipped (--no-prove); next: tracegrove test --grep discovered'
+          : prove.flows.length === 0 ? 'prove: no new flow files to run'
+          : [`prove: ran each new flow end to end${prove.rounds ? `, ${prove.rounds} repair round(s)` : ''}`,
+            ...prove.flows.map((f) => `  ${mark[f.outcome]} ${f.file}${f.served.length ? `  (served ${f.served.length} route(s))` : ''}${f.detail ? `\n                  ${f.detail}` : ''}`),
+            ...prove.actions.map((a) => `  ${a.outcome === 'proven' ? '✓ proven     ' : a.outcome === 'unused' ? '· unused     ' : '✗ unproven   '} ${a.file}  (action ${a.id}${a.usedBy.length ? `, used by ${a.usedBy.join(', ')}` : ''})`),
+            ...(result.catalog ? [`catalog: ${result.catalog.routes} route(s) recorded in ${relative(resolve(flag(args, 'dir') ?? '.'), result.catalog.path)}`] : [])].join('\n');
+        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\n${proveText}`);
+        const proven = prove === null || prove.flows.every((f) => f.outcome === 'proven');
+        return agent.exitCode === 0 && check.ok ? (proven ? 0 : 1) : 2;
       } finally { live.done(); process.off('SIGINT', onSignal); }
     }
 
@@ -349,6 +505,13 @@ async function main(argv: string[]): Promise<number> {
       const report = inspectRecoveryStatus({ stateDir: args.flags['state-dir'], executionId: args.flags.execution, scope: localScope() });
       out(args, report, `${report.code}\n${report.recovery}\nRecorded resources: ${report.resources ? JSON.stringify(report.resources) : 'unavailable'}\nNo cleanup or execution was attempted; this report grants no action authority.`);
       return report.exitCode;
+    }
+
+    case 'setup': {
+      const result = await setupBrowsers({ dryRun: args.flags['dry-run'] === true, checkOnly: args.flags['check-only'] === true, onOutput: args.flags.json ? undefined : (chunk) => process.stderr.write(chunk) });
+      out(args, result, [result.install ? `${result.install.ran ? 'ran' : 'would run'}: ${result.install.command.join(' ')}${result.install.ran ? ` (exit ${result.install.exitCode})` : ''}` : 'install: skipped (--check-only)',
+        result.probe ? (result.probe.ok ? `browser: ok, recorded a ${result.probe.videoBytes}-byte test video with ${result.probe.executable}` : `browser: ${result.probe.code}: ${result.probe.detail}`) : 'browser: not probed (--dry-run)'].join('\n'));
+      return result.probe && !result.probe.ok ? 2 : result.install?.ran && result.install.exitCode !== 0 ? 3 : 0;
     }
 
     case 'doctor': {
@@ -426,6 +589,75 @@ async function main(argv: string[]): Promise<number> {
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
         ledger?.close();
       }
+    }
+
+    case 'import-observations': {
+      const captured = NativeObservationSnapshot.open({ file: args.flags.input, format: args.flags.format, scope: localScope(),
+        ...(args.flags['artifact-root'] ? { artifactRoot: args.flags['artifact-root'] } : {}),
+        ...(args.flags.producer ? { producer: { name: args.flags.producer, version: args.flags['producer-version']! } } : {}) });
+      const report = args.flags.into ? retainNativeImport(args.flags.into, captured).report : exportImportedObservations(captured, args.flags.output!).report;
+      out(args, report, `Imported native observations · ${report.observations.length} reported observation(s)\n` +
+        `${report.attachments.filter(a => a.state === 'captured').length} captured attachment(s); ${report.warnings.length} limitation(s).\n` +
+        'Issuer not authenticated; qualification and verification not evaluated. No execution was started.');
+      return 0;
+    }
+    case 'observations': {
+      const report = readImportedObservations(args.flags.archive).report;
+      const counts = Object.fromEntries([...new Set(report.observations.map(a => a.outcome))].map(status => [status, report.observations.filter(a => a.outcome === status).length]));
+      out(args, report, `Imported native observations · ${report.format}\nProducer-reported observations: ${JSON.stringify(counts)}\n` +
+        `Limitations: ${report.warnings.join(', ') || 'none recorded'}\nIssuer not authenticated; qualification and verification not evaluated.`);
+      return 0;
+    }
+    case 'benchmark': {
+      const report = inspectBenchmark({ stateDir: args.flags['state-dir'], scope: localScope(), axis: args.flags.axis });
+      out(args, report, formatBenchmark(report));
+      return report.exitCode;
+    }
+    case 'usage': {
+      const report = inspectAttemptInventory({ stateDir: args.flags['state-dir'], scope: localScope() });
+      const rows = report.attempts.map(row => `  ${row.executionId ?? `admission #${row.admissionSequence}`} · ${row.kind} · ${row.status}${row.outcome ? ` · ${row.outcome}` : ''}`);
+      out(args, report, `Execution inventory · ${report.code}\n${rows.join('\n')}\n` +
+        (report.recordedUsageSubtotal ? `Recorded runner wall time: ${report.recordedUsageSubtotal.runnerSeconds}s across ${report.recordedUsageSubtotal.receipts} retained receipts.\n` : 'Usage unavailable.\n') +
+        (report.recordedPricing ? `Recorded estimated subtotal: ${report.recordedPricing.estimatedSubtotalCents ?? 'unavailable'} cents; ${report.recordedPricing.unpricedEstimates} unpriced receipt(s).\n` : 'Pricing unavailable.\n') +
+        'Checkpoint admissions only; recorded subtotals are not authenticated invoices. No recovery or execution was performed.');
+      return report.exitCode;
+    }
+
+    case 'pools': {
+      const report=inspectPersonaPools(JSON.parse(readBoundedFile(resolve(args.flags.snapshot),8*1024*1024).toString('utf8')));
+      if(args.flags.pool)report.pools=report.pools.filter(p=>p.poolRef.id===args.flags.pool);
+      out(args,report,`Recorded persona pools · ${report.pools.length}\n`+report.pools.map(p=>`${p.poolRef.id}: ${p.unreleased}/${p.maxConcurrent} unreleased · ${p.members.length} members`).join('\n')+
+        `\n${report.reservedCents}/${report.budgetCents} cents retained reservation budget.\nSupplied snapshot only; lease time not evaluated. No reservation or credential was issued.`);
+      return 0;
+    }
+    case 'workflow-map': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle)));
+      const report=args.flags.cell?snapshot.get(args.flags.cell):snapshot.report;
+      out(args,report,`Recorded workflow knowledge · ${snapshot.report.workflows.length} selection(s)\n`+
+        'Declared routes and landmarks are distinct from recorded observations. Revalidate at execution; no authority or qualification granted.');
+      return 0;
+    }
+    case 'workflows': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle))),flags=args.flags;
+      const page=snapshot.search({...(flags.text?{text:flags.text}:{}),...(flags.case?{caseId:flags.case}:{}),...(flags.workflow?{workflowId:flags.workflow}:{}),
+        ...(flags.route?{route:flags.route}:{}),...(flags.surface?{surface:flags.surface}:{}),...(flags.tag?{tag:flags.tag}:{}),
+        ...(flags.limit?{limit:Number(flags.limit)}:{}),...(flags.cursor?{cursor:flags.cursor}:{})});
+      out(args,page,`Recorded workflow lookup · ${page.results.length} of ${page.total}\n`+
+        page.results.map(w=>`${w.selectionCellId} · ${w.caseRef.id} · ${w.receipt?.outcome??'receipt unavailable'}\n  ${w.purpose}`).join('\n')+
+        (page.cursor?`\nNext cursor: ${page.cursor}`:'')+'\nRecorded evidence only; revalidate landmarks and authority at execution.');
+      return 0;
+    }
+    case 'compare': {
+      let baseline: VerifiedBundleSnapshot, candidate: VerifiedBundleSnapshot;
+      try {
+        baseline = VerifiedBundleSnapshot.open(resolve(args.flags.baseline)); candidate = VerifiedBundleSnapshot.open(resolve(args.flags.candidate));
+      } catch { throw new Conflict('comparison requires two valid evidence bundles'); }
+      const report = compareReplays(baseline, candidate);
+      const rows = report.rows.map(row => `${row.dimensions.caseId} [${row.dimensions.personaId}, ${row.dimensions.environmentId}]\n` +
+        `  ${row.baseline.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} → ${row.candidate.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} · ${row.change}`);
+      out(args, report, `Verified recorded comparison · ${report.executionIdentityRelation}\n${rows.join('\n')}\n` +
+        `Provided bundles only; issuer not authenticated; qualification not evaluated.\nExcluded cells: baseline ${report.baseline.excludedCells.length}, candidate ${report.candidate.excludedCells.length}`);
+      return 0;
     }
 
     case 'inspect': {

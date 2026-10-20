@@ -1,0 +1,28 @@
+title: Discover asks the agent about routing it cannot read, keeps the answer only once a run proves it, and saves it for reuse
+risk: critical
+tags: [ui, browser, discover, agent]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: open the UI
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: open discover
+    browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: the unreadable routing is named
+    browser: { kind: read, target: { by: testId, name: ambiguities } }
+    expect: { text: "Needs a decision1 place discovery cannot readunreadableapp/app.mjs:36 uses pattern-matched node:http paths, which the static scan cannot read.Ask ClaudeThe agent reads the code and writes flows; tracegrove runs them and keeps only what the app actually served." }
+  - name: ask the agent
+    browser: { kind: click, target: { by: role, role: button, name: Ask Claude } }
+  - name: the action and the flow were run, repaired once and proven
+    browser: { kind: read, target: { by: testId, name: draft-files } }
+    expect: { text: "proventracegrove/actions/notes/create.action.yamlPruneaction notes.create, proven through discovered.notes.update-not-allowedproventracegrove/discovered/notes/update-not-allowed.flow.yamlPruneserved GET /notes/{id}, POST /notes, PUT /notes/{id}" }
+    timeoutMs: 60000
+  - name: what was learned is saved for the next discovery
+    browser: { kind: read, target: { by: testId, name: catalog-saved } }
+    expect: { text: "Catalog updated: 4 routes recorded for the next discovery." }
+  - name: the new action joins the reusable library
+    browser: { kind: read, target: { by: testId, name: action-library } }
+    expect: { text: "Reusable actions1 action · flows call them with use:notes.createCreate a note and hand back its id · inputs title, body · outputs noteIdPOST /notesused by 1" }

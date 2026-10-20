@@ -5,7 +5,6 @@
  */
 import { fork, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { HostCapabilityObservation, HostLease, IdentityAttestation, digestOfValue, freeze, parseAs, sameRef, sameScope, verifySelfDigest, type LaunchRecipe, type GitCommitObservation } from '../protocol/index.ts';
@@ -13,10 +12,12 @@ import { verifyGitSnapshotProofMetadata } from '../source/gitObjectProof.ts';
 import { Deadline, sleep } from '../core/deadline.ts';
 import { InfrastructureFailure, Blocked } from '../core/errors.ts';
 import { isoPlusMs, nowIso } from '../core/clock.ts';
-import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
+import { defineHost, type ExecutorHost, type HostCapabilities, type HostSession, type HostStartContext } from './types.ts';
 import { observeApplicationRuntime } from './runtime.ts';
 import { SnapshotLaunchObservation, SnapshotLaunchFailure, identityFromEntries, sourceIdentityDigest } from './sourceIdentity.ts';
 import { NativeJobDriver } from '../adapters/job/driver.ts';
+import { startTrafficProxy, type TrafficRecorder } from './trafficProxy.ts';
+import { issueHostCredentials } from '../credentials/resolvers/hostIssued.ts';
 export { sourceIdentityDigest } from './sourceIdentity.ts';
 
 export function buildCapabilityObservation(input: { hostPlanRef: HostLease['hostPlanRef']; leaseRef: HostLease['ref'] | null; scope: HostStartContext['scope']; executionId: string; supported: string[]; unsupported: string[] }): HostCapabilityObservation {
@@ -80,8 +81,13 @@ async function waitReady(origin: string, path: string, deadline: Deadline, signa
     await sleep(pause, signal);
     pause = Math.min(pause * 2, 100);
   }
-  throw new InfrastructureFailure(`application did not become ready at ${origin}${path} within the readiness timeout`);
+  throw new InfrastructureFailure(`application did not become ready at ${origin}${path} within the readiness timeout`, 'app_not_ready');
 }
+
+export const LOCAL_CAPABILITIES = {
+  supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence'],
+  unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
+} as const satisfies HostCapabilities;
 
 export class LocalProcessHost implements ExecutorHost {
   async start(context: HostStartContext): Promise<HostSession> {
@@ -99,17 +105,7 @@ export class LocalProcessHost implements ExecutorHost {
     if (launch.nativeJobs && runtime.family !== 'node') throw new Blocked([{ code: 'native_job_runtime_unsupported', detail: 'The native job bridge requires a Node application' }]);
     const dataDir = join(context.workspaceDir, 'data');
     mkdirSync(dataDir, { recursive: true });
-    const credentials = new Map<string, string>();
-    const tokenMap: Record<string, string> = {};
-    for (const issued of launch.issuedCredentials) {
-      if (!context.credentialNames.includes(issued.name)) continue;
-      const secret = randomBytes(24).toString('base64url');
-      credentials.set(issued.name, secret);
-      tokenMap[secret] = issued.subject;
-    }
-    for (const name of context.credentialNames) {
-      if (!credentials.has(name)) throw new Blocked([{ code: 'credential_not_issuable', detail: `host ${context.hostPlan.ref.id} cannot issue ${name}`, owner: 'operator', action: 'declare the credential in the launch recipe' }]);
-    }
+    const { credentials, tokenMap } = issueHostCredentials(launch.issuedCredentials, context.credentialNames, context.hostPlan.ref.id);
     const assigned = launch.portMode === 'assigned';
     const assignedPort = assigned ? await freeLoopbackPort() : 0;
     const values = { port: String(assignedPort), dataDir };
@@ -159,31 +155,32 @@ export class LocalProcessHost implements ExecutorHost {
       const lines = text.trim().split('\n').slice(-8).join('\n');
       return lines ? `; last app output:\n${lines}` : '';
     };
+    let traffic: TrafficRecorder | undefined;
     try {
     const port = assigned ? await new Promise<number>((resolvePort, reject) => {
       // No stdout protocol: drain output and let readiness polling decide.
       child.stdout?.resume();
-      child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`)));
-      child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)));
+      child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`, 'app_exited_early')));
+      child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`, 'app_spawn_failed')));
       child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
       resolvePort(assignedPort);
     }) : await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
-      const timer = setTimeout(() => reject(new InfrastructureFailure(`application did not report a port within ${launch.readiness.timeoutMs} ms`)), launch.readiness.timeoutMs);
+      const timer = setTimeout(() => reject(new InfrastructureFailure(`application did not report a port within ${launch.readiness.timeoutMs} ms`, 'app_port_not_reported')), launch.readiness.timeoutMs);
       child.stdout?.on('data', (chunk: Buffer) => {
         buffer += chunk.toString('utf8');
         const match = buffer.match(/listening (\d+)/);
         if (match) { clearTimeout(timer); resolvePort(Number(match[1])); }
       });
-      child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`)); });
-      child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`)); });
+      child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`, 'app_exited_early')); });
+      child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`, 'app_spawn_failed')); });
       child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
     });
     const origin = `http://127.0.0.1:${port}`;
     const stopPolling = new AbortController();
     const exitedEarly = assigned ? new Promise<never>((_, reject) => {
       // Give the last stderr bytes a moment to arrive, reject, then stop the readiness poll.
-      const onExit = () => { setTimeout(() => { reject(new InfrastructureFailure(`application exited before becoming ready${startupHint()}`)); stopPolling.abort(); }, 50); };
+      const onExit = () => { setTimeout(() => { reject(new InfrastructureFailure(`application exited before becoming ready${startupHint()}`, 'app_exited_early')); stopPolling.abort(); }, 50); };
       if (child.exitCode !== null) onExit(); else child.once('exit', onExit);
     }) : null;
     exitedEarly?.catch(() => undefined);
@@ -198,9 +195,12 @@ export class LocalProcessHost implements ExecutorHost {
     }
     catch (error) {
       stopPolling.abort();
-      if (assigned && error instanceof InfrastructureFailure && !error.message.includes('last app output')) throw new InfrastructureFailure(`${error.message}${startupHint()}`);
+      if (assigned && error instanceof InfrastructureFailure && !error.message.includes('last app output')) throw new InfrastructureFailure(`${error.message}${startupHint()}`, error.code);
       throw error;
     }
+    // Steps and browser pages reach the app through a recording proxy; readiness polled the app directly.
+    traffic = await startTrafficProxy(port);
+    const recorder = traffic;
     const lease = buildLease(context, child.pid ?? null);
     const attestation = parseAs(IdentityAttestation, freeze({
       schemaVersion: 'workflow.identity-attestation/v1' as const,
@@ -217,12 +217,12 @@ export class LocalProcessHost implements ExecutorHost {
     }), 'identity attestation');
     const observation = buildCapabilityObservation({
       hostPlanRef: context.hostPlan.ref, leaseRef: lease.ref, scope: context.scope, executionId: context.executionId,
-      supported: ['shell', 'network_origin:loopback', 'confirmed_cancel', 'artifact_delivery', 'file_persistence', ...(nativeJobs ? ['native_job'] : [])],
-      unsupported: ['browser_engine', 'dom_cdp', 'screenshot', 'video_export', 'native_desktop', 'device:ios', 'device:android', 'mcp_transport', 'widget_host'],
+      supported: [...LOCAL_CAPABILITIES.supported, ...(nativeJobs ? ['native_job'] : [])],
+      unsupported: [...LOCAL_CAPABILITIES.unsupported],
     });
     let stopResult: Promise<{ confirmed: boolean; detail: string }> | null = null;
     const session: HostSession = {
-      origin, lease, observation, attestations: [attestation], credentials,
+      origin: recorder.origin, traffic: recorder, lease, observation, attestations: [attestation], credentials,
       boundaryMode: 'real', interceptorRefs: [],
       ownedResources: [
         { entityKey: 'host.process', physicalId: String(child.pid ?? 'unknown'), boundaryId: 'application' },
@@ -233,6 +233,7 @@ export class LocalProcessHost implements ExecutorHost {
       stop(reason: string) {
         if (stopResult) return stopResult;
         stopResult = (async () => {
+        await recorder.close().catch(() => undefined);
         const exited = new Promise<boolean>((resolveExit) => {
           if (child.exitCode !== null || child.signalCode !== null) return resolveExit(true);
           child.once('exit', () => resolveExit(true));
@@ -257,6 +258,7 @@ export class LocalProcessHost implements ExecutorHost {
     if (context.signal.aborted) { await session.stop('cancelled during start'); throw new InfrastructureFailure('cancelled during host start'); }
     return session;
     } catch (error) {
+      await traffic?.close().catch(() => undefined);
       // Disconnect lets the trusted owner kill its application group and remove
       // the owned workspace, including when startup failed before readiness.
       if (child.connected) child.disconnect();
@@ -276,3 +278,5 @@ export class LocalProcessHost implements ExecutorHost {
     }
   }
 }
+
+export const localProcessHost = defineHost({ kind: 'local_process', capabilities: LOCAL_CAPABILITIES, create: () => new LocalProcessHost() });

@@ -1,15 +1,17 @@
 import { z } from 'zod';
-import { IdString, QualificationRoundAdmission, ScenarioDefinition, ScenarioProjection, ScenarioStructuralValidation, ScopeSchema, SelectionManifest,
+import { IdString, QualificationRoundAdmission, RegressionAdmission, ScenarioDefinition, ScenarioProjection, ScenarioStructuralValidation, ScopeSchema, SelectionManifest,
   digestOfValue, sameDigest, sameRef, sameScope, verifySelfDigest, type Ref, type Scope } from '../protocol/index.ts';
 import { qualificationStrataDigest, validateQualificationMatrix, validateQualificationSelection, validateScenarioDefinition, validateScenarioSnapshot } from './scenario.ts';
 import { Conflict } from './errors.ts';
 import { StoredActivation, validateStoredActivations } from './localActivationState.ts';
 import { validateStoredStructure } from './localStructureState.ts';
 import { StoredPromotion, validateStoredPromotion } from './localPromotionState.ts';
+import { validateStoredRegressions } from './localRegressionState.ts';
 
 export const StoredScenario = z.object({ projection: ScenarioProjection, definitions: z.array(ScenarioDefinition).min(1).max(500),
   selections: z.array(SelectionManifest).min(1).max(500), admissions: z.array(QualificationRoundAdmission).max(500),
   activations: z.array(StoredActivation).max(500).default([]),
+  regressionAdmissions: z.array(RegressionAdmission).max(500).default([]),
   structuralValidations: z.array(ScenarioStructuralValidation).max(500).default([]),
   promotion: StoredPromotion.nullable().default(null) }).strict();
 export type StoredScenario = z.infer<typeof StoredScenario>;
@@ -45,10 +47,11 @@ export function checkLocalScenarioState(raw: unknown, scope: Scope): LocalScenar
   if (!sameScope(state.scope, scope)) throw new Conflict('local scenario registry scope mismatch');
   if (state.scenarios.reduce((n, s) => n + s.admissions.length, 0) > 500 ||
       state.scenarios.reduce((n, s) => n + s.activations.length, 0) > 500 ||
+      state.scenarios.reduce((n, s) => n + s.regressionAdmissions.length, 0) > 500 ||
       state.scenarios.reduce((n, s) => n + s.structuralValidations.length, 0) > 500 ||
       state.scenarios.reduce((n, s) => n + s.definitions.length + s.selections.length, 0) > 2000) throw new Conflict('local scenario registry needs archival indexing before more history');
   const names = new Set<string>(); const documents = new Map<string, Ref>(); const activationKeys = new Set<string>(); const promotionKeys = new Set<string>();
-  const claims = new Set<string>();
+  const claims = new Set<string>(); const regressionKeys = new Set<string>();
   const claim = (kind: string, id: string) => { const key = `${kind}:${id}`;
     if (claims.has(key)) throw new Conflict('scenario registry reuses a campaign, execution, attempt or leased-state identity'); claims.add(key); };
   for (const scenario of state.scenarios) {
@@ -77,6 +80,11 @@ export function checkLocalScenarioState(raw: unknown, scope: Scope): LocalScenar
       for (const lease of admission.stateLeaseRefs) claim('state', lease.id);
     }
     validateStoredActivations(scenario, activationKeys);
+    validateStoredRegressions(scenario, regressionKeys);
+    for (const admission of scenario.regressionAdmissions) {
+      claim('campaign', admission.campaignId);
+      for (const lease of admission.intent.stateLeaseRefs) claim('state', lease.id);
+    }
     validateStoredStructure(scenario);
     validateStoredPromotion(scenario, promotionKeys);
   }

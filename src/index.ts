@@ -12,9 +12,14 @@ export { LocalReviewStore, type LocalReviewAuthority } from './core/localReviewS
 export { deriveCleanupExpectation } from './core/ownership.ts';
 export { signCleanupFollowup, verifyCleanupFollowup, cleanupExpectationDigest, type CleanupObserver } from './core/cleanupAttestation.ts';
 export { CoordinationSnapshotSchema, CoordinationCommandSchema, transitionCoordination, commitCoordination, type CoordinationSnapshot, type CoordinationCommand, type CoordinationFence, type CoordinationStore } from './core/coordination.ts';
+export { transitionPersonaPools, inspectPersonaPools } from './core/coordination.ts';
+export { inspectBenchmark, BENCHMARK_LIMITS } from './core/benchmark.ts';
 export { startController, delegateRun } from './core/controller.ts';
 export { searchCases, getCase } from './core/lookup.ts';
+export { WorkflowKnowledgeSnapshot, WORKFLOW_KNOWLEDGE_LIMITS } from './core/workflowKnowledge.ts';
 export { createRerun } from './core/rerun.ts';
+export { compareReplays } from './core/replayComparison.ts';
+export { inspectAttemptInventory, ATTEMPT_INVENTORY_LIMIT } from './core/attemptInventory.ts';
 export { editPlan, reviewPlan, type PlanReviewPorts, type ReviewSnapshot } from './core/review.ts';
 export { promoteScenario, ApprovedPlanReview, type ApprovedPlanSnapshot, type ScenarioPromotionPorts } from './core/sourcePromotion.ts';
 export { ReviewedSourceDocuments, validateReviewedSourceDocuments, validateReviewedSourceSelection } from './core/sourceReviewEvidence.ts';
@@ -25,6 +30,9 @@ export type { LocalScenarioActivationAuthority } from './core/localScenarioActiv
 export { validateScenarioStructure, type ScenarioStructurePorts } from './core/scenarioStructure.ts';
 export type { LocalScenarioStructureAuthority } from './core/localScenarioStructure.ts';
 export { prepareQualificationExecution } from './core/qualificationBundle.ts';
+export { prepareRegressionExecution } from './core/regressionBundle.ts';
+export { RegressionExecutionContext, type RegressionExecutionOwner } from './core/regressionExecution.ts';
+export type { LocalScenarioRegressionAuthority } from './core/localScenarioRegression.ts';
 export { QualificationExecutionContext, localQualificationExecutionOwner, type QualificationExecutionOwner } from './core/qualificationExecution.ts';
 export { reduceQualificationRound, type QualificationResultPorts } from './core/qualification.ts';
 export { LocalQualificationResults, type LocalQualificationResultAuthority, type RetainedQualificationRound } from './core/localQualificationResults.ts';

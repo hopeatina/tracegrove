@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+// A stand-in for the 1Password CLI: `op whoami`, `op item get <item> --vault <v> --format json` and
+// `op read --no-newline op://vault/item/field`, backed by OP_FAKE_ITEMS (JSON vault -> item -> field -> value).
+// OP_FAKE_SIGNED_OUT=1 makes it behave like a CLI whose session expired.
+const [cmd, ...rest] = process.argv.slice(2);
+const items = JSON.parse(process.env.OP_FAKE_ITEMS ?? '{}');
+const fail = (msg, code = 1) => { process.stderr.write(`[ERROR] ${msg}\n`); process.exit(code); };
+if (process.env.OP_FAKE_SIGNED_OUT === '1') fail('You are not currently signed in. Please run `op signin --help` for instructions');
+if (cmd === 'whoami') { process.stdout.write(JSON.stringify({ url: 'my.1password.com', email: 'ci@example.com', user_type: 'SERVICE_ACCOUNT' })); process.exit(0); }
+if (cmd === 'item' && rest[0] === 'get') {
+  const item = rest[1]; const vault = rest[rest.indexOf('--vault') + 1];
+  const found = items[vault]?.[item];
+  if (!found) fail(`"${item}" isn't an item in the "${vault}" vault.`);
+  process.stdout.write(JSON.stringify({ id: 'x', title: item, fields: Object.keys(found).map(label => ({ id: label, label, type: 'CONCEALED' })) }));
+  process.exit(0);
+}
+if (cmd === 'read') {
+  const uri = rest.find(a => a.startsWith('op://')) ?? '';
+  const [vault, item, field] = uri.slice(5).split('/');
+  const value = items[vault]?.[item]?.[field];
+  if (value === undefined) fail(`could not read secret '${uri}': isn't an item or field`);
+  process.stdout.write(rest.includes('--no-newline') ? value : `${value}\n`);
+  process.exit(0);
+}
+fail(`unknown command ${cmd}`);

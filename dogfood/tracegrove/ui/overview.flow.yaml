@@ -1,0 +1,17 @@
+title: The overview shows the project, its two flows and no runs yet
+tags: [ui, read]
+steps:
+  - name: page loads
+    GET: /
+    as: none
+    expect: 200
+
+  - name: overview
+    GET: /api/overview
+    as: none
+    expect: { status: 200, json: { hasConfig: true, config.project: notes, running: false }, count: { flows: 2, runs: 0, pruned: 0 } }
+
+  - name: status
+    GET: /api/status
+    as: none
+    expect: 200

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "routes": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "confirmed": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "cases": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "type": "array"
+                  },
+                  "run": {
+                    "type": "string"
+                  },
+                  "sourceDigest": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "run",
+                  "sourceDigest",
+                  "cases"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "file": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "route": {
+            "pattern": "^(GET|POST|PUT|PATCH|DELETE|HEAD|ANY) \\/",
+            "type": "string"
+          },
+          "source": {
+            "description": "static: read from source; traffic: seen in a verified run; agent: stated by an action's sources and confirmed by traffic.",
+            "enum": [
+              "static",
+              "traffic",
+              "agent"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "route",
+          "source"
+        ],
+        "type": "object"
+      },
+      "maxItems": 2000,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "tracegrove.catalog/v1",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion"
+  ],
+  "type": "object"
+}

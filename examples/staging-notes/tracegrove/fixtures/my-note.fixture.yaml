@@ -1,0 +1,12 @@
+create:
+  POST: /notes
+  json: { title: Isolation probe, body: { words: 6 } }
+  expect: 201
+save: { noteId: note.id }
+readback:
+  GET: /notes/{noteId}
+  expect: { status: 200, json: { note.title: Isolation probe } }
+cleanup:
+  DELETE: /notes/{noteId}
+  expect: 204
+  gone: { GET: "/notes/{noteId}", status: 404 }

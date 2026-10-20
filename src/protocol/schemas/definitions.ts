@@ -8,6 +8,7 @@ import { BrowserAction, BrowserLocator } from './browser.ts';
 import { GitSnapshotBinding } from './gitSources.ts';
 import { NativeJobAction } from './nativeJob.ts';
 import { McpToolCall } from './mcp.ts';
+import { TargetBinding } from './targetBinding.ts';
 import {
   Cents, IdString, IsoDateTime, JsonValue, LIMITS, Millis, NonNegInt, PositiveInt, PositiveMillis,
   RefSchema, ScopeSchema, ShortText, Text, UrlString, idList, refList,
@@ -458,7 +459,7 @@ export type RunnerProfile = z.infer<typeof RunnerProfile>;
 export const HostPlan = z.object({
   ...defined('workflow.host-plan/v1'),
   placement: z.enum(['local', 'agent_cli', 'agent_cloud', 'container', 'managed_sandbox', 'cloud_vm', 'customer_ci', 'device_service']),
-  adapter: z.enum(['local_process', 'mock_loopback']),
+  adapter: z.enum(['local_process', 'mock_loopback', 'url', 'compose', 'container']),
   launch: LaunchRecipe.nullable(), // null when the target is bound rather than launched
   mockResponsesRef: RefSchema.nullable(),
   transportPolicy: z.literal('in_process'),
@@ -469,6 +470,8 @@ export const HostPlan = z.object({
   captureRequirements: idList(16),
   sessionLifetimeMs: PositiveMillis,
   cleanupReserveMs: PositiveMillis,
+  /** Additive: targets that are not a launched local process (url, compose, container). */
+  binding: TargetBinding.optional(),
 }).strict();
 export type HostPlan = z.infer<typeof HostPlan>;
 

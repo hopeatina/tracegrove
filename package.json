@@ -15,6 +15,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./imports": {
+      "types": "./dist/imports/index.d.ts",
+      "default": "./dist/imports/index.js"
+    },
     "./integrations/awr": {
       "types": "./dist/integrations/awr/index.d.ts",
       "default": "./dist/integrations/awr/index.js"
@@ -52,6 +56,13 @@
     "LICENSE",
     "README.md",
     "docs/result-sink.md",
+    "docs/replay-comparison.md",
+    "docs/attempt-usage.md",
+    "docs/attempt-inventory.md",
+    "docs/native-observation-import.md",
+    "docs/workflow-knowledge.md",
+    "docs/persona-pools.md",
+    "docs/benchmark-evidence.md",
     "docs/git-object-proof.md"
   ],
   "scripts": {
@@ -60,6 +71,7 @@
     "test": "vitest run",
     "test:conformance": "vitest run conformance/",
     "test:django": "vitest run --config vitest.django.config.ts",
+    "test:dogfood": "npm run build && node dist/cli/main.js test --config dogfood/tracegrove.config.yaml",
     "test:container": "node scripts/container-conformance.mjs",
     "schema:export": "node --import tsx scripts/export-schemas.ts",
     "schema:check": "node --import tsx scripts/export-schemas.ts --check && node --import tsx scripts/export-environment-examples.ts --check",
@@ -68,6 +80,7 @@
   },
   "dependencies": {
     "playwright": "1.64.1",
+    "saxes": "6.0.0",
     "yaml": "2.9.1",
     "zod": "4.6.5"
   },

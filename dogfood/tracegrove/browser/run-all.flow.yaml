@@ -1,0 +1,30 @@
+title: Run all from the browser grows a passing grove, a history entry, and routes confirmed by traffic
+risk: critical
+tags: [ui, browser, run]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: open the UI
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: nothing has run yet
+    browser: { kind: read, target: { by: role, role: heading, name: Nothing has run yet. Run the grove to see which scenarios hold. } }
+    expect: { text: Nothing has run yet. Run the grove to see which scenarios hold. }
+  - name: run all
+    browser: { kind: click, target: { by: role, role: button, name: Run all } }
+  - name: every scenario held
+    browser: { kind: read, target: { by: role, role: heading, name: Every scenario held on this run. } }
+    expect: { text: Every scenario held on this run. }
+    timeoutMs: 60000
+  - name: open history
+    browser: { kind: click, target: { by: role, role: button, name: History } }
+  - name: history has one run
+    browser: { kind: read, target: { by: role, role: heading, name: 1 run of the grove } }
+    expect: { text: 1 run of the grove }
+  - name: open discover
+    browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: routes the run served are counted
+    browser: { kind: read, target: { by: testId, name: route-summary } }
+    expect: { text: 6 recognized · 4 served in a run · 1 untested }

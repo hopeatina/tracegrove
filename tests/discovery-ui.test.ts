@@ -39,6 +39,8 @@ describe('route scanning', () => {
     ]);
     expect(scanSource('urls.py', 'urlpatterns = [path("notes/<int:pk>/", v), path("", h)]').map((r) => `${r.method} ${r.path}`)).toEqual(['ANY /notes/{pk}', 'ANY /']);
     expect(scanSource('server.ts', "app.delete('/notes/:id', h); router.get(`/x/${y}`, h)").map((r) => `${r.method} ${r.path}`)).toEqual(['DELETE /notes/{id}']);
+    const node = "if (req.method === 'GET' && url.pathname === '/api/status') x();\nif (url.pathname === '/jobs' && req.method === 'POST') y();\nif (url.pathname === '/any') z();\nif (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) w();";
+    expect(scanSource('ui.ts', node).map((r) => `${r.method} ${r.path} ${r.framework}`)).toEqual(['GET /api/status node', 'POST /jobs node', 'ANY /any node', 'GET /api/runs/{id} node']);
   });
 
   it('matches sample routes to the flows that cover them', () => {
@@ -76,6 +78,22 @@ describe('git branches', () => {
     expect(d.routes.map((r) => `${r.method} ${r.path} ${r.changed}`)).toEqual(['POST /b true', 'GET /a false']);
     expect(existsSync(join(dir, 'api'))).toBe(false);
     expect(() => discover(dir, [], '--output=/tmp/x')).toThrow();
+  });
+
+  it('scans a branch from a subfolder, limited to source globs', () => {
+    const dir = temp();
+    git(dir, 'init', '-q', '-b', 'main');
+    mkdirSync(join(dir, 'svc', 'lib'), { recursive: true });
+    writeFileSync(join(dir, 'svc', 'server.js'), "if (url.pathname === '/a') a();\n");
+    writeFileSync(join(dir, 'svc', 'lib', 'extra.js'), "app.get('/hidden', h)\n");
+    git(dir, 'add', '.'); git(dir, 'commit', '-qm', 'a');
+    git(dir, 'checkout', '-qb', 'feature');
+    writeFileSync(join(dir, 'svc', 'server.js'), "if (url.pathname === '/a') a();\nif (req.method === 'POST' && url.pathname === '/b') b();\n");
+    git(dir, 'commit', '-qam', 'b');
+    git(dir, 'checkout', '-q', 'main');
+    const d = discover(join(dir, 'svc'), [], 'feature', ['*.js']);
+    expect(d.changedFiles).toEqual(['server.js']);
+    expect(d.routes.map((r) => `${r.method} ${r.path} ${r.file} ${r.changed}`)).toEqual(['ANY /a server.js true', 'POST /b server.js true']);
   });
 });
 

@@ -8,13 +8,18 @@ import { IdentityAttestation, freeze, parseAs } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { nowIso } from '../core/clock.ts';
 import { buildCapabilityObservation, buildLease } from './local.ts';
-import type { ExecutorHost, HostSession, HostStartContext } from './types.ts';
+import { defineHost, type ExecutorHost, type HostCapabilities, type HostSession, type HostStartContext } from './types.ts';
 
 function matchPath(pattern: string, actual: string): boolean {
   const p = pattern.split('/'); const a = actual.split('/');
   if (p.length !== a.length) return false;
   return p.every((segment, i) => segment.startsWith('{') || segment === a[i]);
 }
+
+export const MOCK_CAPABILITIES = {
+  supported: ['network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
+  unsupported: ['shell', 'file_persistence', 'browser_engine', 'video_export'],
+} as const satisfies HostCapabilities;
 
 export class MockLoopbackHost implements ExecutorHost {
   async start(context: HostStartContext): Promise<HostSession> {
@@ -53,8 +58,8 @@ export class MockLoopbackHost implements ExecutorHost {
     }), 'stub attestation');
     const observation = buildCapabilityObservation({
       hostPlanRef: context.hostPlan.ref, leaseRef: lease.ref, scope: context.scope, executionId: context.executionId,
-      supported: ['network_origin:loopback', 'confirmed_cancel', 'artifact_delivery'],
-      unsupported: ['shell', 'file_persistence', 'browser_engine', 'video_export'],
+      supported: [...MOCK_CAPABILITIES.supported],
+      unsupported: [...MOCK_CAPABILITIES.unsupported],
     });
     let stopped = false;
     return {
@@ -71,3 +76,5 @@ export class MockLoopbackHost implements ExecutorHost {
     };
   }
 }
+
+export const mockLoopbackHost = defineHost({ kind: 'mock_loopback', capabilities: MOCK_CAPABILITIES, create: () => new MockLoopbackHost() });

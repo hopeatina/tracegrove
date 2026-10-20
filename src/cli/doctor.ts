@@ -1,4 +1,4 @@
-/** Native metadata inspection. Compilation writes derived files; this never launches the app. */
+/** Native metadata inspection. Compilation writes derived files; this never launches the app (it may launch the browser engine to probe recording). */
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
@@ -11,6 +11,7 @@ import { sourceIdentityDigest } from '../hosts/local.ts';
 import { observeApplicationRuntime } from '../hosts/runtime.ts';
 import { readGitSnapshotTree } from '../source/snapshotTree.ts';
 import { sameScope } from '../protocol/canonical.ts';
+import { probeBrowser } from '../adapters/browser/probe.ts';
 
 type Issue = { code: string; detail: string; owner: string; action: string };
 type Check = { check: string; state: 'ok' | 'warn' | 'blocked'; detail: string; code: string; action: string };
@@ -100,10 +101,14 @@ export async function inspectDoctor(options: { config?: string | undefined; dir?
         // Loaded only here so HTTP-only projects never pay Playwright's import cost.
         const { chromium } = await import('playwright');
         accessSync(chromium.executablePath(), constants.X_OK);
-        check('chromium_installation', 'ok', 'executable is installed; engine launch, system libraries and video capture are untested', 'browser_executable_installed');
+        check('chromium_installation', 'ok', 'executable is installed', 'browser_executable_installed');
+        // Launch the engine and record one second of video the way a run does; this is not the app.
+        const probe = await probeBrowser();
+        if (probe.ok) check('browser_recording', 'ok', `engine launched and recorded a ${probe.videoBytes}-byte test video`, 'browser_recording_ok');
+        else check('browser_recording', 'blocked', `${probe.code}: ${probe.detail}`, probe.code, 'run tracegrove setup browsers, then doctor again');
       } catch {
         check('chromium_installation', 'blocked', 'required Chromium executable is missing or inaccessible', 'browser_executable_missing',
-          'install the pinned Playwright Chromium and required system libraries in an authorized environment, then run doctor again');
+          'run tracegrove setup browsers (installs the pinned headless shell and ffmpeg), then doctor again');
       }
     }
     report.blocked = report.errors.length > 0 || report.checks.some(c => c.state === 'blocked');

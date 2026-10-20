@@ -10,6 +10,7 @@ export const LocalSettings = z.object({
   agent: z.object({ provider: z.enum(AGENT_PROVIDERS).optional(), model: z.string().min(1).max(120).optional(),
     maxBudgetUsd: z.number().positive().max(100).optional() }).strict().optional(),
   verification: z.object({ source: VerificationSourceSelection }).strict().optional(),
+  env: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*$/).optional(),
 }).strict();
 export type LocalSettings = z.infer<typeof LocalSettings>;
 export function settingsPath(root: string): string { return join(root, '.tracegrove', SETTINGS_FILE); }

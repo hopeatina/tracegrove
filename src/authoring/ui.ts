@@ -2,8 +2,8 @@
  * `tracegrove ui`: a loopback-only web UI over one folder. It shows the config, flows and run
  * history, runs `tracegrove test`, starts discovery at the working tree or a git branch, and
  * hands drafting to Claude Code or Codex using the settings saved in .tracegrove/settings.json.
- * Writes need the per-session token in a custom header (blocks cross-site form posts) and
- * every request must carry the loopback Host header (blocks DNS rebinding).
+ * Writes need the per-session token in a custom header or as a bearer token (either blocks
+ * cross-site form posts) and every request must carry the loopback Host header (blocks DNS rebinding).
  */
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -20,11 +20,18 @@ import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, 
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
 import { readRunVideo, videoRange } from './media.ts';
-import { readSavedRun, readSavedRunSummary } from './savedRun.ts';
 import { heal, listHeals, undoHeal } from './heal.ts';
 import { projectStatus } from './status.ts';
 import { previewVerificationSource, savedVerificationSource, saveVerificationSource } from './verificationSource.ts';
-import { readRunSource } from './runSource.ts';
+import { readRunSource, readSavedRun } from './runSource.ts';
+import { envList } from '../environments/commands.ts';
+import { runEnvDoctor } from '../environments/doctorCache.ts';
+import { SavedRunName } from './runReport.ts';
+import { isRunDirectory } from './runLocation.ts';
+import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
+import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
+import { projectBenchmark } from './projectBenchmark.ts';
 
 /** What the page polls while something runs: the test run, the agent's own words, the heal phase. */
 type Live = { agent: { status: 'idle' | 'running' | 'finished' | 'failed'; task: 'draft' | 'heal' | null; lines: string[]; startedAt: string | null }; heal: { status: 'idle' | 'running' | 'finished' | 'failed'; phase: string; detail: string | null } };
@@ -42,9 +49,10 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   return text ? JSON.parse(text) as Record<string, unknown> : {};
 }
 
-export async function startUi(options: { dir: string; branch?: string | null; port?: number }): Promise<UiServer> {
+export async function startUi(options: { dir: string; branch?: string | null; port?: number; token?: string }): Promise<UiServer> {
   const dir = resolve(options.dir);
-  const token = randomBytes(18).toString('base64url');
+  // A fixed token is for harnesses that drive the UI over HTTP (the dogfood grove); the CLI never sets one.
+  const token = options.token && options.token.length >= 16 ? options.token : randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
   let active: { id: string; kind: 'run' | 'heal' | 'draft'; controller: AbortController; cancelling: boolean } | null = null;
   let closing = false;
@@ -74,9 +82,11 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   const runs = () => {
     const runsDir = join(dir, STATE_DIR, 'runs');
     if (!existsSync(runsDir)) return [];
-    return readdirSync(runsDir).filter((name) => name !== 'latest' && existsSync(join(runsDir, name, 'summary.json'))).sort().reverse().slice(0, 50)
-      .flatMap((name) => { try { const r = readSavedRunSummary(dir, name);
-        return [{ name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }]; } catch { return []; } });
+    return readdirSync(runsDir).filter((name) => name !== 'latest' && SavedRunName.safeParse(name).success && isRunDirectory(join(runsDir, name)) &&
+      (existsSync(join(runsDir, name, 'summary.json')) || existsSync(join(runsDir, name, 'bundle/manifest.json')))).sort().reverse().slice(0, 50)
+      .map((name) => { const r = readSavedRun(join(runsDir, name));
+        return { name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, evidenceStatus: r.evidenceStatus, bundleVerified: r.bundleVerified, environment: r.environment ?? null,
+          cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }; });
   };
   const testDir = () => {
     try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
@@ -126,7 +136,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     };
     if (req.headers.host !== `127.0.0.1:${port}` && req.headers.host !== `localhost:${port}`) return send(421, { error: 'unexpected host' });
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
-    if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token) return send(403, { error: 'missing session token' });
+    if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
     if (closing && req.method === 'POST') return send(409, { error: 'UI is closing; new work is not admitted.' });
     try {
       if (req.method === 'GET' && url.pathname === '/') {
@@ -138,6 +148,14 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
         return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, activeRunId: active?.id ?? null, cancelling: active?.cancelling ?? false, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+      }
+      if (url.pathname === '/api/imports' || url.pathname.startsWith('/api/imports/')) {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return send(403, { error: 'unexpected origin' });
+        const reply = await nativeImportsReply(req, url, { root: dir, canWrite: () => !closing && !active,
+          readBytes: async maximum => { pendingBodies.set(req, res); try { return await readNativeUpload(req, maximum); } finally { pendingBodies.delete(req); } } });
+        if (!Buffer.isBuffer(reply.body)) return send(reply.status, reply.body);
+        if (!res.writableEnded && !res.destroyed) { res.writeHead(reply.status, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...reply.headers }); res.end(reply.body); }
+        return;
       }
       if (req.method === 'POST' && url.pathname === '/api/source/preview') {
         const body = await readBody(req, res);
@@ -173,6 +191,17 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/run-control') return send(200, { runId: active?.id ?? null, operation: active?.kind ?? null, cancelling: active?.cancelling ?? false, closing });
       if (req.method === 'GET' && url.pathname === '/api/live') return send(200, { run: RunActivity.parse(activity), agent: live.agent, heal: live.heal });
       if (req.method === 'GET' && url.pathname === '/api/status') return send(200, projectStatus(dir));
+      if (req.method === 'GET' && url.pathname === '/api/environments') {
+        if (!existsSync(configPath())) return send(200, { schemaVersion: 'tracegrove.env-list/v1', selected: null, environments: [], doctor: {} });
+        const list = envList(configPath());
+        const doctor = Object.fromEntries(list.environments.map(e => { const file = join(dir, STATE_DIR, 'doctor', `${e.name}.json`); try { return [e.name, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as unknown : null]; } catch { return [e.name, null]; } }));
+        return send(200, { ...list, doctor });
+      }
+      if (req.method === 'POST' && url.pathname === '/api/env-doctor') {
+        const body = await readBody(req, res);
+        if (typeof body.env !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(body.env)) return send(400, { error: 'env must be an environment name' });
+        return send(200, await runEnvDoctor({ configPath: configPath(), env: body.env }));
+      }
       if (req.method === 'GET' && url.pathname === '/api/heals') return send(200, listHeals(dir).slice(0, 20));
       if (req.method === 'POST' && url.pathname === '/api/heal') {
         const body = await readBody(req, res);
@@ -229,10 +258,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const operation = begin('draft');
         agentStart('draft');
         try {
-          const job = draftWithAgent({ dir, signal: operation.controller.signal, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, onActivity: agentSay });
+          const job = draftWithAgent({ dir, signal: operation.controller.signal, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, prove: body.prove !== false, onActivity: agentSay, onProve: (line: string) => agentSay(`tracegrove · ${line}`) });
           running = job;
           const result = await job;
-          live.agent.status = result.agent.exitCode === 0 ? 'finished' : 'failed';
+          live.agent.status = result.agent.exitCode === 0 && (result.prove?.flows.every((f) => f.outcome === 'proven') ?? true) ? 'finished' : 'failed';
           return send(200, result);
         } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
         finally { drafting = false; if (active === operation) { running = null; active = null; } }
@@ -243,7 +272,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
       if ((req.method === 'GET' || req.method === 'HEAD') && video) {
         try {
-          if (readSavedRun(dir, decodeURIComponent(video[1]!)).savedEvidence.status !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
+          if (readSavedRun(join(dir, STATE_DIR, 'runs', decodeURIComponent(video[1]!))).evidenceStatus !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
           const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
           const range = videoRange(req.headers.range, bytes.length);
           const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
@@ -254,13 +283,26 @@ export async function startUi(options: { dir: string; branch?: string | null; po
           res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
         } catch { return send(409, { error: 'Recording is unavailable or its evidence failed verification.' }); }
       }
+      if (req.method === 'GET' && ['/api/workflow-map','/api/workflows'].includes(url.pathname)) {
+        const reply=savedWorkflowKnowledge(dir,url);return send(reply.status,reply.body);
+      }
+      if (url.pathname === '/api/benchmark') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return send(403, { error: 'unexpected origin' });
+        if (req.method !== 'GET') return send(405, { error: 'Benchmark inspection is read-only.' });
+        const reply = projectBenchmark(dir, url); return send(reply.status, reply.body);
+      }
+      if (req.method === 'GET' && url.pathname === '/api/compare') {
+        const pair = SavedRunPair.safeParse(Object.fromEntries(url.searchParams));
+        if (!pair.success || url.searchParams.getAll('baseline').length !== 1 || url.searchParams.getAll('candidate').length !== 1)
+          return send(400, { error: 'Select one named baseline and one named candidate.' });
+        try { return send(200, compareSavedRuns(dir, pair.data)); }
+        catch { return send(409, { error: 'Comparison unavailable. Re-check both retained evidence bundles; no recorded result is available for this comparison.' }); }
+      }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
-        if (!/^[A-Za-z0-9_.:-]+$/.test(name)) return send(400, { error: 'bad run name' });
-        try {
-          const saved = readSavedRun(dir, name);
-          return send(200, saved.savedEvidence.status === 'verified' ? readRunSource(saved.runDir, saved) : { ...saved, sourceBinding: null, sourceChecked: false });
-        } catch { return send(409, { error: 'Saved run is unavailable or invalid.' }); }
+        if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
+        const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
+        return existsSync(dirname(file)) ? send(200, readSavedRun(dirname(file))) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {
         const body = await readBody(req, res);
@@ -270,12 +312,14 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         activity = { status: 'running', event: null, stepId: null, label: 'Planning verification', observedAt: new Date().toISOString() };
         const operation = begin('run');
         const job = runTests({ signal: operation.controller.signal, configPath: configPath(), ...(typeof body.grep === 'string' && body.grep ? { grep: body.grep } : {}),
+          ...(typeof body.env === 'string' && /^[A-Za-z][A-Za-z0-9_-]*$/.test(body.env) ? { env: body.env } : {}),
           onEvent: event => { activity = runActivity(event); } });
         running = job;
         try {
           const { report } = await job;
-          activity = { status: 'finished', event: null, stepId: null, label: `Run finished: ${report.outcome}`, observedAt: report.finishedAt };
-          return send(200, readRunSource(report.runDir, report));
+          const checked = readSavedRun(report.runDir);
+          activity = { status: 'finished', event: null, stepId: null, label: `Run finished: ${checked.outcome}`, observedAt: checked.finishedAt || new Date().toISOString() };
+          return send(200, checked);
         } catch (error) {
           activity = { status: 'failed', event: null, stepId: null, label: 'Run could not be completed', observedAt: new Date().toISOString() };
           throw error;

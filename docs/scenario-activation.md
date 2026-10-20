@@ -50,5 +50,60 @@ Host, reviewed-source, physical-lease and issuer authority are explicitly simula
 These proofs do not establish hosted activation, deployed staging qualification or
 live regression admission. [Structural transitions](scenario-structure.md) have a local
 adapter. [Source-plan promotion](source-promotion.md) has a local approved-review bridge.
-Hosted persistence and
-activated regression execution remain open.
+Hosted persistence remains open. The local SDK supports activated regression execution below.
+
+## Run active coverage
+
+An activation records an accepted definition. Each new regression run still needs a
+current runtime owner, an exact scenario snapshot and fresh leased state. Reuse the
+existing scenario store and execution ledger:
+
+```ts
+const regression = store.regressionOwner({
+  authorizeRegistration, // Current authenticated permission for this exact scope/intent digest.
+  validateStateLeases,   // Returns a host lease snapshot with a synchronous assertCurrent().
+  authorizeEffects,     // Current effect permission for the request/admission/cell.
+});
+const admission = await regression.register({
+  snapshot, selectionManifestRef, stateLeaseRefs, idempotencyKey,
+});
+const bundle = await prepareRegressionExecution(frozenPlan, admission.ref, scope, ledger, regression);
+const result = await executeBundle({ bundle, ledger, stateDir, scope, regression });
+```
+
+Registration requires active coverage and preserves the exact case/persona/target matrix,
+including exclusions. It atomically claims state-lease identities alongside all qualification
+and regression history in the same scenario journal. Reused leases, stale snapshots, changed
+definitions and exhausted history bounds are refused. The host checks actual state/access;
+references do not provision or authorize resources. Lease and source snapshots must remain
+current across the final authorization await and synchronous journal publication.
+
+An identical registered intent can be retrieved after a lost acknowledgement. Retrieving that
+historical record does not reactivate coverage. Concurrent registration can conflict; retry the
+same intent to recover an already committed registration. A new run needs a new key and fresh
+leases. Qualification and regression share the frozen-bundle rebinder; neither can alter the
+selected executable contracts during preparation.
+
+Execution resolves the registered admission from the actual owning ledger. It separately checks
+effect permission, current activation, definition, epoch, source review and leases before host,
+fixture and step actions. Revocation halts further actions, retains the failed attempt and still
+cleans acquired resources. A failed regression does not remove the detecting scenario or count
+as another qualification round. The existing native executor, reducer, evidence exporter and
+ownership inventory produce the result; no scheduler or second execution engine is introduced.
+
+Admission-derived execution identities prevent another admission after an append is committed
+but its acknowledgement or index publication is lost. Incomplete/interrupted runs require
+explicit owned-state reconciliation and a fresh registered run; they never automatically repeat
+effects under the old leases. Completed redelivery verifies the committed bundle against the
+ledger and returns its full recorded receipts without another launch. Corrupt evidence blocks.
+`tracegrove usage` retains regression admissions, including incomplete ones.
+
+Bundles bind the regression admission, activation, definition, matrix and selection to the
+request. Independent verification checks that recorded closure and normal assertions/cleanup;
+it does not authenticate the issuer or assert that authorization is still live. Old non-regression
+request files remain readable; new regression requests carry `regressionAdmissionRef`.
+
+This SDK seam is tested with real local native API/fixture execution and explicitly simulated
+host/lease/issuer authority. Generic CLI/controller dispatch has no installed authenticated
+scenario owner and continues to block lifecycle runs. Hosted scheduling, designated-tenant
+canaries, physical/provider fencing and live staging qualification remain separate gates.

@@ -1,0 +1,572 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actionAuthority": {
+      "const": "none",
+      "type": "string"
+    },
+    "attempts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "admissionSequence": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "attemptId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attemptId": {
+                      "anyOf": [
+                        {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "executionId": {
+                      "anyOf": [
+                        {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "outcome": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "passed",
+                            "assertion_failed",
+                            "blocked",
+                            "infrastructure_failed",
+                            "inconclusive",
+                            "cancelled"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receiptRef": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "digest": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "algorithm": {
+                                  "const": "sha256",
+                                  "type": "string"
+                                },
+                                "hex": {
+                                  "pattern": "^[0-9a-f]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "algorithm",
+                                "hex"
+                              ],
+                              "type": "object"
+                            },
+                            "id": {
+                              "maxLength": 200,
+                              "minLength": 1,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                              "type": "string"
+                            },
+                            "revision": {
+                              "maxLength": 64,
+                              "minLength": 1,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "digest"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "selectionCellId": {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "selectionCellId",
+                    "executionId",
+                    "attemptId",
+                    "receiptRef",
+                    "outcome"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "executionId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "ordinary",
+              "qualification",
+              "regression",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "manifestDigest": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "algorithm": {
+                    "const": "sha256",
+                    "type": "string"
+                  },
+                  "hex": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "algorithm",
+                  "hex"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "passed",
+                  "assertion_failed",
+                  "blocked",
+                  "infrastructure_failed",
+                  "inconclusive",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receiptCount": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "recordedPhase": {
+            "anyOf": [
+              {
+                "enum": [
+                  "admitted",
+                  "cell.finalized",
+                  "interrupted",
+                  "finalized",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "finalized",
+              "sealed_unfinalized",
+              "admission_invalid",
+              "duplicate_admission",
+              "binding_invalid",
+              "bundle_unavailable",
+              "bundle_invalid",
+              "unsupported_aggregate"
+            ],
+            "type": "string"
+          },
+          "unresolvedResources": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "admissionSequence",
+          "executionId",
+          "attemptId",
+          "kind",
+          "recordedPhase",
+          "status",
+          "manifestDigest",
+          "outcome",
+          "receiptCount",
+          "unresolvedResources",
+          "cells"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "checkpoint": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "sequence": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "sequence",
+            "digest"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "enum": [
+        "complete_inventory",
+        "partial_evidence",
+        "no_attempts",
+        "ledger_snapshot_unavailable",
+        "ledger_snapshot_changed",
+        "ledger_snapshot_invalid",
+        "inventory_limit_exceeded",
+        "inspection_failed"
+      ],
+      "type": "string"
+    },
+    "evidenceComplete": {
+      "type": "boolean"
+    },
+    "evidenceScope": {
+      "const": "execution_admissions_in_checkpoint",
+      "type": "string"
+    },
+    "exitCode": {
+      "anyOf": [
+        {
+          "const": 0,
+          "type": "number"
+        },
+        {
+          "const": 2,
+          "type": "number"
+        }
+      ]
+    },
+    "issuerTrust": {
+      "const": "not_authenticated",
+      "type": "string"
+    },
+    "recordedPricing": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "basis": {
+              "const": "recorded_values_only_not_authenticated_invoices",
+              "type": "string"
+            },
+            "estimatedSubtotalCents": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reconciledSubtotalCents": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownChargeCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unpricedEstimates": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unreconciledReceipts": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "estimatedSubtotalCents",
+            "reconciledSubtotalCents",
+            "unpricedEstimates",
+            "unreconciledReceipts",
+            "unknownChargeCount",
+            "basis"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recordedUsageSubtotal": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "artifactBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "browserSeconds": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "inferenceCalls": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "inferenceTokens": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "integrationOperations": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "receipts": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "runnerSeconds": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "receipts",
+            "runnerSeconds",
+            "browserSeconds",
+            "artifactBytes",
+            "inferenceCalls",
+            "inferenceTokens",
+            "integrationOperations"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "tracegrove.attempt-inventory/v1",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+          "type": "string"
+        },
+        "tenantId": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "owner_private",
+            "tenant_private"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "tenantId",
+        "visibility"
+      ],
+      "type": "object"
+    },
+    "timingPoints": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "censored": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cold": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unknown": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "warm": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "warm",
+            "cold",
+            "unknown",
+            "censored"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "writerLock": {
+      "enum": [
+        "present",
+        "absent",
+        "unknown"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "scope",
+    "checkpoint",
+    "writerLock",
+    "code",
+    "exitCode",
+    "evidenceScope",
+    "actionAuthority",
+    "issuerTrust",
+    "attempts",
+    "recordedUsageSubtotal",
+    "recordedPricing",
+    "timingPoints",
+    "evidenceComplete"
+  ],
+  "type": "object"
+}

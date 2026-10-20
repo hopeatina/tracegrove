@@ -24,6 +24,8 @@ export type FindingKind = 'setup' | 'authoring' | 'test_drift' | 'product_bug' |
 export type HealFinding = {
   kind: FindingKind; caseId: string | null; file: string | null; step: string | null;
   detail: string; fix: string; status: 'fixed' | 'open' | 'reported';
+  /** stable code heal matches on (a check issue, blocker or infrastructure code) */
+  code?: string;
 };
 export type HealChange = {
   file: string; reason: string; diff: string; status: 'kept' | 'reverted' | 'rejected';
@@ -111,20 +113,25 @@ export function classify(report: TestRunReport | null, issues: CheckIssue[]): He
   for (const issue of issues) {
     const interpreter = issue.code === 'launch_executable_missing' || issue.code === 'application_runtime_unrecognized';
     const file = issue.detail.match(/^(\S+\.(?:flow|fixture)\.yaml)/)?.[1] ?? (interpreter ? CONFIG_FILE : null);
-    open({ kind: interpreter ? 'setup' : 'authoring', caseId: null, file, step: null, detail: `${issue.code}: ${issue.detail}`, fix: interpreter ? 'point app.python at an interpreter that has the app\'s dependencies' : issue.action });
+    open({ kind: interpreter ? 'setup' : 'authoring', code: issue.code, caseId: null, file, step: null, detail: `${issue.code}: ${issue.detail}`, fix: interpreter ? 'point app.python at an interpreter that has the app\'s dependencies' : issue.action });
   }
   if (!report) return findings;
-  for (const b of report.blockers) open({ kind: 'setup', caseId: null, file: CONFIG_FILE, step: null, detail: `${b.code}: ${b.detail}`, fix: b.action });
+  for (const b of report.blockers) open({ kind: 'setup', code: b.code, caseId: null, file: CONFIG_FILE, step: null, detail: `${b.code}: ${b.detail}`, fix: b.action });
   for (const c of report.cases) {
     if (c.outcome === 'passed' || !c.failure) continue;
-    const ready = c.failure.message.match(/did not become ready at https?:\/\/[^/\s]+(\/\S*) within/);
+    // Match the typed code; the message is only parsed for the path it names. Runs saved before codes existed fall back to the text.
+    const notReady = c.failure.code ? c.failure.code === 'app_not_ready' : /did not become ready at/.test(c.failure.message);
+    const ready = notReady ? (c.failure.message.match(/https?:\/\/[^/\s]+(\/[^\s;]*)/) ?? ['', '(unknown)']) : null;
     if (c.failure.step === '(app startup)') {
-      open({ kind: 'setup', caseId: c.caseId, file: CONFIG_FILE, step: null, detail: c.failure.message,
+      open({ kind: 'setup', code: c.failure.code ?? (notReady ? 'app_not_ready' : 'infrastructure'), caseId: c.caseId, file: CONFIG_FILE, step: null, detail: c.failure.message,
         fix: ready ? `make app.health a GET path that answers 2xx once the app is up (now ${ready[1]})` : 'the app exited or failed to start; run it by hand with the same env to see why' });
     } else if (c.outcome === 'assertion_failed') {
       open({ kind: 'assertion', caseId: c.caseId, file: c.file, step: c.failure.step, detail: `${c.failure.message}${c.failure.observed ? `\n${c.failure.observed}` : ''}`, fix: 'decide whether the test drifted or the product regressed' });
     } else {
-      open({ kind: c.outcome === 'infrastructure_failed' ? 'infrastructure' : 'setup', caseId: c.caseId, file: c.file, step: c.failure.step, detail: c.failure.message, fix: 'rerun; if it repeats, inspect the run folder' });
+      // Step failures carry the step's reason code as their message; browser setup codes have a known fix.
+      const browser = /^(browser_unavailable|video_encoder_missing)\b/.exec(c.failure.message)?.[1];
+      open({ kind: c.outcome === 'infrastructure_failed' ? 'infrastructure' : 'setup', ...(browser ? { code: browser } : {}), caseId: c.caseId, file: c.file, step: c.failure.step, detail: c.failure.message,
+        fix: browser ? 'run tracegrove setup browsers to install the pinned headless shell and ffmpeg, then rerun' : 'rerun; if it repeats, inspect the run folder' });
     }
   }
   if (report.bundleVerified === false) open({ kind: 'evidence', caseId: null, file: null, step: null, detail: 'the evidence bundle failed verification', fix: `read ${relative(report.runDir, join(report.runDir, 'bundle-problems.txt'))} in the run folder; evidence is never repaired, only re-recorded by a fresh run` });
@@ -474,8 +481,8 @@ async function healOwned(options: HealOptions): Promise<HealReport> {
   try { config = loadAuthoringConfig(configPath); } catch { config = null; }
   if (config) {
     for (const f of findings.filter((x) => x.kind === 'setup' && x.status === 'open')) {
-      if (/did not become ready at/.test(f.detail)) await fixHealth(ctx, f, config, dryRun);
-      else if (/^(launch_executable_missing|application_runtime_unrecognized)/.test(f.detail)) await fixPython(ctx, f, config, dryRun);
+      if (f.code === 'app_not_ready') await fixHealth(ctx, f, config, dryRun);
+      else if (f.code === 'launch_executable_missing' || f.code === 'application_runtime_unrecognized') await fixPython(ctx, f, config, dryRun);
       try { config = loadAuthoringConfig(configPath); } catch { /* keep previous */ }
     }
   }

@@ -2,6 +2,8 @@
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
 import { CliErrorReport, SchemaViolation } from '../protocol/index.ts';
 import { COMMAND_SCHEMAS } from './arguments.ts';
+import { BLOCK_CODES, describeBlock } from '../core/blockCodes.ts';
+import { NativeObservationError } from '../imports/errors.ts';
 
 type Reason = CliErrorReport['reasons'][number];
 const reason = (code: Reason['code'], message: string, recovery: string): Reason => ({ code, message, recovery });
@@ -31,7 +33,16 @@ const blockedReasons: Partial<Record<Reason['code'], Reason>> = {
   execution_not_found: reason('execution_not_found', 'The selected execution is unavailable.', 'Select an existing execution and its matching state directory.'),
   invalid_request_file: reason('invalid_request_file', 'The input is not a frozen request bundle.', 'Pass an unchanged request bundle written by tracegrove plan.'),
   invalid_port: reason('invalid_port', 'The selected port is invalid.', 'Choose a valid port or omit the port option.'),
+  unknown_environment: reason('unknown_environment', 'The selected environment is not declared.', 'Run tracegrove env list and choose a declared environment.'),
+  invalid_environment: reason('invalid_environment', 'The selected environment configuration is invalid.', 'Fix the environment in tracegrove.config.yaml; tracegrove env show explains each field.'),
+  no_flows_for_environment: reason('no_flows_for_environment', 'No selected flow is enabled for this environment.', 'Opt flows in with envs: [<env>]; flows default to local only.'),
+  approval_required: reason('approval_required', 'Agent runs in this environment need a person to approve them first.', 'Ask a person to run the approval command, then run again.'),
+  approval_requires_human: reason('approval_requires_human', 'Approvals must be granted by a person, not an agent.', 'Ask a person to run the approval command.'),
+  agent_policy_denied: reason('agent_policy_denied', 'Agents may not run in this environment.', 'Ask a person to run it, or to change the environment agent policy.'),
+  invalid_config_path: reason('invalid_config_path', 'The configuration path does not name a setting.', 'Use a dot path such as environments.staging.target.url; see tracegrove config get.'),
+  config_edit_invalid: reason('config_edit_invalid', 'The configuration edit would not validate.', 'Run the edit with --dry-run to see the schema errors and fix the value.'),
 };
+const SAFE_FIX = /^(?:tracegrove|docker|aws|op|npm) [A-Za-z0-9 ._:/=<>@-]{0,200}$/;
 const prerequisite = reason('prerequisite_unavailable', 'A required prerequisite is unavailable.', 'Check the selected configuration, dependencies and authorization; resolve the prerequisite before retrying.');
 
 export function cliErrorReport(error: unknown, command: string | undefined): CliErrorReport {
@@ -39,10 +50,19 @@ export function cliErrorReport(error: unknown, command: string | undefined): Cli
   let omittedReasonCount = 0;
   if (error instanceof Blocked) {
     errorClass = 'blocked'; exitCode = 2;
-    reasons = error.reasons.slice(0, 32).map(item => Object.hasOwn(blockedReasons, item.code)
-      ? blockedReasons[item.code as Reason['code']]! : prerequisite);
+    reasons = error.reasons.slice(0, 32).map(item => {
+      const base = Object.hasOwn(blockedReasons, item.code) ? blockedReasons[item.code as Reason['code']]! : prerequisite;
+      if (base === prerequisite) return base;
+      const described = describeBlock(item.code);
+      const fix = item.fix ?? item.action.match(/(?:runs?|run):\s*(.+)$/)?.[1]?.trim() ?? described.fix;
+      return { ...base, ...(Object.hasOwn(BLOCK_CODES, item.code) ? { owner: described.owner } : {}), ...(fix && SAFE_FIX.test(fix) ? { fix } : {}) };
+    });
     if (!reasons.length) reasons = [prerequisite];
     omittedReasonCount = Math.max(0, error.reasons.length - 32);
+  } else if (error instanceof NativeObservationError) {
+    errorClass = error.code === 'native_output_conflict' ? 'conflict' : 'invalid_input'; exitCode = 2;
+    const diagnostic = NativeObservationError.diagnostic(error.code);
+    reasons = [reason(error.code, diagnostic.message, diagnostic.recovery)];
   } else if (error instanceof Conflict) {
     errorClass = 'conflict'; exitCode = 2;
     reasons = [reason('state_conflict', 'The operation conflicts with existing state or ownership.', 'Inspect the owned state and reconcile the interrupted operation; do not break locks or replay uncertain effects.')];

@@ -1,0 +1,18 @@
+title: Discover lists the app's routes, which ones a run confirmed, and the ones nothing reaches
+tags: [ui, browser, discover]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD]
+  maxActions: 1000
+steps:
+  - name: open the UI
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: open discover
+    browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: intent comes first
+    browser: { kind: read, target: { by: role, role: heading, name: What should be true after this change? } }
+    expect: { text: What should be true after this change? }
+  - name: routes and gaps are counted
+    browser: { kind: read, target: { by: testId, name: route-summary } }
+    expect: { text: 2 recognized · 0 served in a run · 1 untested }
