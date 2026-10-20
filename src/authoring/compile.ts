@@ -43,6 +43,8 @@ export type CompileResult = {
   flows: CompiledFlowInfo[];
   sourceDigest: string;
   sourceFiles: string[];
+  /** Folder the source globs are relative to (the launch cwd). */
+  sourceRoot: string;
   sourceBinding: VerificationSourceBinding;
 };
 export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined };
@@ -486,6 +488,6 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     executionHostRef: './host.yaml', intelligencePolicyRef: './policy.yaml',
     profiles: { [PROFILE]: { class: 'isolated_candidate', environmentPlanRef: './environment.yaml', hostPlanRef: null, personaRef: `./personas/${defaultPersona}.yaml`, fixturePlanRef: null, fidelityProfileRef: './fidelity.yaml', runnerRef: './runner.yaml', budget: { deadlineMs: budgetMs, costCeilingCents: 0 } } },
   });
-  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles,
+  return { root, configPath: resolve(configPath), compiledDir, workflowConfigPath: join(compiledDir, 'workflow.yaml'), config, flows, sourceDigest: identity.hex, sourceFiles, sourceRoot: launchCwd,
     sourceBinding: snapshotSource ? describeSnapshot(snapshotSource.snapshot) : { kind: 'working_tree' } };
 }

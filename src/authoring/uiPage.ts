@@ -76,7 +76,7 @@ pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:1
 .phases{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}.phases li{display:flex;gap:10px;align-items:center}.phases .ok{color:var(--moss);width:12px}.phases .wait{color:var(--muted);width:12px}
 .src{display:flex;flex-direction:column;gap:4px}.src button{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid transparent;background:none;text-align:left;font:13px/18px var(--mono)}
 .src button[aria-pressed=true]{background:var(--paper);border-color:var(--line2)}.src button:hover{background:var(--paper)}
-.route{display:grid;grid-template-columns:8px minmax(160px,1.4fr) minmax(120px,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:8px;min-height:44px}.route:hover{background:var(--paper)}
+.route{display:grid;grid-template-columns:8px minmax(160px,1.4fr) minmax(120px,1fr) 64px;gap:12px;align-items:center;padding:8px 12px;border-radius:8px;min-height:44px}.route:hover{background:var(--paper)}
 .grid{border-collapse:separate;border-spacing:0}.grid th:first-child,.grid td:first-child{min-width:280px;padding-right:32px}.grid th{white-space:nowrap}.grid th,.grid td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line)}.grid th:first-child,.grid td:first-child{text-align:left;position:sticky;left:0;background:var(--stone)}
 .cell{width:28px;height:28px;border-radius:8px;border:1px solid transparent;background:none;display:inline-flex;align-items:center;justify-content:center}.cell:hover{border-color:var(--twig);background:var(--paper)}
 .scroll{overflow-x:auto}.seg{display:flex;flex-wrap:wrap;gap:8px}.seg button{flex:1 1 160px;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--paper);display:flex;flex-direction:column;gap:2px}
@@ -168,7 +168,7 @@ const resource=p=>(p||'').split('?')[0].replace(/\{[^}]*\}/g,'·')||'/';
 function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg=sv('svg',{viewBox:'0 0 '+W+' 300',class:'grove'+(ui.sel?' focus':''),role:'img','aria-label':n+' scenarios as a grove: one pad per scenario, one leaf per step'});
  const wood=sv('g'),roots=sv('g'),pads=sv('g'),labels=sv('g');svg.append(sv('line',{class:'soil',x1:24,x2:W-24,y1:SOIL,y2:SOIL}),roots,wood,pads,labels);
  const top=[CX+4,128];wood.append(sv('path',{class:'wood',d:ribbon([[CX,SOIL+2],[CX-10,178],[CX+10,152],top],13,6)}));
- const r=7,gap=r*2.15;
+ const r=7,gap=r*2.15,placed=[];
  sc.forEach((c,i)=>{const a=n===1?-Math.PI/2:Math.PI+0.42+(Math.PI-0.84)*i/(n-1);const px=CX+Math.cos(a)*Math.min(250,90+70*n),py=118+Math.sin(a)*62;
   const cut=c.state==='pruned';const mid=[(top[0]+px)/2,Math.min(top[1],py)+18];
   wood.append(cut?sv('path',{class:'cutwood',d:line([top,mid,[px,py+10]])}):sv('path',{class:'wood',d:ribbon([top,mid,[px,py+8]],4.5,1.6)}));
@@ -177,14 +177,20 @@ function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg
   steps.forEach((x,j)=>{const row=Math.floor(j/perRow),col=j%perRow,inRow=row===0?Math.min(perRow,steps.length):steps.length-perRow;
    const at=c.failure&&x.name&&(x.name===c.failure.step||x.reportedName===c.failure.step);pad.append(sv('circle',{cx:(px+(col-(inRow-1)/2)*gap).toFixed(1),cy:(py-row*gap*.86).toFixed(1),r:r,class:'lf-'+(at?'fail':x.result),'data-leaf':x.id||null},at?sv('title',{},'Case failed at '+c.failure.step):null))});
   pads.append(pad);
-  const rows=steps.length>4?2:1;const ly=py-(rows-1)*gap*.86-r-8;minY=Math.min(minY,ly-12);labels.append(sv('text',{x:px.toFixed(1),y:ly.toFixed(1),'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},c.id.length>26?c.id.slice(0,25)+'…':c.id))});
- const res=new Map();for(const c of sc)for(const x of c.steps){if(!x.path)continue;const k=resource(x.path);const v=res.get(k)||{fail:false,pass:false};if(x.result==='fail')v.fail=true;if(x.result==='pass')v.pass=true;res.set(k,v)}
+  const text=c.id.length>26?c.id.slice(0,25)+'…':c.id,half=text.length*3.4+4,rows=steps.length>4?2:1;
+  const box=y=>({x0:px-half,x1:px+half,y0:y-11,y1:y+3}),hit=b=>placed.some(q=>b.x0<q.x1&&q.x0<b.x1&&b.y0<q.y1&&q.y0<b.y1);
+  let ly=py-(rows-1)*gap*.86-r-8;if(hit(box(ly)))ly=py+r+15;placed.push(box(ly));minY=Math.min(minY,ly-12);
+  labels.append(sv('text',{x:px.toFixed(1),y:ly.toFixed(1),'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},text))});
+ const res=new Map();for(const c of sc)for(const x of c.steps){if(!x.path||x.method==='UI')continue;const k=resource(x.path);const v=res.get(k)||{fail:false,pass:false};if(x.result==='fail')v.fail=true;if(x.result==='pass')v.pass=true;res.set(k,v)}
  const keys=[...res.keys()].slice(0,8);keys.forEach((k,i)=>{const m=keys.length;const a=m===1?Math.PI/2:0.3+(Math.PI-0.6)*(m-1-i)/(m-1);const tx=CX+Math.cos(a)*Math.min(270,80+60*m),ty=SOIL+18+Math.sin(a)*56;const v=res.get(k);
   roots.append(sv('path',{class:'root',d:line([[CX,SOIL+1],[(CX+tx)/2,SOIL+10+Math.sin(a)*20],[tx,ty]]),'stroke-width':1.6}),sv('circle',{class:'tip '+(v.fail?'fail':v.pass?'':'none'),cx:tx.toFixed(1),cy:ty.toFixed(1),r:3.6}),
-   sv('text',{x:tx.toFixed(1),y:(ty+16).toFixed(1),'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
- svg.setAttribute('viewBox','0 '+Math.floor(minY)+' '+W+' '+Math.ceil(300-minY));
- if(res.size>keys.length)labels.append(sv('text',{x:W-24,y:292,'text-anchor':'end'},'+'+(res.size-keys.length)+' more resources'));
+   sv('text',{x:tx.toFixed(1),y:(ty+16+(i%2)*12).toFixed(1),'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
+ svg.setAttribute('viewBox','0 '+Math.floor(minY)+' '+W+' '+Math.ceil(312-minY));
+ if(res.size>keys.length)labels.append(sv('text',{x:W-24,y:304,'text-anchor':'end'},'+'+(res.size-keys.length)+' more resources'));
  return svg}
+// Step ids are the slug of the authored name; a saved name with the same slug is the same step, not a rename.
+const slug=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+const sameName=x=>!!x.reportedName&&slug(x.reportedName)===x.name;
 function legend(){const it=(cls,t)=>h('span',{},h('i',{style:cls}),t);return h('div',{class:'legend'},it('background:var(--moss)','held'),it('background:var(--verm)','failed'),it('background:var(--ochre)','blocked'),it('border:1px dashed var(--twig)','not run or pruned'),it('background:var(--gold)','resource read back'))}
 function inputChip(){const src=state.verificationSource;const b=src.binding;
  return h('button',{class:'kpi chip',title:src.status==='blocked'?'Blocked — review selection':sourceDescription(b),on:{click:()=>{tab='Settings';render()}}},
@@ -227,7 +233,7 @@ function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state=
    h('span',{class:'pips','aria-label':s.steps.filter(x=>x.result==='pass').length+' of '+s.steps.length+' steps held'},s.steps.map(x=>h('i',{class:x.result}))),
    h('span',{class:'time'},secs(s.ms)))),
   open?h('div',{class:'twigs fade'},s.steps.map((x,j)=>{const left=at/total*100;at+=x.ms||0;return h('div',{class:'br'},h('span',{class:'twig'},h('i')),
-   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},x.name,x.reportedName&&x.reportedName!==x.name?h('span',{class:'tag',title:'Saved name (unsealed): '+x.reportedName},'renamed'):null),h('span',{class:'req'},x.method+' '+x.path),
+   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},sameName(x)?x.reportedName:x.name,x.reportedName&&!sameName(x)?h('span',{class:'tag',title:'Saved name (unsealed): '+x.reportedName},'renamed'):null),h('span',{class:'req'},x.method+' '+x.path),
     h('span',{class:'bar','aria-hidden':'true'},x.ms!=null?h('i',{class:x.result==='fail'?'fail':'',style:'left:'+left.toFixed(1)+'%;width:'+((x.ms||0)/total*100).toFixed(1)+'%'}):null),
     h('span',{class:'ms muted'},x.ms!=null?x.ms+' ms':''),h('span',{class:'res c-'+x.result},x.status!=null?x.status:x.result==='none'?'–':LABEL[x.result])))})):null)}
 function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.state==='warn')items.push({s,title:s.failure?s.failure.message:'Did not complete',where:s.failure?'step "'+s.failure.step+'"':s.file});
@@ -241,16 +247,16 @@ function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.s
 function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id);const v=c&&(c.videos||[]).find(v=>v.mediaType==='video/webm'&&/^[a-f0-9]{64}$/.test(v.digest));if(!v||!ui.runName)return null;
  const status=h('p',{class:'small muted',role:'status'},'Checking the recording evidence…');
  if(ui.run.bundleVerified===false)return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),h('p',{role:'alert'},'Recording unavailable: this run’s evidence failed verification.'));
- const key=ui.runName+':'+v.digest;
+ const key=ui.runName+':'+v.digest;let posed=false;
  const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id),
-  on:{loadedmetadata:()=>{const at=ui.videoTimes[key];if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,Number.isFinite(player.duration)?player.duration:at);status.textContent='Recording loaded from verified evidence.'},timeupdate:()=>{ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
+  on:{loadedmetadata:()=>{const at=ui.videoTimes[key],end=Number.isFinite(player.duration)?player.duration:0;if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,end||at);else if(end>0.2){posed=true;player.currentTime=end-0.1}status.textContent='Recording loaded from verified evidence.'},play:()=>{if(posed){posed=false;player.currentTime=0}},timeupdate:()=>{if(!posed)ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
  return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
 function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
- return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},x.name),
-  x.reportedName&&x.reportedName!==x.name?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
+ return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},sameName(x)?x.reportedName:x.name),
+  x.reportedName&&!sameName(x)?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
     h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
 
   h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
@@ -291,11 +297,11 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
   ui.agentPhase>=0?h('div',{class:'fade'},h('p',{class:'row small muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),name+' is working; tracegrove checks every file it writes'),
    h('div',{class:'log',id:'agent-log','aria-live':'polite'},(ui.live&&ui.live.agent.task==='draft'&&ui.live.agent.lines.length?ui.live.agent.lines:['Waiting for the agent to start']).map(x=>h('div',{},x)))):null,
   ui.agent?agentResult():null);
- const reach=h('section',{style:'margin-top:28px'},h('div',{class:'rulehead'},h('span',{class:'label'},'Static routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted'},d.routes.length+' recognized · '+d.uncovered+' without a flow'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
+ const reach=h('section',{style:'margin-top:28px'},h('div',{class:'rulehead'},h('span',{class:'label'},'Static routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted','data-testid':'route-summary'},d.routes.length+' recognized · '+d.uncovered+' without a flow'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
   h('div',{class:'row',style:'margin-bottom:12px'},chips,g.isRepo?null:h('span',{class:'small muted'},'Not a git repo, so only the working tree.')),
   !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?h('div',{},d.routes.map(r=>routeRow(r))):
    h('div',{class:'empty'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},'No routes recognized here.'),h('div',{class:'small'},'Describe the behavior above and the agent drafts flows from the code instead.'))),
-  h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Partial static inventory for FastAPI, Django and Express. Other routes may be missing; this is not execution coverage.'),
+  h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Partial static inventory for FastAPI, Django, Express and plain node:http handlers. Other routes may be missing; this is not execution coverage.'),
    h('p',{},'Other routing styles, including Next.js, are not scanned.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
   ui.draft?draftCard():null);
  return[intent,reach]}

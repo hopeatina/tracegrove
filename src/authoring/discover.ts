@@ -1,14 +1,15 @@
 /**
  * Discovery: find HTTP routes in a folder (or at a git branch) and match them against flows.
- * Heuristic static scan for FastAPI, Django and Express-style routers; it proposes what to test
+ * Heuristic static scan for FastAPI, Django, Express-style routers and plain node:http dispatch; it proposes what to test
  * and drafts flow skeletons. It is not evidence and never runs the app.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Blocked } from '../core/errors.ts';
+import { globToRegExp } from './sources.ts';
 
-export type Route = { method: string; path: string; file: string; line: number; framework: 'fastapi' | 'django' | 'express' };
+export type Route = { method: string; path: string; file: string; line: number; framework: 'fastapi' | 'django' | 'express' | 'node' };
 export type FlowRef = { caseId: string; method: string; path: string };
 export type CoveredRoute = Route & { coveredBy: string[]; changed: boolean };
 export type GitInfo = { isRepo: boolean; current: string | null; base: string | null; branches: string[] };
@@ -58,9 +59,10 @@ function workingTree(dir: string): Source {
 }
 
 function atBranch(dir: string, branch: string): Source {
+  // ls-tree lists paths relative to dir; `rev:./path` reads them relative to dir too.
   const files = git(dir, ['ls-tree', '-r', '--name-only', branch]).split('\n')
     .filter((f) => f && EXT.test(f) && !f.split('/').some((part) => SKIP.has(part))).slice(0, MAX_FILES);
-  return { files, read: (file) => git(dir, ['show', `${branch}:${file}`]) };
+  return { files, read: (file) => git(dir, ['show', `${branch}:./${file}`]) };
 }
 
 function normalizePath(path: string): string {
@@ -76,28 +78,40 @@ export function scanSource(file: string, text: string): Route[] {
     for (const m of text.matchAll(/\bpath\(\s*["']([^"']*)["']/g)) routes.push({ method: 'ANY', path: normalizePath(m[1]!), file, line: lineOf(m.index), framework: 'django' });
   } else {
     for (const m of text.matchAll(/\b(?:app|router|server|fastify|api|routes)\.(get|post|put|patch|delete|head)\(\s*["'`]([^"'`]+)["'`]/g)) routes.push({ method: m[1]!.toUpperCase(), path: normalizePath(m[2]!), file, line: lineOf(m.index), framework: 'express' });
+    // Plain node:http dispatch: `req.method === 'GET' && url.pathname === '/x'`, in either order.
+    // A prefix match (`pathname.startsWith('/runs/')`) is read as one parameterized route.
+    for (const m of text.matchAll(/\bpathname\s*(?:===\s*|\.startsWith\(\s*)["'`](\/[^"'`$]*)["'`]/g)) {
+      const start = text.lastIndexOf('\n', m.index) + 1;
+      const end = text.indexOf('\n', m.index);
+      const method = /\bmethod\s*===\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD)["'`]/.exec(text.slice(start, end < 0 ? undefined : end));
+      const prefix = m[0].includes('startsWith');
+      const path = prefix ? `${m[1]!.replace(/\/?$/, '/')}{id}` : m[1]!;
+      routes.push({ method: method?.[1] ?? 'ANY', path: normalizePath(path), file, line: lineOf(m.index), framework: 'node' });
+    }
   }
   return routes.filter((r) => !r.path.includes('${'));
 }
 
 const shape = (path: string) => normalizePath(path).replace(/\{[^}]*\}/g, '{}');
 
-export function discover(dir: string, flows: FlowRef[], branch: string | null): Discovery {
+export function discover(dir: string, flows: FlowRef[], branch: string | null, globs?: string[]): Discovery {
   const info = gitInfo(dir);
   const ref = branch ? safeRef(branch) : null;
   if (ref && !info.isRepo) throw new Blocked([{ code: 'not_a_git_repo', detail: dir, owner: 'operator', action: 'drop --branch, or point at a git checkout' }]);
   const source = ref ? atBranch(dir, ref) : workingTree(dir);
   let changedFiles: string[] = [];
   if (ref && info.base && info.base !== ref) {
-    try { changedFiles = git(dir, ['diff', '--name-only', `${safeRef(info.base)}...${ref}`]).split('\n').filter(Boolean); } catch { changedFiles = []; }
+    try { changedFiles = git(dir, ['diff', '--name-only', '--relative', `${safeRef(info.base)}...${ref}`]).split('\n').filter(Boolean); } catch { changedFiles = []; }
   }
   const changed = new Set(changedFiles);
   const routes: CoveredRoute[] = [];
   const seen = new Set<string>();
+  const patterns = globs?.map(globToRegExp);
   for (const file of source.files) {
+    if (patterns && !patterns.some((pattern) => pattern.test(file))) continue;
     let text: string;
     try { text = source.read(file); } catch { continue; }
-    if (!/(get|post|put|patch|delete|path)\(/.test(text)) continue;
+    if (!/(get|post|put|patch|delete|path)\(|pathname/.test(text)) continue;
     for (const route of scanSource(file, text)) {
       const key = `${route.method} ${route.path}`;
       if (seen.has(key)) continue;

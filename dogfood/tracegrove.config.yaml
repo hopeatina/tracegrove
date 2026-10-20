@@ -1,5 +1,6 @@
 # tracegrove testing tracegrove: flows against the `tracegrove ui` server, served by serve.mjs
 # over a fresh copy of the notes sample. Build first (npm run build), then: tracegrove test --config dogfood/tracegrove.config.yaml
+# The browser/ flows drive the real page and record video; they need Playwright's headless shell and ffmpeg.
 project: tracegrove-ui
 app:
   adapter: node

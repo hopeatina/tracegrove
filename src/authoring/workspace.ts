@@ -28,15 +28,20 @@ export function checkProject(dir: string): CheckResult {
 export function discoverProject(dir: string, branch: string | null): Discovery {
   const root = resolve(dir);
   let flows: Array<{ caseId: string; method: string; path: string }> = [];
+  let scanRoot = root;
+  let globs: string[] | undefined;
   try {
     const configPath = configInDirectory(root);
     if (configPath) {
       const compiled = compileProject(configPath);
       flows = compiled.flows.flatMap((f) => f.steps.map((s) => ({ caseId: f.caseId, method: s.method, path: s.path })));
       flows.push({ caseId: '(readiness check)', method: 'GET', path: compiled.config.app.health });
+      // Scan the app the config launches, limited to its sources, not the folder the config sits in.
+      scanRoot = compiled.sourceRoot;
+      globs = compiled.config.app.sources ?? undefined;
     }
   } catch { /* uncompilable flows cover nothing; check reports why */ }
-  return discover(root, flows, branch);
+  return discover(scanRoot, flows, branch, globs);
 }
 
 function configOrNull(root: string): AuthoringConfig | null {
