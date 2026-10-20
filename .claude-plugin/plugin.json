@@ -1,0 +1,13 @@
+{
+  "name": "tracegrove",
+  "version": "0.4.0",
+  "description": "End-to-end tests that check what your app actually did. Adds the tracegrove MCP tools and the skill that tells the agent how to set up, run and fix flows without weakening a check.",
+  "author": { "name": "Hope Atina" },
+  "homepage": "https://github.com/hopeatina/tracegrove",
+  "repository": "https://github.com/hopeatina/tracegrove",
+  "license": "Apache-2.0",
+  "keywords": ["testing", "e2e", "verification", "voice-agents", "mcp"],
+  "mcpServers": {
+    "tracegrove": { "command": "npx", "args": ["-y", "tracegrove", "mcp"] }
+  }
+}

@@ -133,7 +133,7 @@ Environments (local, docker, staging, prod-readonly; see docs/environments.md):
   approve --env <env> [--ttl <min>] [--uses <n>]       a person approves the next agent run(s) where agents: ask
   config get [<path>] | set <path> <value> | patch <json> [--dry-run]
                                                        validated, comment-preserving edits to tracegrove.config.yaml
-  mcp [--max-calls <n>] [--max-test-runs <n>]          MCP stdio server: status, env_list, env_doctor, capabilities, explain, check, test, show_run, heal, draft
+  mcp [--max-calls <n>] [--max-test-runs <n>]          MCP stdio server: status, init, discover, env_list, env_doctor, capabilities, explain, check, test, show_run, heal, draft, readiness, challenge_check; works before init
 
 Readiness and handoff (four states per claim: ran, evidence, still valid, sign-off):
   readiness [--dir <dir>] [--json]                     every flow as a claim: what ran, what the evidence supports, whether it
@@ -383,7 +383,7 @@ async function main(argv: string[]): Promise<number> {
 
     case 'mcp': {
       const { serveMcp } = await import('../mcp/server.ts');
-      await serveMcp({ configPath: findConfig(flag(args, 'config') ?? '.'), ceilings: { ...(flag(args, 'max-calls') ? { maxCalls: Number(flag(args, 'max-calls')) } : {}), ...(flag(args, 'max-test-runs') ? { maxRuns: Number(flag(args, 'max-test-runs')) } : {}) } });
+      await serveMcp({ ...(flag(args, 'config') ? { configPath: findConfig(flag(args, 'config')!) } : { dir: '.' }), ceilings: { ...(flag(args, 'max-calls') ? { maxCalls: Number(flag(args, 'max-calls')) } : {}), ...(flag(args, 'max-test-runs') ? { maxRuns: Number(flag(args, 'max-test-runs')) } : {}) } });
       return 0;
     }
 
