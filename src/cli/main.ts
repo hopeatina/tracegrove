@@ -48,7 +48,10 @@ import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
+import { createInterface } from 'node:readline/promises';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
+import { detectForConfig, detectedNamed, guidedEnvAdd, renderDetected } from './envAdd.ts';
+import { detectedPatch } from '../environments/detect.ts';
 import { heal, undoHeal } from '../authoring/heal.ts';
 import { projectRoot, projectStatus } from '../authoring/status.ts';
 import { runActivity } from '../authoring/activity.ts';
@@ -129,7 +132,10 @@ Environments (local, docker, staging, prod-readonly; see docs/environments.md):
   env list                                             targets, classes, write and agent policy, persona secret references
   env show [<env>]                                     one environment, each persona probed (resolvable/expired/missing), no values
   env doctor [<env>] [--no-whoami]                     reachability, readiness, persona secrets, whoami identity, network, cleanup
-  env add <env> --url <https://…> --persona p=<ref>    validated shortcut that writes environments.<env> (also --class --writes --agents --dry-run)
+  env detect                                           environments this repo's deploy files describe (compose, Fly, Render, Vercel, Netlify, .env.<stage>)
+  env add                                              guided: pick a detected environment, name it, say where persona credentials live
+  env add <env> [--url <https://…|env:VAR>] [--persona p=<ref>]  writes environments.<env>; without --url uses the detected <env>
+                                                       (also --class --writes --agents --dry-run)
   whoami [--env <env>] [--as <persona>]                sign each persona in and show who the deployment thinks it is
   explain [<case>] [--env <env>]                       dry plan: which flows run, as whom, what they write and clean up, what is skipped
   capabilities [--env <env>]                           capability × environment matrix with the reason and fix for each gap
@@ -334,6 +340,33 @@ async function main(argv: string[]): Promise<number> {
         out(args, report, renderDoctor(report, p));
         return report.exitCode;
       }
+      if (sub === 'detect') {
+        const result = detectForConfig(configPath);
+        out(args, result, renderDetected(result));
+        return 0;
+      }
+      if (sub === 'add' && !name && process.stdin.isTTY && !args.flags.json) {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        try {
+          const added = await guidedEnvAdd(configPath, (q) => rl.question(q), (line) => process.stdout.write(`${line}\n`), { dryRun: args.flags['dry-run'] === true });
+          if (!added) return 1;
+          process.stdout.write(`${renderConfigEdit(added.result, p)}${added.result.written ? `\nnext: tracegrove env doctor ${added.name}` : ''}\n`);
+          return 0;
+        } finally { rl.close(); }
+      }
+      if (sub === 'add' && !name) {
+        const result = detectForConfig(configPath);
+        out(args, result, `${renderDetected(result)}\n\nRun env add in a terminal to choose one, or use a command above.`);
+        return 0;
+      }
+      if (sub === 'add' && name && !flag(args, 'url')) {
+        const detected = detectedNamed(configPath, name);
+        if (detected) {
+          const result = configPatch(configPath, detectedPatch(detected), { dryRun: args.flags['dry-run'] === true });
+          out(args, result, `from ${detected.source}: ${detected.why}\n${renderConfigEdit(result, p)}${result.written ? `\nnext: tracegrove env doctor ${name}` : ''}`);
+          return 0;
+        }
+      }
       if (sub === 'add') {
         if (!name) throw new Blocked([{ code: 'missing_argument', detail: 'env add needs a name', owner: 'agent', action: 'tracegrove env add staging --url https://staging.example.com --persona owner=env:OWNER_TOKEN' }]);
         const patch = envAddPatch({ name, url: flag(args, 'url'), personas: (args.flags as { persona?: string[] }).persona ?? [], class: flag(args, 'class'), writes: flag(args, 'writes'), agents: flag(args, 'agents'), health: flag(args, 'health'), whoami: flag(args, 'whoami') });
@@ -341,7 +374,7 @@ async function main(argv: string[]): Promise<number> {
         out(args, result, `${renderConfigEdit(result, p)}${result.written ? `\nnext: tracegrove env doctor ${name}` : ''}`);
         return 0;
       }
-      throw new Blocked([{ code: 'invalid_argument', detail: `env ${sub ?? ''}: use list, show, doctor or add`, owner: 'agent', action: 'tracegrove env list' }]);
+      throw new Blocked([{ code: 'invalid_argument', detail: `env ${sub ?? ''}: use list, show, doctor, detect or add`, owner: 'agent', action: 'tracegrove env list' }]);
     }
 
     case 'whoami': {

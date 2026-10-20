@@ -129,6 +129,7 @@ describe('runs against standalone deployments', () => {
   const procs: ChildProcess[] = [];
   let project = '';
   let fakes = '';
+  let previewOrigin = '';
   const secrets = { owner: 'stg_owner_test_secret_value_1', stranger: 'stg_stranger_test_secret_value_2' };
   const saved = { ...process.env };
 
@@ -167,12 +168,14 @@ describe('runs against standalone deployments', () => {
       '  staging-flaky:', `    target: { url: "${flaky}", health: /health }`, '    whoami: { GET: /me, subject: user.id }', personas.trimEnd(),
       '  staging-broker:', `    target: { url: "${staging}", health: /health }`, '    whoami: { GET: /me, subject: user.id }', `    network: { allow: ["127.0.0.1:${fakesPort}"] }`,
       '    personas:\n      owner: { from: "orgx-broker://staging?role=owner&ttl=600" }\n      stranger: { from: "orgx-broker://staging?role=member&ttl=600" }',
+      '  preview:', '    target: { url: env:TG_PREVIEW_URL, health: /health, release: { field: build, expect: env:TG_PREVIEW_RELEASE } }', '    whoami: { GET: /me, subject: user.id }', personas.trimEnd(),
       '  prod-readonly:', `    target: { url: "${staging}", health: /health }`, '    class: production_observation', '    personas:\n      owner: { from: "env:TG_TEST_OWNER" }', '',
     ].join('\n'));
     for (const flow of ['tenant-isolation', 'read-only']) {
       const path = join(project, 'tracegrove/notes', `${flow}.flow.yaml`);
-      writeFileSync(path, readFileSync(path, 'utf8').replace(/^envs: .*$/m, 'envs: [local, staging, staging-rotated, staging-wrong-release, staging-flaky, staging-broker, prod-readonly]'));
+      writeFileSync(path, readFileSync(path, 'utf8').replace(/^envs: .*$/m, 'envs: [local, staging, staging-rotated, staging-wrong-release, staging-flaky, staging-broker, prod-readonly, preview]'));
     }
+    previewOrigin = staging;
     Object.assign(process.env, { TG_TEST_OWNER: secrets.owner, TG_TEST_STRANGER: secrets.stranger, TRACEGROVE_ORGX_BROKER_URL: fakes, TRACEGROVE_ORGX_TOKEN: 'oxk_grant_for_tests' });
   }, 60_000);
   afterAll(() => { for (const p of procs) p.kill(); process.env = saved; if (project) rmSync(project, { recursive: true, force: true }); });
@@ -206,6 +209,19 @@ describe('runs against standalone deployments', () => {
     expect(report.exitCode).toBe(2);
     expect(JSON.stringify(report)).toMatch(/persona_identity_(mismatch|collision)/);
   }, 60_000);
+
+  it('runs a per-PR preview whose URL and release arrive in environment variables', async () => {
+    delete process.env.TG_PREVIEW_URL;
+    await expect(runTests({ configPath: configPath(), env: 'preview', grep: 'tenant', agent: human })).rejects.toSatisfy((e: unknown) => e instanceof Blocked && e.reasons[0]!.code === 'environment_value_missing');
+    Object.assign(process.env, { TG_PREVIEW_URL: previewOrigin, TG_PREVIEW_RELEASE: '2026.10.19-rc1' });
+    const { report } = await runTests({ configPath: configPath(), env: 'preview', grep: 'tenant', agent: human });
+    expect(report.outcome).toBe('passed');
+    expect(report.environment).toMatchObject({ name: 'preview', class: 'deployed_preview', expectedRelease: '2026.10.19-rc1' });
+    process.env.TG_PREVIEW_RELEASE = 'some-other-sha';
+    const stale = await runTests({ configPath: configPath(), env: 'preview', grep: 'tenant', agent: human });
+    expect(stale.report.exitCode).toBe(2);
+    expect(JSON.stringify(stale.report)).toContain('identity_mismatch');
+  }, 90_000);
 
   it('blocks when the deployment is not the expected release', async () => {
     const { report } = await runTests({ configPath: configPath(), env: 'staging-wrong-release', grep: 'tenant', agent: human });

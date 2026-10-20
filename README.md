@@ -134,7 +134,7 @@ Each flow is a claim with four separate answers: did it run, what the evidence s
 <details>
 <summary><b>Staging, production and secrets</b></summary>
 
-The same flows run against Docker, staging or production. Credentials stay in your secret store; the config only says where they live:
+The same flows run against Docker, staging, per-PR previews or production. `npx tracegrove env add` reads your compose, Fly, Render, Vercel, Netlify and `.env.<stage>` files, proposes environments, and asks only where each credential lives. Credentials stay in your secret store; the config only says where they live:
 
 ```yaml
 environments:
@@ -150,7 +150,7 @@ npx tracegrove env doctor staging   # reachable, secrets resolve, each persona i
 npx tracegrove test --env staging
 ```
 
-On staging, a run whose cleanup can't be confirmed fails. In production, any flow that writes is blocked before it starts. [Environments](docs/environments.md).
+On staging, a run whose cleanup can't be confirmed fails. In production, any flow that writes is blocked before it starts. A preview reads its address at run time (`url: env:PREVIEW_URL`), and the GitHub Action can run it when the preview deploys ([per-PR previews](docs/environments.md#previews)). [Environments](docs/environments.md).
 
 </details>
 

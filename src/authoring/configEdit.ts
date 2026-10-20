@@ -32,7 +32,7 @@ export function parseValue(text: string): unknown {
 }
 
 function validated(file: string, doc: Document, path: string): string {
-  const next = doc.toString({ lineWidth: 0 });
+  const next = doc.toString({ lineWidth: 0, flowCollectionPadding: false });
   const parsed = AuthoringConfig.safeParse(parseYaml(next) ?? {});
   if (!parsed.success) throw new Blocked(parsed.error.issues.slice(0, 8).map(issue => ({ code: 'config_edit_invalid', detail: `${path}: ${issue.path.join('.') || '(root)'}: ${issue.message}`, owner: 'agent', action: `tracegrove config get ${issue.path.slice(0, -1).join('.') || path} to see the current value` })));
   void file;
