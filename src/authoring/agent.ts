@@ -113,6 +113,7 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
   const routes = input.discovery.routes.filter((r) => r.coveredBy.length === 0 || r.changed).slice(0, 40)
     .map((r) => `- ${r.method} ${r.path}  (${r.file}:${r.line}${r.changed ? ', changed on this branch' : ''}${r.coveredBy.length ? `, covered by ${r.coveredBy.join(', ')}` : ', uncovered'})`);
   const example = exampleFlow(input.testDir);
+  const ambiguities = input.discovery.ambiguities.slice(0, 12).map((a) => `- ${a.detail} ${a.ask}`);
   const personas = input.config ? Object.keys(input.config.personas) : [];
   return [
     'You are drafting behaviour tests for tracegrove, a workflow verifier that drives a real running app through HTTP and Chromium.',
@@ -120,6 +121,7 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
     `Discovery (${input.discovery.source}${input.discovery.base ? `, base ${input.discovery.base}` : ''}): ${input.discovery.routes.length} routes, ${input.discovery.uncovered} uncovered.`,
     input.discovery.changedFiles.length ? `Files changed on this branch: ${input.discovery.changedFiles.slice(0, 30).join(', ')}` : '',
     'Routes worth a flow:', ...(routes.length ? routes : ['- (none uncovered; strengthen existing flows only if the intent asks)']),
+    ...(ambiguities.length ? ['', 'Where discovery is unsure (resolve these by reading the code; tracegrove confirms your answer by running the flows you write and recording which routes the app actually served):', ...ambiguities] : []),
     '',
     'Rules:',
     `1. Write new flows only under ${outDir}/ as <area>/<behavior>.flow.yaml (kebab-case, one behaviour per file). Never edit application code or existing flows outside ${outDir}/.`,
@@ -128,10 +130,26 @@ export function buildDraftPrompt(input: { root: string; testDir: string; discove
     '3b. Browser flows must declare browser: { allowPaths: [/page, /assets, /api], allowMethods: [GET, HEAD] }. Browser steps use browser: { kind: navigate, path: /page }, browser: { kind: click, target: { by: role, role: button, name: Submit } }, browser: { kind: fill, target: { by: label, name: Note }, value: text }, or browser: { kind: read, target: { by: testId, name: result } } with expect: { text: exact text }. Navigation may expect: { status: 200 }. Read polls until its text holds. Browser steps use the default persona and require a recording. Do not invent scripts, selectors, other browser commands, or job/MCP/native steps. Keep independent API readback where possible.',
     personas.length ? `4. Personas available: ${personas.join(', ')}, plus "none" for an unauthenticated caller.` : '4. Use as: none for unauthenticated calls.',
     `5. JSON Schemas: ${join(schemaDir(), 'tracegrove_flow_v1.json')} (flows) and ${join(schemaDir(), 'tracegrove_config_v1.json')} (config).`,
-    `6. After writing, run \`${tg} check --json\` and fix every reported issue until it reports ok. Do not run tests against the app.`,
+    `6. After writing, run \`${tg} check --json\` and fix every reported issue until it reports ok. Do not run \`test\` yourself: when you finish, tracegrove runs every flow you wrote end to end against the real app and sends you back any failure.`,
     '7. Finish with one line per file you wrote: path, then what behaviour it pins down.',
     example ? `\nAn existing flow in this repo, for conventions:\n${example}` : '',
   ].filter((line) => line !== '').join('\n');
+}
+
+export type ProveFailure = { file: string; caseId: string; step: string; message: string; observed: string | null };
+
+/** A follow-up turn after tracegrove ran the agent's flows: what failed, and the rule for drift versus bugs. */
+export function buildRepairPrompt(input: { failures: ProveFailure[]; round: number; rounds: number; tracegrove?: string[] }): string {
+  const tg = (input.tracegrove ?? tracegroveCommand()).join(' ');
+  return [
+    `tracegrove ran the flows you wrote against the real app (repair round ${input.round} of ${input.rounds}). These failed:`,
+    ...input.failures.slice(0, 20).map((f) => `- ${f.file} (${f.caseId}), step "${f.step}": ${f.message}${f.observed ? `\n  observed: ${f.observed.slice(0, 600)}` : ''}`),
+    '',
+    'For each failure, read the handler for that route before changing anything:',
+    '- If the code shows your expectation was wrong (wrong body, status, path or persona), fix the flow.',
+    '- If the code shows the app is wrong, leave that flow unchanged and say "product bug:" with the file and what the app does wrong. Never weaken an assertion to match behaviour the code says is a bug.',
+    `Edit only the flow files listed above, run \`${tg} check --json\` until it reports ok, and finish with one line per file: path, then "fixed", "product bug" or "unchanged" and why.`,
+  ].join('\n');
 }
 
 export type AgentRunResult = { provider: AgentProvider; model: string | null; modelFallback?: { from: string | null; to: string }; exitCode: number; files: string[]; output: string; command: string[] };

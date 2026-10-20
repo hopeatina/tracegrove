@@ -148,7 +148,7 @@ ${SOURCE_CONTROLS_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;
  // Saved observations belong to their recorded steps, never today's flow or array position.
- if(run)return(run.cases||[]).map(c=>({id:c.caseId,title:c.title,file:c.file,reportedFile:c.reportedFile,reportedTitle:c.reportedTitle,fixtures:[],state:kind(c.outcome),ms:c.durationMs,failure:c.failure,
+ if(run)return(run.cases||[]).map(c=>({id:c.caseId,title:c.title,file:c.file,reportedFile:c.reportedFile,reportedTitle:c.reportedTitle,fixtures:[],state:kind(c.outcome),ms:c.durationMs,failure:c.failure,requests:c.requests||[],
   steps:c.steps.map(r=>({id:r.id,name:r.name,reportedName:r.reportedName,method:r.method,path:r.path,as:null,expect:null,expectation:'Recorded checks',result:kind(r.result),status:r.status,observedText:r.observedText,ms:r.durationMs,reason:r.reason}))}));
  const live=state.flows.map(f=>({id:f.caseId,title:f.title,file:f.file,fixtures:f.fixtures,state:'none',ms:null,failure:null,
   steps:f.steps.map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:'none',status:null,observedText:null,ms:null,reason:null}))}));
@@ -164,7 +164,7 @@ function ribbon(p,w0,w1){const c=cr(p),L=[],R=[];for(let i=0;i<c.length;i++){con
  const w=(w0+(w1-w0)*Math.pow(i/(c.length-1),.8))/2;L.push([c[i][0]-dy*w,c[i][1]+dx*w]);R.push([c[i][0]+dy*w,c[i][1]-dx*w])}
  const f=q=>q[0].toFixed(1)+' '+q[1].toFixed(1);return 'M'+L.map(f).join(' L')+' L'+R.reverse().map(f).join(' L')+' Z'}
 const line=p=>'M'+cr(p).map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' L');
-const resource=p=>(p||'').split('?')[0].replace(/\{[^}]*\}/g,'·')||'/';
+const resource=p=>(p||'').split('?')[0].split('/').map(g=>/^\{[^}]*\}$/.test(g)||/^\d+$/.test(g)||/^[0-9a-f-]{12,}$/i.test(g)||(/^[A-Za-z0-9_-]{16,}$/.test(g)&&/\d/.test(g))?'·':g).join('/')||'/';
 function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg=sv('svg',{viewBox:'0 0 '+W+' 300',class:'grove'+(ui.sel?' focus':''),role:'img','aria-label':n+' scenarios as a grove: one pad per scenario, one leaf per step'});
  const wood=sv('g'),roots=sv('g'),pads=sv('g'),labels=sv('g');svg.append(sv('line',{class:'soil',x1:24,x2:W-24,y1:SOIL,y2:SOIL}),roots,wood,pads,labels);
  const top=[CX+4,128];wood.append(sv('path',{class:'wood',d:ribbon([[CX,SOIL+2],[CX-10,178],[CX+10,152],top],13,6)}));
@@ -181,7 +181,10 @@ function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg
   const box=y=>({x0:px-half,x1:px+half,y0:y-11,y1:y+3}),hit=b=>placed.some(q=>b.x0<q.x1&&q.x0<b.x1&&b.y0<q.y1&&q.y0<b.y1);
   let ly=py-(rows-1)*gap*.86-r-8;if(hit(box(ly)))ly=py+r+15;placed.push(box(ly));minY=Math.min(minY,ly-12);
   labels.append(sv('text',{x:px.toFixed(1),y:ly.toFixed(1),'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},text))});
- const res=new Map();for(const c of sc)for(const x of c.steps){if(!x.path||!x.path.startsWith('/')||['UI','JOB','MCP'].includes(x.method))continue;const k=resource(x.path);const v=res.get(k)||{fail:false,pass:false};if(x.result==='fail')v.fail=true;if(x.result==='pass')v.pass=true;res.set(k,v)}
+ // Roots are what the app served during the run (recorded by the proxy, including a page's own fetches); a scenario without a run falls back to the paths its steps declare.
+ const res=new Map();const touch=(k,result)=>{const v=res.get(k)||{fail:false,pass:false};if(result==='fail')v.fail=true;if(result==='pass')v.pass=true;res.set(k,v)};
+ for(const c of sc){if(c.requests&&c.requests.length){const by=new Map(c.steps.map(x=>[x.id,x.result]));for(const q of c.requests)if(q.step)touch(resource(q.path),by.get(q.step)||'none');continue}
+  for(const x of c.steps){if(!x.path||!x.path.startsWith('/')||['UI','JOB','MCP'].includes(x.method))continue;touch(resource(x.path),x.result)}}
  const keys=[...res.keys()].slice(0,8);keys.forEach((k,i)=>{const m=keys.length;const a=m===1?Math.PI/2:0.3+(Math.PI-0.6)*(m-1-i)/(m-1);const tx=CX+Math.cos(a)*Math.min(270,80+60*m),ty=SOIL+18+Math.sin(a)*56;const v=res.get(k);
   roots.append(sv('path',{class:'root',d:line([[CX,SOIL+1],[(CX+tx)/2,SOIL+10+Math.sin(a)*20],[tx,ty]]),'stroke-width':1.6}),sv('circle',{class:'tip '+(v.fail?'fail':v.pass?'':'none'),cx:tx.toFixed(1),cy:ty.toFixed(1),r:3.6}),
    sv('text',{x:tx.toFixed(1),y:(ty+16+(i%2)*12).toFixed(1),'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
@@ -191,7 +194,7 @@ function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg
 // Step ids are the slug of the authored name; a saved name with the same slug is the same step, not a rename.
 const slug=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 const sameName=x=>!!x.reportedName&&slug(x.reportedName)===x.name;
-function legend(){const it=(cls,t)=>h('span',{},h('i',{style:cls}),t);return h('div',{class:'legend'},it('background:var(--moss)','held'),it('background:var(--verm)','failed'),it('background:var(--ochre)','blocked'),it('border:1px dashed var(--twig)','not run or pruned'),it('background:var(--gold)','resource read back'))}
+function legend(){const it=(cls,t)=>h('span',{},h('i',{style:cls}),t);return h('div',{class:'legend'},it('background:var(--moss)','held'),it('background:var(--verm)','failed'),it('background:var(--ochre)','blocked'),it('border:1px dashed var(--twig)','not run or pruned'),it('background:var(--gold)','route the app served'))}
 function inputChip(){const src=state.verificationSource;const b=src.binding;
  return h('button',{class:'kpi chip',title:src.status==='blocked'?'Blocked — review selection':sourceDescription(b),on:{click:()=>{tab='Settings';render()}}},
   h('b',{style:'font-size:14px'},src.status==='blocked'?'blocked':!b?'unknown':b.kind==='working_tree'?'working tree':'snapshot '+String(b.commit).slice(0,8)),h('span',{},'next run input · change'))}
@@ -292,35 +295,51 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
  const intent=h('section',{class:'card','aria-label':'Intent'},h('span',{class:'label'},'Intent'),h('h1',{style:'margin:6px 0 14px;font-size:26px;line-height:32px;max-width:none'},'What should be true after this change?'),
   h('textarea',{id:'intent',placeholder:'After Alice revokes a share, Bob can no longer read the note.','aria-label':'Intent'},ui.intent||''),
   h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn','aria-describedby':'agent-readiness',disabled:!available||ui.agentPhase>=0,on:{click:agentDraft}},name?'Draft with '+name:'Draft'),
-   h('span',{id:'agent-readiness',class:'small muted',style:'flex:1;min-width:220px'},name?(available?name+' ('+(a.model||'CLI default')+') writes flows into tracegrove/discovered/; tracegrove checks them before you see them.':name+' is not installed. Executable detection does not establish sign-in.'):'No agent selected: route templates still work.'),
+   h('span',{id:'agent-readiness',class:'small muted',style:'flex:1;min-width:220px'},name?(available?name+' ('+(a.model||'CLI default')+') writes flows into tracegrove/discovered/; tracegrove runs each one end to end before you see it.':name+' is not installed. Executable detection does not establish sign-in.'):'No agent selected: route templates still work.'),
    h('button',{class:'btn ghost sm',on:{click:()=>{tab='Settings';render()}}},'Settings')),
-  ui.agentPhase>=0?h('div',{class:'fade'},h('p',{class:'row small muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),name+' is working; tracegrove checks every file it writes'),
+  ui.agentPhase>=0?h('div',{class:'fade'},h('p',{class:'row small muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),name+' is working; tracegrove runs every file it writes'),
    h('div',{class:'log',id:'agent-log','aria-live':'polite'},(ui.live&&ui.live.agent.task==='draft'&&ui.live.agent.lines.length?ui.live.agent.lines:['Waiting for the agent to start']).map(x=>h('div',{},x)))):null,
   ui.agent?agentResult():null);
- const reach=h('section',{style:'margin-top:28px'},h('div',{class:'rulehead'},h('span',{class:'label'},'Static routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted','data-testid':'route-summary'},d.routes.length+' recognized · '+d.uncovered+' without a flow'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
+ const seen=d?d.routes.filter(r=>r.observedBy.length).length:0;
+ const reach=h('section',{style:'margin-top:28px'},d&&d.ambiguities.length?unsure(d,available,name):null,
+  h('div',{class:'rulehead'},h('span',{class:'label'},'Routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted','data-testid':'route-summary'},d.routes.length+' recognized · '+seen+' served in a run · '+d.uncovered+' untested'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
+  d?h('p',{class:'small muted','data-testid':'observed-source',style:'margin:-4px 0 12px'},d.observed?('Served means the app answered that route during the verified run '+d.observed.run+(d.observed.stale?', before the latest source change. Run again to refresh.':'.')):'No verified run yet, so no route is confirmed by traffic. Run all to confirm them.'):null,
   h('div',{class:'row',style:'margin-bottom:12px'},chips,g.isRepo?null:h('span',{class:'small muted'},'Not a git repo, so only the working tree.')),
   !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?h('div',{},d.routes.map(r=>routeRow(r))):
    h('div',{class:'empty'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},'No routes recognized here.'),h('div',{class:'small'},'Describe the behavior above and the agent drafts flows from the code instead.'))),
-  h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Partial static inventory for FastAPI, Django, Express and plain node:http handlers. Other routes may be missing; this is not execution coverage.'),
-   h('p',{},'Other routing styles, including Next.js, are not scanned.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
+  h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Two sources. The static scan reads FastAPI, Django, Express and plain node:http handlers from source text, which is a hint. The recording proxy in front of the app sees every request a run causes, including the ones a browser page makes, which is evidence.'),
+   h('p',{},'Routes seen only in traffic have no source location yet. Routing the scan cannot read is listed above as a question for the agent.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
   ui.draft?draftCard():null);
  return[intent,reach]}
-function routeRow(r){const covered=r.coveredBy.length>0;return h('div',{class:'route fade'},h('span',{class:'dot s '+(covered?'pass':'fail'),'aria-hidden':'true'}),
- h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,h('div',{class:'small '+(covered?'muted':'c-fail')},covered?r.coveredBy.join(', '):'no matching flow')),
- h('span',{class:'where mono small muted',style:'overflow-wrap:anywhere'},r.file+':'+r.line),covered?h('span'):h('button',{class:'btn ghost sm',on:{click:()=>draftOne(r)}},'Draft'))}
+function routeRow(r){const served=r.observedBy.length>0,declared=r.coveredBy.length>0,covered=served||declared;
+ const note=served?'served during '+r.observedBy.join(', '):declared?'declared by '+r.coveredBy.join(', ')+', not seen in a verified run yet':'no flow reaches it';
+ return h('div',{class:'route fade','data-testid':'route'},h('span',{class:'dot s '+(served?'pass':declared?'warn':'fail'),'aria-hidden':'true'}),
+ h('span',{style:'min-width:0'},h('span',{class:'mono small'},r.method+' '+r.path),r.changed?h('span',{class:'pill p-warn',style:'margin-left:8px'},'changed'):null,r.provenance==='traffic'?h('span',{class:'pill p-info',style:'margin-left:8px'},'traffic only'):null,h('div',{class:'small '+(covered?'muted':'c-fail')},note)),
+ h('span',{class:'where mono small muted',style:'overflow-wrap:anywhere'},r.file?r.file+':'+r.line:'not in scanned source'),covered||r.method==='ANY'?h('span'):h('button',{class:'btn ghost sm',on:{click:()=>draftOne(r)}},'Draft'))}
+/* Where discovery is unsure: each item is a question the agent answers with flows, and the run proves the answer. */
+function unsure(d,available,name){const items=d.ambiguities;
+ return h('section',{class:'card fade',style:'margin-bottom:24px','aria-label':'Needs a decision','data-testid':'ambiguities'},h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'label'},'Needs a decision'),h('span',{class:'small muted'},items.length+' place'+(items.length===1?'':'s')+' discovery cannot read')),
+  h('div',{style:'margin-top:8px'},items.slice(0,8).map(a=>h('div',{class:'row',style:'justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)'},
+   h('span',{style:'min-width:0;flex:1'},h('span',{class:'pill '+(a.kind==='unlisted_traffic'?'p-info':'p-warn')},a.kind==='unlisted_traffic'?'seen, not found':'unreadable'),h('span',{class:'small',style:'margin-left:8px'},a.detail)),
+   h('button',{class:'btn ghost sm',disabled:!available||ui.agentPhase>=0,title:available?a.ask:'Choose an agent in Settings',on:{click:()=>{ui.intent=a.ask;agentDraft()}}},name?'Ask '+name:'Ask agent')))),
+  items.length>8?h('p',{class:'small muted',style:'margin:8px 0 0'},'+'+(items.length-8)+' more; Draft with '+(name||'the agent')+' resolves all of them.'):null,
+  h('p',{class:'small muted',style:'margin:10px 0 0'},'The agent reads the code and writes flows; tracegrove runs them and keeps only what the app actually served.'))}
 function draftCard(){const d=ui.draft;return h('div',{class:'card fade',style:'margin-top:16px'},h('span',{class:'label'},'Draft'),h('h2',{class:'mono',style:'font-size:14px;margin:6px 0 12px'},'discovered/'+d.file),h('pre',{},d.yaml),
  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',on:{click:async()=>{try{const s=await api('/api/draft',{method:d.route.method,path:d.route.path,save:true});ui.draft=null;toast('Saved '+s.saved.split('/').slice(-3).join('/')+'. Fill the TODOs.');await load();scan()}catch(e){toast(e.error||'Could not save')}}}},'Plant it'),h('button',{class:'btn ghost',on:{click:()=>{ui.draft=null;render()}}},'Discard')))}
 async function draftOne(r){try{const d=await api('/api/draft',{method:r.method,path:r.path});ui.draft={...d,route:r};render()}catch(e){toast(e.error||'Could not draft')}}
 async function scan(){ui.scanning=true;ui.disc=null;ui.draft=null;render();try{ui.disc=await api('/api/discover?branch='+encodeURIComponent(ui.source||''))}catch(e){ui.scanning=false;page(blocked(e));return}ui.scanning=false;if(tab==='Discover')render()}
 async function agentDraft(){const box=document.getElementById('intent');if(box)ui.intent=box.value;ui.agent=null;ui.agentPhase=0;ui.live=null;render();watchRun();
  try{ui.agent=await api('/api/agent-draft',{intent:ui.intent||'',branch:ui.source})}catch(e){ui.agent={error:e}}finally{ui.agentPhase=-1;stopRunWatch()}await load();if(ui.disc)scan();
- if(ui.agent&&ui.agent.agent)toast(ui.agent.agent.files.length+' flow file(s) drafted'+(ui.agent.check.ok?' and checked':'; check found issues'))}
-function agentResult(){const r=ui.agent;if(r.error)return h('div',{style:'margin-top:16px'},blocked(r.error));const c=r.check;const ok=c.ok&&r.agent.exitCode===0;
- return h('div',{class:'fade',style:'margin-top:16px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(ok?'p-pass':'p-fail')},ok?'checked':'needs fixes'),h('span',{class:'small muted'},r.agent.files.length+' flow file(s) from '+r.agent.provider+(r.agent.model?' · '+r.agent.model:''))),
-  r.agent.files.length?h('div',{style:'margin-top:8px'},r.agent.files.map(f=>h('div',{class:'row',style:'justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)'},h('span',{class:'mono small',style:'overflow-wrap:anywhere'},f),h('button',{class:'btn ghost sm',on:{click:()=>prune(f,false)}},'Prune')))):null,
+ if(ui.agent&&ui.agent.agent){const p=ui.agent.prove;const n=p?p.flows.filter(f=>f.outcome==='proven').length:0;toast(ui.agent.agent.files.length+' flow file(s) drafted'+(p&&p.flows.length?'; '+n+' proven end to end':ui.agent.check.ok?' and checked':'; check found issues'))}}
+const PROVE={proven:['proven','p-pass'],failed:['failed','p-fail'],product_bug:['product bug','p-fail'],not_run:['not run','p-none']};
+function agentResult(){const r=ui.agent;if(r.error)return h('div',{style:'margin-top:16px'},blocked(r.error));const c=r.check;const p=r.prove;const byFile=new Map((p?p.flows:[]).map(f=>[f.file,f]));const ok=c.ok&&r.agent.exitCode===0&&(!p||p.flows.every(f=>f.outcome==='proven'));
+ return h('div',{class:'fade',style:'margin-top:16px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(ok?'p-pass':'p-fail')},ok?(p?'proven':'checked'):'needs fixes'),h('span',{class:'small muted'},r.agent.files.length+' flow file(s) from '+r.agent.provider+(r.agent.model?' · '+r.agent.model:'')+(p&&p.rounds?' · '+p.rounds+' repair round'+(p.rounds===1?'':'s'):''))),
+  r.agent.files.length?h('div',{style:'margin-top:8px','data-testid':'draft-files'},r.agent.files.map(f=>{const pf=byFile.get(f);const k=pf?PROVE[pf.outcome]:null;return h('div',{style:'padding:6px 0;border-bottom:1px solid var(--line)'},h('div',{class:'row',style:'justify-content:space-between'},
+   h('span',{class:'row',style:'gap:8px;min-width:0'},k?h('span',{class:'pill '+k[1]},k[0]):null,h('span',{class:'mono small',style:'overflow-wrap:anywhere'},f)),h('button',{class:'btn ghost sm',on:{click:()=>prune(f,false)}},'Prune')),
+   pf&&pf.served.length?h('div',{class:'small muted'},'served '+pf.served.join(', ')):null,pf&&pf.detail?h('div',{class:'small c-fail'},pf.detail):null)})):null,
   c.ok?null:c.issues.map(x=>h('p',{class:'small'},h('span',{class:'c-fail'},x.detail),h('br'),h('span',{class:'muted'},'Fix: '+x.action))),
   r.agent.output?h('details',{style:'margin-top:8px'},h('summary',{class:'small muted'},'What the agent said'),h('pre',{style:'margin-top:8px'},r.agent.output)):null,
-  ok&&r.agent.files.length?h('button',{class:'btn',style:'margin-top:12px',disabled:!!ui.running,on:{click:()=>{tab='Run';ui.sel=null;render();runNow('discovered')}}},'Run the new scenarios'):null)}
+  ok&&r.agent.files.length?h('button',{class:'btn',style:'margin-top:12px',disabled:!!ui.running,on:{click:()=>{tab='Run';ui.sel=null;render();runNow('discovered')}}},p?'See them in the grove':'Run the new scenarios'):null)}
 
 /* ---------- History: one case or the whole set ---------- */
 function historyTab(){const runs=state.runs.slice(0,24);if(!runs.length)return[h('div',{class:'card'},h('h2',{},'No runs yet'),h('p',{class:'muted'},'Every run is kept under .tracegrove/runs/ with its evidence bundle.'))];

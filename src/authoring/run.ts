@@ -14,6 +14,7 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
+import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import type { RunVideo } from './schema.ts';
 import { STATE_DIR, compileProject, type CompileOptions, type CompileResult, type CompiledFlowInfo } from './compile.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
@@ -21,8 +22,10 @@ import type { VerificationSourceBinding } from './sourceSelection.ts';
 export type StepReport = { id: string; name: string; method: string; path: string; result: string; status: number | null; durationMs: number | null; reason: string | null; observedText?: string | null };
 export type CaseReport = {
   caseId: string; file: string; title: string; outcome: string; durationMs: number;
-  steps: StepReport[]; failure: { step: string; message: string; observed: string | null } | null;
+  steps: StepReport[]; failure: { step: string; message: string; observed: string | null; code?: string | undefined } | null;
   videos?: RunVideo[];
+  /** What the app served during this case, from the sealed proxy events. */
+  requests?: ObservedRequest[];
 };
 export type TestRunReport = {
   schemaVersion: 'tracegrove.run-summary/v1';
@@ -202,9 +205,10 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
     const report = caseReport(r, flowsById.get(r.caseRef.id));
     // A host that never started explains every not_run step; surface its sealed message.
     const events = join(runDir, 'bundle', 'cells', r.selectionCellId, 'events.jsonl');
+    if (bundleVerified && existsSync(events)) report.requests = verifiedObservedRequests(r, readFileSync(events));
     if (report.outcome !== 'passed' && existsSync(events)) {
-      const hostFailed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; redactedPayload: { error?: string } }).find((e) => e.kind === 'host.failed');
-      if (hostFailed) report.failure = { step: '(app startup)', message: hostFailed.redactedPayload.error ?? 'host failed', observed: null };
+      const hostFailed = readFileSync(events, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as { kind: string; redactedPayload: { error?: string; code?: string } }).find((e) => e.kind === 'host.failed');
+      if (hostFailed) report.failure = { step: '(app startup)', message: hostFailed.redactedPayload.error ?? 'host failed', observed: null, code: hostFailed.redactedPayload.code ?? 'infrastructure' };
     }
     return report;
   });

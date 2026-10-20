@@ -223,9 +223,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
+    // Every request the app served, attributed to the step that was running when it arrived.
+    session.traffic?.subscribe(({ stepId, ...request }) => { log.emit('app.request', stepId, { ...request, phase: stepId ? 'step' : 'setup' }); });
   } catch (error) {
     if (error instanceof Blocked) blockedReasons.push(...error.reasons.map((r) => r.code));
-    else { infrastructureFailure = true; log.emit('host.failed', null, { error: String((error as Error).message) }); }
+    else { infrastructureFailure = true; log.emit('host.failed', null, { error: String((error as Error).message), code: error instanceof InfrastructureFailure ? error.code : 'infrastructure' }); }
   }
 
   // Host capability check: required capabilities need a probed, supported, current observation.
@@ -378,6 +380,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     }
     const stepStart = nowIso();
     const stepStartedMs = monotonicMs();
+    session?.traffic?.setStep(stepId);
     const startEvent = log.emit('step.started', stepId, { kind: step.kind, variables: Object.fromEntries(Object.entries(variables).filter(([k]) => step.inputs[k]?.kind !== 'credential')) });
     const deadline = cellDeadline.child(step.timeoutMs);
     try {
@@ -439,6 +442,9 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       halted = true;
     }
   }
+
+  session?.traffic?.setStep(null);
+  if (session?.traffic) log.emit('app.traffic', null, session.traffic.seal());
 
   // ---- collecting: boundary observations ----
   const boundaryObservations: BoundaryObservation[] = fidelityCell.boundaries.map((rule) => {

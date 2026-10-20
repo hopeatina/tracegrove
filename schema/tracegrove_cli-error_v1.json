@@ -21,6 +21,7 @@
             "settings",
             "sample-config",
             "validate",
+            "setup",
             "doctor",
             "plan",
             "seed",

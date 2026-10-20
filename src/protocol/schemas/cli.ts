@@ -14,7 +14,7 @@ const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
   command: z.enum(['help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft',
-    'settings', 'sample-config', 'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
+    'settings', 'sample-config', 'validate', 'setup', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases',
     'rerun', 'inspect', 'export', 'verify-bundle', 'result-ingest', 'results', 'awr-prepare', 'awr-inspect', 'awr-deliver',
     'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve', 'recovery-status',
     'source-materialize', 'schema']).nullable(),

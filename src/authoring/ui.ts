@@ -230,10 +230,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const operation = begin('draft');
         agentStart('draft');
         try {
-          const job = draftWithAgent({ dir, signal: operation.controller.signal, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, onActivity: agentSay });
+          const job = draftWithAgent({ dir, signal: operation.controller.signal, branch: typeof body.branch === 'string' && body.branch ? body.branch : null, intent: typeof body.intent === 'string' && body.intent.trim() ? body.intent.trim().slice(0, 2000) : null, prove: body.prove !== false, onActivity: agentSay, onProve: (line: string) => agentSay(`tracegrove · ${line}`) });
           running = job;
           const result = await job;
-          live.agent.status = result.agent.exitCode === 0 ? 'finished' : 'failed';
+          live.agent.status = result.agent.exitCode === 0 && (result.prove?.flows.every((f) => f.outcome === 'proven') ?? true) ? 'finished' : 'failed';
           return send(200, result);
         } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
         finally { drafting = false; if (active === operation) { running = null; active = null; } }

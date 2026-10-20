@@ -1,19 +1,49 @@
 /**
  * Discovery: find HTTP routes in a folder (or at a git branch) and match them against flows.
- * Heuristic static scan for FastAPI, Django, Express-style routers and plain node:http dispatch; it proposes what to test
- * and drafts flow skeletons. It is not evidence and never runs the app.
+ * Two sources, each labeled: a static scan of source text (FastAPI, Django, Express-style routers,
+ * plain node:http dispatch), which is a hint, and the requests the app actually served in the last
+ * verified run, which is evidence. Where the scan can see routing it cannot read, it says so as an
+ * ambiguity a person or a coding agent can resolve.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Blocked } from '../core/errors.ts';
 import { globToRegExp } from './sources.ts';
+import { matchesTemplate, type ObservedRequest } from './traffic.ts';
 
 export type Route = { method: string; path: string; file: string; line: number; framework: 'fastapi' | 'django' | 'express' | 'node' };
 export type FlowRef = { caseId: string; method: string; path: string };
-export type CoveredRoute = Route & { coveredBy: string[]; changed: boolean };
+/** static: read from source text (a hint). traffic: only seen in requests the app served (evidence, no source location). */
+export type RouteProvenance = 'static' | 'traffic';
+export type CoveredRoute = Omit<Route, 'framework' | 'file' | 'line'> & {
+  framework: Route['framework'] | 'observed'; file: string | null; line: number | null; provenance: RouteProvenance;
+  /** flows whose steps declare this route */
+  coveredBy: string[];
+  /** scenarios whose requests reached this route in the last verified run */
+  observedBy: string[];
+  changed: boolean;
+};
+export type Ambiguity = {
+  id: string;
+  kind: 'unreadable_routing' | 'unlisted_traffic';
+  file: string | null; line: number | null;
+  /** what tracegrove saw, in a sentence */
+  detail: string;
+  /** the question a coding agent is asked to answer, with evidence tracegrove can then check */
+  ask: string;
+};
+export type ObservedRun = { run: string; stale: boolean; cases: Array<{ caseId: string; requests: ObservedRequest[] }> };
 export type GitInfo = { isRepo: boolean; current: string | null; base: string | null; branches: string[] };
-export type Discovery = { source: string; branch: string | null; base: string | null; files: number; changedFiles: string[]; routes: CoveredRoute[]; uncovered: number };
+export type Discovery = {
+  source: string; branch: string | null; base: string | null; files: number; changedFiles: string[];
+  routes: CoveredRoute[];
+  /** routes with neither a declaring flow nor an observed request */
+  uncovered: number;
+  /** the verified run the observed coverage comes from, if any */
+  observed: { run: string; stale: boolean; requests: number } | null;
+  ambiguities: Ambiguity[];
+};
 
 const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '__pycache__', '.tracegrove', 'dist', 'build', '.next', 'coverage', 'migrations']);
 const EXT = /\.(py|js|mjs|cjs|ts|mts|jsx|tsx)$/;
@@ -70,7 +100,15 @@ function normalizePath(path: string): string {
   return withSlash.replace(/<(?:\w+:)?(\w+)>/g, '{$1}').replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, '{$1}').replace(/\/+$/, '') || '/';
 }
 
-export function scanSource(file: string, text: string): Route[] {
+/** Blank out comments (keeping offsets and newlines) so prose about routes is not read as routes. */
+export function maskComments(file: string, text: string): string {
+  const blank = (m: string) => m.replace(/[^\n]/g, ' ');
+  if (file.endsWith('.py')) return text.replace(/(^|[ \t])#[^\n]*/gm, (m, lead: string) => lead + blank(m.slice(lead.length)));
+  return text.replace(/\/\*[\s\S]*?\*\/|(^|[ \t;{}(),])\/\/[^\n]*/gm, (m, lead: string | undefined) => (lead ?? '') + blank(m.slice((lead ?? '').length)));
+}
+
+export function scanSource(file: string, source: string): Route[] {
+  const text = maskComments(file, source);
   const routes: Route[] = [];
   const lineOf = (index: number) => text.slice(0, index).split('\n').length;
   if (file.endsWith('.py')) {
@@ -92,9 +130,44 @@ export function scanSource(file: string, text: string): Route[] {
   return routes.filter((r) => !r.path.includes('${'));
 }
 
+/**
+ * Routing the static scan sees but cannot read. Each one is reported, never silently skipped, so
+ * Discover's counts say what they leave out.
+ */
+const BLIND_SPOTS: Array<{ test: RegExp; what: string; py?: boolean }> = [
+  { test: /\b\w+\.use\(\s*["'`]\/[^"'`]*["'`]\s*,/, what: 'a router mounted under a path prefix' },
+  { test: /\.route\(\s*["'`]/, what: 'chained .route() handlers' },
+  { test: /\bexpress\.Router\(|\bRouter\(\)/, what: 'a separately declared router' },
+  { test: /@(?:Controller|Get|Post|Put|Patch|Delete)\(/, what: 'decorator routes (NestJS style)' },
+  { test: /\bpathname\.match\(|switch\s*\(\s*\w+\.pathname\s*\)|\.exec\(\s*\w+\.pathname\s*\)/, what: 'pattern-matched node:http paths' },
+  { test: /\bexport\s+(?:async\s+)?function\s+(?:GET|POST|PUT|PATCH|DELETE)\b/, what: 'file-based route handlers (Next.js style)' },
+  { test: /APIRouter\([^)]*prefix\s*=/, what: 'an APIRouter with a prefix', py: true },
+  { test: /\binclude_router\(|\binclude\(\s*["']/, what: 'included routers or URL modules', py: true },
+  { test: /@\w+\.(?:route|api_route|websocket)\(/, what: '.route()/api_route decorators', py: true },
+  { test: /\bre_path\(|\.register\(\s*r?["']/, what: 'regex URL patterns or DRF routers', py: true },
+];
+
+export function blindSpots(file: string, source: string): Array<{ line: number; what: string }> {
+  const text = maskComments(file, source);
+  const py = file.endsWith('.py');
+  const found: Array<{ line: number; what: string }> = [];
+  for (const spot of BLIND_SPOTS) {
+    if (Boolean(spot.py) !== py) continue;
+    const m = spot.test.exec(text);
+    if (m) found.push({ line: text.slice(0, m.index).split('\n').length, what: spot.what });
+  }
+  return found;
+}
+
+/** Collapse id-like segments of an observed path so repeated requests group as one route. */
+export function templateOfObserved(path: string): string {
+  return normalizePath(path).split('/').map((seg) =>
+    /^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) || /^[0-9a-f]{12,}$/i.test(seg) || (/^[A-Za-z0-9_-]{16,}$/.test(seg) && /\d/.test(seg)) ? '{id}' : seg).join('/') || '/';
+}
+
 const shape = (path: string) => normalizePath(path).replace(/\{[^}]*\}/g, '{}');
 
-export function discover(dir: string, flows: FlowRef[], branch: string | null, globs?: string[]): Discovery {
+export function discover(dir: string, flows: FlowRef[], branch: string | null, globs?: string[], observed?: ObservedRun | null): Discovery {
   const info = gitInfo(dir);
   const ref = branch ? safeRef(branch) : null;
   if (ref && !info.isRepo) throw new Blocked([{ code: 'not_a_git_repo', detail: dir, owner: 'operator', action: 'drop --branch, or point at a git checkout' }]);
@@ -105,23 +178,53 @@ export function discover(dir: string, flows: FlowRef[], branch: string | null, g
   }
   const changed = new Set(changedFiles);
   const routes: CoveredRoute[] = [];
+  const ambiguities: Ambiguity[] = [];
   const seen = new Set<string>();
   const patterns = globs?.map(globToRegExp);
+  const requests = (observed?.cases ?? []).flatMap((c) => c.requests.filter((r) => r.status !== null).map((r) => ({ ...r, caseId: c.caseId })));
+  const observedBy = (method: string, path: string) => [...new Set(requests.filter((r) => (method === 'ANY' || r.method === method) && matchesTemplate(path, r.path)).map((r) => r.caseId))];
   for (const file of source.files) {
     if (patterns && !patterns.some((pattern) => pattern.test(file))) continue;
     let text: string;
     try { text = source.read(file); } catch { continue; }
-    if (!/(get|post|put|patch|delete|path)\(|pathname/.test(text)) continue;
+    if (!/(get|post|put|patch|delete|path|route|use|register|include)\(|pathname|@(?:Controller|Get|Post)|function\s+(?:GET|POST)/.test(text)) continue;
+    for (const spot of blindSpots(file, text)) {
+      ambiguities.push({ id: `unreadable:${file}:${spot.line}`, kind: 'unreadable_routing', file, line: spot.line,
+        detail: `${file}:${spot.line} uses ${spot.what}, which the static scan cannot read.`,
+        ask: `List every HTTP route ${file} defines, with its full path including any mount prefix, and write a flow that calls each one so a run can confirm it.` });
+    }
     for (const route of scanSource(file, text)) {
       const key = `${route.method} ${route.path}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const coveredBy = [...new Set(flows.filter((f) => shape(f.path) === shape(route.path) && (route.method === 'ANY' || f.method === route.method)).map((f) => f.caseId))];
-      routes.push({ ...route, coveredBy, changed: changed.has(route.file) });
+      routes.push({ ...route, provenance: 'static', coveredBy, observedBy: observedBy(route.method, route.path), changed: changed.has(route.file) });
     }
   }
-  routes.sort((a, b) => Number(b.changed) - Number(a.changed) || a.coveredBy.length - b.coveredBy.length || a.path.localeCompare(b.path));
-  return { source: ref ? `branch ${ref}` : 'working tree', branch: ref, base: info.base, files: source.files.length, changedFiles, routes, uncovered: routes.filter((r) => r.coveredBy.length === 0).length };
+  // Requests the app served that match no scanned route: real routes the scan missed.
+  const unlisted = new Map<string, { method: string; path: string; cases: Set<string> }>();
+  for (const r of requests) {
+    if (routes.some((route) => route.provenance === 'static' && (route.method === 'ANY' || route.method === r.method) && matchesTemplate(route.path, r.path))) continue;
+    if (r.status === 404 || r.status === 405) continue; // the app itself said no such route
+    const template = templateOfObserved(r.path);
+    const key = `${r.method} ${template}`;
+    const entry = unlisted.get(key) ?? { method: r.method, path: template, cases: new Set<string>() };
+    entry.cases.add(r.caseId); unlisted.set(key, entry);
+  }
+  for (const u of unlisted.values()) {
+    const coveredBy = [...new Set(flows.filter((f) => shape(f.path) === shape(u.path) && f.method === u.method).map((f) => f.caseId))];
+    routes.push({ method: u.method, path: u.path, file: null, line: null, framework: 'observed', provenance: 'traffic', coveredBy, observedBy: [...u.cases], changed: false });
+    // A flow that names the route, plus the app serving it, leaves nothing to decide; only its source location is unknown.
+    if (coveredBy.length === 0) ambiguities.push({ id: `unlisted:${u.method} ${u.path}`, kind: 'unlisted_traffic', file: null, line: null,
+      detail: `The app served ${u.method} ${u.path} during ${[...u.cases].join(', ')}, but the static scan found no such route.`,
+      ask: `Find the handler that serves ${u.method} ${u.path}, and say which file defines it and what the path's parameters are.` });
+  }
+  const tested = (r: CoveredRoute) => r.coveredBy.length + r.observedBy.length;
+  routes.sort((a, b) => Number(b.changed) - Number(a.changed) || Number(tested(a) > 0) - Number(tested(b) > 0) || a.path.localeCompare(b.path));
+  return { source: ref ? `branch ${ref}` : 'working tree', branch: ref, base: info.base, files: source.files.length, changedFiles, routes,
+    uncovered: routes.filter((r) => tested(r) === 0).length,
+    observed: observed ? { run: observed.run, stale: observed.stale, requests: requests.length } : null,
+    ambiguities: ambiguities.slice(0, 50) };
 }
 
 /** A starting flow for one route; placeholders the author must fill are marked TODO. */

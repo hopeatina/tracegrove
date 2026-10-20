@@ -1,0 +1,30 @@
+#!/bin/sh
+# Deterministic stand-in for Claude Code, so dogfood runs never spend tokens or vary.
+# First turn: resolves the unreadable `pathname.match` routing by writing a flow for PUT /notes/{id},
+# guessing the wrong status (404). Repair turn: reads tracegrove's failure and fixes it to 405.
+mkdir -p tracegrove/discovered/notes
+case "$*" in
+  *"repair round"*) STATUS=405 ;;
+  *) STATUS=404 ;;
+esac
+cat > tracegrove/discovered/notes/update-not-allowed.flow.yaml <<YAML
+title: Notes cannot be edited in place; PUT on a note is refused
+tags: [discovered, notes]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Draft, body: first version }
+    expect: 201
+    save: { noteId: note.id }
+  - name: edit in place is refused
+    PUT: /notes/{noteId}
+    json: { title: Edited, body: second version }
+    expect: $STATUS
+  - name: the note is unchanged
+    GET: /notes/{noteId}
+    expect: { status: 200, json: { note.title: Draft } }
+YAML
+case "$*" in
+  *"repair round"*) echo '{"result":"tracegrove/discovered/notes/update-not-allowed.flow.yaml: fixed; the handler answers 405 method_not_allowed for PUT on an existing note"}' ;;
+  *) echo '{"result":"tracegrove/discovered/notes/update-not-allowed.flow.yaml: app/app.mjs routes /notes/{id} with pathname.match; pins that PUT is refused"}' ;;
+esac

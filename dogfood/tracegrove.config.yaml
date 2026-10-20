@@ -7,7 +7,7 @@ app:
   root: ..
   entry: dogfood/serve.mjs
   health: /api/status
-  sources: [src/authoring/**, dogfood/serve.mjs]
+  sources: [src/authoring/**, src/hosts/**, dogfood/serve.mjs, dogfood/agent/**]
 personas:
   operator: { subject: operator }
   stranger: { subject: stranger }

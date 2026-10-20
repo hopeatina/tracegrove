@@ -41,10 +41,13 @@ export class BrowserDriver {
     let browser: Browser | undefined;
     const abort = () => { void browser?.close().catch(() => {}); };
     signal.addEventListener('abort', abort, { once: true });
+    // Which setup stage failed decides the typed code, so a missing engine and a missing encoder read differently.
+    let stage: 'launch' | 'page' | 'video' = 'launch';
     try {
       // Loaded on first browser step so HTTP-only runs never pay Playwright's import cost.
       const { chromium } = await import('playwright');
       browser = await chromium.launch({ headless: true, timeout: Math.max(1, input.deadline.remainingMs()) });
+      stage = 'page';
       signal.throwIfAborted();
       const context = await browser.newContext({
         serviceWorkers: 'block', acceptDownloads: false,
@@ -93,6 +96,7 @@ export class BrowserDriver {
       // Keep mobile pixels at their native size; VP9's chroma grid needs even dimensions.
       const viewport = input.viewport ?? { width: 1280, height: 720 };
       const videoSize = { width: Math.ceil(viewport.width / 2) * 2, height: Math.ceil(viewport.height / 2) * 2 };
+      stage = 'video';
       await page.screencast.start({ path: join(mediaDir, 'recording.webm'), size: videoSize,
         onFrame: frame => { driver.latestFrameAt = frame.timestamp; driver.onFrame?.(frame.timestamp); },
       });
@@ -101,7 +105,8 @@ export class BrowserDriver {
     } catch (error) {
       await browser?.close();
       await rm(mediaDir, { recursive: true, force: true });
-      throw error;
+      if (error instanceof BrowserStepError || signal.aborted || stage === 'page') throw error;
+      throw new BrowserStepError(stage === 'launch' ? 'browser_unavailable' : 'video_encoder_missing');
     } finally { signal.removeEventListener('abort', abort); }
   }
 

@@ -37,6 +37,7 @@ import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverProject, draftWithAgent } from '../authoring/workspace.ts';
+import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
 import { heal, undoHeal } from '../authoring/heal.ts';
@@ -90,7 +91,8 @@ Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>]           routes in the code vs. flows that cover them; changed-on-branch first
   check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
-        [--agent claude|codex] [--model <m>]           then check them (default: Claude Code on haiku, its cheapest model)
+        [--agent claude|codex] [--model <m>]           then check them and run each one end to end, sending failures back
+        [--no-prove]                                   for up to 2 repairs (default: Claude Code on haiku, its cheapest model)
   settings [--agent claude|codex|none] [--model <m>]   show or save your agent choice in .tracegrove/settings.json
            [--source-snapshot <snapshot.json> | --working-tree]  save the next run's input; never edits team config
   test, list, show and compile take --config <tracegrove.config.yaml|tracegrove.config.ts>; the commands above use --dir.
@@ -98,6 +100,8 @@ Agent-friendly commands (every one takes --json and never starts the app):
 Low-level corpus commands (the strict workflow.*/v1 files):
   sample-config --sample ${SampleName.options.join('|')} --output <dir>     write a sample project (real app + corpus)
   validate --config <workflow.yaml>                    validate schemas, references and digests
+  setup browsers [--dry-run] [--check-only]            install the pinned Playwright headless shell and ffmpeg, then record
+                                                       a one-second test video to prove browser flows can run here
   doctor [--dir <dir>|--config <yaml>] [--profile <name>]\n                                                       inspect native setup and plan; never launch the app
   plan --config <workflow.yaml> [--profile <name>] --output <request.json>
        [--work-binding <json>]                        freeze an existing work ID and requirement refs before execution
@@ -258,7 +262,13 @@ async function main(argv: string[]): Promise<number> {
 
     case 'discover': {
       const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
-      out(args, result, `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered${result.changedFiles.length ? `, ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}\n${result.routes.map((r) => `  ${r.coveredBy.length ? 'covered  ' : 'UNCOVERED'} ${r.method.padEnd(6)} ${r.path}  ${r.file}:${r.line}${r.changed ? '  (changed)' : ''}`).join('\n')}`);
+      const observed = result.observed ? `observed traffic from run ${result.observed.run}${result.observed.stale ? ' (source changed since)' : ''}` : 'no verified run yet, so nothing is observed';
+      const state = (r: typeof result.routes[number]) => r.observedBy.length ? 'observed ' : r.coveredBy.length ? 'declared ' : 'UNCOVERED';
+      out(args, result, [
+        `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered; ${observed}${result.changedFiles.length ? `; ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}`,
+        ...result.routes.map((r) => `  ${state(r)} ${r.method.padEnd(6)} ${r.path}  ${r.file ? `${r.file}:${r.line}` : '(seen only in traffic)'}${r.changed ? '  (changed)' : ''}`),
+        ...(result.ambiguities.length ? ['', `${result.ambiguities.length} place(s) discovery cannot read; \`tracegrove draft\` asks the agent to resolve them and proves the answer:`, ...result.ambiguities.slice(0, 12).map((a) => `  ? ${a.detail}`)] : []),
+      ].join('\n'));
       return 0;
     }
 
@@ -301,11 +311,18 @@ async function main(argv: string[]): Promise<number> {
       live.update('Discovering routes and briefing the agent');
       try {
         const result = await draftWithAgent({ dir: flag(args, 'dir') ?? '.', branch: flag(args, 'branch'), intent: flag(args, 'intent'), overrides: { provider: flag(args, 'agent'), model: flag(args, 'model') }, signal: controller.signal,
-          ...(args.flags.json ? {} : { onActivity: (line: string) => live.update(`agent · ${line.replaceAll(`${resolve(flag(args, 'dir') ?? '.')}/`, '')}`) }) });
+          prove: args.flags['no-prove'] !== true,
+          ...(args.flags.json ? {} : { onActivity: (line: string) => live.update(`agent · ${line.replaceAll(`${resolve(flag(args, 'dir') ?? '.')}/`, '')}`), onProve: (line: string) => live.update(`prove · ${line}`) }) });
         live.done();
-        const { agent, check } = result;
-        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written:\n${agent.files.map((f) => `  ${f}`).join('\n') || '  (none)'}\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\nnext: tracegrove test --grep discovered`);
-        return agent.exitCode === 0 && check.ok ? 0 : 2;
+        const { agent, check, prove } = result;
+        const mark = { proven: '✓ proven     ', failed: '✗ failed     ', product_bug: '! product bug', not_run: '· not run    ' } as const;
+        const proveText = prove === null ? 'prove: skipped (--no-prove); next: tracegrove test --grep discovered'
+          : prove.flows.length === 0 ? 'prove: no new flow files to run'
+          : [`prove: ran each new flow end to end${prove.rounds ? `, ${prove.rounds} repair round(s)` : ''}`,
+            ...prove.flows.map((f) => `  ${mark[f.outcome]} ${f.file}${f.served.length ? `  (served ${f.served.length} route(s))` : ''}${f.detail ? `\n                  ${f.detail}` : ''}`)].join('\n');
+        out(args, result, `\n${agent.provider}${agent.model ? ` (${agent.model})` : ''} exited ${agent.exitCode}; ${agent.files.length} flow file(s) written\n\n${agent.output}\n\ncheck: ${check.ok ? `ok, ${check.flows.length} flow(s) compile` : check.issues.map((i) => `  ${i.detail}`).join('\n')}\n${proveText}`);
+        const proven = prove === null || prove.flows.every((f) => f.outcome === 'proven');
+        return agent.exitCode === 0 && check.ok ? (proven ? 0 : 1) : 2;
       } finally { live.done(); process.off('SIGINT', onSignal); }
     }
 
@@ -349,6 +366,13 @@ async function main(argv: string[]): Promise<number> {
       const report = inspectRecoveryStatus({ stateDir: args.flags['state-dir'], executionId: args.flags.execution, scope: localScope() });
       out(args, report, `${report.code}\n${report.recovery}\nRecorded resources: ${report.resources ? JSON.stringify(report.resources) : 'unavailable'}\nNo cleanup or execution was attempted; this report grants no action authority.`);
       return report.exitCode;
+    }
+
+    case 'setup': {
+      const result = await setupBrowsers({ dryRun: args.flags['dry-run'] === true, checkOnly: args.flags['check-only'] === true, onOutput: args.flags.json ? undefined : (chunk) => process.stderr.write(chunk) });
+      out(args, result, [result.install ? `${result.install.ran ? 'ran' : 'would run'}: ${result.install.command.join(' ')}${result.install.ran ? ` (exit ${result.install.exitCode})` : ''}` : 'install: skipped (--check-only)',
+        result.probe ? (result.probe.ok ? `browser: ok, recorded a ${result.probe.videoBytes}-byte test video with ${result.probe.executable}` : `browser: ${result.probe.code}: ${result.probe.detail}`) : 'browser: not probed (--dry-run)'].join('\n'));
+      return result.probe && !result.probe.ok ? 2 : result.install?.ran && result.install.exitCode !== 0 ? 3 : 0;
     }
 
     case 'doctor': {

@@ -25,9 +25,17 @@ export class Conflict extends Error {
   }
 }
 
+/**
+ * Stable codes for the infrastructure failures a person or heal acts on. Messages are for reading;
+ * these are for matching, so rewording a message never changes what heal does.
+ */
+export type InfrastructureCode = 'app_not_ready' | 'app_exited_early' | 'app_spawn_failed' | 'app_port_not_reported' | 'browser_unavailable' | 'video_encoder_missing' | 'infrastructure';
+
 export class InfrastructureFailure extends Error {
-  constructor(message: string) {
+  readonly code: InfrastructureCode;
+  constructor(message: string, code: InfrastructureCode = 'infrastructure') {
     super(message);
     this.name = 'InfrastructureFailure';
+    this.code = code;
   }
 }

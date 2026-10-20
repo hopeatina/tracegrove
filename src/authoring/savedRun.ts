@@ -7,12 +7,14 @@ import { readBoundedFile } from '../core/boundedFile.ts';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { caseReport, type TestRunReport } from './run.ts';
 import type { CompiledFlowInfo } from './compile.ts';
+import { MAX_OBSERVED_PER_CASE, ObservedRequest, verifiedObservedRequests } from './traffic.ts';
+import { cellBundleName } from '../core/bundlePaths.ts';
 
 const text = z.string().max(8192);
 const step = z.object({ id: text, name: text, method: text, path: text, result: text, status: z.number().finite().nullable(), durationMs: z.number().finite().nullable(), reason: text.nullable(), observedText: text.nullable().optional() });
 const summary = z.object({ schemaVersion: z.literal('tracegrove.run-summary/v1'), project: text, outcome: text, exitCode: z.number().int(), startedAt: text, finishedAt: text,
   executionId: text.nullable(), sourceDigest: text, runDir: text, stateDir: text.optional(), bundleVerified: z.boolean().nullable(), blockers: z.array(z.object({ code: text, detail: text, action: text })).max(256),
-  cases: z.array(z.object({ caseId: text, file: text, title: text, outcome: text, durationMs: z.number().finite(), steps: z.array(step).max(512), failure: z.object({ step: text, message: text, observed: text.nullable() }).nullable(), videos: z.array(z.object({ digest: text, byteCount: z.number().int().nonnegative(), mediaType: z.literal('video/webm') })).max(64).optional() })).max(1024),
+  cases: z.array(z.object({ caseId: text, file: text, title: text, outcome: text, durationMs: z.number().finite(), steps: z.array(step).max(512), failure: z.object({ step: text, message: text, observed: text.nullable(), code: text.optional() }).nullable(), videos: z.array(z.object({ digest: text, byteCount: z.number().int().nonnegative(), mediaType: z.literal('video/webm') })).max(64).optional(), requests: z.array(ObservedRequest).max(MAX_OBSERVED_PER_CASE).optional() })).max(1024),
   totals: z.object({ passed: z.number().int(), failed: z.number().int(), other: z.number().int() }),
 });
 type EvidenceStatus = 'verified' | 'missing' | 'invalid' | 'mismatch';
@@ -39,7 +41,7 @@ export function readSavedRunSummary(root: string, name: string): TestRunReport {
   try {
     const parsed = summary.parse(JSON.parse(readBoundedFile(join(ownedRunDirectory(root, name), 'summary.json'), 8 * 1024 * 1024).toString('utf8')));
     const { stateDir, ...report } = parsed;
-    return { ...report, ...(stateDir === undefined ? {} : { stateDir }), cases: parsed.cases.map(c => ({ ...c, videos: c.videos ?? [], steps: c.steps.map(s => ({ ...s, observedText: s.observedText ?? null })) })) };
+    return { ...report, ...(stateDir === undefined ? {} : { stateDir }), cases: parsed.cases.map(c => ({ ...c, videos: c.videos ?? [], requests: c.requests ?? [], steps: c.steps.map(s => ({ ...s, observedText: s.observedText ?? null })) })) };
   }
   catch { throw new Error('Saved run summary is unavailable or invalid.'); }
 }
@@ -72,6 +74,8 @@ export function readSavedRun(root: string, name: string): SavedRunReport {
       path: s.kind === 'ui.navigate' ? `navigate ${s.path}` : s.kind === 'ui.action' ? `${s.command.kind} ${s.command.target.name}` : s.kind === 'ui.observe' ? `read ${s.target.name}` : s.kind === 'http.request' ? s.path : s.kind === 'observe' ? s.readback.path : '',
       expectStatus: s.kind === 'http.request' ? s.expectStatus : null })) };
     const verified = caseReport(receipt, info);
+    // Requests are read from the sealed events, bound to the receipt's events digest.
+    try { verified.requests = verifiedObservedRequests(receipt, readBoundedFile(join(bundleDir, 'cells', cellBundleName(receipt.selectionCellId), 'events.jsonl'), 16 * 1024 * 1024)); } catch { verified.requests = []; }
     const facts = (s: typeof verified.steps[number]) => ({ id: s.id, result: s.result, status: s.status, durationMs: s.durationMs, reason: s.reason, observedText: s.observedText ?? null });
     if (JSON.stringify(recorded.steps.map(facts)) !== JSON.stringify(verified.steps.map(facts)) || JSON.stringify(recorded.videos ?? []) !== JSON.stringify(verified.videos ?? [])) return result('mismatch');
     cases.push({ ...verified, reportedTitle: recorded.title, reportedFile: recorded.file, steps: verified.steps.map(s => ({ ...s, reportedName: recorded.steps.find(r => r.id === s.id)?.name ?? s.id })) });

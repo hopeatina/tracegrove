@@ -152,6 +152,52 @@ echo '{"result":"tracegrove/discovered/notes/owner-only.flow.yaml: owner-only re
     expect(result.agent.command).toContain('<prompt>');
     expect(result.check.ok).toBe(true);
     expect(checkProject(root).flows.map((f) => f.caseId)).toContain('discovered.notes.owner-only');
+    // The agent proposes, tracegrove proves: the new flow ran end to end against the real app.
+    expect(result.prove?.flows).toEqual([expect.objectContaining({ file: 'tracegrove/discovered/notes/owner-only.flow.yaml', outcome: 'proven', repairs: 0, served: ['POST /notes'] })]);
+  });
+
+  function repairingClaude(): string {
+    const bin = temp();
+    // First turn writes a flow with a wrong status; the repair turn reads the failure and fixes it.
+    writeFileSync(join(bin, 'claude'), `#!/bin/sh
+mkdir -p tracegrove/discovered/notes
+case "$*" in
+  *"repair round"*) STATUS=201 ;;
+  *) STATUS=200 ;;
+esac
+cat > tracegrove/discovered/notes/create.flow.yaml <<YAML
+title: creating a note answers with the new note
+tags: [discovered]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: t, body: b }
+    expect: $STATUS
+YAML
+case "$*" in
+  *"repair round"*) echo '{"result":"tracegrove/discovered/notes/create.flow.yaml: fixed, the handler returns 201"}' ;;
+  *) echo '{"result":"tracegrove/discovered/notes/create.flow.yaml: create a note"}' ;;
+esac
+`);
+    chmodSync(join(bin, 'claude'), 0o755);
+    return bin;
+  }
+
+  it('sends a failing draft back to the agent and keeps it only once a re-run proves it', async () => {
+    const root = copy('notes-api');
+    process.env.PATH = `${repairingClaude()}${delimiter}${PATH}`;
+    const lines: string[] = [];
+    const result = await draftWithAgent({ dir: root, branch: null, intent: 'creating a note', onProve: (line) => lines.push(line) });
+    expect(result.prove).toMatchObject({ rounds: 1, flows: [{ file: 'tracegrove/discovered/notes/create.flow.yaml', outcome: 'proven', repairs: 1 }] });
+    expect(lines.some((l) => /create\.flow\.yaml: failed \(expected status 200, got 201\)/.test(l))).toBe(true);
+    expect(readFileSync(join(root, 'tracegrove/discovered/notes/create.flow.yaml'), 'utf8')).toContain('expect: 201');
+  }, 60_000);
+
+  it('skips proving with prove: false', async () => {
+    const root = copy('notes-api');
+    process.env.PATH = `${repairingClaude()}${delimiter}${PATH}`;
+    const result = await draftWithAgent({ dir: root, branch: null, intent: null, prove: false });
+    expect(result.prove).toBeNull();
   });
 
   it('blocks with an install hint when the agent CLI is missing', async () => {

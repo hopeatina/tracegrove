@@ -5,13 +5,14 @@ Use the installed binary through `npx --no-install tracegrove` so CI never fetch
 | Command | Effect | Result |
 | --- | --- | --- |
 | `status --json` | Reads the current project and run state | `tracegrove.status/v1` and ordered `next` commands |
-| `discover --json` | Compares discovered routes and authored flows | Coverage suggestions, no app launch |
+| `discover --json` | Compares scanned routes, authored flows and the requests the last verified run served | `routes` with `provenance` and `observedBy`, `ambiguities` with a question for an agent; no app launch |
 | `check --json` | Compiles authoring files | `ok` and located issues; may evaluate trusted TypeScript authoring modules |
 | `doctor --dir . --json` | Checks the native plan without app launch | `tracegrove.doctor/v1`, `checks`, `errors`, `blocked`, `execution: not_started` |
 | `test --json` | Starts the selected app and executes scenarios | `tracegrove.run-summary/v1`, `outcome`, `cases`, `blockers`, `runDir`, `bundleVerified` |
 | `verify-bundle --bundle <dir> --json` | Checks existing evidence | `ok`, `problems`, `outcome`, `receipts`; no app launch |
-| `draft --intent '<goal>'` | Starts a coding agent to edit drafts | Review changed files and compile/run afterward |
+| `draft --intent '<goal>'` | Starts a coding agent to write flows, then runs each new flow end to end and sends failures back for up to 2 repairs (`--no-prove` skips the runs) | `prove.flows[]`, each `proven`, `failed` or `product_bug` with the routes it served; exit 1 unless all are proven |
 | `heal --dry-run` | Runs and diagnoses the suite | Findings without retained agent edits |
+| `setup browsers` | Installs the pinned headless shell and ffmpeg, then records a one-second test video | `probe.ok`, or a typed `browser_unavailable` / `video_encoder_missing` |
 | `heal` | May retain bounded setup/flow edits | `tracegrove.heal/v1`; inspect saved diff and backups |
 
 Exit codes: 0 clean/passed; 1 assertion failure; 2 blocked/inconclusive; 3 infrastructure failure; 4 cancellation. A top-level JSON error uses `tracegrove.cli-error/v1`, with a public class, bounded reason codes and recovery actions. Normal reports and artifacts may contain application data; protect them with your usual workspace access controls. `--json=false` selects prose errors, while `--jsonl` keeps its event stream.

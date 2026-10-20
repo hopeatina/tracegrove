@@ -27,6 +27,8 @@ export type HostSession = {
   ownedResources: Array<{ entityKey: string; physicalId: string; boundaryId: string }>;
   dataDir: string | null;
   nativeJobs?: import('../adapters/job/types.ts').NativeJobSession;
+  /** Present when a recording proxy fronts the app: `origin` is then the proxy's origin. */
+  traffic?: import('./trafficProxy.ts').TrafficRecorder;
   stop(reason: string): Promise<{ confirmed: boolean; detail: string }>;
 };
 

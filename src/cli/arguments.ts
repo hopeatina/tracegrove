@@ -19,10 +19,11 @@ export const COMMAND_SCHEMAS = {
   ui: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), port: Text.optional() }).strict(),
   discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional() }).strict(),
   check: z.object({ ...common, dir: Text.optional() }).strict(),
-  draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional() }).strict(),
+  draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-prove': Bool }).strict(),
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
   'sample-config': z.object({ ...common, sample: SampleName.optional(), output: Text }).strict(),
   validate: z.object({ ...common, config: Text }).strict(),
+  setup: z.object({ ...common, 'dry-run': Bool, 'check-only': Bool }).strict(),
   doctor: z.object({ ...common, config: Text.optional(), dir: Text.optional(), profile: Text.optional() }).strict(),
   plan: z.object({ ...common, config: Text, profile: Text.optional(), output: Text,
     purpose: RunRequest.shape.purpose.optional(), 'work-binding': Text.optional() }).strict(),
@@ -73,6 +74,8 @@ export function jsonRequested(argv: string[]): boolean {
 
 /** Validate every option before file access, admission or execution. No ignored arguments. */
 export function parseArgs(argv: string[]): Args {
+  // `setup browsers` reads as a sentence; browsers are the only thing setup installs today.
+  if (argv[0] === 'setup' && argv[1] === 'browsers') argv = ['setup', ...argv.slice(2)];
   const first = argv[0] ?? 'help';
   const command = ['-h', '--help'].includes(first) ? 'help' : first;
   if (!Object.hasOwn(COMMAND_SCHEMAS, command)) deny('unknown_command', `unknown command ${command}`, 'help');

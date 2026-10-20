@@ -1,4 +1,4 @@
-title: Discover lists the app's routes and the ones no flow covers
+title: Discover lists the app's routes, which ones a run confirmed, and the ones nothing reaches
 tags: [ui, browser, discover]
 browser:
   allowPaths: [/]
@@ -15,4 +15,4 @@ steps:
     expect: { text: What should be true after this change? }
   - name: routes and gaps are counted
     browser: { kind: read, target: { by: testId, name: route-summary } }
-    expect: { text: 2 recognized · 1 without a flow }
+    expect: { text: 2 recognized · 0 served in a run · 1 untested }
