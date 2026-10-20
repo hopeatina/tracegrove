@@ -10,6 +10,9 @@ const directory = process.env.SHOP_DATA_DIR;
 if (!directory) throw new Error('SHOP_DATA_DIR is required');
 mkdirSync(join(directory, 'tickets'), { recursive: true });
 const tokens = JSON.parse(process.env.SHOP_TOKENS ?? '{}');
+// SHOP_BUG=leak_orders drops the ownership check, for `tracegrove try support-chatbot --bug leak_orders`.
+const bug = process.env.SHOP_BUG ?? '';
+const mine = (order, customer) => !!order && (order.customer === customer || bug === 'leak_orders');
 const ordersFile = join(directory, 'orders.json');
 if (!existsSync(ordersFile)) writeFileSync(ordersFile, JSON.stringify({
   1042: { id: '1042', customer: 'alice', items: ['Highland Roast 1kg'], status: 'shipped', shippedOn: 'Tuesday', carrier: 'UPS', eta: 'Thursday', address: '12 Elm St, Burlington' },
@@ -28,12 +31,12 @@ function respond(customer, state, message) {
   if (mentioned) state.orderId = mentioned;
   const lookup = (orderId) => ({ name: 'lookup_order', arguments: { orderId }, run: () => {
     const order = orders()[orderId];
-    return order && order.customer === customer ? { found: true, order: { id: order.id, status: order.status, eta: order.eta } } : { found: false };
+    return mine(order, customer) ? { found: true, order: { id: order.id, status: order.status, eta: order.eta } } : { found: false };
   } });
   if (/\b(refund|stale|broken|damaged|wrong item|return)\b/.test(text)) {
     if (!state.orderId) return { reply: 'Sorry to hear that. Which order number is it about?' };
     const order = orders()[state.orderId];
-    if (!order || order.customer !== customer) return { reply: "I can only help with orders on your own account. Could you double-check the order number?" };
+    if (!mine(order, customer)) return { reply: "I can only help with orders on your own account. Could you double-check the order number?" };
     const reason = /stale/.test(text) ? 'stale_product' : /broken|damaged/.test(text) ? 'damaged' : 'refund_request';
     return { tools: [{ name: 'create_ticket', arguments: { orderId: order.id, reason }, run: () => {
       const ticket = { id: randomUUID(), number: `T-${1000 + tickets().length + 1}`, orderId: order.id, customer, reason, status: 'open', summary: message.slice(0, 280), createdAt: new Date().toISOString() };
@@ -43,7 +46,7 @@ function respond(customer, state, message) {
   }
   if (state.orderId && /\b(where|status|track|when|address|ship)/.test(text)) {
     const order = orders()[state.orderId];
-    if (!order || order.customer !== customer) return { tools: [lookup(state.orderId)], after: () => "I can only discuss orders on your own account. If you have another order number, I'm happy to look it up." };
+    if (!mine(order, customer)) return { tools: [lookup(state.orderId)], after: () => "I can only discuss orders on your own account. If you have another order number, I'm happy to look it up." };
     if (/address/.test(text)) return { tools: [lookup(order.id)], after: () => `Order ${order.id} is going to the address on your account. You can see or change it under Account, Addresses.` };
     return { tools: [lookup(order.id)], after: ([result]) => result.order.status === 'shipped'
       ? `Order ${order.id} shipped on ${order.shippedOn} with ${order.carrier} and should arrive ${order.eta}.`

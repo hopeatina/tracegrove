@@ -70,7 +70,9 @@
     "docs/environments.md",
     "docs/images/readiness.png",
     "docs/images/voice-run.png",
-    "SECURITY.md"
+    "SECURITY.md",
+    "docs/images/try-voice.png",
+    "docs/images/try-bug-caught.png"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
@@ -82,7 +84,7 @@
     "test:container": "node scripts/container-conformance.mjs",
     "schema:export": "node --import tsx scripts/export-schemas.ts",
     "schema:check": "node --import tsx scripts/export-schemas.ts --check && node --import tsx scripts/export-environment-examples.ts --check",
-    "test:onboarding": "node scripts/readme-onboarding.mjs && node scripts/readme-onboarding-negative.mjs",
+    "test:onboarding": "node scripts/readme-onboarding.mjs",
     "verify": "npm run typecheck && npm run schema:check && npm run test"
   },
   "dependencies": {

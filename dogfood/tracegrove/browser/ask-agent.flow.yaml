@@ -13,7 +13,7 @@ steps:
     browser: { kind: click, target: { by: role, role: button, name: Discover } }
   - name: the unreadable routing is named
     browser: { kind: read, target: { by: testId, name: ambiguities } }
-    expect: { text: "Needs a decision1 place discovery cannot readunreadableapp/app.mjs:36 uses pattern-matched node:http paths, which the static scan cannot read.Ask ClaudeThe agent reads the code and writes flows; tracegrove runs them and keeps only what the app actually served." }
+    expect: { text: "Needs a decision1 place discovery cannot readunreadableapp/app.mjs:38 uses pattern-matched node:http paths, which the static scan cannot read.Ask ClaudeThe agent reads the code and writes flows; tracegrove runs them and keeps only what the app actually served." }
   - name: ask the agent
     browser: { kind: click, target: { by: role, role: button, name: Ask Claude } }
   - name: the action and the flow were run, repaired once and proven

@@ -1,62 +1,55 @@
-/** Execute the README's canonical first-use block after build; not a clean dependency-install claim. */
-import { readFileSync, writeFileSync, mkdirSync, cpSync, lstatSync } from 'node:fs';
-import { join, resolve, basename, dirname } from 'node:path';
+/**
+ * Run the README's first command exactly as a reader would (`tracegrove try <example>`) against the
+ * built CLI, then check the outcome, the evidence and cleanup from the files it left. Also runs the
+ * bug variant the README advertises and requires it to be caught. Not a clean dependency-install claim.
+ */
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, cpSync, rmSync } from 'node:fs';
+import { join, resolve, basename } from 'node:path';
+import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import assert from 'node:assert/strict';
 import { verifyBundle, readVerifiedBundle } from '../dist/index.js';
+
 const root = resolve(import.meta.dirname, '..');
+const cli = join(root, 'dist', 'cli', 'main.js');
 const output = join(root, 'artifacts', 'qa', 'readme-onboarding'); mkdirSync(output, { recursive: true });
 const readme = readFileSync(join(root, 'README.md'), 'utf8');
-const block = readme.match(/<!-- onboarding-quickstart:start -->\s*```bash\n([\s\S]*?)```\s*<!-- onboarding-quickstart:end -->/);
-if (!block) throw new Error('README canonical onboarding block missing');
-const started = Date.now();
-function retainRun(stdout, preferredRunDir) {
-  const demoDir = stdout.match(/^wrote sample notes-api to (.+)$/m)?.[1];
-  let runDir = preferredRunDir;
-  if (!runDir) {
-    for (const line of stdout.split('\n')) {
-      try { const report = JSON.parse(line); if (report.schemaVersion === 'tracegrove.run-summary/v1' && typeof report.runDir === 'string') runDir = report.runDir; } catch { /* unrelated CLI output */ }
-    }
-  }
-  if (!runDir) return { status: 'no_run_report_available', bundleVerified: false };
-  try {
-    // Only the run produced beneath this invocation's generated sample is eligible for export.
-    if (!demoDir || dirname(resolve(runDir)) !== resolve(demoDir, '.tracegrove', 'runs') || !lstatSync(runDir).isDirectory() || lstatSync(runDir).isSymbolicLink()) return { status: 'invalid_owned_run_path', bundleVerified: false };
-    const exportedRunDir = join(output, basename(runDir));
-    cpSync(runDir, exportedRunDir, { recursive: true, errorOnExist: true, force: false });
-    const verification = verifyBundle(join(exportedRunDir, 'bundle'));
-    return { status: 'retained', runDir, exportedRunDir, pathRelativeToArtifact: basename(runDir), bundleVerified: verification.ok, outcome: verification.outcome ?? null };
-  } catch { return { status: 'export_failed', bundleVerified: false }; }
-}
-let result;
-try { result = await promisify(execFile)('bash', ['-c', block[1]], { cwd: output, env: { ...process.env, TRACEGROVE_CLI: join(root, 'dist', 'cli', 'main.js') }, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }); }
-catch (error) {
-  writeFileSync(join(output, 'stdout.txt'), String(error.stdout ?? ''), { mode: 0o600 });
-  writeFileSync(join(output, 'stderr.txt'), String(error.stderr ?? ''), { mode: 0o600 });
-  const retained = retainRun(String(error.stdout ?? ''));
-  writeFileSync(join(output, 'failure-receipt.json'), `${JSON.stringify({ status: 'failed', observedExitCode: typeof error.code === 'number' ? error.code : null,
-    retained, limit: 'Available failed sample evidence exported; missing capture is explicit and never a passing journey.' }, null, 2)}\n`, { mode: 0o600 });
-  throw new Error('README onboarding failed; inspect artifacts/qa/readme-onboarding/ stderr/stdout');
-}
-writeFileSync(join(output, 'stdout.txt'), result.stdout, { mode: 0o600 });
-writeFileSync(join(output, 'stderr.txt'), result.stderr, { mode: 0o600 });
-const runDir = result.stdout.match(/^Evidence retained at (.+)$/m)?.[1];
-if (!runDir) throw new Error('README did not identify evidence destination');
-const summary = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8'));
-const verification = verifyBundle(join(runDir, 'bundle'));
-// The CI runner's /tmp disappears; retain this exact owned sample and verify its exported bytes.
-const retained = retainRun(result.stdout, runDir);
-if (retained.status !== 'retained' || !retained.exportedRunDir) throw new Error('README sample artifact export failed');
-const exportedRunDir = retained.exportedRunDir;
-const snapshot = readVerifiedBundle(join(runDir, 'bundle'));
-const cleanup = snapshot.receipts.map(r => ({ executionId: r.executionId, attempted: r.cleanup.attempted, confirmed: r.cleanup.confirmed,
+// The README's first command and its "break it" command are the journeys under test.
+const first = readme.match(/npx tracegrove try ([a-z-]+)\n/)?.[1];
+const broken = readme.match(/npx tracegrove try ([a-z-]+) --bug ([a-z_]+)/);
+assert.ok(first, 'README must lead with `npx tracegrove try <example>`');
+assert.ok(broken, 'README must show `npx tracegrove try <example> --bug <name>`');
+
+const cleanupOf = (bundle) => readVerifiedBundle(bundle).receipts.map(r => ({ executionId: r.executionId, attempted: r.cleanup.attempted, confirmed: r.cleanup.confirmed,
   remainingUnknownMutations: r.cleanup.remainingUnknownMutations, critical: r.cleanup.critical, reasonCodes: r.cleanup.reasonCodes }));
-const cleanupConfirmed = cleanup.length > 0 && cleanup.every(c => [...c.attempted, ...c.critical].every(id => c.confirmed.includes(id)) && !c.remainingUnknownMutations && !c.reasonCodes.length);
-const receipt = { schemaVersion: 'tracegrove.readme-onboarding-receipt/v1', node: process.version, platform: process.platform,
-  elapsedSeconds: (Date.now() - started) / 1000, runDir, exportedRunDir, outcome: summary.outcome,
-  bundleVerified: verification.ok, exportedBundleVerified: retained.bundleVerified, pathRelativeToArtifact: retained.pathRelativeToArtifact, cleanupConfirmed, cleanup,
-  limit: 'Actual README sample journey using the existing build/dependencies; independent clean-room setup is separate. No portable profile/host qualification.' };
+const confirmed = (cleanup) => cleanup.length > 0 && cleanup.every(c => [...c.attempted, ...c.critical].every(id => c.confirmed.includes(id)) && !c.remainingUnknownMutations && !c.reasonCodes.length);
+
+async function journey(label, args) {
+  const cwd = mkdtempSync(join(tmpdir(), `tracegrove-try-${label}-`));
+  const started = Date.now();
+  let stdout = '', stderr = '', exitCode = 0;
+  try { ({ stdout, stderr } = await promisify(execFile)(process.execPath, [cli, 'try', ...args, '--json'], { cwd, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 })); }
+  catch (error) { stdout = String(error.stdout ?? ''); stderr = String(error.stderr ?? ''); exitCode = typeof error.code === 'number' ? error.code : -1; }
+  writeFileSync(join(output, `${label}-stdout.txt`), stdout, { mode: 0o600 });
+  writeFileSync(join(output, `${label}-stderr.txt`), stderr, { mode: 0o600 });
+  const facts = JSON.parse(stdout);
+  assert.equal(facts.schemaVersion, 'tracegrove.try/v1');
+  // The CI runner's temp folder disappears; retain the run and verify the exported copy.
+  const exportedRunDir = join(output, `${label}-${basename(facts.runDir)}`);
+  cpSync(facts.runDir, exportedRunDir, { recursive: true, errorOnExist: true, force: false });
+  const verification = verifyBundle(join(exportedRunDir, 'bundle'));
+  const cleanup = cleanupOf(join(exportedRunDir, 'bundle'));
+  rmSync(cwd, { recursive: true, force: true });
+  return { label, command: `tracegrove try ${args.join(' ')}`, exitCode, elapsedSeconds: (Date.now() - started) / 1000, outcome: facts.outcome, caught: facts.caught,
+    bundleVerified: facts.bundleVerified, exportedBundleVerified: verification.ok, exportedOutcome: verification.outcome ?? null, exportedRunDir, cleanupConfirmed: confirmed(cleanup), cleanup };
+}
+
+const passing = await journey('first-use', [first]);
+const bug = await journey('bug-caught', [broken[1], '--bug', broken[2]]);
+const receipt = { schemaVersion: 'tracegrove.readme-onboarding-receipt/v2', node: process.version, platform: process.platform, journeys: [passing, bug],
+  limit: 'The README commands run with the existing build and dependencies; independent clean-room setup is separate. No portable profile/host qualification.' };
 writeFileSync(join(output, 'receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
-writeFileSync(join(exportedRunDir, 'onboarding-receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
-if (summary.outcome !== 'passed' || !summary.bundleVerified || !verification.ok || !retained.bundleVerified || !cleanupConfirmed) throw new Error('README first-use outcome/evidence/export/cleanup gate failed');
-console.log(JSON.stringify(receipt));
+console.log(JSON.stringify({ first: passing.command, outcome: passing.outcome, bug: bug.command, caught: bug.caught }));
+if (passing.exitCode !== 0 || passing.outcome !== 'passed' || !passing.bundleVerified || !passing.exportedBundleVerified || !passing.cleanupConfirmed) throw new Error('README first-use journey failed; inspect artifacts/qa/readme-onboarding/');
+if (bug.exitCode !== 0 || bug.outcome !== 'assertion_failed' || !bug.caught || !bug.exportedBundleVerified || bug.exportedOutcome !== 'assertion_failed' || !bug.cleanupConfirmed) throw new Error('README bug journey was not caught as an assertion failure with verified evidence and cleanup');

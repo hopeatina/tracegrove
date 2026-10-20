@@ -10,6 +10,8 @@ const port = Number(process.env.PORT ?? 0);
 const dir = process.env.NOTES_DIR ?? './notes-data';
 const tokens = JSON.parse(process.env.NOTES_TOKENS ?? '{}');
 const build = process.env.NOTES_BUILD ?? 'dev';
+// NOTES_BUG switches on a deliberate defect for `tracegrove try notes-api --bug <name>`.
+const bug = process.env.NOTES_BUG ?? '';
 mkdirSync(dir, { recursive: true });
 
 function notePath(id) { if (!/^[0-9a-f-]{36}$/.test(id)) return null; return join(dir, `${id}.json`); }
@@ -51,8 +53,10 @@ const server = createServer(async (req, res) => {
     if (id) {
       const note = readNote(id);
       if (!note) return send(res, 404, { error: 'not_found' });
+      if (bug === 'share_with_strangers' && req.method === 'GET') return send(res, 200, { note: { ...note } });
       if (note.ownerId !== userId) return send(res, 403, { error: 'forbidden' });
       if (req.method === 'GET') return send(res, 200, { note });
+      if (req.method === 'DELETE' && bug === 'keep_on_delete') return send(res, 204);
       if (req.method === 'DELETE') { unlinkSync(notePath(id)); return send(res, 204); }
     }
     return send(res, 405, { error: 'method_not_allowed' });

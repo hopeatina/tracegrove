@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
+import { tryExample } from './try.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
 import { EXIT_CODES, executeBundle } from '../core/executor.ts';
@@ -99,6 +100,9 @@ function samplesDir(): string {
 }
 
 const HELP = `tracegrove <command> [--flags]
+
+Start here:
+  try [<example>] [--bug <name>] [--no-open]          run a working example end to end, then open the UI; --bug shows a bug being caught
 
 Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walking up from the current folder):
   (no command)                                         where this project stands and what to run next
@@ -766,6 +770,11 @@ async function main(argv: string[]): Promise<number> {
       for (const [name, schema] of Object.entries(schemas)) writeFileSync(join(output, `${name.replace(/[\/.]/g, '_')}.json`), `${JSON.stringify(schema, null, 2)}\n`);
       out(args, { output, count: Object.keys(schemas).length }, `exported ${Object.keys(schemas).length} schemas to ${output}`);
       return 0;
+    }
+
+    case 'try': {
+      return tryExample({ example: args.flags._?.[0] ?? null, bug: flag(args, 'bug'), out: flag(args, 'out'), open: args.flags['no-open'] !== true,
+        port: flag(args, 'port'), json: args.flags.json === true, samplesRoot: samplesDir(), write: (value, text) => out(args, value, text) });
     }
 
     case 'readiness': {
