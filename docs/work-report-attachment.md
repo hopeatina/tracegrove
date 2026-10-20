@@ -99,7 +99,7 @@ POST attempt. A lost response does not turn into a new approval grant.
 
 The CLI represents a local operator's explicit configuration. Local labels and
 no-op callbacks do not authenticate a tenant. Scoped attachment requires the
-native API and migration in [OrgX #3663](https://github.com/hopeatina/orgx/pull/3663).
+native attachment API and migration on the OrgX side.
 That transaction checks workspace ownership, locks the work target, and compares
 the frozen workspace and timestamp before insertion. Matching historical retries
 return the original artifact after a work change, subject to current workspace

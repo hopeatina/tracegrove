@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "enum": [
+        "voice",
+        "chat"
+      ],
+      "type": "string"
+    },
+    "endpoint": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^\\/(?!\\/)[A-Za-z0-9_./-]*$",
+      "type": "string"
+    },
+    "messageField": {
+      "default": "message",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "type": "string"
+    },
+    "replyPath": {
+      "default": "reply",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "type": "string"
+    },
+    "sessionField": {
+      "default": "sessionId",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "type": "string"
+    },
+    "settleMs": {
+      "default": 800,
+      "maximum": 10000,
+      "minimum": 50,
+      "type": "integer"
+    },
+    "toolsPath": {
+      "default": "toolCalls",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "type": "string"
+    },
+    "transport": {
+      "enum": [
+        "rtvi",
+        "http_chat"
+      ],
+      "type": "string"
+    },
+    "turnTimeoutMs": {
+      "default": 10000,
+      "maximum": 60000,
+      "minimum": 100,
+      "type": "integer"
+    },
+    "turns": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "say": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "say"
+        ],
+        "type": "object"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "channel",
+    "transport",
+    "endpoint",
+    "turns",
+    "messageField",
+    "sessionField",
+    "replyPath",
+    "toolsPath",
+    "settleMs",
+    "turnTimeoutMs"
+  ],
+  "type": "object"
+}

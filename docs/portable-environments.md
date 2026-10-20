@@ -124,11 +124,11 @@ readback; and measured cost or explicitly unmeasured infrastructure cost. Preser
 and distinguish preflight, execution, verification and business acceptance. No environment becomes
 supported from templates, schemas, host brand, CI color or prose alone.
 
-Current evidence is limited to this Codex Linux cloud's isolated native/API/browser fixtures and
-the hosted Linux sample CI lanes already linked in the release audit. Actual OrgX #3620 proved a
-settings heading, #3614 a method boundary, and #3645 failed receipt lookup with unavailable offline
-workspace/store. None proves full OrgX workflow/client acceptance. Local Docker registry HTTPS
-was refused; hosted CI's Docker success is separate evidence. Claude coding cloud, broader macOS applications, OrgX-triggered runtime and authenticated external staging remain unqualified.
+Current evidence is limited to isolated native, API and browser fixtures in Linux cloud sandboxes and
+the hosted Linux CI lanes. Trials against a real private application proved individual boundaries (a
+rendered settings heading, an HTTP method boundary, a failed lookup with an unavailable store) but not
+full workflow acceptance. Claude coding cloud, broader macOS applications, externally triggered
+runtimes and authenticated external staging remain unqualified.
 
 ## Recorded clean-room onboarding
 

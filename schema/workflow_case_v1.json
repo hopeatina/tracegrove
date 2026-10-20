@@ -115,6 +115,92 @@
           "additionalProperties": false,
           "properties": {
             "kind": {
+              "const": "json_path_includes",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "json_path_excludes",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "json_path_at_most",
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 400,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "path",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
               "const": "step_result",
               "type": "string"
             },
@@ -239,6 +325,7 @@
                   "browser.observation",
                   "job.observation",
                   "mcp.observation",
+                  "conversation.observation",
                   "step.result"
                 ],
                 "type": "string"
@@ -336,6 +423,31 @@
         "networkMetadata": {
           "const": true,
           "type": "boolean"
+        },
+        "redact": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "pattern": {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "pattern"
+            ],
+            "type": "object"
+          },
+          "maxItems": 16,
+          "type": "array"
         },
         "redactionPolicyRef": {
           "anyOf": [
@@ -659,6 +771,11 @@
               "type": "null"
             }
           ]
+        },
+        "maxConversations": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
         },
         "maxCreates": {
           "maximum": 2147483647,
@@ -1073,6 +1190,7 @@
                   "browser.observation",
                   "job.observation",
                   "mcp.observation",
+                  "conversation.observation",
                   "step.result"
                 ],
                 "type": "string"
@@ -3906,6 +4024,360 @@
               },
               "kind": {
                 "const": "mcp.call",
+                "type": "string"
+              },
+              "retry": {
+                "additionalProperties": false,
+                "properties": {
+                  "attempts": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "attempts"
+                ],
+                "type": "object"
+              },
+              "timeoutMs": {
+                "maximum": 2592000000,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "timeoutMs",
+              "inputs",
+              "retry",
+              "kind",
+              "command",
+              "auth",
+              "captures"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "auth": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "persona",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "credential",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "captures": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "const": "json",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "type": "string"
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "maxLength": 400,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "from",
+                    "path"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              "command": {
+                "additionalProperties": false,
+                "properties": {
+                  "channel": {
+                    "enum": [
+                      "voice",
+                      "chat"
+                    ],
+                    "type": "string"
+                  },
+                  "endpoint": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "pattern": "^\\/(?!\\/)[A-Za-z0-9_./-]*$",
+                    "type": "string"
+                  },
+                  "messageField": {
+                    "default": "message",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "type": "string"
+                  },
+                  "replyPath": {
+                    "default": "reply",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "type": "string"
+                  },
+                  "sessionField": {
+                    "default": "sessionId",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "type": "string"
+                  },
+                  "settleMs": {
+                    "default": 800,
+                    "maximum": 10000,
+                    "minimum": 50,
+                    "type": "integer"
+                  },
+                  "toolsPath": {
+                    "default": "toolCalls",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "type": "string"
+                  },
+                  "transport": {
+                    "enum": [
+                      "rtvi",
+                      "http_chat"
+                    ],
+                    "type": "string"
+                  },
+                  "turnTimeoutMs": {
+                    "default": 10000,
+                    "maximum": 60000,
+                    "minimum": 100,
+                    "type": "integer"
+                  },
+                  "turns": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "say": {
+                          "maxLength": 2000,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "say"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "channel",
+                  "transport",
+                  "endpoint",
+                  "turns",
+                  "messageField",
+                  "sessionField",
+                  "replyPath",
+                  "toolsPath",
+                  "settleMs",
+                  "turnTimeoutMs"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                "type": "string"
+              },
+              "inputs": {
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "literal",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/$defs/__schema1"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entityKey": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "fixture",
+                          "type": "string"
+                        },
+                        "outputName": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "entityKey",
+                        "outputName"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "capture",
+                          "type": "string"
+                        },
+                        "name": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        },
+                        "stepId": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "stepId",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "credential",
+                          "type": "string"
+                        },
+                        "name": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "runtime",
+                          "type": "string"
+                        },
+                        "name": {
+                          "enum": [
+                            "execution_nonce",
+                            "lease_namespace",
+                            "target_origin"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "kind": {
+                "const": "conversation.run",
                 "type": "string"
               },
               "retry": {

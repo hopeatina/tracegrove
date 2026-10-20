@@ -1,8 +1,8 @@
 {
   "name": "tracegrove",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": false,
-  "description": "Verify app behavior with real requests, independent readback and inspectable evidence.",
+  "description": "End-to-end tests that check what your app actually did: APIs, web UIs, voice agents and chatbots, with independent readbacks and verifiable evidence.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -63,7 +63,14 @@
     "docs/workflow-knowledge.md",
     "docs/persona-pools.md",
     "docs/benchmark-evidence.md",
-    "docs/git-object-proof.md"
+    "docs/git-object-proof.md",
+    "docs/voice-and-chat.md",
+    "docs/security.md",
+    "docs/readiness-and-handoff.md",
+    "docs/environments.md",
+    "docs/images/readiness.png",
+    "docs/images/voice-run.png",
+    "SECURITY.md"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-samples.mjs",
@@ -109,7 +116,20 @@
     "workflow",
     "verification",
     "cli",
-    "evidence"
+    "evidence",
+    "end-to-end",
+    "e2e",
+    "voice-agent",
+    "chatbot",
+    "pipecat",
+    "mcp"
   ],
-  "homepage": "https://www.npmjs.com/package/tracegrove"
+  "homepage": "https://github.com/hopeatina/tracegrove#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hopeatina/tracegrove.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hopeatina/tracegrove/issues"
+  }
 }

@@ -4,11 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeSample } from '../src/cli/samples/write.ts';
 import { runTests } from '../src/authoring/run.ts';
-import { decide, readiness } from '../src/authoring/readiness.ts';
+import { decide, readDecisions, readiness } from '../src/authoring/readiness.ts';
 import { renderHandoff } from '../src/authoring/handoff.ts';
 import { sealRun, unsealRun } from '../src/core/seal.ts';
 import { verifyBundle } from '../src/core/bundle.ts';
 import { scrubber, redactionRules } from '../src/core/privacy.ts';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { createTracegroveMcpServer } from '../src/mcp/server.ts';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -19,6 +22,20 @@ function voice() {
 }
 
 describe('readiness', () => {
+  it('lets an MCP agent read claims and challenge a check, but never sign off', async () => {
+    const p = voice();
+    const server = createTracegroveMcpServer({ configPath: p.configPath, agent: { agent: 'claude-code', source: 'test' } });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    const client = new Client({ name: 'test', version: '0' });
+    await client.connect(clientSide);
+    const call = async (name: string, args: Record<string, unknown> = {}) => (await client.callTool({ name, arguments: args }) as { structuredContent: Record<string, unknown> }).structuredContent;
+    expect(await call('readiness')).toMatchObject({ schemaVersion: 'tracegrove.readiness/v1', ready: false });
+    expect(await call('challenge_check', { case: 'calls.after-hours', reason: 'should also offer the next weekday slot' })).toMatchObject({ decision: 'challenged', by: 'agent:claude-code' });
+    expect(readDecisions(p.root).map((d) => d.decision)).toEqual(['challenged']);
+    expect((await client.listTools()).tools.map((t) => t.name)).not.toContain('accept');
+  });
+
   it('keeps execution, assessment, validity and decision separate, and binds sign-off to the evidence it saw', async () => {
     const p = voice();
     let state = readiness(p.root);

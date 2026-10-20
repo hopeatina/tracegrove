@@ -1,0 +1,240 @@
+{
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "maxLength": 64000,
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "maxItems": 5000,
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "propertyNames": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "const": 1,
+      "type": "number"
+    },
+    "channel": {
+      "enum": [
+        "voice",
+        "chat"
+      ],
+      "type": "string"
+    },
+    "durationMs": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "endpoint": {
+      "maxLength": 512,
+      "type": "string"
+    },
+    "kind": {
+      "const": "conversation",
+      "type": "string"
+    },
+    "maxFirstReplyMs": {
+      "anyOf": [
+        {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replies": {
+      "maxLength": 64000,
+      "type": "string"
+    },
+    "sessionId": {
+      "maxLength": 128,
+      "type": "string"
+    },
+    "toolCalls": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "required": [
+          "name",
+          "arguments",
+          "result"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "toolNames": {
+      "items": {
+        "maxLength": 128,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "transcript": {
+      "maxLength": 64000,
+      "type": "string"
+    },
+    "transport": {
+      "enum": [
+        "rtvi",
+        "http_chat"
+      ],
+      "type": "string"
+    },
+    "turns": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ended": {
+            "enum": [
+              "stopped",
+              "settled",
+              "response",
+              "timeout"
+            ],
+            "type": "string"
+          },
+          "firstReplyMs": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "index": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reply": {
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "say": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "toolCalls": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "arguments": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "name": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "result": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              "required": [
+                "name",
+                "arguments",
+                "result"
+              ],
+              "type": "object"
+            },
+            "maxItems": 16,
+            "type": "array"
+          },
+          "toolNames": {
+            "items": {
+              "maxLength": 128,
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "say",
+          "reply",
+          "firstReplyMs",
+          "durationMs",
+          "toolCalls",
+          "toolNames",
+          "ended"
+        ],
+        "type": "object"
+      },
+      "maxItems": 20,
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "channel",
+    "transport",
+    "endpoint",
+    "sessionId",
+    "turns",
+    "transcript",
+    "replies",
+    "toolCalls",
+    "toolNames",
+    "maxFirstReplyMs",
+    "durationMs",
+    "attempts"
+  ],
+  "type": "object"
+}

@@ -943,6 +943,450 @@
                   "mcp"
                 ],
                 "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "as": {
+                    "type": "string"
+                  },
+                  "expect": {
+                    "additionalProperties": false,
+                    "description": "Checks over the whole conversation.",
+                    "properties": {
+                      "calls": {
+                        "description": "Tools the agent must call.",
+                        "items": {
+                          "maxLength": 128,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "json": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "noCalls": {
+                        "description": "Tools the agent must not call.",
+                        "items": {
+                          "maxLength": 128,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "notSays": {
+                        "description": "Phrases the agent must never say.",
+                        "items": {
+                          "maxLength": 400,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "says": {
+                        "description": "Phrases the agent must say (each one, anywhere in the reply).",
+                        "items": {
+                          "maxLength": 400,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "within": {
+                        "description": "Milliseconds: the agent starts replying within this time.",
+                        "exclusiveMinimum": 0,
+                        "maximum": 60000,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "description": "name: dot.path into the conversation, like toolCalls[0].result.id.",
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  },
+                  "voice": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "endpoint": {
+                        "description": "WebSocket (voice) or POST (chat) path on the app.",
+                        "pattern": "^\\/",
+                        "type": "string"
+                      },
+                      "messageField": {
+                        "type": "string"
+                      },
+                      "replyPath": {
+                        "type": "string"
+                      },
+                      "sessionField": {
+                        "type": "string"
+                      },
+                      "settleMs": {
+                        "maximum": 10000,
+                        "minimum": 50,
+                        "type": "integer"
+                      },
+                      "toolsPath": {
+                        "type": "string"
+                      },
+                      "transport": {
+                        "description": "voice defaults to rtvi (Pipecat-style WebSocket); chat defaults to http_chat.",
+                        "enum": [
+                          "rtvi",
+                          "http_chat"
+                        ],
+                        "type": "string"
+                      },
+                      "turnTimeoutMs": {
+                        "maximum": 60000,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      "turns": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "expect": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "calls": {
+                                  "description": "Tools the agent must call.",
+                                  "items": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 16,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "noCalls": {
+                                  "description": "Tools the agent must not call.",
+                                  "items": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 16,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "notSays": {
+                                  "description": "Phrases the agent must never say.",
+                                  "items": {
+                                    "maxLength": 400,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 32,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "says": {
+                                  "description": "Phrases the agent must say (each one, anywhere in the reply).",
+                                  "items": {
+                                    "maxLength": 400,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 32,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "within": {
+                                  "description": "Milliseconds: the agent starts replying within this time.",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 60000,
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "say": {
+                              "description": "What the caller says; {saved} placeholders work.",
+                              "maxLength": 2000,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "say"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 20,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "endpoint",
+                      "turns"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "voice"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "as": {
+                    "type": "string"
+                  },
+                  "chat": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "endpoint": {
+                        "description": "WebSocket (voice) or POST (chat) path on the app.",
+                        "pattern": "^\\/",
+                        "type": "string"
+                      },
+                      "messageField": {
+                        "type": "string"
+                      },
+                      "replyPath": {
+                        "type": "string"
+                      },
+                      "sessionField": {
+                        "type": "string"
+                      },
+                      "settleMs": {
+                        "maximum": 10000,
+                        "minimum": 50,
+                        "type": "integer"
+                      },
+                      "toolsPath": {
+                        "type": "string"
+                      },
+                      "transport": {
+                        "description": "voice defaults to rtvi (Pipecat-style WebSocket); chat defaults to http_chat.",
+                        "enum": [
+                          "rtvi",
+                          "http_chat"
+                        ],
+                        "type": "string"
+                      },
+                      "turnTimeoutMs": {
+                        "maximum": 60000,
+                        "minimum": 100,
+                        "type": "integer"
+                      },
+                      "turns": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "expect": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "calls": {
+                                  "description": "Tools the agent must call.",
+                                  "items": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 16,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "noCalls": {
+                                  "description": "Tools the agent must not call.",
+                                  "items": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 16,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "notSays": {
+                                  "description": "Phrases the agent must never say.",
+                                  "items": {
+                                    "maxLength": 400,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 32,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "says": {
+                                  "description": "Phrases the agent must say (each one, anywhere in the reply).",
+                                  "items": {
+                                    "maxLength": 400,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "maxItems": 32,
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "within": {
+                                  "description": "Milliseconds: the agent starts replying within this time.",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 60000,
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "say": {
+                              "description": "What the caller says; {saved} placeholders work.",
+                              "maxLength": 2000,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "say"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 20,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "endpoint",
+                      "turns"
+                    ],
+                    "type": "object"
+                  },
+                  "expect": {
+                    "additionalProperties": false,
+                    "description": "Checks over the whole conversation.",
+                    "properties": {
+                      "calls": {
+                        "description": "Tools the agent must call.",
+                        "items": {
+                          "maxLength": 128,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "json": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "noCalls": {
+                        "description": "Tools the agent must not call.",
+                        "items": {
+                          "maxLength": 128,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "notSays": {
+                        "description": "Phrases the agent must never say.",
+                        "items": {
+                          "maxLength": 400,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "says": {
+                        "description": "Phrases the agent must say (each one, anywhere in the reply).",
+                        "items": {
+                          "maxLength": 400,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "within": {
+                        "description": "Milliseconds: the agent starts replying within this time.",
+                        "exclusiveMinimum": 0,
+                        "maximum": 60000,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "save": {
+                    "additionalProperties": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[[0-9]+\\])?)*$",
+                      "type": "string"
+                    },
+                    "description": "name: dot.path into the conversation, like toolCalls[0].result.id.",
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "timeoutMs": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 120000,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "chat"
+                ],
+                "type": "object"
               }
             ]
           },
