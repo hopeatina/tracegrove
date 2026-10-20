@@ -13,7 +13,7 @@ import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, NativeJobObservation, McpToolObservation, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, type ExecutionReceipt } from '../protocol/index.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -51,6 +51,8 @@ function excerpt(value: unknown, max = 240): string {
 
 function observedLine(output: unknown): string | null {
   if (!output || typeof output !== 'object') return null;
+  const conversation = ConversationObservation.safeParse(output);
+  if (conversation.success) return conversationLine(conversation.data);
   const mcp = McpToolObservation.safeParse(output);
   if (mcp.success) return `MCP ${mcp.data.endpoint} ${mcp.data.tool} -> ${mcp.data.isError ? 'tool error' : 'result'} ${excerpt(mcp.data.structuredContent ?? mcp.data.content)}`;
   const browser = BrowserObservation.safeParse(output);
@@ -58,6 +60,11 @@ function observedLine(output: unknown): string | null {
   const o = output as { method?: string; url?: string; status?: number; body?: unknown; bodyText?: string | null };
   const path = o.url ? o.url.replace(/^https?:\/\/[^/]+/, '') : '';
   return `${o.method ?? ''} ${path} -> ${o.status ?? '?'} ${excerpt(o.body ?? o.bodyText ?? '')}`.trim();
+}
+
+function conversationLine(observation: ConversationObservation): string {
+  return observation.turns.map((turn) => [`caller: ${turn.say}`, `agent: ${turn.reply || '(no reply)'}${turn.firstReplyMs !== null ? `  [${turn.firstReplyMs} ms]` : ''}`,
+    ...turn.toolCalls.map((call) => `  tool ${call.name}(${excerpt(call.arguments, 160)}) -> ${excerpt(call.result, 160)}`)].join('\n')).join('\n');
 }
 
 export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined): CaseReport {
@@ -68,13 +75,18 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const browser = BrowserObservation.safeParse(s.output);
     const job = NativeJobObservation.safeParse(s.output);
     const mcp = McpToolObservation.safeParse(s.output);
+    const conversation = ConversationObservation.safeParse(s.output);
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
       declared: !!info, expectStatus: info?.expectStatus ?? null, ...(info?.expectation ? { expectation: info.expectation } : {}),
-      ...(mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
+      ...(conversation.success ? { observedText: conversationLine(conversation.data) } : mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;
-  const failedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
-  const failedAssertion = receipt.assertions.find((a) => a.result !== 'pass');
+  const order = new Map(receipt.steps.map((s, index) => [s.stepId, index]));
+  const failedAssertion = receipt.assertions.filter((a) => a.result !== 'pass')
+    .sort((a, b) => (order.get(a.assertionId.replace(/\.expect$/, '')) ?? 1e9) - (order.get(b.assertionId.replace(/\.expect$/, '')) ?? 1e9))[0];
+  const firstFailedStep = receipt.steps.find((s) => s.result === 'failed' || s.result === 'cancelled');
+  // A readback that completed but disagreed comes before a later step that then failed because of it.
+  const failedStep = firstFailedStep && failedAssertion && (order.get(failedAssertion.assertionId.replace(/\.expect$/, '')) ?? 1e9) < (order.get(firstFailedStep.stepId) ?? 0) ? undefined : firstFailedStep;
   if (receipt.outcome === 'blocked' && receipt.steps.every(step => step.result === 'not_run')) {
     failure = { step: '(before steps)', message: receipt.reasonCodes.join(', ') || 'blocked before steps', observed: null };
   } else if (failedStep) {

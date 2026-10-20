@@ -38,6 +38,13 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
   if (spec.capture.video === 'required' && !capabilities.captureFormats.includes('video/webm')) reasons.push({ code: 'required_video_unsupported', detail: 'runner does not advertise video capture' });
   const browserSteps = spec.steps.filter(step => step.kind.startsWith('ui.'));
   const jobSteps = spec.steps.filter(step => step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel');
+  const conversationSteps = spec.steps.filter(step => step.kind === 'conversation.run');
+  if (conversationSteps.length > (spec.effects.maxConversations ?? 0)) reasons.push({ code: 'conversation_limit', detail: 'Conversations exceed the explicitly declared effect ceiling' });
+  for (const step of conversationSteps) {
+    if (spec.effects.mode !== 'designated_writes') reasons.push({ code: 'conversation_effect_not_admitted', detail: `${step.id}: a conversation can trigger agent tools, so it needs designated writes` });
+    if (step.retry.attempts !== 1) reasons.push({ code: 'conversation_retry_unsupported', detail: `${step.id}: conversations run once; a retry could repeat agent side effects` });
+    if (!spec.effects.allowedResourcePrefixes.some(prefix => step.command.endpoint === prefix || step.command.endpoint.startsWith(`${prefix}/`))) reasons.push({ code: 'conversation_endpoint_not_admitted', detail: `${step.id}: endpoint is outside the effect envelope` });
+  }
   const mcpSteps = spec.steps.filter(step => step.kind === 'mcp.call');
   if (mcpSteps.length > (spec.effects.maxMcpCalls ?? 0)) reasons.push({ code: 'mcp_call_limit', detail: 'MCP calls exceed the explicitly declared effect ceiling' });
   for (const step of mcpSteps) {
@@ -83,6 +90,7 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     if (step.kind === 'ui.observe') templateNames(step.target, used);
     if (step.kind === 'job.submit' || step.kind === 'job.observe' || step.kind === 'job.cancel') templateNames(step.command, used);
     if (step.kind === 'mcp.call') templateNames(step.command.arguments, used);
+    if (step.kind === 'conversation.run') templateNames(step.command.turns, used);
     for (const name of used) if (!declared.has(name)) reasons.push({ code: 'undeclared_variable', detail: `${step.id} uses {${name}} without declaring it in inputs` });
     for (const [name, source] of Object.entries(step.inputs) as Array<[string, VariableSource]>) {
       switch (source.kind) {
@@ -101,6 +109,7 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
           break;
         }
         case 'credential':
+          if (step.kind === 'conversation.run') reasons.push({ code: 'conversation_credential_expansion_unsupported', detail: `${step.id}: credentials are sent as auth, never spoken into a conversation` });
           if (step.kind === 'mcp.call') reasons.push({ code: 'mcp_credential_expansion_unsupported', detail: `${step.id}: use MCP auth rather than expanding credentials into tool arguments` });
           if (step.kind.startsWith('ui.')) reasons.push({ code: 'browser_credential_expansion_unsupported', detail: `${step.id}: credentials cannot be filled into recorded browser steps` });
           credentialNames.add(source.name); break;
@@ -120,7 +129,8 @@ export function compileCase(spec: CaseSpec, capabilities: RunnerCapabilities, re
     if (!stepsById.has(assertion.stepId)) reasons.push({ code: 'assertion_unknown_step', detail: `${assertion.id} -> ${assertion.stepId}` });
     const assertedStep = stepsById.get(assertion.stepId);
     if (assertion.oracle.name === 'browser.observation' && !assertedStep?.kind.startsWith('ui.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: browser oracle needs a browser step` });
-    if (assertion.oracle.name === 'http.observation' && (assertedStep?.kind.startsWith('ui.') || assertedStep?.kind.startsWith('job.') || assertedStep?.kind === 'mcp.call')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle needs an HTTP step` });
+    if (assertion.oracle.name === 'http.observation' && (assertedStep?.kind.startsWith('ui.') || assertedStep?.kind.startsWith('job.') || assertedStep?.kind === 'mcp.call' || assertedStep?.kind === 'conversation.run')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: HTTP oracle needs an HTTP step` });
+    if (assertion.oracle.name === 'conversation.observation' && assertedStep?.kind !== 'conversation.run') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: conversation oracle needs a conversation step` });
     if (assertion.oracle.name === 'mcp.observation' && assertedStep?.kind !== 'mcp.call') reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: MCP oracle needs an MCP call` });
     if (assertion.oracle.name === 'job.observation' && !assertedStep?.kind.startsWith('job.')) reasons.push({ code: 'oracle_step_mismatch', detail: `${assertion.id}: job oracle needs a native job step` });
   }

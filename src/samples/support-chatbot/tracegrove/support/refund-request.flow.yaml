@@ -1,0 +1,25 @@
+title: A customer asks about an order, requests a refund, and a real ticket is opened
+risk: critical
+tags: [chat, support]
+steps:
+  - name: customer chats about a stale order
+    chat:
+      endpoint: /chat
+      turns:
+        - say: Hi, where is my order 1042?
+          expect: { says: [shipped, UPS, Thursday], calls: [lookup_order], within: 1000 }
+        - say: It arrived but the beans are stale. I'd like a refund.
+          expect: { says: [ticket, refund, "1042"], calls: [create_ticket] }
+    save:
+      ticketId: toolCalls[1].result.ticket.id
+  - name: support sees the open ticket
+    GET: /tickets/{ticketId}
+    as: support
+    observe: true
+    expect:
+      status: 200
+      json: { ticket.orderId: "1042", ticket.customer: alice, ticket.reason: stale_product, ticket.status: open }
+  - name: another customer cannot open it
+    GET: /tickets/{ticketId}
+    as: other_customer
+    expect: { status: 403, absent: [ticket] }

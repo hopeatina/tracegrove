@@ -143,7 +143,9 @@ export function captureValues(observation: Pick<HttpObservation, 'body'> & Parti
       case 'json': {
         let current: unknown = observation.body;
         for (const segment of (capture.path ?? '').split('.').filter(Boolean)) {
-          current = current && typeof current === 'object' ? (current as Record<string, unknown>)[segment] : undefined;
+          const indexed = segment.match(/^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\]$/);
+          current = current && typeof current === 'object' ? (current as Record<string, unknown>)[indexed ? indexed[1]! : segment] : undefined;
+          if (indexed) current = Array.isArray(current) ? current[Number(indexed[2])] : undefined;
         }
         if (current === undefined) throw new HttpStepError('capture_missing', `capture ${capture.name}: path ${capture.path} absent from response`);
         values[capture.name] = current;

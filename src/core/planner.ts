@@ -36,6 +36,7 @@ export function caseWrites(spec: CaseSpec): string[] {
   for (const step of spec.steps) {
     if (step.kind === 'http.request' && step.method !== 'GET' && step.method !== 'HEAD') writes.add(step.method);
     if (step.kind === 'mcp.call') writes.add('mcp.call');
+    if (step.kind === 'conversation.run') writes.add('conversation.run');
     if (step.kind.startsWith('job.')) writes.add(step.kind);
     if (step.kind === 'ui.action') writes.add('ui.action');
   }

@@ -31,6 +31,7 @@ export const CAPABILITIES = {
   observe: { version: 1, layer: 'surface', summary: 'Independent readback polling', providedBy: LIVE, requires: ['http.request'], probe: null, writes: false, docs: docs('capabilities') },
   'fixture.http': { version: 1, layer: 'fixture', summary: 'Owned fixtures created and deleted through the app API', providedBy: LIVE, requires: ['http.request'], probe: null, writes: true, docs: docs('capabilities') },
   'mcp.call': { version: 1, layer: 'surface', summary: 'MCP tool calls over streamable HTTP', providedBy: LAUNCHED, requires: ['http.request'], probe: 'mcp_sdk', writes: false, docs: docs('capabilities') },
+  'conversation.run': { version: 1, layer: 'surface', summary: 'Scripted voice or chat conversation (RTVI WebSocket or HTTP chat)', providedBy: LIVE, requires: ['http.request'], probe: null, writes: true, docs: 'docs/voice-and-chat.md' },
   'ui.navigate': { version: 1, layer: 'surface', summary: 'Browser navigation (Playwright)', providedBy: LAUNCHED, requires: ['http.request'], probe: 'playwright', writes: false, docs: docs('capabilities') },
   'ui.action': { version: 1, layer: 'surface', summary: 'Browser actions (Playwright)', providedBy: LAUNCHED, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
   'ui.observe': { version: 1, layer: 'surface', summary: 'Browser observations (Playwright)', providedBy: LAUNCHED, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
@@ -48,8 +49,8 @@ export type CapabilityId = keyof typeof CAPABILITIES;
 export const isCapabilityId = (id: string): id is CapabilityId => Object.hasOwn(CAPABILITIES, id);
 
 /** Capability ids a compiled case needs, in the order the compiler always wrote them. */
-export function caseCapabilities(input: { mcp: boolean; browser: boolean; fixtures: boolean }): CapabilityId[] {
-  return ['http.request', 'observe', ...(input.mcp ? ['mcp.call' as const] : []), ...(input.browser ? ['ui.navigate', 'ui.action', 'ui.observe'] as const : []), ...(input.fixtures ? ['fixture.http' as const] : [])];
+export function caseCapabilities(input: { mcp: boolean; browser: boolean; fixtures: boolean; conversation?: boolean }): CapabilityId[] {
+  return ['http.request', 'observe', ...(input.mcp ? ['mcp.call' as const] : []), ...(input.conversation ? ['conversation.run' as const] : []), ...(input.browser ? ['ui.navigate', 'ui.action', 'ui.observe'] as const : []), ...(input.fixtures ? ['fixture.http' as const] : [])];
 }
 
 /** Why `host` cannot run something that needs `id`, or null when it can. */
