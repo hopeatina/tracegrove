@@ -20,6 +20,14 @@ import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readFrozenBundle } from '../core/frozenBundle.ts';
 import { inspectFrozenPlan } from '../core/planInspection.ts';
 import { inspectExecution, inspectFailedSteps } from '../core/executionInspection.ts';
+import { compareReplays } from '../core/replayComparison.ts';
+import { WorkflowKnowledgeSnapshot } from '../core/workflowKnowledge.ts';
+import { inspectPersonaPools } from '../core/coordination.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
+import { inspectAttemptInventory } from '../core/attemptInventory.ts';
+import { inspectBenchmark } from '../core/benchmark.ts';
+import { formatBenchmark } from './benchmark.ts';
+import { NativeObservationSnapshot, exportImportedObservations, readImportedObservations } from '../imports/index.ts';
 import { checkCleanupFiles } from './cleanup.ts';
 import { readConfigurationJson } from './jsonFile.ts';
 import { jsonRequested, parseArgs, type Args } from './arguments.ts';
@@ -52,6 +60,8 @@ import { capabilityMatrix, envList, envShow, explain, whoamiCommand } from '../e
 import { runEnvDoctor } from '../environments/doctorCache.ts';
 import { configGet, configPatch, configSet, envAddPatch, parseValue } from '../authoring/configEdit.ts';
 import { renderApproval, renderCapabilities, renderConfigEdit, renderDoctor, renderEnvList, renderEnvShow, renderExplain, renderWhoami } from './renderEnv.ts';
+import { readSavedRun } from '../authoring/runSource.ts';
+import { retainNativeImport } from '../authoring/nativeImports.ts';
 
 function flag(args: Args, name: string): string | null {
   const value = (args.flags as Record<string, unknown>)[name];
@@ -147,6 +157,17 @@ Low-level corpus commands (the strict workflow.*/v1 files):
   inspect --request <request.json>                    inspect frozen structure; no runtime or authority checks
   export --execution <id> --state-dir <dir> --output <dir>
   verify-bundle --bundle <dir>                         recheck hashes, digests and re-reduce the verdict
+  compare --baseline <bundle> --candidate <bundle>     compare verified recorded results; no execution or qualification
+  workflow-map --bundle <bundle> [--cell <cell>]       derive cited recorded navigation, prerequisites and coverage
+  workflows --bundle <bundle> [--text <text>]         look up recorded workflows; revalidate at execution
+       [--route <path> --case <id> --workflow <id> --surface <surface> --tag <tag> --limit <1..100> --cursor <cursor>]
+  usage --state-dir <dir>                             inspect every admission at one ledger checkpoint; no recovery
+  benchmark --state-dir <dir> --axis runner|model      compare recorded cohorts across all checkpoint admissions
+  pools --snapshot <json> [--pool <id>]                inspect recorded persona pool availability; no reservation or credentials
+  import-observations --format playwright_json|junit_xml --input <file> --output <new-dir>|--into <project>
+       [--artifact-root <owned-dir>]                  capture foreign report bytes and selected attachments; no execution
+       [--producer <name> --producer-version <v>]      declare missing producer metadata explicitly
+  observations --archive <dir>                        recheck imported bytes and show producer-reported attempts
   result-ingest --bundle <dir> --sink <dir>             retain verified local evidence; does not qualify or activate it
   awr-prepare --sink <dir> --id <result-id> --destination <json>
                                                        freeze a redacted AWR export and exact destination; no network
@@ -351,10 +372,10 @@ async function main(argv: string[]): Promise<number> {
       const configPath = findConfig(flag(args, 'config') ?? '.');
       const root = dirname(configPath);
       const runDir = resolveRun(root, flag(args, 'run') ?? 'latest');
-      if (!runDir || !existsSync(join(runDir, 'summary.json'))) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
-      const report = JSON.parse(readFileSync(join(runDir, 'summary.json'), 'utf8')) as TestRunReport;
+      if (!runDir) throw new Blocked([{ code: 'run_not_found', detail: flag(args, 'run') ?? 'latest', owner: 'operator', action: 'run tracegrove test first, or pass --run <folder name>' }]);
+      const report = readSavedRun(runDir);
       out(args, report, renderTree(report, root, paint()));
-      return 0;
+      return report.bundleVerified === false ? 2 : 0;
     }
 
     case 'ui': {
@@ -568,6 +589,75 @@ async function main(argv: string[]): Promise<number> {
         process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal);
         ledger?.close();
       }
+    }
+
+    case 'import-observations': {
+      const captured = NativeObservationSnapshot.open({ file: args.flags.input, format: args.flags.format, scope: localScope(),
+        ...(args.flags['artifact-root'] ? { artifactRoot: args.flags['artifact-root'] } : {}),
+        ...(args.flags.producer ? { producer: { name: args.flags.producer, version: args.flags['producer-version']! } } : {}) });
+      const report = args.flags.into ? retainNativeImport(args.flags.into, captured).report : exportImportedObservations(captured, args.flags.output!).report;
+      out(args, report, `Imported native observations · ${report.observations.length} reported observation(s)\n` +
+        `${report.attachments.filter(a => a.state === 'captured').length} captured attachment(s); ${report.warnings.length} limitation(s).\n` +
+        'Issuer not authenticated; qualification and verification not evaluated. No execution was started.');
+      return 0;
+    }
+    case 'observations': {
+      const report = readImportedObservations(args.flags.archive).report;
+      const counts = Object.fromEntries([...new Set(report.observations.map(a => a.outcome))].map(status => [status, report.observations.filter(a => a.outcome === status).length]));
+      out(args, report, `Imported native observations · ${report.format}\nProducer-reported observations: ${JSON.stringify(counts)}\n` +
+        `Limitations: ${report.warnings.join(', ') || 'none recorded'}\nIssuer not authenticated; qualification and verification not evaluated.`);
+      return 0;
+    }
+    case 'benchmark': {
+      const report = inspectBenchmark({ stateDir: args.flags['state-dir'], scope: localScope(), axis: args.flags.axis });
+      out(args, report, formatBenchmark(report));
+      return report.exitCode;
+    }
+    case 'usage': {
+      const report = inspectAttemptInventory({ stateDir: args.flags['state-dir'], scope: localScope() });
+      const rows = report.attempts.map(row => `  ${row.executionId ?? `admission #${row.admissionSequence}`} · ${row.kind} · ${row.status}${row.outcome ? ` · ${row.outcome}` : ''}`);
+      out(args, report, `Execution inventory · ${report.code}\n${rows.join('\n')}\n` +
+        (report.recordedUsageSubtotal ? `Recorded runner wall time: ${report.recordedUsageSubtotal.runnerSeconds}s across ${report.recordedUsageSubtotal.receipts} retained receipts.\n` : 'Usage unavailable.\n') +
+        (report.recordedPricing ? `Recorded estimated subtotal: ${report.recordedPricing.estimatedSubtotalCents ?? 'unavailable'} cents; ${report.recordedPricing.unpricedEstimates} unpriced receipt(s).\n` : 'Pricing unavailable.\n') +
+        'Checkpoint admissions only; recorded subtotals are not authenticated invoices. No recovery or execution was performed.');
+      return report.exitCode;
+    }
+
+    case 'pools': {
+      const report=inspectPersonaPools(JSON.parse(readBoundedFile(resolve(args.flags.snapshot),8*1024*1024).toString('utf8')));
+      if(args.flags.pool)report.pools=report.pools.filter(p=>p.poolRef.id===args.flags.pool);
+      out(args,report,`Recorded persona pools · ${report.pools.length}\n`+report.pools.map(p=>`${p.poolRef.id}: ${p.unreleased}/${p.maxConcurrent} unreleased · ${p.members.length} members`).join('\n')+
+        `\n${report.reservedCents}/${report.budgetCents} cents retained reservation budget.\nSupplied snapshot only; lease time not evaluated. No reservation or credential was issued.`);
+      return 0;
+    }
+    case 'workflow-map': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle)));
+      const report=args.flags.cell?snapshot.get(args.flags.cell):snapshot.report;
+      out(args,report,`Recorded workflow knowledge · ${snapshot.report.workflows.length} selection(s)\n`+
+        'Declared routes and landmarks are distinct from recorded observations. Revalidate at execution; no authority or qualification granted.');
+      return 0;
+    }
+    case 'workflows': {
+      const snapshot=WorkflowKnowledgeSnapshot.capture(VerifiedBundleSnapshot.open(resolve(args.flags.bundle))),flags=args.flags;
+      const page=snapshot.search({...(flags.text?{text:flags.text}:{}),...(flags.case?{caseId:flags.case}:{}),...(flags.workflow?{workflowId:flags.workflow}:{}),
+        ...(flags.route?{route:flags.route}:{}),...(flags.surface?{surface:flags.surface}:{}),...(flags.tag?{tag:flags.tag}:{}),
+        ...(flags.limit?{limit:Number(flags.limit)}:{}),...(flags.cursor?{cursor:flags.cursor}:{})});
+      out(args,page,`Recorded workflow lookup · ${page.results.length} of ${page.total}\n`+
+        page.results.map(w=>`${w.selectionCellId} · ${w.caseRef.id} · ${w.receipt?.outcome??'receipt unavailable'}\n  ${w.purpose}`).join('\n')+
+        (page.cursor?`\nNext cursor: ${page.cursor}`:'')+'\nRecorded evidence only; revalidate landmarks and authority at execution.');
+      return 0;
+    }
+    case 'compare': {
+      let baseline: VerifiedBundleSnapshot, candidate: VerifiedBundleSnapshot;
+      try {
+        baseline = VerifiedBundleSnapshot.open(resolve(args.flags.baseline)); candidate = VerifiedBundleSnapshot.open(resolve(args.flags.candidate));
+      } catch { throw new Conflict('comparison requires two valid evidence bundles'); }
+      const report = compareReplays(baseline, candidate);
+      const rows = report.rows.map(row => `${row.dimensions.caseId} [${row.dimensions.personaId}, ${row.dimensions.environmentId}]\n` +
+        `  ${row.baseline.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} → ${row.candidate.map(point => point.outcome ?? 'missing receipt').join(', ') || 'not selected'} · ${row.change}`);
+      out(args, report, `Verified recorded comparison · ${report.executionIdentityRelation}\n${rows.join('\n')}\n` +
+        `Provided bundles only; issuer not authenticated; qualification not evaluated.\nExcluded cells: baseline ${report.baseline.excludedCells.length}, candidate ${report.candidate.excludedCells.length}`);
+      return 0;
     }
 
     case 'inspect': {

@@ -34,6 +34,8 @@ it('runs native submissions, deduplication, owner isolation, worker readback, ca
     expect(receipt.hostObservationRefs.length).toBeGreaterThan(0);
     expect(receipt.cleanup.confirmed).toEqual(expect.arrayContaining(['host.process', 'host.workspace']));
     expect(receipt.cleanup.remainingUnknownMutations).toBe(0);
+    expect(receipt.performance.length).toBeGreaterThan(0);
+    expect(receipt.performance.every(value => value.boundary === 'native_job' && value.warm === null)).toBe(true);
     for (const step of receipt.steps) {
       const job = NativeJobObservation.parse(step.output); states.add(job.status);
       if (job.workerId) {

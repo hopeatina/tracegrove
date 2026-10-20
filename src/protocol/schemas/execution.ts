@@ -124,6 +124,7 @@ export const RunRequest = z.object({
   reviewRef: RefSchema.nullable(),
   scenarioRefs: refList(),
   qualificationRoundRef: RefSchema.nullable(),
+  regressionAdmissionRef: RefSchema.optional(),
   effectiveConfigRef: RefSchema,
   sourceSelectionRef: RefSchema.nullable(),
   executionHostRef: RefSchema.nullable(),
@@ -451,7 +452,7 @@ export const PerformanceObservation = z.object({
   cellId: IdString,
   valueMs: NonNegInt.nullable(),
   censored: z.boolean(),
-  warm: z.boolean(),
+  warm: z.boolean().nullable(), // null = cache/startup temperature was not observed
   strata: z.record(z.string().max(64), ShortText),
 }).strict();
 

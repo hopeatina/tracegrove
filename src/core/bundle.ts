@@ -8,6 +8,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { createDurableDirectory, requireRealDirectory, syncDirectory, syncDirectoryAncestors, syncRegularFile, writeExclusiveDurable } from './atomicFiles.ts';
 import { readBoundedFile } from './boundedFile.ts';
 import { checkCellEvidence } from './bundleEvidence.ts';
+import { validateRecordedRegression } from './regressionExecution.ts';
 import { BundleSnapshot, BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
 export { BUNDLE_SCHEMA_VERSION, BUNDLE_LIMITS } from './bundleSnapshot.ts';
 import {
@@ -260,6 +261,7 @@ function verifySnapshot(snapshot: BundleSnapshot): Inspection {
   if (!sameRef(request.selectionManifestRef, selection.ref) || !sameRef(campaign.selectionManifestRef, selection.ref) || !sameRef(campaign.requestRef, request.ref) ||
       request.campaignId !== campaign.campaignId || !sameScope(request.requestedScope, selection.scope) || !sameScope(request.requestedScope, campaign.scope)) problems.push('request/selection/campaign binding or scope mismatch');
   const selectedCases = [...new Set(selection.cells.map(cell => refKey(cell.caseRef)))].sort();
+  validateRecordedRegression(request, selection, documents);
   if (new Set(request.caseRefs.map(refKey)).size !== request.caseRefs.length || digestOfValue([...request.caseRefs.map(refKey)].sort()).hex !== digestOfValue(selectedCases).hex) problems.push('request cases differ from the complete selection');
   const receipts: ExecutionReceipt[] = [];
   const cellNames = [...new Set(snapshot.paths().filter(path => path.startsWith('cells/')).map(path => path.split('/')[1]!))].sort();

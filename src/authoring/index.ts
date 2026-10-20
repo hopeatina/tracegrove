@@ -1,5 +1,5 @@
 export { compileProject, findConfig, configInDirectory, caseIdFor, CONFIG_FILE, CONFIG_FILES, STATE_DIR, type CompileResult, type CompiledFlowInfo } from './compile.ts';
-export { runTests, resolveRun, renderJunit, renderMarkdown, renderText, type TestRunReport, type CaseReport } from './run.ts';
+export { runTests, resolveRun, renderJunit, renderMarkdown, renderText } from './run.ts';
 export { initProject, detect, AUTH_SNIPPETS } from './init.ts';
 export { AuthoringConfig, Flow, FlowStep, HttpFlowStep, BrowserFlowStep, JobFlowStep, Fixture, RunVideo, exportAuthoringSchemas } from './schema.ts';
 export { discover, draftFlow, gitInfo, scanSource, type Discovery, type Route } from './discover.ts';
@@ -12,3 +12,7 @@ export { projectStatus, projectRoot, type ProjectStatus, type NextAction } from 
 export { defineConfig, flow, fixture } from './typed.ts';
 export { VerificationSourceSelection, VerificationSourceBinding } from './sourceSelection.ts';
 export { previewVerificationSource, saveVerificationSource, savedVerificationSource } from './verificationSource.ts';
+export { StepReport, CaseReport, TestRunReport, SavedRunName } from './runReport.ts';
+export { readSavedRun, readRunSource, CheckedRunReport } from './runSource.ts';
+export { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+export { NativeImportName, NativeImportEntry, listNativeImports, readNativeImport, retainNativeImport } from './nativeImports.ts';

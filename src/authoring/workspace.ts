@@ -98,7 +98,7 @@ export function latestObservedRun(root: string, sourceDigest: string | null, dep
   for (const name of names) {
     let saved: ReturnType<typeof readSavedRun>;
     try { saved = readSavedRun(root, name); } catch { continue; }
-    if (saved.savedEvidence.status !== 'verified') continue;
+    if (saved.evidenceStatus !== 'verified') continue;
     if (anchor && saved.sourceDigest !== anchor.digest) continue;
     anchor ??= { run: name, digest: saved.sourceDigest };
     for (const c of saved.cases) if (!cases.has(c.caseId)) cases.set(c.caseId, { caseId: c.caseId, requests: c.requests ?? [] });

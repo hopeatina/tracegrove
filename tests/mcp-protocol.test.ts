@@ -26,6 +26,10 @@ it('runs the native MCP sample with HTTP readback and owner isolation, then inde
   const bundle = readVerifiedBundle(join(report.runDir, 'bundle'));
   const receipt = bundle.receipts[0]!;
   expect(receipt.accounting.integrationOperations).toBe(1);
+  expect(receipt.accounting).toMatchObject({ estimatedCents: null, reconciledCents: null,
+    unknownCharges: expect.arrayContaining([expect.objectContaining({ route: 'provider_operation' })]) });
+  expect(receipt.performance.map(value => value.boundary)).toEqual(['mcp', 'http', 'http']);
+  expect(receipt.performance.every(value => value.warm === null)).toBe(true);
   const observation = McpToolObservation.parse(receipt.steps[0]!.output);
   expect(observation).toMatchObject({ isError: false, protocolVersion: '2025-11-25', server: { name: 'native-notes' }, attempts: 1 });
   expect(receipt.steps[1]!.output).toMatchObject({ status: 200, body: { note: { title: 'Protocol proof', ownerId: 'alice' } } });

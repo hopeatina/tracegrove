@@ -12,6 +12,7 @@ import type { LocalScenarioOwner } from './localScenarioOwner.ts';
 import type { LocalReviewStore } from './localReviewStore.ts';
 import { localScenarioPromotionPorts, type LocalScenarioPromotionAuthority } from './localScenarioPromotion.ts';
 import type { ApprovedPlanSnapshot } from './sourcePromotion.ts';
+import { localScenarioRegressionOwner, type LocalScenarioRegressionAuthority } from './localScenarioRegression.ts';
 
 export interface LocalScenarioAuthority {
   /** Required for source-derived definitions. The same-ledger owner supplies current evidence and a synchronous fence. */
@@ -75,7 +76,7 @@ export class LocalScenarioStore {
     if (state.scenarios.some(item => item.projection.id === this.id)) throw new Conflict('local scenario is already initialized');
     const projection = ScenarioProjection.parse({ id: this.id, scope: this.scope, aggregateVersion: 1, definitionRef: definition.ref,
       state: initialState, invalidationEpoch: 0, latestRoundSequence: 0, qualificationRoundRefs: [], activationDecisionRef: null });
-    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], structuralValidations: [], promotion: null });
+    state.scenarios.push({ projection, definitions: [definition], selections: uniqueSelections, admissions: [], activations: [], regressionAdmissions: [], structuralValidations: [], promotion: null });
     reviewed?.assertCurrent();
     this.write(version, state, 'workflow.scenario.initialized');
   }
@@ -174,6 +175,9 @@ export class LocalScenarioStore {
   }
   activationPorts(results: LocalQualificationResults, authority: LocalScenarioActivationAuthority) {
     return localScenarioActivationPorts(this.owner(), results, authority);
+  }
+  regressionOwner(authority: LocalScenarioRegressionAuthority) {
+    return localScenarioRegressionOwner(this.owner(), authority);
   }
   structuralPorts(authority: LocalScenarioStructureAuthority) {
     return localScenarioStructurePorts(this.owner(), authority);

@@ -29,7 +29,7 @@ export function deriveScenarioStructure(token: ScenarioRevisionToken, projection
   matrix: SelectionManifest, bundle: FrozenBundle, actor: z.infer<typeof StructuralActor>, validatedAt: string) {
   const intent = structuralIntent(token, bundle); const { request } = intent;
   if (!['proposed', 'degraded'].includes(projection.state)) throw new Conflict('structural validation requires a proposed or degraded scenario');
-  if (!['trial', 'work_proof'].includes(request.purpose) || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef) throw new Conflict('structural validation requires an unchanged non-lifecycle frozen plan');
+  if (!['trial', 'work_proof'].includes(request.purpose) || request.sourcePlanRef || request.reviewRef || request.scenarioRefs.length || request.qualificationRoundRef || request.regressionAdmissionRef) throw new Conflict('structural validation requires an unchanged non-lifecycle frozen plan');
   if (bundle.blockers.length) throw new Blocked(bundle.blockers);
   validateQualificationMatrix(definition, matrix, matrix);
   const { selection } = prepareFrozenCells(bundle, token.scope, request);

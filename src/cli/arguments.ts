@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdString, RunRequest } from '../protocol/index.ts';
+import { CliCommandName, IdString, NativeReportFormat, RunRequest } from '../protocol/index.ts';
 import { Blocked } from '../core/errors.ts';
 import { SampleName } from './samples/catalog.ts';
 
@@ -50,6 +50,19 @@ export const COMMAND_SCHEMAS = {
     'choose --request, --bundle, or --execution with --state-dir; --failed-step is only for execution evidence'),
   export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
   'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
+  compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
+  'workflow-map': z.object({...common,bundle:Text,cell:IdString.optional()}).strict(),
+  workflows: z.object({...common,bundle:Text,text:Text.max(256).optional(),case:IdString.optional(),workflow:IdString.optional(),
+    route:Text.max(4096).startsWith('/').optional(),surface:z.enum(['ui','api','job','integration','hybrid']).optional(),tag:IdString.optional(),cursor:Text.max(1024).optional(),
+    limit:Text.regex(/^[1-9][0-9]{0,2}$/).refine(value=>Number(value)<=100,'limit must be 1..100').optional()}).strict(),
+  usage: z.object({ ...common, 'state-dir': Text }).strict(),
+  benchmark: z.object({ ...common, 'state-dir': Text, axis: z.enum(['runner', 'model']) }).strict(),
+  pools:z.object({...common,snapshot:Text,pool:IdString.optional()}).strict(),
+  'import-observations': z.object({ ...common, input: Text, format: NativeReportFormat, output: Text.optional(), into: Text.optional(),
+    'artifact-root': Text.optional(), producer: Text.optional(), 'producer-version': Text.optional() }).strict()
+    .refine(flags => !!flags.producer === !!flags['producer-version'], 'provide both producer name and version')
+    .refine(flags => !!flags.output !== !!flags.into, 'select either output or into'),
+  observations: z.object({ ...common, archive: Text }).strict(),
   'result-ingest': z.object({ ...common, bundle: Text, sink: Text }).strict(),
   results: z.object({ ...common, sink: Text, id: IdString.optional(), cursor: Text.optional(), limit: Text.regex(/^(?:[1-9][0-9]?|100)$/).optional() }).strict(),
   'awr-prepare': z.object({ ...common, sink: Text, id: IdString, destination: Text }).strict(),
@@ -63,7 +76,7 @@ export const COMMAND_SCHEMAS = {
   'recovery-status': z.object({ ...common, 'state-dir': Text, execution: Text }).strict(),
   'source-materialize': z.object({ ...common, input: Text, repository: Text, root: Text, side: z.enum(['base', 'head']), output: Text }).strict(),
   schema: z.object({ ...common, output: Text }).strict(),
-} as const;
+} as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 /** Most positional words each command accepts (its schema's `_` array validates the rest). */
 const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3 };
 export type Args = {

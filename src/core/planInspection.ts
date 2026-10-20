@@ -36,6 +36,6 @@ export function inspectFrozenPlan(input: unknown, scope: Scope): FrozenPlanInspe
   return FrozenPlanInspection.parse({ schemaVersion: 'tracegrove.plan-inspection/v1', structural: blockers.length ? 'blocked' : 'valid', executionAuthority: 'not_checked',
     scope: request?.requestedScope ?? null, requestRef: request?.ref ?? null, purpose: request?.purpose ?? null, replayOf: request?.replayOf ?? null,
     sourceSelectionRef: request?.sourceSelectionRef ?? null, sourcePlanRef: request?.sourcePlanRef ?? null, reviewRef: request?.reviewRef ?? null,
-    requiresQualificationOwner: request?.purpose === 'qualification' || !!request?.sourcePlanRef || !!request?.scenarioRefs.length,
+    requiresQualificationOwner: request?.purpose === 'qualification' || request?.purpose === 'regression' || !!request?.regressionAdmissionRef || !!request?.sourcePlanRef || !!request?.scenarioRefs.length,
     executableClosureDigest: digestOfValue({ request, documents: bundle.documents }), cells, blockers });
 }
