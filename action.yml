@@ -1,0 +1,96 @@
+name: tracegrove proof card
+description: Run tracegrove flows and post one PR comment, updated in place, saying which claims hold on this commit.
+branding: { icon: check-circle, color: green }
+inputs:
+  directories:
+    description: Folders that hold a tracegrove.config.yaml, one per line. Default is the repository root.
+    default: .
+  run:
+    description: Run `tracegrove test` in each folder first. Set to false when an earlier step already ran them.
+    default: 'true'
+  env:
+    description: Environment to test (local, staging, or one declared in the config).
+    default: local
+  tracegrove:
+    description: Command that runs tracegrove.
+    default: npx --yes tracegrove
+  title:
+    description: Heading on the card.
+    default: tracegrove
+  comment:
+    description: Post or update the PR comment (needs pull-requests write). The card always goes to the job summary.
+    default: 'true'
+  fail-on-contradiction:
+    description: Fail this step when any claim fails.
+    default: 'true'
+outputs:
+  verdict:
+    description: holds, fails or incomplete
+    value: ${{ steps.card.outputs.verdict }}
+runs:
+  using: composite
+  steps:
+    - name: Run flows
+      if: inputs.run == 'true'
+      shell: bash
+      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', TG_ENV: '${{ inputs.env }}' }
+      run: |
+        status=0
+        while IFS= read -r dir; do
+          [ -z "$dir" ] && continue
+          $TG test --config "$dir" --env "$TG_ENV" || status=$?
+        done <<< "$DIRS"
+        echo "tracegrove test finished with exit $status; the card reports each claim"
+    - name: Handoff reports
+      shell: bash
+      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', OUT: '${{ runner.temp }}/tracegrove-proof' }
+      run: |
+        mkdir -p "$OUT"
+        i=0
+        while IFS= read -r dir; do
+          [ -z "$dir" ] && continue
+          i=$((i+1)); $TG handoff --dir "$dir" --out "$OUT/$i-$(basename "$(cd "$dir" && pwd)").html" >/dev/null || true
+        done <<< "$DIRS"
+    - name: Upload handoff reports
+      id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: tracegrove-proof
+        path: ${{ runner.temp }}/tracegrove-proof/
+        if-no-files-found: ignore
+    - name: Build the card
+      id: card
+      shell: bash
+      env:
+        DIRS: '${{ inputs.directories }}'
+        TG: '${{ inputs.tracegrove }}'
+        TITLE: '${{ inputs.title }}'
+        LINK: '${{ steps.upload.outputs.artifact-url }}'
+        SHA: '${{ github.event.pull_request.head.sha || github.sha }}'
+        OUT: '${{ runner.temp }}/tracegrove-card'
+      run: |
+        mapfile -t dirs < <(printf '%s\n' "$DIRS" | sed '/^$/d')
+        $TG card "${dirs[@]}" --commit "$SHA" --title "$TITLE" ${LINK:+--link "$LINK"} --out "$OUT.md" --json > "$OUT.json"
+        cat "$OUT.md" >> "$GITHUB_STEP_SUMMARY"
+        node -e '
+          const card = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+          for (const f of card.failures) console.log(`::error file=${f.file},title=${f.project}: ${f.caseId}::${f.failure.replace(/\n/g, " ")}`);
+          require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `verdict=${card.verdict}\n`);
+        ' "$OUT.json"
+    - name: Post or update the PR comment
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        BODY: ${{ runner.temp }}/tracegrove-card.md
+      run: |
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- tracegrove-proof -->")) | .id' | head -n1)
+        if [ -n "$id" ]; then gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$BODY" >/dev/null
+        else gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$BODY" >/dev/null; fi
+    - name: Fail on a contradicted claim
+      if: inputs.fail-on-contradiction == 'true' && steps.card.outputs.verdict == 'fails'
+      shell: bash
+      run: echo "::error::a tracegrove claim failed; see the card" && exit 1

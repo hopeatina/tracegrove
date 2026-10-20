@@ -151,6 +151,17 @@ On staging, a run whose cleanup can't be confirmed fails. In production, any flo
 </details>
 
 <details>
+<summary><b>A proof card on every pull request</b></summary>
+
+```yaml
+- uses: hopeatina/tracegrove@codex/bootstrap   # runs your flows, comments on the PR
+```
+
+One comment per PR, updated in place: whether every claim held on this commit, the failing step if not, critical claims waiting for sign-off, and a link to the full report. tracegrove's own pull requests carry one. [PR proof card](docs/pr-proof-card.md).
+
+</details>
+
+<details>
 <summary><b>Security and client data</b></summary>
 
 - Runs on your machine or CI. No tracegrove server, account or telemetry.
@@ -206,6 +217,7 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | [Voice and chat](docs/voice-and-chat.md) | Conversation steps, transports, checks |
 | [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
+| [PR proof card](docs/pr-proof-card.md) | The GitHub Action and `tracegrove card` |
 | [Security](docs/security.md) | Credentials, redaction, sealed runs |
 | [Agent guide](docs/agent-guide.md) | JSON contracts for coding agents |
 | [Browser driver](docs/browser-driver.md) · [MCP driver](docs/mcp-driver.md) · [Native jobs](docs/native-jobs.md) | Other surfaces |
