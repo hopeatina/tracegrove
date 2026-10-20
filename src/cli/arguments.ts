@@ -82,12 +82,13 @@ export const COMMAND_SCHEMAS = {
   waive: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   reject: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   challenge: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text, step: Text.optional() }).strict(),
+  card: z.object({ ...common, _: Positionals(0, 32).optional(), commit: Text.optional(), link: Text.optional(), title: Text.optional(), out: Text.optional() }).strict(),
   handoff: z.object({ ...common, dir: Text.optional(), out: Text.optional(), client: Text.optional(), by: Text.optional() }).strict(),
   seal: z.object({ ...common, dir: Text.optional(), run: Text.optional(), out: Text, remove: Bool }).strict(),
   unseal: z.object({ ...common, _: Positionals(1, 1), out: Text }).strict(),
 } as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 /** Most positional words each command accepts (its schema's `_` array validates the rest). */
-const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, try: 1, waive: 1, reject: 1, challenge: 1, unseal: 1 };
+const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, try: 1, card: 32, waive: 1, reject: 1, challenge: 1, unseal: 1 };
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];
