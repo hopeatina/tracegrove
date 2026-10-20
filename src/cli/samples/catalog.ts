@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SampleName = z.enum(['notes-api', 'notes-django', 'notes-browser', 'notes-mcp', 'report-jobs', 'report-native', 'voice-receptionist', 'support-chatbot', 'vet-receptionist']);
+export const SampleName = z.enum(['notes-api', 'notes-django', 'notes-browser', 'notes-mcp', 'report-jobs', 'report-native', 'voice-receptionist', 'support-chatbot', 'vet-receptionist', 'saas-billing', 'clinic-portal']);
 export type SampleName = z.infer<typeof SampleName>;
 
 /** A bug an example can switch on, so `tracegrove try <example> --bug <name>` shows a real failure being caught. */
@@ -17,6 +17,16 @@ export const EXAMPLES: Example[] = [
       { name: 'double_book', env: { VET_BUG: 'double_book' }, what: 'every booking is sent to the calendar automation twice', caughtBy: 'the calendar automation got one booking' }] },
   { name: 'support-chatbot', title: 'Support chatbot', shows: 'a coffee shop support bot handles refunds, privacy questions and a prompt-injection attempt', needs: null,
     bugs: [{ name: 'leak_orders', env: { SHOP_BUG: 'leak_orders' }, what: 'the bot answers questions about other customers\' orders', caughtBy: 'customer asks about someone else\'s order' }] },
+  { name: 'saas-billing', title: 'SaaS billing', shows: 'plan upgrades charge a card through a payments API, webhooks credit the account, a declined card emails the owner; stand-ins fail on cue and record every charge', needs: null,
+    bugs: [
+      { name: 'double_charge', env: { BILLING_BUG: 'double_charge' }, what: 'a retried charge uses a new idempotency key, so the card can be charged twice', caughtBy: 'the retry reused the idempotency key' },
+      { name: 'trust_client_price', env: { BILLING_BUG: 'trust_client_price' }, what: 'the charge uses the price the browser sent', caughtBy: 'the card was charged the Team price once' },
+      { name: 'replay_webhooks', env: { BILLING_BUG: 'replay_webhooks' }, what: 'a redelivered webhook credits the account again', caughtBy: 'credits went up by 500 exactly once' }] },
+  { name: 'clinic-portal', title: 'Clinic patient portal', shows: 'patients read only their own results, every staff chart read is audited, alerts to the on-call phone carry no health details, and SSNs never reach the saved evidence', needs: null,
+    bugs: [
+      { name: 'any_record', env: { PORTAL_BUG: 'any_record' }, what: 'a patient can open anyone\'s record by guessing its id', caughtBy: 'another patient\'s record is not found' },
+      { name: 'skip_audit', env: { PORTAL_BUG: 'skip_audit' }, what: 'staff chart reads are not written to the audit log', caughtBy: 'the audit log got one chart read' },
+      { name: 'phi_in_sms', env: { PORTAL_BUG: 'phi_in_sms' }, what: 'the text to the on-call phone quotes the patient\'s message', caughtBy: 'the on-call phone got one generic text' }] },
   { name: 'notes-api', title: 'Notes API', shows: 'create, read back, stranger denied, delete, confirm it is gone', needs: null,
     bugs: [
       { name: 'keep_on_delete', env: { NOTES_BUG: 'keep_on_delete' }, what: 'DELETE returns 204 but the note is still there', caughtBy: 'gone' },

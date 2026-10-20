@@ -797,6 +797,11 @@
             "pattern": "^[A-Z_][A-Z0-9_]*$",
             "type": "string"
           },
+          "idempotencyKey": {
+            "description": "Body field this provider dedupes on, like idempotencyKey. Calls reusing a key are marked repeat: true, and readbacks get distinct.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+            "type": "string"
+          },
           "respond": {
             "additionalProperties": {
               "anyOf": [

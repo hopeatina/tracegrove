@@ -1,0 +1,22 @@
+title: A patient message reaches the clinic, and the text to the on-call phone carries no health details
+risk: critical
+tags: [portal, privacy, messaging]
+rubric:
+  - The text message would be safe to show on a locked phone screen
+steps:
+  - name: patient sends a message
+    POST: /messages
+    json: { text: My A1C came back at 5.4 and I am still dizzy after the new metformin dose. }
+    expect: 201
+  - name: the nurse sees it in the inbox
+    GET: /inbox
+    as: nurse
+    observe: true
+    expect: { status: 200, json: { "messages[0].from": alice } }
+  - name: the on-call phone got one generic text
+    standin: sms
+    received: POST /messages
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.body": New patient message in the Riverbend portal. Log in to read it.

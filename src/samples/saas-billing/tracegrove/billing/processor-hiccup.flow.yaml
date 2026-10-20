@@ -1,0 +1,20 @@
+title: When the processor errors once, the retry reuses the idempotency key so the card can't be charged twice
+risk: critical
+tags: [billing, payments, faults]
+steps:
+  - name: the processor returns 500 once
+    standin: payments
+    fail: { route: POST /v1/charges, status: 500, times: 1 }
+  - name: owner upgrades to Business
+    POST: /subscription
+    json: { plan: business }
+    expect: { status: 200, json: { account.plan: business } }
+  - name: the retry reused the idempotency key
+    standin: payments
+    received: POST /v1/charges
+    expect:
+      calls: 2
+      json:
+        "calls[0].status": 500
+        "calls[1].repeat": true
+        distinct: 1

@@ -46,6 +46,8 @@ export const AuthoringConfig = z.object({
     respond: z.record(z.string().regex(/^(GET|POST|PUT|PATCH|DELETE) \/\S*$/, 'use "METHOD /path", like "POST /events"'),
       z.union([Status, z.object({ status: Status.default(200), json: Json.optional() }).strict()])).default({})
       .describe('Answers by route; /{id} matches one segment and /* the rest. Undeclared routes get 404.'),
+    idempotencyKey: z.string().regex(/^[A-Za-z_][A-Za-z0-9_.]*$/).optional()
+      .describe('Body field this provider dedupes on, like idempotencyKey. Calls reusing a key are marked repeat: true, and readbacks get distinct.'),
   }).strict()).optional().describe('Third parties the app calls (calendar, CRM, payments, automation webhooks), replaced by recording servers on loopback. Flows can make them fail and read back what the app sent.'),
   personas: z.record(Name, z.object({ subject: z.string().min(1),
     ...Persona.pick({ locale: true, timezone: true, viewport: true, inputMode: true, reducedMotion: true }).partial().shape,

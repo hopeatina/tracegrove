@@ -1,0 +1,17 @@
+title: Every chart a nurse opens is written to the audit log, and the evidence never stores the SSN
+risk: critical
+tags: [portal, compliance]
+steps:
+  - name: nurse opens a chart
+    GET: /records/rec_7f3a
+    as: nurse
+    expect: { status: 200, json: { record.patient: alice }, present: [record.ssn] }
+  - name: the audit log got one chart read
+    standin: audit
+    received: POST /events
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.actor": nurse-kim
+        "calls[0].json.action": chart.read
+        "calls[0].json.record": rec_7f3a

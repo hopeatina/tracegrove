@@ -1,0 +1,15 @@
+title: A patient sees their own lab results, and can't open another patient's by id
+risk: critical
+tags: [portal, privacy, authz]
+steps:
+  - name: patient lists their results
+    GET: /records
+    expect: { status: 200, json: { "records[0].test": Hemoglobin A1C }, absent: ["records[1]", "records[0].ssn"] }
+  - name: another patient's record is not found
+    GET: /records/rec_9c1e
+    expect: { status: 404, absent: [record] }
+  - name: the other patient still sees it
+    GET: /records/rec_9c1e
+    as: other_patient
+    observe: true
+    expect: { status: 200, json: { record.test: Lipid panel } }

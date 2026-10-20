@@ -1,0 +1,27 @@
+title: A declined card keeps the old plan, flags the account and emails the billing contact
+risk: critical
+tags: [billing, payments, faults]
+steps:
+  - name: the processor declines the card
+    standin: payments
+    fail: { route: POST /v1/charges, status: 402, times: 1 }
+  - name: owner tries to upgrade
+    POST: /subscription
+    json: { plan: team }
+    expect: { status: 402, json: { error: payment_failed } }
+  - name: the plan didn't change
+    GET: /account
+    observe: true
+    expect: { status: 200, json: { account.plan: starter, account.dunning: true } }
+  - name: the billing contact got one payment-failed email
+    standin: email
+    received: POST /send
+    expect:
+      calls: 1
+      json:
+        "calls[0].json.to": billing@acme.test
+        "calls[0].json.template": payment_failed
+  - name: no invoice was issued
+    GET: /invoices
+    observe: true
+    expect: { status: 200, json: { invoices: [] } }

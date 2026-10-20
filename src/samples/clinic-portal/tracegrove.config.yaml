@@ -1,0 +1,25 @@
+project: riverbend-portal
+app:
+  adapter: node
+  entry: app/portal.mjs
+  health: /health
+  sources: [app/**]
+  inject:
+    port: PORT
+    dataDir: PORTAL_DATA_DIR
+    tokens: PORTAL_TOKENS
+standIns:
+  audit:                 # the compliance audit log
+    env: AUDIT_URL
+    respond:
+      POST /events: 201
+  sms:                   # the SMS provider that texts the on-call phone
+    env: SMS_URL
+    respond:
+      POST /messages: { status: 200, json: { sid: SM_test_1 } }
+privacy:
+  redact: [ssn]          # social security numbers never reach the saved evidence
+personas:
+  patient: { subject: alice }
+  other_patient: { subject: bob }
+  nurse: { subject: nurse-kim }

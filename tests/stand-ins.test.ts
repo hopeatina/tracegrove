@@ -43,6 +43,17 @@ describe('stand-ins', () => {
     expect(seen.calls.map((c) => c.faulted)).toEqual([true, true, false]);
   });
 
+  it('marks calls that reuse an idempotency key, as the provider would see them', async () => {
+    const standIns = await StandIns.start([{ name: 'payments', env: 'PAYMENTS_URL', idempotencyKey: 'idempotencyKey', responses: [{ method: 'POST', path: '/v1/charges', status: 200 }] }]);
+    open.push(standIns);
+    const url = standIns.env().PAYMENTS_URL!;
+    for (const key of ['k1', 'k1', 'k2']) await post(`${url}/v1/charges`, { idempotencyKey: key });
+    await post(`${url}/v1/charges`, { amount: 1 });
+    const seen = await standIns.observe({ standIn: 'payments', route: { method: 'POST', path: '/v1/charges' } }, () => true, 10, Deadline.in(1000));
+    expect(seen.calls.map((c) => [c.key, c.repeat])).toEqual([['k1', false], ['k1', true], ['k2', false], [null, false]]);
+    expect(seen.distinct).toBe(3);
+  });
+
   it('drops the connection when asked', async () => {
     const { standIns, url } = await start();
     standIns.arm(StandInFault.parse({ standIn: 'crm', route: { method: 'POST', path: '/contacts' }, times: 1, drop: true }));

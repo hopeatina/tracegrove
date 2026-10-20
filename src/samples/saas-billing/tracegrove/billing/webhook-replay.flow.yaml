@@ -1,0 +1,25 @@
+title: A payments webhook delivered twice credits the account once, and unsigned webhooks change nothing
+risk: critical
+tags: [billing, webhooks]
+steps:
+  - name: provider grants a 500 credit
+    POST: /webhooks/payments
+    as: none
+    headers: { x-webhook-secret: whsec_test_plotline }
+    json: { id: evt_credit_1, type: credit.granted, user: alice, amount: 500 }
+    expect: { status: 200, json: { applied: true } }
+  - name: provider redelivers the same event
+    POST: /webhooks/payments
+    as: none
+    headers: { x-webhook-secret: whsec_test_plotline }
+    json: { id: evt_credit_1, type: credit.granted, user: alice, amount: 500 }
+    expect: 200
+  - name: a forged webhook without the secret
+    POST: /webhooks/payments
+    as: none
+    json: { id: evt_forged, type: credit.granted, user: alice, amount: 100000 }
+    expect: 401
+  - name: credits went up by 500 exactly once
+    GET: /account
+    observe: true
+    expect: { status: 200, json: { account.credits: 500 } }

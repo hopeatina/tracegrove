@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { tryExample } from '../src/cli/try.ts';
@@ -35,6 +36,20 @@ describe('tracegrove try', () => {
     const why = exitCode === 0 ? '' : (() => { try { return readFileSync(join(facts.runDir as string, 'summary.json'), 'utf8').slice(0, 4000); } catch { return JSON.stringify(facts); } })();
     expect(exitCode, why).toBe(0);
     expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true });
+  }, 30_000);
+
+  it('runs the SaaS billing example with a payments stand-in that dedupes idempotency keys', async () => {
+    const { exitCode, facts } = await run('saas-billing');
+    expect(exitCode, JSON.stringify(facts)).toBe(0);
+    expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true, totals: { passed: 4 } });
+  }, 30_000);
+
+  it('runs the clinic portal, and the SSN it reads never reaches the saved evidence', async () => {
+    const { exitCode, facts } = await run('clinic-portal');
+    expect(exitCode, JSON.stringify(facts)).toBe(0);
+    expect(facts).toMatchObject({ outcome: 'passed', bundleVerified: true, totals: { passed: 4 } });
+    const grep = spawnSync('grep', ['-rl', '123-45-6789', facts.runDir as string], { encoding: 'utf8' });
+    expect(grep.status, grep.stdout).toBe(1); // 1: no file contains it
   }, 30_000);
 
   it.each(EXAMPLES.flatMap((e) => e.bugs.map((b) => [e.name, b.name, b.caughtBy] as const)))('%s --bug %s is caught at "%s"', async (example, bug, step) => {

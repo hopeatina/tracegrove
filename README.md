@@ -38,6 +38,8 @@ The call still sounds right. The readback from the clinic's own system is what f
 | --- | --- | --- |
 | `voice-receptionist` | A dental clinic phone agent books, cancels and transfers calls; each call is checked against the clinic's records | `drop_booking`: says booked, saves nothing |
 | `vet-receptionist` | An after-hours vet clinic agent books through an automation webhook and transfers emergencies; flows make the webhook fail and read back what it received | `ignore_automation_errors`: says "all set" when the booking never landed; `double_book` |
+| `saas-billing` | Plan upgrades charge a card through a payments API, webhooks credit the account, a declined card emails the owner | `double_charge`, `trust_client_price`, `replay_webhooks` |
+| `clinic-portal` | Patients see only their own results, every staff chart read is audited, alerts carry no health details, SSNs never reach saved evidence | `any_record`, `skip_audit`, `phi_in_sms` |
 | `support-chatbot` | A support bot handles refunds, privacy questions and a prompt-injection attempt | `leak_orders`: answers about other customers' orders |
 | `notes-api` | Create, read back, stranger denied, delete, confirm it's gone | `keep_on_delete`, `share_with_strangers` |
 | `notes-browser` | A Chromium page and an API readback in one flow, with a video | |

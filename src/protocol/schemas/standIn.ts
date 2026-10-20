@@ -22,6 +22,8 @@ export const StandInSpec = z.object({
   name: Name,
   env: z.string().min(1).max(64).regex(/^[A-Z_][A-Z0-9_]*$/),
   responses: z.array(StandInResponse).max(64),
+  /** Body field the provider dedupes on (like Stripe's idempotency key): repeats are marked, as the provider would see them. */
+  idempotencyKey: z.string().min(1).max(200).regex(/^[A-Za-z_][A-Za-z0-9_.]*$/).optional(),
 }).strict();
 export type StandInSpec = z.infer<typeof StandInSpec>;
 
@@ -42,10 +44,14 @@ export type StandInQuery = z.infer<typeof StandInQuery>;
 export const StandInCall = z.object({
   method: z.string().max(16), path: z.string().max(2048), query: z.record(z.string(), z.string()),
   json: JsonValue.nullable(), text: z.string().max(65_536).nullable(), status: z.number().int(), faulted: z.boolean(), at: z.string(),
+  /** With an idempotency key declared: the key, and whether an earlier call to the same route already used it. */
+  key: z.string().max(400).nullable().optional(), repeat: z.boolean().optional(),
 }).strict();
 export const StandInObservation = z.object({
   kind: z.literal('stand_in'), standIn: Name, route: StandInRoute.nullable(),
   count: NonNegInt, calls: z.array(StandInCall).max(200), attempts: NonNegInt,
+  /** Calls the provider would treat as separate requests: repeats of an idempotency key count once. */
+  distinct: NonNegInt.optional(),
 }).strict();
 export type StandInObservation = z.infer<typeof StandInObservation>;
 export const StandInArmObservation = z.object({ kind: z.literal('stand_in_fault'), standIn: Name, route: StandInRoute, times: NonNegInt, attempts: NonNegInt }).strict();
