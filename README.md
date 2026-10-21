@@ -137,10 +137,12 @@ npx tracegrove verify-bundle --bundle .tracegrove/runs/<run>/bundle   # re-deriv
 npx tracegrove compare --baseline <old>/bundle --candidate <new>/bundle
 npx tracegrove rerun --request <request.json> --output <new.json>     # a fresh attempt on the same frozen cases
 npx tracegrove handoff --client "Acme"                               # one HTML page with every claim and readback
+npx tracegrove sign                                                  # sign the latest run with your committed key
 npx tracegrove seal --run latest --out run.sealed                    # encrypt it to send or archive
 ```
 
 - **Re-verify instead of trusting a green tick.** A reviewer, a client or CI can recheck a run without rerunning your app.
+- **Prove who ran it.** `keygen` commits a public key under `tracegrove/signers/`; signed runs show the signer on the PR card, a key that isn't committed shows as untrusted, and a signature that no longer verifies fails the card. Set `TRACEGROVE_SIGNING_KEY` in CI to sign every run. [Signed evidence](docs/signed-evidence.md).
 - **Compare across commits.** `compare` lines up two verified runs case by case and says what changed: outcome, contract or selection.
 - **Know when evidence is stale.** Each claim records the source it ran against. Change the code or the check and its sign-off has to be given again (`tracegrove readiness`).
 - **Watch it back.** Browser steps keep a video, voice and chat steps keep the full transcript with tool calls, and the UI's History tab shows every scenario across every run.
