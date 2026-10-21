@@ -282,7 +282,7 @@ const gbPlain=t=>String(t||'').split(gbBT).join('');
    height on the outside of a bend, branches alternating and shortening upward, the apex back over the roots. A branch
    is a journey. When fewer than two journeys branch, the headline journey's own failure and guard paths grow as its
    first branches, so a one-journey change is still a whole tree and every pad stands for something real. */
-function gbTree(M,js,H,S,key,sap){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(j).size:0,nl=j=>(M.leaves[j.id]||[]).length;
+function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(j).size:0,nl=j=>(M.leaves[j.id]||[]).length;
  /* a bonsai's first branch is its largest and its apex its smallest: the journey with the most scenarios grows lowest, the
     one with the fewest is the crown */
  const big=(a,b)=>nl(b)-nl(a)||nc(b)-nc(a)||M.weight(b)-M.weight(a)||(a.id<b.id?-1:1);
@@ -294,7 +294,7 @@ function gbTree(M,js,H,S,key,sap){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(
  const maxV=js.length===1?2:0;let left=A.length,nv=0;
  for(const p of ['failure','guard']){if(nv>=maxV)break;const n=A.filter(x=>gbPol(x)===p).length;if(n&&n<left){left-=n;nv++;items.push({id:apex.id+'~'+p,j:apex,pol:p,w:Math.max(.6,M.weight(apex)*n/A.length)})}}
  const m=items.length,lit=!m;const vp=new Set(items.filter(it=>it.pol).map(it=>it.pol));
- const h1=m>=7?.27:.31;const hs=[];for(let i=0,h=h1;i<m;i++){hs.push(h);h+=(.86-h)*.4}
+ const h1=m>=7?.27:m===1?.42:.31;const hs=[];for(let i=0,h=h1;i<m;i++){hs.push(h);h+=(.86-h)*.4}
  const side=items.map((_,i)=>i%2?-S:S),back=items.map((_,i)=>m>=3&&i%3===2);
  const carry={};for(const j of js)for(const id of j.units)if(!U[id].root)carry[id]=(carry[id]||0)+1;
  const ownOf=j=>j.units.filter(id=>!U[id].root&&carry[id]===1);
@@ -305,7 +305,9 @@ function gbTree(M,js,H,S,key,sap){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(
  for(const pd of padList){pd.leaves=leavesOf(pd);pd.geo=gbPadGeo(pd.leaves,H,pd.crown||back[pd.i]?0:side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown)}
  const cpd=padList[0];
  const gap=.022*H,inC=.42*cpd.geo.PH,lift=.02*H+6;let need=lit?.84*H:m<=1?.3*H:m<=2?.32*H:.42*H;
- if(!lit){for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(pd.geo.PH+pd.geo.L*.75+gap+inC+lift)/(1-hs[pd.i]));
+ /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
+    upper trunk is not a bare pole (tried first, and kept only if nothing then overlaps) */
+ if(!lit){for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(pd.geo.PH*(strict?1:.5)+pd.geo.L*(strict?.75:0)+gap+inC+lift)/(1-hs[pd.i]));
   for(let i=0;i<m;i++)for(let j=i+1;j<m;j++)if(side[i]===side[j]&&!back[i]&&!back[j])need=Math.max(need,(padList[i+1].geo.PH+padList[i+1].geo.L+gap)/(hs[j]-hs[i]))}
  const Ht=Math.min(.92*H,need);const D=Ht*(sap?.05:lit?.1:m<=3?.16:.17);
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
@@ -375,6 +377,8 @@ function gbTree(M,js,H,S,key,sap){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(
  const veins={};for(const id of lanes){const f=lanes.length===1?0:(lanes.indexOf(id)-(lanes.length-1)/2)/lanes.length*1.1;const b=br.find(x=>x.id===id);const kTop2=b?b.k:tp.length-1;
   const trunk=tp.slice(0,kTop2+1).map((q,i)=>{const n=gbNorm(tp,i),o=f*tw[i]*.5;return[q[0]+n[0]*o,q[1]+n[1]*o]});
   veins[id]={jid:pads[id].jid,trunk,branch:b?b.pts.slice(b.exit,Math.round(.55*(b.pts.length-1))):[],pad:origin[id]}}
+ if(!strict&&!lit){const bx=(pd,o)=>{const g=pd.geo;return pd.crown?[o[0]-g.PW/2-g.L*.6,o[1]-g.PH-g.L,o[0]+g.PW/2+g.L*.6,o[1]+g.L*1.7]:[o[0]-g.PW/2-g.L*.5,o[1]-g.PH-g.L*.9,o[0]+g.PW/2+g.L*.5,o[1]+g.L+14]};
+  const c=bx(cpd,origin[apex.id]);if(padList.slice(1).some(pd=>{const q=bx(pd,origin[pd.id]);return Math.min(c[2],q[2])+10>Math.max(c[0],q[0])&&Math.min(c[3],q[3])+10>Math.max(c[1],q[1])}))return gbTree(M,js,H,S,key,sap,true)}
  let x0=Infinity,x1=-Infinity,y0=0;const grow=(x,y)=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y)};
  tp.forEach((q,i)=>{grow(q[0]-tw[i]/2,q[1]);grow(q[0]+tw[i]/2,q[1])});for(const b of br)b.pts.forEach(q=>grow(q[0],q[1]-b.b));
  for(const pd of padList){const o=origin[pd.id],g=pd.geo;grow(o[0]-g.PW/2-g.L*.5,o[1]-g.PH-g.L*.9);grow(o[0]+g.PW/2+g.L*.5,o[1]+g.L+14)}
