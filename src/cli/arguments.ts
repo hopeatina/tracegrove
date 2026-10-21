@@ -31,6 +31,7 @@ export const COMMAND_SCHEMAS = {
   grow: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), base: Text.optional(), spec: Text.optional(), config: Text.optional(),
     mode: z.enum(['min', 'minimum', 'std', 'standard', 'max', 'maximum']).optional(), agent: Text.optional(), model: Text.optional(),
     'no-agent': Bool, 'no-prove': Bool, 'no-gh': Bool, jsonl: Bool, yes: Bool }).strict(),
+  clip: z.object({ ...common, dir: Text.optional(), log: Text.optional(), out: Text.optional(), 'no-video': Bool }).strict(),
   check: z.object({ ...common, dir: Text.optional() }).strict(),
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-prove': Bool }).strict(),
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
