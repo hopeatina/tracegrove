@@ -1,0 +1,27 @@
+title: "POST /api/grow/mode: Answer after the reader left returns 409"
+risk: critical
+tags: [ui, grow, mode]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: a grow waits for a mode
+    use: grow.start-without-mode
+    with: { branch: notes-count }
+    save: { waitingRun: runId }
+  - name: the reader leaves, which aborts the waiting grow
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: the lock is freed
+    use: grow.wait-until-idle
+  - name: a late mode pick for the aborted grow is refused
+    POST: /api/grow/mode
+    json: { id: "{waitingRun}", mode: std }
+    expect: { status: 409, json: { error: no discovery is waiting for a mode } }
+  - name: the aborted grow never reached the prove phase
+    GET: /api/grow/last?branch=notes-count
+    expect: { status: 200, json: { "state.phase": 4, "state.blocked.code": discovery_cancelled } }
+  - name: nothing started after the late pick
+    GET: /api/run-control
+    expect: { status: 200, json: { runId: null, operation: null } }

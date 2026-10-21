@@ -1,0 +1,27 @@
+title: "POST /api/grow: Second grow while one is running is refused"
+risk: critical
+tags: [ui, grow, lock]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: a grow waits for a mode
+    use: grow.start-without-mode
+    with: { branch: notes-count }
+    save: { waitingRun: runId }
+  - name: a second grow is refused while the first holds the lock
+    POST: /api/grow
+    json: { branch: notes-count, base: main, mode: std, prove: false, agent: false }
+    expect: { status: 409, json: { error: an operation is already in progress } }
+  - name: the first grow still holds the lock, and nothing replaced it
+    GET: /api/run-control
+    expect: { status: 200, json: { operation: grow, cancelling: false } }
+  - name: the first grow is still asking for a mode
+    browser: { kind: read, target: { by: testId, name: grow-mode-hint } }
+    expect: { text: "Choose how much to prove. Tracing is done; nothing runs until you pick." }
+  - name: the reader leaves, which aborts the first grow
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: the lock is freed
+    use: grow.wait-until-idle

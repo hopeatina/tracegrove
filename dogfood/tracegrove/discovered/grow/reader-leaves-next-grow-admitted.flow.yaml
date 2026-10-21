@@ -1,0 +1,24 @@
+title: "POST /api/grow: Reader leaves mid-grow, next grow is admitted"
+risk: critical
+tags: [ui, grow, lock]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: a grow waits for a mode
+    use: grow.start-without-mode
+    with: { branch: notes-count }
+    save: { waitingRun: runId }
+  - name: the reader leaves, which aborts the waiting grow
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: the lock is freed
+    use: grow.wait-until-idle
+  - name: the grow stopped at the mode prompt, with its cancellation recorded
+    GET: /api/grow/last?branch=notes-count
+    expect: { status: 200, json: { "state.blocked.code": discovery_cancelled } }
+  - name: a new grow is admitted, not refused with 409
+    POST: /api/grow
+    json: { branch: notes-count, base: main, mode: min, prove: false, agent: false }
+    expect: 200

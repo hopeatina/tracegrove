@@ -1,0 +1,25 @@
+title: "POST /api/grow/mode: User picks std during mode.asked"
+risk: critical
+tags: [ui, grow, mode]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: a grow waits for a mode
+    use: grow.start-without-mode
+    with: { branch: notes-count }
+    save: { waitingRun: runId }
+  - name: the user picks Standard for the waiting grow
+    POST: /api/grow/mode
+    json: { id: "{waitingRun}", mode: std }
+    expect: { status: 200, json: { mode: std } }
+  - name: the page says the mode was the user's choice
+    browser: { kind: read, target: { by: testId, name: grow-mode-hint } }
+    expect: { text: "Mode: Standard, your choice." }
+    timeoutMs: 30000
+  - name: the grow runs to its end, proving after the choice
+    use: grow.wait-until-idle
+  - name: the saved grow records Standard chosen by you, and reached the prove phase
+    GET: /api/grow/last?branch=notes-count
+    expect: { status: 200, json: { "state.mode": std, "state.modeBy": you, "state.phase": 5 } }

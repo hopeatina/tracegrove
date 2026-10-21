@@ -9,7 +9,7 @@
  * scenario without a flow is "not proven yet", never green.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
@@ -164,7 +164,16 @@ function aborted(ctx: Ctx) {
 }
 const execGit = (dir: string, args: string[]) => git(dir, args).trim();
 
-const slug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 80) || 'change';
+export const slug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 80) || 'change';
+/** The last saved grow of a branch, folded back into state, so a reload shows it instead of an empty start card. */
+export function lastGrow(dir: string, branch: string): { state: GrowState; log: string; at: string } | null {
+  const path = join(dir, STATE_DIR, 'discovery', `${slug(branch)}.jsonl`);
+  try {
+    const state = freshGrow();
+    for (const line of readFileSync(path, 'utf8').split('\n')) if (line.trim()) applyGrow(state, JSON.parse(line) as GrowEvent);
+    return state.change ? { state, log: relative(dir, path), at: statSync(path).mtime.toISOString() } : null;
+  } catch { return null; }
+}
 function saveLog(dir: string, branch: string, events: GrowEvent[]): string | null {
   try {
     const folder = join(dir, STATE_DIR, 'discovery'); mkdirSync(folder, { recursive: true });

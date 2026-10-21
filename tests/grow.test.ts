@@ -185,5 +185,9 @@ describe('UI stream', () => {
     expect(last.data.view.criteria).toHaveLength(3);
     expect(blocks.at(-1)!.event).toBe('done');
     expect((await post(port, '/api/grow/mode', { id: 'nope', mode: 'min' }, 'tk-0123456789abcdef')).status).toBe(409);
+    // A reload shows the saved grow instead of an empty start card.
+    const saved = await new Promise<any>((done, fail) => request({ host: '127.0.0.1', port, path: '/api/grow/last?branch=refunds' }, (res) => { let t = ''; res.on('data', (c) => { t += c; }); res.on('end', () => done(JSON.parse(t))); }).on('error', fail).end());
+    expect(saved.state.change.branch).toBe('refunds');
+    expect(saved.view.criteria).toHaveLength(3);
   });
 });

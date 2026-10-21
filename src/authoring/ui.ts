@@ -15,9 +15,9 @@ import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompileResult } from './compile.ts';
 import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
-import { draftFlow, gitInfo } from './discover.ts';
+import { draftFlow, gitInfo, safeRef } from './discover.ts';
 import { discoverLive, draftWithAgent } from './workspace.ts';
-import { grow } from './grow.ts';
+import { grow, lastGrow } from './grow.ts';
 import { growView, type GrowState, type Mode } from './growState.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
@@ -278,6 +278,11 @@ export async function startUi(options: { dir: string; branch?: string | null; po
           return send(200, result);
         } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
         finally { drafting = false; if (active === operation) { running = null; active = null; } }
+      }
+      if (req.method === 'GET' && url.pathname === '/api/grow/last') {
+        const branch = url.searchParams.get('branch') || gitInfo(dir).current;
+        let last = null; try { last = branch ? lastGrow(dir, safeRef(branch)) : null; } catch { last = null; }
+        return send(200, last ? { ...last, view: growView(last.state) } : null);
       }
       if (req.method === 'POST' && url.pathname === '/api/grow') {
         // Live discovery of a change, streamed as server-sent events over a token-guarded POST:

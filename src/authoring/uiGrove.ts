@@ -125,9 +125,14 @@ export const GROVE_JS = String.raw`
 const GW=${CONST};
 const gw={el:null,svg:null,G:null,state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
 try{const v=localStorage.getItem('gw-tree');if(v==='outline'||v==='grove')gw.tree=v;else if(window.innerWidth<700)gw.tree='outline'}catch(e){if(window.innerWidth<700)gw.tree='outline'}
-function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});growPaint();return gw.el}
+function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
+ const branch=ui.source||state.git.current||'';if(!gw.busy&&!gw.state&&state.git.isRepo&&branch&&gw.lastFor!==branch){gw.lastFor=branch;growLast(branch)}
+ growPaint();return gw.el}
+/* A saved grow of this branch comes back on reload, marked as saved, instead of an empty start card. */
+async function growLast(branch){try{const r=await fetch('/api/grow/last?branch='+encodeURIComponent(branch));const d=r.ok?await r.json():null;
+ if(d&&!gw.busy&&!gw.state){gw.state=d.state;gw.view=d.view;gw.log=d.log;gw.saved=d.at;growPaint()}}catch(e){}}
 async function growStart(){
- if(gw.busy)return;gw.busy=true;gw.error=null;gw.state=null;gw.view=null;gw.events=0;gw.id=null;gw.log=null;gw.pinned=null;gw.selCrit=null;gw.svg=null;gw.G=null;gw.t0=Date.now();growPaint();growTick();
+ if(gw.busy)return;gw.busy=true;gw.saved=null;gw.error=null;gw.state=null;gw.view=null;gw.events=0;gw.id=null;gw.log=null;gw.pinned=null;gw.selCrit=null;gw.svg=null;gw.G=null;gw.t0=Date.now();growPaint();growTick();
  try{
   const r=await fetch('/api/grow',{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify({branch:ui.source||null,base:gw.base||null,prove:gw.prove,agent:gw.agent})});
   if(!r.ok){gw.error=await r.json().catch(()=>({error:'Could not start'}));return}
@@ -300,7 +305,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const kids=[];
  const v=gw.view;const c=s.change;
  kids.push(h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
    h('div',{class:'sub'},c?((c.pr?'#'+c.pr+' · ':'')+c.files+' files · +'+c.adds+' −'+c.dels+(c.untraced?' · '+c.untraced+' small parts not traced':'')+(s.spec?' · spec: '+s.spec.source:'')):'')),
-  h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;growPaint()}}},'New grow'):null)));
+  h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gw.saved?'saved '+ago(gw.saved)+' · took '+gwFmt(s.ms):gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;growPaint()}}},'New grow'):null)));
  kids.push(h('div',{class:'gw-rail',role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?((en-st)/1000).toFixed(1)+' s':'now'))})));
  const rules=s.agents.filter(a=>a.by==='rules'&&a.done&&a.ok),live=s.agents.filter(a=>!rules.includes(a)&&(!s.done||!a.ok||a.by!=='rules'));
