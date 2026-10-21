@@ -1,0 +1,44 @@
+name: Adapter request
+description: Ask for, or offer to build, a new surface, host, launch preset, credential source, importer or deploy detector.
+title: "Adapter: "
+labels: [adapter]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of adapter
+      options:
+        - Step kind (surface)
+        - Host (where the app runs)
+        - App launch preset (framework)
+        - Credential source
+        - Evidence importer
+        - Deploy detector
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Tool, service or framework
+      placeholder: e.g. HashiCorp Vault, Next.js, Cypress
+    validations:
+      required: true
+  - type: textarea
+    id: proves
+    attributes:
+      label: What should a passing run prove?
+      description: The behavior you want checked, and how it could be read back independently.
+    validations:
+      required: true
+  - type: textarea
+    id: fixture
+    attributes:
+      label: Golden fixture
+      description: A public repository or small sample to test against, and a bug the adapter should catch.
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Building it
+      options:
+        - label: I'd like to build this myself (see docs/extending.md)
