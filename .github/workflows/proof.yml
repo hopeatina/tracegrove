@@ -1,12 +1,15 @@
 name: proof card
 on:
   pull_request:
+concurrency:
+  group: proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 permissions:
   contents: read
   pull-requests: write
 jobs:
   proof:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true) && fromJSON(vars.CI_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +19,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install Chromium for the UI self-test
-        run: npx --no-install playwright install --with-deps chromium
+        # The self-hosted VM has Chromium's system libraries preinstalled and its runner user has no sudo.
+        run: |
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then npx --no-install playwright install chromium
+          else npx --no-install playwright install --with-deps chromium; fi
       - run: npm run build
       - name: Run the examples and tracegrove's own UI self-test
         run: |
