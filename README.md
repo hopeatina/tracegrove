@@ -246,9 +246,9 @@ Then paste:
 
 ```text
 Set up tracegrove end-to-end tests for this repo with the tracegrove MCP tools. Call status,
-then init if there is no config, then discover. Write flows for the riskiest workflows first
-(writes, money, permissions), each with a separate readback and a check that another user is
-denied. Run them and fix setup until they pass. Never weaken an assertion to get green; use
+then init if there is no config, then discover. Write flows for the routes discover lists as
+riskiest untested first (writes, money, permissions), each with a separate readback and a
+check that another user is denied. Run them and fix setup until they pass. Never weaken an assertion to get green; use
 challenge_check if you think one is wrong. Finish with the readiness summary.
 ```
 

@@ -15,7 +15,7 @@ import { describeBlock } from '../core/blockCodes.ts';
 import { findConfig, loadAuthoringConfig } from '../authoring/compile.ts';
 import { exportAuthoringSchemas } from '../authoring/schema.ts';
 import { projectStatus } from '../authoring/status.ts';
-import { checkProject, discoverProject, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
+import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
 import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { heal } from '../authoring/heal.ts';
 import { AGENTS_GUIDE, initProject } from '../authoring/init.ts';
@@ -80,8 +80,8 @@ export function createTracegroveMcpServer(input: { configPath?: string; dir?: st
   tool('status', 'Where the project stands: config, flows, latest run, environments with doctor state, and ordered next commands.', {}, () => projectStatus(root));
   tool('init', 'Set tracegrove up in this repo: detect the framework, write tracegrove.config.yaml, a first flow and AGENTS.md. Returns the files written and the test-mode auth snippet the app needs for personas.', { force: z.boolean().optional().describe('Overwrite files init wrote before. Default false.') },
     args => initProject(root, { force: args.force === true }), false);
-  tool('discover', 'Routes found in source and in observed traffic, which flows cover each, the uncovered ones, reusable actions, and places the scan cannot read. Rank uncovered writes, money and permission routes first when drafting.', { branch: z.string().optional().describe('Compare with this git branch to mark changed routes.'), save: z.boolean().optional().describe('Record the result in tracegrove/catalog.yaml. Default false.') },
-    args => { const result = discoverProject(root, args.branch ?? null); const saved = args.save === true ? saveCatalog(root, result) : null; return { ...result, catalog: saved }; }, true);
+  tool('discover', 'Routes found in source and in observed traffic, which flows cover each, the uncovered ones, reusable actions, places the scan cannot read, events (domain.found, surface.found with a risk score and reasons, surface.observed, flow.declared, flow.proven, flow.failed, question.asked) in drafting order, and a coverage summary with the riskiest untested routes. Draft riskyUntested first.', { branch: z.string().optional().describe('Compare with this git branch to mark changed routes.'), save: z.boolean().optional().describe('Record the result in tracegrove/catalog.yaml. Default false.') },
+    args => { const result = discoverLive(root, args.branch ?? null); const saved = args.save === true ? saveCatalog(root, result) : null; return { ...result, catalog: saved }; }, true);
   tool('env_list', 'Declared environments: target, class, write policy, agent policy and persona secret references (never values).', {}, () => envList(config()));
   tool('env_doctor', 'Probe an environment: deployment reachable and ready, each persona secret resolvable, whoami identity, network, budget, cleanup. Each failing check has a fix.', { env: Env, identity: z.boolean().optional().describe('Sign personas in and compare whoami subjects (default true).') },
     async (args, signal) => runEnvDoctor({ configPath: config(), env: args.env ?? defaultEnv(), identity: args.identity !== false, signal, agent }));

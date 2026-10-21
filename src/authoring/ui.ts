@@ -16,7 +16,7 @@ import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthorin
 import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
 import { draftFlow, gitInfo } from './discover.ts';
-import { discoverProject, draftWithAgent } from './workspace.ts';
+import { discoverLive, draftWithAgent } from './workspace.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
@@ -276,7 +276,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         finally { drafting = false; if (active === operation) { running = null; active = null; } }
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
-        return send(200, discoverProject(dir, url.searchParams.get('branch') || null));
+        return send(200, discoverLive(dir, url.searchParams.get('branch') || null));
       }
       const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
       if ((req.method === 'GET' || req.method === 'HEAD') && video) {

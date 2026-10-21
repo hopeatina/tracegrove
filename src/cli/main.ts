@@ -45,7 +45,7 @@ import { compileProject, findConfig } from '../authoring/compile.ts';
 import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
-import { checkProject, discoverProject, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
+import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { loadAuthoringConfig } from '../authoring/compile.ts';
@@ -154,7 +154,8 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
-                                                       --save records what is known in tracegrove/catalog.yaml
+        [--jsonl]                                      riskiest untested first; --save records what is known in tracegrove/catalog.yaml;
+                                                       --jsonl prints one typed event per line, then the coverage summary
   check [--dir <dir>]                                  compile flows only; exit 0 when clean, 2 with file-located issues
   draft [--intent "<what to verify>"] [--branch <b>]   have Claude Code or Codex write flows into tracegrove/discovered/,
         [--agent claude|codex] [--model <m>]           then check them and run each one end to end, sending failures back
@@ -420,13 +421,23 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'discover': {
-      const result = discoverProject(flag(args, 'dir') ?? '.', flag(args, 'branch'));
+      const result = discoverLive(flag(args, 'dir') ?? '.', flag(args, 'branch'));
       const saved = args.flags.save === true ? saveCatalog(flag(args, 'dir') ?? '.', result) : null;
+      if (args.flags.jsonl === true) {
+        // One event per line, in drafting order, then the coverage strip: what the UI and MCP render.
+        process.stdout.on('error', (error: NodeJS.ErrnoException) => { if (error.code === 'EPIPE') process.exit(0); throw error; });
+        for (const event of result.events) process.stdout.write(`${JSON.stringify(event)}\n`);
+        process.stdout.write(`${JSON.stringify({ kind: 'coverage', ...result.coverage })}\n`);
+        return 0;
+      }
+      const cov = result.coverage;
       const observed = result.observed ? `observed traffic from run ${result.observed.run}${result.observed.stale ? ' (source changed since)' : ''}` : 'no verified run yet, so nothing is observed';
       const state = (r: typeof result.routes[number]) => r.observedBy.length ? 'observed ' : r.confirmedEarlier ? 'earlier  ' : r.coveredBy.length ? 'declared ' : 'UNCOVERED';
       out(args, result, [
         `${result.source}: ${result.routes.length} route(s), ${result.uncovered} uncovered; ${observed}${result.changedFiles.length ? `; ${result.changedFiles.length} changed file(s) vs ${result.base}` : ''}`,
         ...result.routes.map((r) => `  ${state(r)} ${r.method.padEnd(6)} ${r.path}  ${r.file ? `${r.file}${r.line ? `:${r.line}` : ''}` : '(seen only in traffic)'}${r.actions.length ? `  [${r.actions.join(', ')}]` : ''}${r.changed ? '  (changed)' : ''}`),
+        `coverage: ${cov.domains} area(s), ${cov.surfaces} route(s): ${cov.observed} served in a run, ${cov.declared} declared, ${cov.untested} untested${cov.proven || cov.failed ? `; ${cov.proven} scenario(s) proven, ${cov.failed} failing` : ''}`,
+        ...(cov.riskyUntested.length ? ['', 'riskiest untested, draft these first:', ...cov.riskyUntested.map((r) => `  ${r.method.padEnd(6)} ${r.path}  ${r.risk.why.join(', ')}`)] : []),
         ...(result.actions.length ? ['', `${result.actions.length} reusable action(s):`, ...result.actions.map((a) => `  ${a.id.padEnd(24)} ${a.routes.join(', ') || '(no routes)'}  used by ${a.usedBy.length} flow(s)`)] : []),
         ...(saved ? ['', `catalog: ${saved.routes} route(s) recorded in ${relative(resolve(flag(args, 'dir') ?? '.'), saved.path)}`] : []),
         ...(result.ambiguities.length ? ['', `${result.ambiguities.length} place(s) discovery cannot read; \`tracegrove draft\` asks the agent to resolve them and proves the answer:`, ...result.ambiguities.slice(0, 12).map((a) => `  ? ${a.detail}`)] : []),

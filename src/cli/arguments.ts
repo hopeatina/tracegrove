@@ -27,7 +27,7 @@ export const COMMAND_SCHEMAS = {
   compile: z.object({ ...common, config: Text.optional(), 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional(), env: EnvName.optional() }).strict(),
   show: z.object({ ...common, config: Text.optional(), run: Text.optional() }).strict(),
   ui: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), port: Text.optional() }).strict(),
-  discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), save: Bool }).strict(),
+  discover: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), save: Bool, jsonl: Bool }).strict(),
   check: z.object({ ...common, dir: Text.optional() }).strict(),
   draft: z.object({ ...common, dir: Text.optional(), branch: Text.optional(), intent: Text.optional(), agent: Text.optional(), model: Text.optional(), 'no-prove': Bool }).strict(),
   settings: z.object({ ...common, dir: Text.optional(), agent: Text.optional(), model: Text.optional(), 'source-snapshot': Text.optional(), 'working-tree': Bool }).strict(),
