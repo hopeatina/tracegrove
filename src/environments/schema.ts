@@ -9,6 +9,10 @@ const Name = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*$/, 'use letters, digits, 
 const Path = z.string().regex(/^\/(?!\/)[^?#\s]*$/, 'paths start with /');
 const Url = z.string().url().refine(value => /^https:\/\//.test(value) || /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/.test(value), 'use https, or http only for loopback (127.0.0.1, localhost)');
 
+/** `env:NAME`: a value only known at run time, such as a preview deployment's URL in CI. */
+export const EnvRef = z.string().regex(/^env:[A-Z_][A-Z0-9_]*$/, 'use env:NAME');
+export const URL_RULE = Url;
+
 export const WRITE_POLICIES = ['none', 'owned_namespace'] as const;
 export const AGENT_POLICIES = ['allow', 'ask', 'deny'] as const;
 export type AgentPolicy = typeof AGENT_POLICIES[number];
@@ -27,10 +31,10 @@ export type EnvironmentPersona = z.infer<typeof EnvironmentPersona>;
 export const EnvironmentTarget = z.union([
   z.object({ launch: z.literal('app').describe('Launch the app from app: on this machine (the default local environment).') }).strict(),
   z.object({
-    url: Url.describe('Deployed origin tracegrove does not launch, e.g. https://staging.example.com.'),
+    url: z.union([Url, EnvRef]).describe('Deployed origin tracegrove does not launch, e.g. https://staging.example.com, or env:PREVIEW_URL for a per-PR preview read at run time.'),
     health: Path.default('/health').describe('GET path that answers 2xx when the deployment is ready.'),
     release: z.object({ field: z.string().regex(/^[A-Za-z_][A-Za-z0-9_.]*$/).describe('Health-body field holding the deployed release, e.g. build or version.'),
-      expect: z.string().min(1).max(256).optional().describe('Expected release; a different deployment blocks the run with identity_mismatch.') }).strict().optional(),
+      expect: z.string().min(1).max(256).optional().describe('Expected release; a different deployment blocks the run with identity_mismatch. env:GITHUB_SHA reads it at run time.') }).strict().optional(),
     readyTimeoutMs: z.number().int().positive().max(300_000).default(20_000),
   }).strict(),
   z.object({

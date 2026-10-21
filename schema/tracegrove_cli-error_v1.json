@@ -71,7 +71,9 @@
             "import-call",
             "judge",
             "seal",
-            "unseal"
+            "unseal",
+            "keygen",
+            "sign"
           ],
           "type": "string"
         },
@@ -144,6 +146,7 @@
               "unexpected_failure",
               "unknown_environment",
               "invalid_environment",
+              "environment_value_missing",
               "no_flows_for_environment",
               "approval_required",
               "approval_requires_human",

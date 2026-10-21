@@ -11,7 +11,7 @@ export const CliErrorCode = z.enum([
   'prerequisite_unavailable', 'state_conflict', 'invalid_document', 'invalid_json',
   'input_unavailable', 'access_denied', 'infrastructure_failure', 'unexpected_failure',
   // environments (additive)
-  'unknown_environment', 'invalid_environment', 'no_flows_for_environment', 'approval_required', 'approval_requires_human', 'agent_policy_denied',
+  'unknown_environment', 'invalid_environment', 'environment_value_missing', 'no_flows_for_environment', 'approval_required', 'approval_requires_human', 'agent_policy_denied',
   'invalid_config_path', 'config_edit_invalid',
   ...NativeObservationErrorCode.options,
 ]);
@@ -24,7 +24,7 @@ export const CliCommandName = z.enum([
   'workflow-map', 'workflows', 'usage', 'benchmark', 'pools', 'import-observations', 'observations', 'result-ingest', 'results',
   'awr-prepare', 'awr-inspect', 'awr-deliver', 'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve',
   'recovery-status', 'source-materialize', 'schema', 'setup', 'env', 'whoami', 'explain', 'capabilities', 'config', 'approve', 'mcp',
-  'readiness', 'try', 'accept', 'waive', 'reject', 'challenge', 'handoff', 'card', 'import-call', 'judge', 'seal', 'unseal']);
+  'readiness', 'try', 'accept', 'waive', 'reject', 'challenge', 'handoff', 'card', 'import-call', 'judge', 'seal', 'unseal', 'keygen', 'sign']);
 export const CliErrorReport = z.object({
   schemaVersion: z.literal('tracegrove.cli-error/v1'),
   command: CliCommandName.nullable(),

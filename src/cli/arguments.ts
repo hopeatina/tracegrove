@@ -50,7 +50,7 @@ export const COMMAND_SCHEMAS = {
       : flags.bundle ? !flags.execution && !flags['state-dir'] : !!flags.execution && !!flags['state-dir'],
     'choose --request, --bundle, or --execution with --state-dir; --failed-step is only for execution evidence'),
   export: z.object({ ...common, execution: ExecutionId, 'state-dir': Text, output: Text }).strict(),
-  'verify-bundle': z.object({ ...common, bundle: Text }).strict(),
+  'verify-bundle': z.object({ ...common, bundle: Text, signers: Text.optional() }).strict(),
   compare: z.object({ ...common, baseline: Text, candidate: Text }).strict(),
   'workflow-map': z.object({...common,bundle:Text,cell:IdString.optional()}).strict(),
   workflows: z.object({...common,bundle:Text,text:Text.max(256).optional(),case:IdString.optional(),workflow:IdString.optional(),
@@ -86,6 +86,8 @@ export const COMMAND_SCHEMAS = {
   'import-call': z.object({ ...common, _: Positionals(1, 1), out: Text.optional(), name: Text.optional(), channel: z.enum(['voice', 'chat']).optional(), endpoint: Text.optional(), 'keep-client-data': Bool, force: Bool }).strict(),
   card: z.object({ ...common, _: Positionals(0, 32).optional(), commit: Text.optional(), link: Text.optional(), title: Text.optional(), out: Text.optional() }).strict(),
   handoff: z.object({ ...common, dir: Text.optional(), out: Text.optional(), client: Text.optional(), by: Text.optional() }).strict(),
+  keygen: z.object({ ...common, dir: Text.optional(), name: Text.optional() }).strict(),
+  sign: z.object({ ...common, dir: Text.optional(), run: Text.optional(), key: Text.optional() }).strict(),
   seal: z.object({ ...common, dir: Text.optional(), run: Text.optional(), out: Text, remove: Bool }).strict(),
   unseal: z.object({ ...common, _: Positionals(1, 1), out: Text }).strict(),
 } as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;

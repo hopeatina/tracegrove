@@ -287,7 +287,7 @@ Each flow is a claim with four separate answers: did it run, what the evidence s
 <details>
 <summary><b>Staging, production and secrets</b></summary>
 
-The same flows run against Docker, staging or production. Credentials stay in your secret store; the config only says where they live:
+The same flows run against Docker, staging, per-PR previews or production. `npx tracegrove env add` reads your compose, Fly, Render, Vercel, Netlify and `.env.<stage>` files, proposes environments, and asks only where each credential lives. Credentials stay in your secret store; the config only says where they live:
 
 ```yaml
 environments:
@@ -303,7 +303,7 @@ npx tracegrove env doctor staging   # reachable, secrets resolve, each persona i
 npx tracegrove test --env staging
 ```
 
-On staging, a run whose cleanup can't be confirmed fails. In production, any flow that writes is blocked before it starts. [Environments](docs/environments.md).
+On staging, a run whose cleanup can't be confirmed fails. In production, any flow that writes is blocked before it starts. A preview reads its address at run time (`url: env:PREVIEW_URL`), and the GitHub Action can run it when the preview deploys ([per-PR previews](docs/environments.md#previews)). [Environments](docs/environments.md).
 
 </details>
 
@@ -366,7 +366,7 @@ Declare the services your app calls under `standIns:` and tracegrove replaces ea
 | The agent said the right thing, kindly | Only the phrases you listed (`says`, `notSays`) decide pass or fail. A `rubric:` gets graded by your agent with cited lines, but only as advice to the person who signs off. |
 | It works with hosted voice platforms | Pipecat and anything speaking RTVI, plus HTTP chat. Retell and Vapi transports are planned; today, test the backend they call. |
 | Discovery found every route | Routes found by reading code are marked unverified until a run reaches them. |
-| The evidence can't be tampered with | Every run is hash-chained and checked on read. It isn't signed by a third party yet. |
+| The evidence can't be tampered with | Every run is hash-chained and checked on read. Unsigned runs prove consistency, not authorship; [sign them](docs/signed-evidence.md) with a committed key, and add a GitHub attestation in CI. |
 | It runs on my stack | Node, FastAPI and Django apps today. Apps that need a build step first (Next.js, NestJS) can't be launched yet. |
 
 When a person disagrees with a passing claim, `tracegrove reject <claim> --reason "…"` records why, and the [PR card](docs/pr-proof-card.md) fails until it's fixed.
@@ -413,6 +413,7 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Adding tracegrove to your app |
 | [Voice and chat](docs/voice-and-chat.md) | Conversation steps, transports, checks |
+| [Signed evidence](docs/signed-evidence.md) | Sign runs with a committed key; GitHub attestations for handoff reports |
 | [Stand-ins](docs/stand-ins.md) | Replace calendars, CRMs and webhooks; read back what was sent; inject failures |
 | [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
