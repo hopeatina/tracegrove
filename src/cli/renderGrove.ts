@@ -6,7 +6,7 @@
  */
 import {
   LAYER_CODE, MODES, PHASE_SHORT, criterionStatus, depthOf, growSummary, inMode, modeCount,
-  type DepthStatus, type GrowEvent, type GrowState, type GrowUnit, type Mode,
+  type DepthStatus, type GrowEvent, type GrowScenario, type GrowState, type GrowUnit, type Mode,
 } from '../authoring/growState.ts';
 
 export type Style = '' | 'frame' | 'dim' | 'bark' | 'root' | 'gold' | 'leaf' | 'moss' | 'fail' | 'b' | 'inv' | 'ital';
@@ -275,17 +275,17 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
     L.push(one([['dim', 'prove   '], ...MODES.flatMap((m, i): Seg[] => [[m.id === mode ? 'inv' : 'dim', ` ${i + 1} ${m.label.toLowerCase()} · ${modeCount(s, m.id)} `], ['', '  ']])]));
     L.push(one([['root', `↵ prove ${modeLabel}`], ['dim', ` · ${modeCount(s, mode)} scenarios · ${MODES.find((m) => m.id === mode)!.blurb}`]]));
   }
-  // The scenarios in the chosen mode, with their mock and real lanes.
+  // The scenarios in the chosen mode, by journey, with their mock and real lanes. Parts on their own and the
+  // existing flows the change reaches collapse to counts; a failure among them is still spelled out.
   if (s.modeBy) {
     const list = s.scenarios.filter((x) => inMode(s, x));
-    const room = view.height ? Math.max(3, view.height - L.length - 8) : list.length * 2;
+    const room = view.height ? Math.max(3, view.height - L.length - 8) : Infinity;
     const TITLE = Math.max(20, IN - 51);
     L.push(one([]));
     L.push(one([['dim', `     ${'kind'.padEnd(8)}${'scenario'.padEnd(TITLE + 1)}${'spec'.padEnd(9)}${'mock'.padEnd(13)}real`]]));
-    let shown = 0, drawn = 0, lastUnit: string | null = null;
-    for (const x of list) {
-      if (shown >= room) break;
-      if (x.unit !== lastUnit) { const u = s.units.find((y) => y.id === x.unit); lastUnit = x.unit; if (u) { L.push(one([['b', String(s.units.indexOf(u) + 1).padStart(2)], ['', ` ${u.label}`], ['dim', `  ${u.unitKind} · ${u.loc}`]])); shown++; } }
+    let shown = 0, drawn = 0;
+    const head = (l: Line) => { L.push(one(l)); shown++; };
+    const row = (x: GrowScenario) => {
       shown++; drawn++;
       const r = s.run[x.id]; const v = s.real[x.id];
       const mk: Seg = !r ? ['dim', '○'] : r.st === 'run' ? ['root', sp] : r.st === 'pass' ? ['leaf', '✓'] : r.st === 'fail' ? ['fail', '✕'] : ['dim', '–'];
@@ -294,6 +294,33 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
       const agentMade = x.ext.some((e) => s.ext[e] && s.ext[e]!.state !== 'proven');
       L.push(one([['', '   '], mk, ['dim', ` ${x.scenarioKind.padEnd(7)} `], ['', pad(x.title, TITLE - 2)], agentMade ? ['dim', ' ✎'] : ['', '  '], ['dim', ` ${pad(x.criteria.join(' '), 8)} `], ...fit([mock], 12), ['', ' '], real]));
       if (r?.st === 'fail' && r.why) L.push(one([['fail', `    ${r.why}`]]));
+    };
+    if (!s.journeys.length) {
+      // A log written before journeys: by unit, as it was drawn then.
+      let lastUnit: string | null = null;
+      for (const x of list) {
+        if (shown >= room) break;
+        if (x.unit !== lastUnit) { const u = s.units.find((y) => y.id === x.unit); lastUnit = x.unit; if (u) head([['b', String(s.units.indexOf(u) + 1).padStart(2)], ['', ` ${u.label}`], ['dim', `  ${u.unitKind} · ${u.loc}`]]); }
+        row(x);
+      }
+    } else {
+      s.journeys.forEach((j, i) => {
+        if (shown >= room) return;
+        const own = list.filter((x) => x.journey === j.id && x.level !== 'part' && x.scenarioKind !== 'regression');
+        const tail = `  · ${j.surface} · ${j.units.length} part${j.units.length === 1 ? '' : 's'}${own.length ? '' : ` · outside the critical cut, nothing in ${modeLabel}`}`;
+        head([['b', String(i + 1).padStart(2)], ['', `  ${cut(j.title, Math.max(20, IN - 4 - chars(tail).length))}`], ['dim', tail]]);
+        for (const x of own) { if (shown >= room) break; row(x); }
+      });
+      const groups: Array<[string, GrowScenario[]]> = [
+        ['Parts on their own', list.filter((x) => x.scenarioKind !== 'regression' && (x.level === 'part' || !x.journey))],
+        ['Existing flows the change reaches', list.filter((x) => x.scenarioKind === 'regression')]];
+      for (const [name, xs] of groups) {
+        if (!xs.length || shown >= room) continue;
+        const failed = xs.filter((x) => s.run[x.id]?.st === 'fail'); const passed = xs.filter((x) => s.run[x.id]?.st === 'pass').length;
+        head([['dim', ' +'], ['', `  ${name}`], ['dim', `  · ${xs.length} scenario${xs.length === 1 ? '' : 's'}`], ...(passed ? [['leaf', ` · ${passed} passed`] as Seg] : []), ...(failed.length ? [['fail', ` · ${failed.length} failed`] as Seg] : [])]);
+        drawn += xs.length - failed.length;
+        for (const x of failed) { if (shown >= room) break; row(x); }
+      }
     }
     if (drawn < list.length) L.push(one([['dim', `  +${list.length - drawn} more scenarios in the log`]]));
   }

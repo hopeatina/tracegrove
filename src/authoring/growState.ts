@@ -18,10 +18,16 @@ export const LAYER_CODE: Record<Layer, string> = { ui: 'ui', api: 'api', cli: 'c
 export type CellStatus = 'built' | 'indirect' | 'missing';
 export type ScenarioKind = 'happy' | 'sad' | 'edge' | 'regression';
 export type Mode = 'min' | 'std' | 'max';
+/** Where a person or caller starts a journey. */
+export type Surface = 'browser' | 'terminal' | 'http' | 'job';
+/** A journey scenario proves the path end to end; a part scenario checks one part on its own (max). */
+export type ScenarioLevel = 'journey' | 'part';
+/** What a scenario shows: the path works, the app refuses what it must (auth, validation), or it survives a fault. */
+export type Polarity = 'happy' | 'guard' | 'failure';
 export const MODES: Array<{ id: Mode; label: string; blurb: string }> = [
-  { id: 'min', label: 'Minimum', blurb: 'every spec criterion, plus the riskiest failure of each part' },
-  { id: 'std', label: 'Standard', blurb: 'adds the remaining sad paths and edge cases' },
-  { id: 'max', label: 'Max', blurb: 'adds regression of every existing flow the change reaches' },
+  { id: 'min', label: 'Minimum', blurb: 'each critical journey end to end, its riskiest failure, and every spec criterion' },
+  { id: 'std', label: 'Standard', blurb: 'adds the other journeys, and the other ways each one can fail' },
+  { id: 'max', label: 'Max', blurb: 'adds every part on its own, and regression of the flows the change reaches' },
 ];
 export const MODE_RANK: Record<Mode, number> = { min: 0, std: 1, max: 2 };
 export type ExtensionKind = 'breakdown' | 'action' | 'flow' | 'seed' | 'verification script' | 'adapter draft';
@@ -30,6 +36,7 @@ export const EXTENSION_STATE: Record<ExtensionState, string> = { proven: 'proven
 export type Tracer = 'rules' | 'claude' | 'codex';
 
 type E<K extends string, T> = { kind: K } & T;
+// Fields added after v1 shipped are optional (a scenario's journey, level, polarity and modeWhy), so older logs still load.
 export type GrowEventBody =
   | E<'phase.started', { phase: number }>
   | E<'change.read', { branch: string; base: string; head: string | null; pr: number | null; title: string; url: string | null; files: number; adds: number; dels: number; untraced: number }>
@@ -39,6 +46,8 @@ export type GrowEventBody =
   | E<'criterion.found', { id: string; text: string }>
   | E<'trunk.grown', Record<never, never>>
   | E<'unit.found', { unit: string; label: string; unitKind: string; loc: string; root: boolean; layer: Layer; parent: string | null }>
+  | E<'journey.found', { journey: string; title: string; entry: string; units: string[]; surface: Surface; why: string; loc: string }>
+  | E<'journey.named', { journey: string; title: string; by: Tracer | 'spec' }>
   | E<'agent.started', { agent: string; brief: string; by: Tracer; model: string | null; units: string[] }>
   | E<'agent.said', { agent: string; line: string }>
   | E<'depth.checked', { agent: string; unit: string; step: DepthStep; status: DepthStatus; loc: string; note: string; by: Tracer }>
@@ -51,7 +60,7 @@ export type GrowEventBody =
   | E<'agent.done', { agent: string; ok: boolean; note: string }>
   | E<'extension.written', { ext: string; extKind: ExtensionKind; name: string; path: string; why: string; state: ExtensionState; need: string; unit: string | null }>
   | E<'extension.proven', { ext: string; by: string }>
-  | E<'scenario.drafted', { scenario: string; unit: string; scenarioKind: ScenarioKind; mode: Mode; title: string; proves: string; criteria: string[]; layers: Layer[]; flow: string | null; variants: Array<'mock' | 'real'>; realKey: string | null; mockOnly: string | null; by: Tracer; ext: string[] }>
+  | E<'scenario.drafted', { scenario: string; unit: string; scenarioKind: ScenarioKind; mode: Mode; title: string; proves: string; criteria: string[]; layers: Layer[]; flow: string | null; variants: Array<'mock' | 'real'>; realKey: string | null; mockOnly: string | null; by: Tracer; ext: string[]; journey?: string | null; level?: ScenarioLevel; polarity?: Polarity; modeWhy?: string }>
   | E<'mode.asked', { counts: Record<Mode, number> }>
   | E<'mode.chosen', { mode: Mode; by: 'flag' | 'you' | 'default' }>
   | E<'flows.checked', { scenarios: number; runnable: number; config: string | null }>
@@ -69,6 +78,7 @@ export type GrowEventKind = GrowEvent['kind'];
 type Of<K extends GrowEventKind> = Extract<GrowEvent, { kind: K }>;
 
 export type GrowUnit = Omit<Of<'unit.found'>, 'kind' | 'v' | 'seq'> & { id: string; foundAt: number };
+export type GrowJourney = Omit<Of<'journey.found'>, 'kind' | 'v' | 'seq' | 'journey'> & { id: string; titleBy: Tracer | 'spec' | 'rules' };
 export type GrowAgent = { id: string; brief: string; by: Tracer; model: string | null; units: string[]; unit: string | null; note: string; done: boolean; ok: boolean; said: string[] };
 export type GrowScenario = Omit<Of<'scenario.drafted'>, 'kind' | 'v' | 'seq' | 'scenario'> & { id: string };
 export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null };
@@ -77,7 +87,7 @@ export type GrowState = {
   change: Of<'change.read'> | null; files: Array<Of<'file.changed'>>;
   spec: Of<'spec.found'> | null; specMissing: string | null; criteria: Array<{ id: string; text: string }>;
   linked: Record<string, Array<{ unit: string; why: string }>>; unbuilt: Record<string, string>; drift: Array<Of<'drift.found'>>;
-  trunkAt: number | null; units: GrowUnit[];
+  trunkAt: number | null; units: GrowUnit[]; journeys: GrowJourney[];
   depth: Record<string, Partial<Record<DepthStep, Of<'depth.checked'>>>>;
   cells: Record<string, Array<Of<'layer.needed'>>>;
   stops: Array<Of<'trace.stopped'>>; dropped: Array<Of<'claim.dropped'>>;
@@ -91,7 +101,7 @@ export type GrowState = {
 };
 
 export function freshGrow(): GrowState {
-  return { phase: -1, phaseAt: {}, ms: 0, change: null, files: [], spec: null, specMissing: null, criteria: [], linked: {}, unbuilt: {}, drift: [], trunkAt: null, units: [],
+  return { phase: -1, phaseAt: {}, ms: 0, change: null, files: [], spec: null, specMissing: null, criteria: [], linked: {}, unbuilt: {}, drift: [], trunkAt: null, units: [], journeys: [],
     depth: {}, cells: {}, stops: [], dropped: [], agents: [], focus: null, ext: {}, extOrder: [], scenarios: [], counts: null, asked: false, mode: 'min', modeBy: null,
     flows: null, run: {}, real: {}, done: null, blocked: null, last: 0 };
 }
@@ -111,6 +121,8 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'criterion.found': s.criteria.push({ id: e.id, text: e.text }); break;
     case 'trunk.grown': s.trunkAt = e.ms; break;
     case 'unit.found': s.units.push({ ...strip(e), id: e.unit, foundAt: e.ms }); break;
+    case 'journey.found': { const { journey: _j, ...rest } = strip(e); s.journeys.push({ ...rest, id: e.journey, titleBy: 'rules' }); break; }
+    case 'journey.named': { const j = s.journeys.find((x) => x.id === e.journey); if (j) { j.title = e.title; j.titleBy = e.by; } break; }
     case 'agent.started': s.agents.push({ id: e.agent, brief: e.brief, by: e.by, model: e.model, units: e.units, unit: null, note: 'starting', done: false, ok: true, said: [] }); break;
     case 'agent.said': { const a = agent(e.agent); if (a) { a.note = e.line; a.said.push(e.line); if (a.said.length > 40) a.said.shift(); } break; }
     case 'depth.checked': {
