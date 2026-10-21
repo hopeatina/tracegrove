@@ -9,6 +9,7 @@ import { SOURCE_CONTROLS_JS } from './uiSourceControls.ts';
 import { NATIVE_IMPORTS_JS } from './uiNativeImports.ts';
 import { WORKFLOW_MAP_JS } from './uiWorkflowMap.ts';
 import { COMPARISON_CSS, COMPARISON_JS } from './uiComparison.ts';
+import { GROVE_CSS, GROVE_JS } from './uiGrove.ts';
 import { BENCHMARK_CSS, BENCHMARK_JS } from './uiBenchmark.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -127,6 +128,7 @@ details.more>div{margin-top:8px;padding-left:18px;border-left:1px solid var(--li
 @media (max-width:720px){header{padding:12px 16px}.page{padding:20px 16px 40px}.ctx{margin-left:0;width:100%}h1{font-size:23px;line-height:30px}
  .step{grid-template-columns:8px minmax(0,1fr) 48px;}.grovecard{overflow-x:auto}.grovecard svg{min-width:560px}.kpi{min-width:0;flex:1 1 140px}.step .req,.step .bar,.step .ms{display:none}.route{grid-template-columns:8px 1fr auto}.route .where{display:none}.obs{grid-template-columns:minmax(0,1fr)}}
 ${COMPARISON_CSS}
+${GROVE_CSS}
 ${BENCHMARK_CSS}
 </style></head><body>
 <header><span class="brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M12 18c-.6-2.6 1.4-3.6.6-6.4" stroke="var(--ink)" stroke-width="1.8"/><path d="M12.4 13.4c-2-.4-3.6-1.4-4.6-2.6M12.8 11.6c1.6-.6 3-1.8 3.8-3" stroke="var(--ink)" stroke-width="1.1"/><g fill="var(--moss)"><circle cx="6.2" cy="10.2" r="1.7"/><circle cx="8.8" cy="9.6" r="1.7"/><circle cx="15.6" cy="7.4" r="1.7"/><circle cx="18.2" cy="8" r="1.7"/><circle cx="11.6" cy="6" r="1.9"/></g><path d="M3 18h18" stroke="var(--ink3)" stroke-width=".9"/><path d="M12 18c-1 1.6-2.6 2.6-4.4 3M12 18c1.2 1.4 2.8 2.2 4.6 2.4" stroke="var(--gold)" stroke-width=".9"/></svg>tracegrove</span>
@@ -156,6 +158,7 @@ function page(...nodes){document.getElementById('main').replaceChildren(...nodes
 
 ${SOURCE_CONTROLS_JS}
 ${COMPARISON_JS}
+${GROVE_JS}
 ${NATIVE_IMPORTS_JS}
 ${WORKFLOW_MAP_JS}
 ${BENCHMARK_JS}
@@ -326,7 +329,7 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
   h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Two sources. The static scan reads FastAPI, Django, Express and plain node:http handlers from source text, which is a hint. The recording proxy in front of the app sees every request a run causes, including the ones a browser page makes, which is evidence.'),
    h('p',{},'Routes seen only in traffic have no source location yet. Routing the scan cannot read is listed above as a question for the agent.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
   ui.draft?draftCard():null);
- return[intent,reach]}
+ return[growPanel(),intent,reach]}
 /* Coverage strip: where the app stands, and the riskiest routes nothing tests yet. */
 function coverageStrip(d){const c=d.coverage;const stat=(n,label,cls)=>h('span',{},h('b',{class:cls||null},String(n)),h('span',{class:'small muted'},label));
  return h('div',{'data-testid':'coverage-strip',style:'margin:0 0 16px'},h('div',{class:'stats',style:'margin-top:0'},stat(c.domains,c.domains===1?'area':'areas'),stat(c.surfaces,'routes'),stat(c.observed,'served in a run'),stat(c.declared,'declared'),stat(c.untested,'untested',c.untested?'c-fail':null),

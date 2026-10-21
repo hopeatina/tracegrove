@@ -17,6 +17,8 @@ import { runTests, type TestRunReport } from './run.ts';
 import { initProject } from './init.ts';
 import { draftFlow, gitInfo } from './discover.ts';
 import { discoverLive, draftWithAgent } from './workspace.ts';
+import { grow } from './grow.ts';
+import { growView, type GrowState, type Mode } from './growState.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
@@ -57,7 +59,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   // A fixed token is for harnesses that drive the UI over HTTP (the dogfood grove); the CLI never sets one.
   const token = options.token && options.token.length >= 16 ? options.token : randomBytes(18).toString('base64url');
   let running: Promise<unknown> | null = null;
-  let active: { id: string; kind: 'run' | 'heal' | 'draft'; controller: AbortController; cancelling: boolean } | null = null;
+  let active: { id: string; kind: 'run' | 'heal' | 'draft' | 'grow'; controller: AbortController; cancelling: boolean } | null = null;
+  /** The live grow waiting for a mode choice, if any: answered by POST /api/grow/mode. */
+  let growPick: { id: string; done: (mode: Mode | null) => void } | null = null;
   let closing = false;
   let closePromise: Promise<void> | null = null;
   const pendingBodies = new Map<IncomingMessage, ServerResponse>();
@@ -65,7 +69,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     pendingBodies.set(req, res);
     try { return await readJson(req); } finally { pendingBodies.delete(req); }
   };
-  const begin = (kind: 'run' | 'heal' | 'draft') => {
+  const begin = (kind: 'run' | 'heal' | 'draft' | 'grow') => {
     const operation = { id: randomBytes(12).toString('hex'), kind, controller: new AbortController(), cancelling: false };
     active = operation; return operation;
   };
@@ -274,6 +278,39 @@ export async function startUi(options: { dir: string; branch?: string | null; po
           return send(200, result);
         } catch (error) { live.agent.status = 'failed'; agentSay((error as Error).message); throw error; }
         finally { drafting = false; if (active === operation) { running = null; active = null; } }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/grow') {
+        // Live discovery of a change, streamed as server-sent events over a token-guarded POST:
+        // `event` for every discovery event, `state` for the folded state (at most ten a second), `done` last.
+        const body = z.object({ branch: z.string().max(200).nullable().default(null), base: z.string().max(200).nullable().default(null),
+          mode: z.enum(['min', 'std', 'max']).nullable().default(null), prove: z.boolean().default(true), agent: z.boolean().default(true) }).strict().parse(await readBody(req, res));
+        if (closing) return send(409, { error: 'UI is closing; new work is not admitted.' });
+        if (active) return send(409, { error: 'an operation is already in progress' });
+        const operation = begin('grow');
+        res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        const sse = (event: string, data: unknown) => { if (!res.writableEnded && !res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+        // A reader that leaves mid-stream stops the work and frees the lock.
+        res.on('close', () => { if (!res.writableFinished) operation.controller.abort(); });
+        sse('session', { id: operation.id });
+        let snapshot: GrowState | null = null; let last = 0; let timer: ReturnType<typeof setTimeout> | null = null;
+        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growView(snapshot) }); };
+        const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, agent: { off: !body.agent }, signal: operation.controller.signal,
+          ...(body.mode ? {} : { chooseMode: () => new Promise<Mode | null>((done) => { growPick = { id: operation.id, done }; operation.controller.signal.addEventListener('abort', () => done(null), { once: true }); }) }) },
+        (event, state) => { sse('event', event); snapshot = state; if (Date.now() - last >= 100) flush(); else timer ??= setTimeout(flush, 100); });
+        running = job;
+        try {
+          const result = await job;
+          if (timer) clearTimeout(timer);
+          flush(); sse('done', { log: result.log ? relative(dir, result.log) : null });
+        } catch (error) { sse('failed', errorBody(error)); }
+        finally { growPick = null; if (active === operation) { running = null; active = null; } res.end(); }
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/grow/mode') {
+        const body = z.object({ id: z.string().max(64), mode: z.enum(['min', 'std', 'max']) }).strict().parse(await readBody(req, res));
+        if (!growPick || growPick.id !== body.id) return send(409, { error: 'no discovery is waiting for a mode' });
+        const pick = growPick; growPick = null; pick.done(body.mode);
+        return send(200, { id: body.id, mode: body.mode });
       }
       if (req.method === 'GET' && url.pathname === '/api/discover') {
         return send(200, discoverLive(dir, url.searchParams.get('branch') || null));

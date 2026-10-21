@@ -12,7 +12,7 @@ import {
 export type Style = '' | 'frame' | 'dim' | 'bark' | 'root' | 'gold' | 'leaf' | 'moss' | 'fail' | 'b' | 'inv' | 'ital';
 type Seg = [Style, string];
 type Line = Seg[];
-export type GroveView = { width: number; height?: number; elapsed: number; color: boolean; picking?: Mode | null; log?: string | null };
+export type GroveView = { width: number; height?: number; elapsed: number; clock?: number; color: boolean; picking?: Mode | null; log?: string | null };
 
 const PALETTE: Record<Exclude<Style, ''>, string> = {
   frame: '38;2;74;88;80', dim: '38;2;139;138;127', bark: '38;2;185;173;148', root: '38;2;216;178;94', gold: '1;38;2;240;200;104',
@@ -76,35 +76,43 @@ const MAX_BRANCHES = 12; const MAX_ROOTS = 6;
 export function layout(units: GrowUnit[]): Geometry {
   const branches = units.filter((u) => !u.root).slice(0, MAX_BRANCHES);
   const roots = units.filter((u) => u.root).slice(0, MAX_ROOTS);
-  const ground = 13; const height = ground + (roots.length ? 8 : 2);
-  const trunk = cellsOf([[TRUNK_X, ground], [TRUNK_X, ground - 3], [TRUNK_X + 1, ground - 4], [TRUNK_X, ground - 6], [TRUNK_X, ground - 7]]);
+  const ground = 13; const height = ground + (roots.length ? 9 : 2);
+  const top = ground - 7;
+  const trunk = cellsOf([[TRUNK_X, ground], [TRUNK_X, ground - 3], [TRUNK_X + 1, ground - 4], [TRUNK_X, ground - 6], [TRUNK_X, top]]);
   const limbs = new Map<string, Cell[]>(); const tips = new Map<string, Pt>(); const dead = new Map<string, Cell[]>();
-  const nb = branches.length;
-  // Alternate sides so neighbors in the list land apart: left, right, left...
-  const order = branches.map((_, i) => i).sort((a, b) => (a % 2) - (b % 2) || (a % 2 ? b - a : a - b));
-  order.forEach((idx, k) => {
-    const u = branches[idx]!;
-    const deg = nb === 1 ? 96 : 166 - k * (152 / (nb - 1));
-    const th = deg * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
-    const ys = Math.round(ground - 2 - s * 5), xs = TRUNK_X + (c > 0.25 ? 1 : c < -0.25 ? -1 : 0);
-    const reach = 13 + Math.round(9 * Math.abs(c));
-    const xt = Math.max(3, Math.min(CW - 4, Math.round(TRUNK_X + c * reach)));
-    const yt = Math.max(1, Math.round(ys - 2 - s * (ys - 3)));
-    const xm = Math.round(xs + (xt - xs) * 0.55), ym = Math.round(ys + (yt - ys) * 0.3);
-    limbs.set(u.id, cellsOf([[xs, ys], [xm, ym], [xt, yt]]));
-    tips.set(u.id, [xt + (c > 0.3 ? 2 : c < -0.3 ? -2 : 0), yt + (Math.abs(c) <= 0.3 ? -1 : 0)]);
+  // Branches alternate left and right. On each side the lowest limb reaches widest and the highest is
+  // shortest and most upright, so limbs nest like a real bonsai's and never cross. With an odd count
+  // the last one crowns the trunk.
+  const crown = branches.length % 2 === 1 && branches.length > 2 ? branches.at(-1)! : null;
+  const sides = branches.filter((u) => u !== crown);
+  const perSide = [sides.filter((_, i) => i % 2 === 0), sides.filter((_, i) => i % 2 === 1)];
+  perSide.forEach((list, side) => {
+    const dir = side === 0 ? -1 : 1;
+    list.forEach((u, j) => {
+      const n = list.length;
+      const ys = Math.max(top, ground - 2 - side - j * Math.max(1, Math.floor(6 / Math.max(1, n - 1 || 1))));
+      const lift = j / Math.max(1, n - 1 || 1);
+      const reach = Math.round(23 - lift * 11 - (n > 4 ? j : 0));
+      const xs = TRUNK_X + (dir > 0 ? 1 : 0);
+      const ex = xs + dir * 2, ey = ys - 2;
+      const xt = Math.max(2, Math.min(CW - 3, TRUNK_X + dir * reach));
+      const yt = Math.max(1, Math.round(ey - 1 - lift * Math.max(1, ey - 3)));
+      limbs.set(u.id, cellsOf([[xs, ys], [ex, ey], [Math.round((ex + xt) / 2), Math.round((ey + yt) / 2 + 0.5)], [xt, yt]]));
+      tips.set(u.id, [xt + dir * 2, yt]);
+    });
   });
+  if (crown) { limbs.set(crown.id, cellsOf([[TRUNK_X, top], [TRUNK_X, top - 2], [TRUNK_X + 2, 2], [TRUNK_X + 2, 1]])); tips.set(crown.id, [TRUNK_X + 2, 0]); }
   const nr = roots.length;
   roots.forEach((u, j) => {
-    const deg = nr === 1 ? 290 : 204 + j * (132 / (nr - 1));
-    const th = deg * Math.PI / 180, c = Math.cos(th), s = Math.abs(Math.sin(th));
-    const xs = TRUNK_X + (c < 0 ? -1 : 1), ys = ground + 1;
-    const xt = Math.max(3, Math.min(CW - 4, Math.round(TRUNK_X + c * (10 + 9 * Math.abs(c))))), yt = Math.round(ground + 1 + s * 5);
-    const cells = cellsOf([[xs, ys], [Math.round(xs + (xt - xs) * 0.45), Math.round(ys + (yt - ys) * 0.65)], [xt, yt]]);
-    limbs.set(u.id, cells);
-    tips.set(u.id, [xt + (c > 0.2 ? 2 : c < -0.2 ? -2 : 0), yt + (Math.abs(c) <= 0.2 ? 1 : 0)]);
-    const dir = c >= 0 ? 1 : -1;
-    dead.set(u.id, cellsOf([[xt, yt], [xt + dir * 3, Math.min(height - 1, yt + 1)], [xt + dir * 5, Math.min(height - 1, yt + 2)]]));
+    const dir = j % 2 === 0 ? -1 : 1; const k = Math.floor(j / 2); const deep = Math.ceil(nr / 2);
+    const xs = TRUNK_X + (dir > 0 ? 2 : -1), ys = ground + 1;
+    const reach = Math.round(21 - k * (12 / Math.max(1, deep)));
+    const yt = Math.min(height - 2, ground + 2 + k * 2);
+    const xt = Math.max(2, Math.min(CW - 3, TRUNK_X + dir * reach));
+    const ex = xs + dir * 2, ey = ys + 1;
+    limbs.set(u.id, cellsOf([[xs, ys], [ex, ey], [Math.round((ex + xt) / 2), Math.round((ey + yt) / 2)], [xt, yt]]));
+    tips.set(u.id, [xt + dir * 2, yt]);
+    dead.set(u.id, cellsOf([[xt, yt], [xt + dir * 2, Math.min(height - 1, yt + 1)], [xt + dir * 4, Math.min(height - 1, yt + 2)]]));
   });
   return { ground, height, trunk, limbs, tips, dead, shown: [...branches, ...roots] };
 }
@@ -198,7 +206,7 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
 
   // Title bar.
   const title: Line = [['', ' '], ['b', 'tracegrove grow'], ['dim', ' · '], ['', c ? c.branch : 'reading the branch'], ...(c ? [['dim', ' → '] as Seg, ['', c.base] as Seg] : []), ['', ' ']];
-  const right: Line = [['', ' '], ['root', s.modeBy || view.picking ? modeLabel : 'choosing'], ['dim', ` ${fmt(view.elapsed)}`], ['', ' ']];
+  const right: Line = [['', ' '], ['root', s.modeBy || view.picking ? modeLabel : 'choosing'], ['dim', ` ${fmt(view.clock ?? view.elapsed)}`], ['', ' ']];
   const fill = TW - 4 - width(title) - width(right);
   L.push([F('╭─'), ...(fill >= 1 ? [...title, F('─'.repeat(fill)), ...right] : fit(title, TW - 4)), F('─╮')]);
   // The change and its spec.

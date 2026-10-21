@@ -64,7 +64,7 @@ export async function growCommand(flags: GrowFlags, write: (text: string) => voi
     if (settle > 0) await new Promise((r) => setTimeout(r, Math.min(settle, 1500)));
     if (timer) clearInterval(timer);
     draw(true); write('\x1b[?25h'); process.off('SIGINT', stop);
-  } else if (!flags.json && !flags.jsonl) write(`${renderGrove(result.state, { width: 118, elapsed: result.state.ms + 5000, color: false, log }).join('\n')}\n`);
+  } else if (!flags.json && !flags.jsonl) write(`${renderGrove(result.state, { width: 118, elapsed: result.state.ms + 5000, clock: result.state.ms, color: false, log }).join('\n')}\n`);
   const s = result.state;
   const code = s.blocked ? (s.blocked.code === 'discovery_cancelled' ? 4 : 2) : s.done && s.done.failed > 0 ? 1 : 0;
   return { code, state: s, log };

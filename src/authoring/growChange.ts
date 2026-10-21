@@ -174,7 +174,7 @@ function programName(dir: string): string {
   } catch { return basename(resolve(dir)); }
 }
 /** A line that holds a regular expression or a pattern table describes code; it does not call it. */
-export const isPatternSource = (text: string) => /\\[.()/[\]sbdwS]|\/[^/\n]*\\\(/.test(text);
+export const isPatternSource = (text: string) => /\\[.()/[\]sbdwS]|\/[^/\n]*\\\(|\/[^/\n]+\/[a-z]*\.(?:test|exec)\(/.test(text);
 const stem = (file: string) => basename(file).replace(/\.[^.]+$/, '');
 const inRanges = (line: number, ranges: Array<[number, number]>) => ranges.some(([a, b]) => line >= a && line <= b);
 

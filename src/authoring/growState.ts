@@ -198,3 +198,15 @@ export function growSummary(s: GrowState) {
     toReview: s.extOrder.filter((x) => s.ext[x]!.state !== 'proven').length,
   };
 }
+
+/** What the UI draws besides raw state: the same derived answers the terminal computes. */
+export function growView(s: GrowState) {
+  return {
+    criteria: s.criteria.map((c) => ({ ...c, status: criterionStatus(s, c.id), units: (s.linked[c.id] ?? []).map((l) => l.unit) })),
+    depth: Object.fromEntries(s.units.map((u) => [u.id, { pips: depthOf(s, u.id), score: depthScore(s, u.id) }])),
+    gaps: Object.fromEntries(s.units.map((u) => [u.id, unitHasGap(s, u.id)])),
+    counts: { min: modeCount(s, 'min'), std: modeCount(s, 'std'), max: modeCount(s, 'max') },
+    summary: growSummary(s),
+  };
+}
+export type GrowView = ReturnType<typeof growView>;
