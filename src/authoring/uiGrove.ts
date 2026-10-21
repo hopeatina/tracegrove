@@ -125,7 +125,9 @@ ${BONSAI_CSS}
 .gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 22%,var(--paper))}.gw-sw .pot{fill:color-mix(in srgb,var(--ochre) 26%,var(--line2))}
 .gw-sw .rt{fill:none;stroke:var(--sw-wood);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-sw .tl{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linecap:round}.gw-sw .te{fill:var(--paper);stroke:var(--muted);stroke-width:1.1}
-.gw-sw .case{fill:none;stroke:var(--paper);stroke-width:3.2;stroke-linecap:round;opacity:.9}.gw-sw .rte{fill:none;stroke:var(--ink);stroke-width:1.3;stroke-linecap:round;stroke-dasharray:2 3}.gw-sw .rte.bad{stroke:var(--verm)}
+.gw-sw .rglow{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;opacity:.38}.gw-sw .rte{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.6;stroke-linecap:round;stroke-dasharray:3 3}.gw-sw .rte.bad{stroke:var(--verm);stroke-width:2.4;stroke-dasharray:none}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
+.gw-sw .k0{fill:var(--sw-shade);opacity:.5}.gw-sw .k1{fill:var(--sw-wood)}.gw-sw .k2{fill:var(--sw-lit);opacity:.85}.gw-sw .kglow{fill:var(--gold);opacity:.6}.gw-sw .kbad{fill:var(--verm);opacity:.5}
+.gw-sw .stk{fill:none;stroke:var(--sw-shade);stroke-width:.8;stroke-dasharray:1 1.4}.gw-sw .tag{fill:var(--paper);stroke:var(--line2);stroke-width:.8}
 .gw-sw .ring{fill:none;stroke:var(--ink);stroke-width:1}.gw-sw .crk{fill:none;stroke:var(--verm);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-g{display:inline-flex;flex:none;align-items:center;line-height:0}.gb-gs .gw-sw{vertical-align:0}
 .gw-legend{display:grid;gap:4px;margin:6px 6px 2px;font:12px/18px var(--sans);color:var(--ink3)}
@@ -372,13 +374,17 @@ function gwSw(k){
  if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
  if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
  if(k==='cut')return gwSvg(16,12,sv('g',{transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
- if(k==='root')return gwSvg(18,12,sv('rect',{x:0,y:5,width:18,height:7,class:'dirt'}),sv('path',{d:'M.5 5 L17.5 5',class:'soil'}),sv('path',{d:'M1 2.6 C5.6 2.8 9.8 5.4 16.8 10.4 C17 10.6 16.7 11 16.4 10.9 C9.2 7.4 5.4 6 1 6.2 Z',class:'wd'}));
+ if(k==='root')return gwSvg(22,14,sv('rect',{x:0,y:8.4,width:22,height:5.6,class:'dirt'}),sv('path',{d:'M.5 8.4 L21.5 8.4',class:'soil'}),sv('path',{d:'M.5 6.4 C4.6 6.6 8.8 7.2 13.6 8.6 C13.8 8.8 13.6 9.2 13.2 9.2 C8.6 8.6 4.6 8.6 .5 9 Z',class:'wd'}),
+  sv('path',{d:'M16.4 8.4 L16.4 4.6',class:'stk'}),sv('rect',{x:11.6,y:.6,width:9.6,height:4.2,rx:.9,class:'tag'}));
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
- if(k==='route')return gwSvg(32,10,sv('rect',{x:0,y:2.3,width:32,height:5.4,rx:2.7,class:'wd'}),sv('path',{d:'M2.6 5 L29.4 5',class:'case'}),sv('path',{d:'M2.6 5 L20.6 5',class:'rte'}),sv('path',{d:'M23 5 L29.4 5',class:'rte bad'}));
- if(k==='knot')return gwSvg(14,10,sv('ellipse',{cx:7,cy:5,rx:4.5,ry:2.5,class:'wl'}));
- if(k==='lit')return gwSvg(16,12,sv('ellipse',{cx:8,cy:6,rx:4.5,ry:2.5,class:'wl'}),sv('ellipse',{cx:8,cy:6,rx:6.6,ry:4.4,class:'ring'}));
- if(k==='crack')return gwSvg(14,12,sv('ellipse',{cx:7,cy:6,rx:4.8,ry:3,class:'wl'}),sv('path',{d:'M5 3.3 L7.4 5.4 L6 6.6 L8.6 8.8',class:'crk'}));
+ /* the route as the tree draws it: a gold dashed line along the wood, red on the hop where it broke, grey dots where it never got */
+ if(k==='route')return gwSvg(36,10,sv('path',{d:'M0 2.2 C12 2.6 24 3.2 36 3.6 L36 6.4 C24 6.8 12 7.4 0 7.8 Z',class:'wd'}),sv('path',{d:'M2 5 L18.6 5',class:'rglow'}),sv('path',{d:'M2 5 L18.6 5',class:'rte'}),sv('path',{d:'M20 5 L26.4 5',class:'rte bad'}),sv('path',{d:'M28.6 5 L34.4 5',class:'rte rest'}));
+ /* a knot: a boss on the bark, lit gold from inside when its route is lit, cracked red where a hop broke */
+ const kn=(...x)=>gwSvg(20,10,sv('path',{d:'M0 3.1 C7 3.3 13 3.5 20 3.7 L20 6.3 C13 6.5 7 6.7 0 6.9 Z',class:'wd'}),...x,sv('ellipse',{cx:10.5,cy:5.6,rx:4.3,ry:3.1,class:'k0'}),sv('ellipse',{cx:10,cy:5,rx:3.9,ry:2.8,class:'k1'}),sv('ellipse',{cx:9.3,cy:4.2,rx:2.2,ry:1.3,class:'k2'}));
+ if(k==='knot')return kn();
+ if(k==='lit')return kn(sv('ellipse',{cx:10,cy:5,rx:5.6,ry:4.2,class:'kglow'}));
+ if(k==='crack'){const g=kn(sv('ellipse',{cx:10,cy:5,rx:5.6,ry:4.2,class:'kbad'}));g.append(sv('path',{d:'M5.4 5 L8 3.9 L10 5.9 L12.2 4.1 L14.6 5',class:'crk'}));return g}
  return null}
 /* A criterion's state as a bucket: every criterion lands in exactly one, so the counts always add up to the criteria. */
 const gwCB=st=>{const c=st.cls;return c==='pass'?'proved':c==='warn'?'agent':c==='fail'?'failed':c==='miss'?'needs':c==='open'?'open':c==='run'?'run':c==='cov'?(/ of /.test(st.text)?'part':'toprove'):c==='code'?'code':'wait'};
@@ -549,11 +555,14 @@ function gwPolKeys(one){const s=gw.state,M=gw.M;if(!one||!M||!M.J.length)return 
   return h('li',{class:'pol'},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},t),' · ',...gwRich(gwVia(gbOrd(inm)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
 /* Where a leaf sits on a pad, drawn small with the tree's own pad and leaf: the one it names solid, the other two faint. */
 function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:tr,class:'lp-lf'+(pos===k?'':' dim')});
+ /* the tree's pad: a crest cushion over two shoulder cushions, each with its shaded underside */
+ const dome=(x0,x1,top,base)=>{const m=(x0+x1)/2,w=x1-x0,h=base-top;return 'M'+x0+' '+base+' C'+x0+' '+gwF(top+h*.18)+' '+gwF(x0+w*.2)+' '+top+' '+m+' '+top+' C'+gwF(x1-w*.2)+' '+top+' '+x1+' '+gwF(top+h*.18)+' '+x1+' '+base+' Q'+m+' '+gwF(base+1.4)+' '+x0+' '+base+'Z'};
+ const band=(x0,x1,base)=>{const m=(x0+x1)/2;return 'M'+gwF(x0+.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base-5)+' '+gwF(x1-.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base+1.4)+' '+gwF(x0+.4)+' '+gwF(base-.2)+'Z'};
+ const C=[[4,18.5,14,22.4],[29.5,44,13,22.4],[13,35,7.6,21.6]];
  return sv('svg',{class:'gw-svg gb gw-lpad',width:42,height:30,viewBox:'0 0 48 34','aria-hidden':'true',focusable:'false'},
   sv('path',{d:'M15.6 23 L14.8 26.2',class:'lp-st'+(pos==='hang'?'':' dim')}),
-  sv('path',{d:'M4.8 20.1 C3.6 16.5 7.2 14.1 10.8 14.6 C12 11.2 16.8 10 19.9 11.7 C21.8 9.1 27.1 9.1 28.8 11.9 C32.2 10.3 36.7 11.7 37.2 14.8 C40.8 14.3 44.4 16.7 43.2 20.1 C41.5 22.5 36 23.2 24 23.2 C12 23.2 6.5 22.5 4.8 20.1 Z',class:'lp-pad'}),
-  sv('path',{d:'M5.3 20.6 C7.2 22.3 13.2 23.2 24 23.2 C34.8 23.2 40.8 22.3 42.7 20.6 C42 19.7 39.6 18.9 37.2 19.4 C32.4 20.3 15.6 20.3 10.8 19.4 C8.4 18.9 6 19.6 5.3 20.6 Z',class:'lp-band'}),
-  lf('crest','translate(24 5.4) rotate(-90)'),lf('shoulder','translate(41.9 11.9) rotate(-30)'),lf('hang','translate(14.3 30.7) rotate(96)'))}
+  ...C.flatMap(([x0,x1,t,b])=>[sv('path',{d:dome(x0,x1,t,b),class:'lp-pad'}),sv('path',{d:band(x0,x1,b),class:'lp-band'})]),
+  lf('crest','translate(24 5.2) rotate(-90)'),lf('shoulder','translate(42.4 11.2) rotate(-34)'),lf('hang','translate(14.3 30.7) rotate(96)'))}
 function gwKey(){const s=gw.state;const drafted=s.scenarios.length,inm=s.scenarios.filter(gwIn).length;const M=gw.M,B=gw.B;
  const one=!!M&&M.J.length===1,narrow=!!(B&&B.L&&B.L.narrow);const it=(k,t)=>h('span',{class:'gw-li'},gwSw(k),h('span',{},t));
  const onJ=x=>!!M&&M.J.some(j=>(M.leaves[j.id]||[]).includes(x));const out=s.scenarios.filter(x=>!gwIn(x));const outJ=out.filter(onJ).length;
@@ -571,7 +580,7 @@ function gwKey(){const s=gw.state;const drafted=s.scenarios.length,inm=s.scenari
  const pm=(k,t)=>h('span',{class:'gw-li'},gwPadMark(k),h('span',{},t));
  const where=M&&M.J.length>1?h('div',{class:'gw-lg where'},h('span',{class:'lh'},'Where a leaf sits'),pm('crest','happy path'),pm('shoulder','what it refuses'),pm('hang','how it fails')):null;
  const leaves=h('div',{class:'gw-lg'},it('pass','passed'),it('fail','failed'),it('run','running'),it('in','to prove'),it('none','no flow yet'),buds?it('bud','part checked on its own'):null,it('cut','pruned'));
- const route=h('div',{class:'gw-lg'},h('span',{class:'gw-li'},gwSw('route'),h('span',{},'the route a scenario runs · ',h('span',{class:'bad'},'red where it broke'))),it('knot','a file on the route'),it('lit','on the lit route'),crack?it('crack','where it failed'):null);
+ const route=h('div',{class:'gw-lg'},h('span',{class:'gw-li'},gwSw('route'),h('span',{},'the route a scenario runs · ',h('span',{class:'bad'},'red where it broke'),', grey dots where it never got')),it('knot','a file it passes through'),it('lit','on the lit route'),crack?it('crack','where it failed'):null);
  const ground=roots.length||s.stops.length?h('div',{class:'gw-lg'},roots.some(u=>u.layer!=='ext')?it('root','a root in the repo'):null,roots.some(u=>u.layer==='ext')?it('ext','over the rim: a service outside'):null,s.stops.length?it('stop','where tracing stops'):null):null;
  const cap=s.modeBy&&out.length?h('div',{class:'gb-cap gw-cap'},gwML(s.mode)+' keeps '+inm+' of the '+drafted+' drafted. '+gwPruned(out,s.mode)+'.'+(outJ?' On the tree, '+(outJ===out.length?(outJ===1?'it is the cut stub on its journey.':'they are the cut stubs and stems on the journeys.'):outJ===1?'1 of them is the cut stub on its journey.':outJ+' of them are the cut stubs and stems on the journeys.'):'')):null;
  const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{gw.howOpen=e.currentTarget.open}}},h('summary',{},'How to read the tree'),
