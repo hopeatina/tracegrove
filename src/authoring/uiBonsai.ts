@@ -818,7 +818,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
     /* pruning: a leaf the chosen mode drops falls once, one after another, then only its cut stem is left */
-    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet){el.__cutAt=Date.now();el.__lag=i*80;const st=el.__inner.style;st.animationDelay=el.__lag+'ms';
+    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet){el.__cutAt=Date.now();el.__lag=Math.min(i*80,560);const st=el.__inner.style;st.animationDelay=el.__lag+'ms';
       /* it drops and drifts in screen space, so the leaf's own angle is taken out of the fall */
       const a=(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))*Math.PI/180,sc=sl[3]||1,h=gbHash('fall:'+x.id),fx=(h-.5)*40,fy=90;
       st.setProperty('--fx',gbF((fx*Math.cos(a)+fy*Math.sin(a))/sc)+'px');st.setProperty('--fy',gbF((-fx*Math.sin(a)+fy*Math.cos(a))/sc)+'px');st.setProperty('--fr',gbF((h<.5?-1:1)*(60+80*gbHash('spin:'+x.id)))+'deg');
@@ -958,8 +958,10 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))){hide();return}
  const s=gw.state,M=gw.M;const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return [...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map(u=>u.label).join(' › ')};
  tip.replaceChildren();
- if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x);
-  gwPut(tip,h('span',{class:'k'},(j?{happy:'happy path',guard:'guard',failure:'a way it fails'}[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')+(x.criteria.length?' · '+x.criteria.join(' '):'')),h('b',{},x.title),h('div',{class:'st '+w.c},w.t),
+ if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
+  gwPut(tip,h('span',{class:'k'},(j?{happy:'happy path',guard:'what it refuses',failure:'how it fails'}[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')+(x.criteria.length?' · '+x.criteria.join(' '):'')),h('b',{},x.title),
+   /* a failure says where it broke, in the same words as the list, then where on the route */
+   r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140)):h('div',{class:'st '+w.c},w.t),r0&&r0.st==='fail'?h('div',{class:'st fail'},r0.hop?'On the route: '+(r0.after?'after ':'at ')+r0.hop:'The run does not say which hop broke'):null,
    h('div',{class:'path'},j?pathOf(j):((M.U[x.unit]||{}).label||'')+(x.flow&&x.scenarioKind==='regression'?' · '+x.flow:'')))}
  else if(k.startsWith('j:')){const j=M.J.find(q=>q.id===P.jid);const n=(gw.order||[]).indexOf(P.jid)+1;const vis=s.modeBy?s.mode:null;
   const later=P.leaves.filter(x=>vis&&gbRank[x.mode]>gbRank[vis]);
@@ -967,7 +969,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
    h('div',{class:'st'},P.pruned?'Pruned in '+gbModeName(vis)+': '+later.length+' scenario'+(later.length===1?'':'s')+' here; '+[...new Set(later.map(x=>gbModeName(x.mode)))].join(' and ')+' grows '+(later.length===1?'it':'them')+'.'
     :(P.leaves.length-later.length)+' scenario'+(P.leaves.length-later.length===1?'':'s')+(P.pol==='failure'?' that break it on purpose and check it fails safely':' that check it refuses what it must')+(later.length?'; '+later.length+' more in '+gbModeName(later[0].mode):'')+'.'))}
  else if(B.knot[k.slice(2)]&&B.knot[k.slice(2)].__ids.length>1){const ids=B.knot[k.slice(2)].__ids;const on=M.J.filter(j=>ids.some(id=>j.units.includes(id)));
-  gwPut(tip,h('span',{class:'k'},ids.length+' parts · a burl, where more files share the wood than fit as knots'),...ids.map(id=>h('b',{},(M.U[id]||{}).label||id)),
+  gwPut(tip,h('span',{class:'k'},ids.length+' parts on one knot'),...ids.map(id=>h('b',{},(M.U[id]||{}).label||id)),
    h('div',{class:'st'},on.length===1?'On 1 journey: '+on[0].title:on.length+' of '+M.J.length+' journeys pass through them'))}
  else{const id=k.slice(2);const u=M.U[id];if(!u){hide();return}const on=M.J.filter(j=>j.units.includes(id));
   const stop=s.stops.find(x=>x.unit===id);

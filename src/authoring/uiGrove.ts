@@ -95,7 +95,7 @@ export const GROVE_CSS = String.raw`
 @media (max-width:1060px){.gw-two{grid-template-columns:minmax(0,1fr)}}
 .gw-result{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 24px;align-items:center;padding:16px 20px;border-radius:12px;background:var(--forest);color:var(--on-forest);margin:0 0 18px}
 .gw-result .big{font:400 22px/28px var(--serif)}.gw-result .sub{font-size:13px;line-height:19px;opacity:.85;max-width:760px}
-.gw-result.bad{background:var(--verm-bg);color:var(--ink)}
+.gw-result.bad{background:var(--verm-bg);color:var(--ink)}.gw-result.quiet{background:var(--sel);color:var(--ink)}.gw-result.quiet .sub{opacity:1;color:var(--ink3)}
 @media (prefers-color-scheme:dark){.gw-result{background:color-mix(in srgb,var(--moss) 14%,var(--paper));color:var(--ink);border:1px solid color-mix(in srgb,var(--moss) 30%,var(--line2))}.gw-result.bad{background:var(--verm-bg);border-color:color-mix(in srgb,var(--verm) 40%,var(--line2))}.gw-chip.min{background:var(--moss-bg);color:var(--moss)}}
 .gw-result .btn.ghost{background:transparent;color:inherit;border-color:currentColor;opacity:.9}
 .gw-empty{font-size:13px;color:var(--muted);margin:6px 0}
@@ -415,6 +415,12 @@ function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.sc
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
  return h('div',{class:'gw-result','data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),sub),
   h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs')))}
+/* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
+function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
+ if(!s.modeBy||s.phase<5){const n=s.scenarios.length;return s.phase>=4&&n?box(n+' scenario'+(n===1?'':'s')+' drafted','Nothing has run yet.'):box('Growing the tree','Now: '+String(GW.phases[s.phase]||GW.phases[0]).toLowerCase()+'.')}
+ const ids=s.scenarios.filter(x=>gwIn(x)).map(x=>x.id);const n=v.counts[s.mode]||ids.length;
+ const done=ids.filter(id=>s.run[id]&&s.run[id].st!=='run').length,bad=ids.filter(id=>s.run[id]&&s.run[id].st==='fail').length;
+ return box('Proving '+n+' scenario'+(n===1?'':'s')+' in '+GW.modes.find(m=>m.id===s.mode).label,done+' of '+n+' landed'+(bad?', '+bad+' failed':'')+'. Each leaf turns as its run lands.')}
 /* How much to prove sits right above the tree it prunes; hovering a choice previews the cut. */
 function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;const locked=!!s.modeBy;
  const cur=locked?s.mode:(gw.picking||null),lbl=id=>GW.modes.find(m=>m.id===id).label;
@@ -473,7 +479,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
    h('div',{class:'sub'},c?gwFacts([c.pr?'#'+c.pr:null,c.files+' files','+'+c.adds+' −'+c.dels,c.untraced?c.untraced+' small parts not traced':null,s.spec?['spec: '+s.spec.source]:null]):'')),
   h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gw.saved?[h('span',{},'saved '+ago(gw.saved)),' · ',h('span',{},'took '+gwFmt(s.ms))]:gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.pinned=null;growPaint()}}},'New grow'):null)));
- gwSet(S.verdict,s.blocked?h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))):null,s.done?gwResult():null);
+ gwSet(S.verdict,s.blocked?h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))):null,s.done?gwResult():s.blocked?null:gwProving());
  gwSet(S.rail,h('div',{class:'gw-rail'+(s.done?' quiet':''),role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?((en-st)/1000).toFixed(1)+' s':'now'))})));
  const rules=s.agents.filter(a=>a.by==='rules'&&a.done&&a.ok),live=s.agents.filter(a=>!rules.includes(a)&&(!s.done||!a.ok||a.by!=='rules'));
@@ -490,7 +496,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
     the tree holds still while it is cut */
  const ask=!!(s.asked&&!s.modeBy);if(gw.modeAsk&&!ask&&s.modeBy&&S.mode.offsetHeight&&!gwQuiet()){const h0=S.mode.offsetHeight;S.mode.style.transition='';S.mode.style.height=h0+'px';clearTimeout(gw.modeT);
   gw.modeT=setTimeout(()=>{S.mode.style.height='auto';const to=S.mode.offsetHeight;S.mode.style.height=h0+'px';void S.mode.offsetHeight;S.mode.style.transition='height .45s cubic-bezier(.3,.7,.3,1)';S.mode.style.height=to+'px';
-   gw.modeT=setTimeout(()=>{S.mode.style.height='';S.mode.style.transition=''},500)},1100)}
+   gw.modeT=setTimeout(()=>{S.mode.style.height='';S.mode.style.transition=''},500)},1500)}
  gw.modeAsk=ask;
  gwSet(S.mode,s.scenarios.length||s.asked?gwModes():null);
  if(gw.tree==='grove'){if(S.left.firstChild!==S.scroll)S.left.replaceChildren(S.scroll,S.legend);
