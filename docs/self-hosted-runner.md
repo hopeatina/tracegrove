@@ -24,7 +24,7 @@ with no host mounts and no host credentials.
 From a Mac with `gh` signed in as the repository admin and SSH to the mini:
 
 ```sh
-M="ssh hopeatina@hopes-mac-mini"
+M="ssh <you>@<mini-address>"
 LIMA='LIMA_HOME=$HOME/orgx-ci/lima $HOME/orgx-ci/bin/limactl shell orgx-ci --'
 $M "$LIMA sudo bash -s" < infra/ci-runner/mini/add-tracegrove-runner.sh
 # Register: the token goes gh -> stdin -> the runner, never into argv, a file or the terminal.
