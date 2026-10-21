@@ -4,6 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { chromium } from 'playwright';
 import { scanSource } from '../src/authoring/discover.ts';
 import { grow } from '../src/authoring/grow.ts';
 import { criteriaFrom, harnessOf, isPatternSource, isTestFile, matchCriterion, readChange, roleOf, routesOf, scaffoldsOf, unitsOf } from '../src/authoring/growChange.ts';
@@ -475,4 +476,65 @@ describe('UI stream', () => {
     expect(saved.state.change.branch).toBe('refunds');
     expect(saved.view.criteria).toHaveLength(3);
   });
+});
+
+describe('Grow page', () => {
+  /** A grown change with one scenario failed at a step, and one titled by the route it is sent through. */
+  async function grownWithFailure() {
+    const dir = repo();
+    const { state } = await grow({ dir, branch: 'refunds', base: 'main', mode: 'min', prove: false, gh: false, agent: { off: true }, save: false });
+    const onJourney = state.scenarios.filter((x) => x.mode === 'min' && x.journey && x.proves);
+    const failed = onJourney.find((x) => x.polarity === 'guard' || x.polarity === 'failure') ?? onJourney[0]!;
+    const routed = onJourney.find((x) => x.id !== failed.id)!;
+    routed.title = 'POST /refunds: A partial refund is turned away';
+    const why = 'only the refund is sent to Stripe: expected 1 call, got 2';
+    applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'scenario.failed', scenario: failed.id, took: 12, run: null, why } as GrowEvent);
+    return { dir, state, failed, routed, why };
+  }
+  /** Every card or row body on the page that states what the failed scenario claims: it must say where it broke first, and
+   *  put the claim as the thing being checked, never as a bare pass claim. */
+  const claims = (proves: string) => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-ins, [data-testid="grow"] .gb-olin, [data-testid="grow"] .gw-olcard'))
+    .filter((el) => (el as HTMLElement).offsetParent !== null && (el.textContent ?? '').includes(proves))
+    .map((el) => { const t = el.textContent ?? ''; const at = t.indexOf(proves); return { broke: t.indexOf('Broke at'), at, before: t.slice(Math.max(0, at - 'What it checks'.length), at) }; });
+
+  it('says where a failed scenario broke before what it checks, in every card and row, and moves a route out of a title', async () => {
+    const { dir, state, failed, routed, why } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+      await page.goto(server.url);
+      await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+      await page.getByTestId('grow').waitFor();
+      await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
+      const ins = page.getByTestId('grow-inspector');
+      await ins.waitFor();
+      const step = why.slice(0, why.indexOf(': '));
+      // The inspector opens on the first failing journey: where it broke, not the claim the scenario makes.
+      await expect.poll(() => ins.textContent()).toContain('Broke at ' + step);
+      expect(await ins.textContent()).not.toContain(failed.proves);
+      const check = async () => {
+        const found = await page.evaluate(claims, failed.proves);
+        expect(found.length).toBeGreaterThan(0);
+        for (const c of found) { expect(c.broke).toBeGreaterThanOrEqual(0); expect(c.broke).toBeLessThan(c.at); expect(c.before).toBe('What it checks'); }
+      };
+      // Pinned from the tree, the inspector holds the scenario's card.
+      await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 's:' + id; w.gw.pinList = null; w.growPaint(); }, failed.id);
+      await check();
+      // Chosen in the Journeys card, the row opens in place, and the inspector keeps only its journey.
+      await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.growPaint(); });
+      await page.locator('[data-testid="grow-scenarios"] .gb-ols[data-sid="' + failed.id + '"]').click();
+      await check();
+      expect(await ins.textContent()).toContain('Its journey');
+      // The Outline opens it in place too.
+      await page.getByTestId('grow-view-outline').click();
+      await check();
+      // A title that leads with its route reads as what happens, the route on a line of its own.
+      const row = page.locator('[data-testid="grow-outline"] .gb-ols[data-sid="' + routed.id + '"] .t');
+      expect(await row.textContent()).toBe('A partial refund is turned awayvia POST /refunds');
+      // One set of words for where a leaf sits: the tree's own.
+      const text = await page.getByTestId('grow').textContent();
+      for (const old of ['what it must refuse', 'and must fail safely', 'End to end through']) expect(text).not.toContain(old);
+    } finally { await browser.close(); }
+  }, 60000);
 });
