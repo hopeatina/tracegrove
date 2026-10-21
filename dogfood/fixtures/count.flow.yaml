@@ -1,0 +1,21 @@
+title: The note count is the caller's own notes, and anonymous callers are refused
+tags: [notes]
+steps:
+  - name: create
+    POST: /notes
+    json: { title: Counted, body: one }
+    expect: 201
+
+  - name: owner counts one
+    GET: /notes/count
+    expect: { status: 200, json: { count: 1 } }
+
+  - name: another user counts none
+    GET: /notes/count
+    as: intruder
+    expect: { status: 200, json: { count: 0 } }
+
+  - name: anonymous is refused
+    GET: /notes/count
+    as: none
+    expect: 401

@@ -1,0 +1,35 @@
+title: Discover grows a feature branch as a tree, traces it against its spec and proves it with the branch's own flows
+risk: critical
+tags: [ui, browser, discover, grow]
+browser:
+  allowPaths: [/]
+  allowMethods: [GET, HEAD, POST]
+  maxActions: 1000
+steps:
+  - name: open the UI
+    browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - name: open discover
+    browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: pick the feature branch
+    browser: { kind: click, target: { by: role, role: button, name: notes-count } }
+  - name: the start card names the branch
+    browser: { kind: read, target: { by: testId, name: grow-go } }
+    expect: { text: Grow notes-count }
+  - name: trace with the rules only, so the run is free and repeatable
+    browser: { kind: click, target: { by: testId, name: grow-agent } }
+  - name: grow it
+    browser: { kind: click, target: { by: testId, name: grow-go } }
+  - name: nothing runs until a mode is chosen
+    browser: { kind: read, target: { by: testId, name: grow-mode-hint } }
+    expect: { text: "Choose how much to prove. Tracing is done; nothing runs until you pick." }
+    timeoutMs: 30000
+  - name: each mode says how many scenarios it proves
+    browser: { kind: read, target: { by: testId, name: grow-modes } }
+    expect: { text: "Minimum · 2every spec criterion, plus the riskiest failure of each partStandard · 3adds the remaining sad paths and edge casesMax · 3adds regression of every existing flow the change reaches" }
+  - name: choose minimum
+    browser: { kind: click, target: { by: testId, name: grow-mode-min } }
+  - name: every criterion is proved by a passing flow
+    browser: { kind: read, target: { by: testId, name: grow-result } }
+    expect: { text: "2 of 2 scenarios provedSpec: 3 of 3 criteria proved, 0 agent-checked, 0 need you. Log: .tracegrove/discovery/notes-count.jsonlOpen the runs" }
+    timeoutMs: 60000

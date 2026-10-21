@@ -19,7 +19,7 @@ const Reason = z.object({ code: CliErrorCode, message: z.string().min(1).max(512
   /** Additive: who owns the fix and a runnable command, from the block-code table (environment names only, never values). */
   owner: z.enum(['developer', 'operator', 'agent']).optional(), fix: z.string().max(512).optional() }).strict();
 export const CliCommandName = z.enum([
-  'help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'check', 'draft', 'settings', 'sample-config',
+  'help', 'init', 'test', 'status', 'heal', 'list', 'compile', 'show', 'ui', 'discover', 'grow', 'check', 'draft', 'settings', 'sample-config',
   'validate', 'doctor', 'plan', 'seed', 'run', 'controller', 'cases', 'rerun', 'inspect', 'export', 'verify-bundle', 'compare',
   'workflow-map', 'workflows', 'usage', 'benchmark', 'pools', 'import-observations', 'observations', 'result-ingest', 'results',
   'awr-prepare', 'awr-inspect', 'awr-deliver', 'report-prepare', 'report-inspect', 'report-attach', 'verify-cleanup', 'source-resolve',

@@ -40,6 +40,22 @@ function get(origin: string, path: string, headers: Record<string, string> = {})
 }
 
 describe('recording proxy', () => {
+  it('closes the upstream request when the client leaves a streaming answer', async () => {
+    let upstreamClosed!: () => void;
+    const closed = new Promise<void>((done) => { upstreamClosed = done; });
+    const port = await upstream((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('event: hello\ndata: {}\n\n');
+      res.on('close', () => upstreamClosed());
+    });
+    const recorder = await proxy(port);
+    await new Promise<void>((done, fail) => {
+      const req = request(`${recorder.origin}/stream`, (res) => { res.once('data', () => { req.destroy(); done(); }); });
+      req.on('error', () => undefined); req.on('close', () => undefined); req.end();
+      setTimeout(() => fail(new Error('no first event')), 5000);
+    });
+    await expect(Promise.race([closed.then(() => 'closed'), new Promise((done) => setTimeout(() => done('still open'), 3000))])).resolves.toBe('closed');
+  });
+
   it('forwards requests, attributes them to the running step, and records no header, body or query values', async () => {
     const seenHosts: string[] = [];
     const port = await upstream((req, res) => { seenHosts.push(String(req.headers.host)); res.writeHead(req.url?.startsWith('/missing') ? 404 : 200, { 'content-type': 'text/plain' }); res.end(`hello ${req.url}`); });

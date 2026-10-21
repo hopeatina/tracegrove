@@ -113,6 +113,9 @@ export async function startTrafficProxy(upstreamPort: number): Promise<TrafficRe
       if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
       res.end('tracegrove proxy: upstream unavailable');
     });
+    // A client that leaves early takes the upstream request with it, so a streaming answer
+    // (server-sent events) ends at the app too instead of holding whatever it holds.
+    res.on('close', () => { if (!res.writableFinished) upstream.destroy(); });
     req.pipe(upstream);
   });
 

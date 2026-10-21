@@ -1,0 +1,11 @@
+title: Wait until no operation holds the UI, so the next grow is admitted
+routes:
+  - GET /api/run-control
+sources:
+  - src/authoring/ui.ts
+steps:
+  - name: the lock is free
+    GET: /api/run-control
+    observe: true
+    expect: { status: 200, json: { runId: null } }
+    timeoutMs: 120000

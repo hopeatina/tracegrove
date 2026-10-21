@@ -1,0 +1,18 @@
+title: "POST /api/grow: Invalid mode value is rejected before the lock is taken"
+risk: critical
+tags: [ui, grow, lock]
+steps:
+  - name: nothing holds the lock before the bad request
+    GET: /api/run-control
+    expect: { status: 200, json: { runId: null, operation: null } }
+  - name: a mode outside min, std and max fails the parse
+    POST: /api/grow
+    json: { branch: notes-count, base: main, mode: huge, prove: false, agent: false }
+    expect: 500
+  - name: the rejected request left no operation behind
+    GET: /api/run-control
+    expect: { status: 200, json: { runId: null, operation: null } }
+  - name: a valid grow after it is admitted
+    POST: /api/grow
+    json: { branch: notes-count, base: main, mode: min, prove: false, agent: false }
+    expect: 200

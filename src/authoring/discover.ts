@@ -65,7 +65,7 @@ function git(dir: string, args: string[]): string {
   return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-function safeRef(name: string): string {
+export function safeRef(name: string): string {
   if (!/^[A-Za-z0-9._\/-]+$/.test(name) || name.startsWith('-') || name.includes('..')) throw new Blocked([{ code: 'invalid_branch', detail: name, owner: 'operator', action: 'pick a branch from the list' }]);
   return name;
 }
