@@ -21,12 +21,12 @@ export const GROVE_CSS = String.raw`
 .gw-head .sub{font:13px/20px var(--mono);color:var(--ink3);overflow-wrap:break-word}
 .gw-clock{font:500 13px/18px var(--mono);color:var(--muted)}
 .gw-rail{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:18px}
-.gw-rail .ph{border-top:3px solid var(--line);padding-top:6px;min-width:0}
+.gw-rail .ph{border-top:3px solid var(--line);padding-top:6px;min-width:0;display:grid;grid-template-rows:1fr auto}
 .gw-rail .ph b{display:block;font:500 12.5px/16px var(--sans);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gw-rail .ph span{font:11.5px/16px var(--mono);color:var(--muted)}
 .gw-rail .ph.done{border-color:var(--moss)}.gw-rail .ph.done b{color:var(--ink2)}
 .gw-rail .ph.on{border-color:var(--gold)}.gw-rail .ph.on b{color:var(--ink)}
-.gw-rail.quiet{gap:4px;margin-bottom:14px}.gw-rail.quiet .ph{border-top-width:2px;padding-top:4px}.gw-rail.quiet .ph b{font-size:11.5px;color:var(--muted)}.gw-rail.quiet .ph span{font-size:11px}
+.gw-rail.quiet .ph b{color:var(--muted)}.gw-rail.quiet .ph.done{border-color:color-mix(in srgb,var(--moss) 55%,var(--line))}
 .gw-stage{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:0 18px;align-items:start}
 @media (max-width:1060px){.gw-stage{grid-template-columns:minmax(0,1fr)}}
 .gw-tree{padding:14px 12px 8px;min-width:0}
@@ -79,9 +79,13 @@ export const GROVE_CSS = String.raw`
 .gw-modes button{flex:1 1 180px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line2);background:var(--paper);display:grid;gap:2px}
 .gw-modes button b{font-weight:500;font-size:14px}.gw-modes button span{font-size:12.5px;line-height:17px;color:var(--ink3)}
 .gw-modes button[aria-pressed=true]{border-color:var(--forest);box-shadow:inset 0 0 0 1px var(--forest)}
-.gw-modes.set{gap:6px}.gw-modes.set button{flex:0 1 auto;padding:4px 10px;min-height:28px;border-color:var(--line);display:inline-flex;gap:6px;align-items:center}.gw-modes.set button b{font-size:12.5px}.gw-modes.set button span{display:none}
-.gw-modes.set button[aria-pressed=true]{border-color:var(--forest);box-shadow:none;background:var(--sel)}
-.gw-modes.set button[aria-disabled=true]{cursor:help}.gw-modes.set button[aria-disabled=true]:not([aria-pressed=true]){color:var(--ink3)}.gw-modes.set button[aria-disabled=true]:not([aria-pressed=true]):hover{border-color:var(--line2);color:var(--ink)}
+/* once a mode is set its cards stay as they were asked, so the tree under them never moves; the chosen one keeps its ring, the
+   others go quiet and preview what they would grow. Only a phone, where the three cards stack, folds them into chips */
+.gw-modes.set button{align-content:start;border-color:var(--line)}.gw-modes.set button[aria-pressed=true]{border-color:var(--forest);box-shadow:inset 0 0 0 1px var(--forest);background:var(--sel)}
+.gw-modes.set button[aria-disabled=true]{cursor:help}.gw-modes.set button[aria-disabled=true]:not([aria-pressed=true]) b{color:var(--ink3)}.gw-modes.set button[aria-disabled=true]:not([aria-pressed=true]):hover{border-color:var(--line2)}.gw-modes.set button[aria-disabled=true]:not([aria-pressed=true]):hover b{color:var(--ink)}
+.gw-modes.wait button{align-content:start;border-color:var(--line);cursor:default;opacity:1}.gw-modes.wait button b{color:var(--ink3)}.gw-modes.wait button span{color:var(--muted)}
+@media (max-width:640px){.gw-modes.set{gap:6px}.gw-modes.set button{flex:0 1 auto;padding:4px 10px;min-height:28px;display:inline-flex;gap:6px;align-items:center}.gw-modes.set button b{font-size:12.5px}.gw-modes.set button span{display:none}
+ .gw-modes.set button[aria-pressed=true]{box-shadow:none}}
 .gw-sgroup{border-bottom:1px solid var(--line)}.gw-sgroup:last-child{border-bottom:0}
 .gw-sgroup>summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 4px;cursor:pointer;list-style:none}.gw-sgroup>summary::-webkit-details-marker{display:none}
 .gw-sgroup>summary:hover{background:var(--sel)}.gw-sgroup>summary .n{font:500 13px/18px var(--mono);color:var(--ink);flex:1;min-width:0;overflow-wrap:anywhere}.gw-sgroup>summary .c{font:11.5px/16px var(--mono);color:var(--muted);white-space:nowrap}
@@ -95,8 +99,13 @@ export const GROVE_CSS = String.raw`
 @media (max-width:1060px){.gw-two{grid-template-columns:minmax(0,1fr)}}
 .gw-result{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 24px;align-items:center;padding:16px 20px;border-radius:12px;background:var(--forest);color:var(--on-forest);margin:0 0 18px}
 .gw-result .big{font:400 22px/28px var(--serif)}.gw-result .sub{font-size:13px;line-height:19px;opacity:.85;max-width:760px}
+/* beside a tree the band keeps one height from proving to verdict (two lines under its headline), so the verdict landing does
+   not move the tree under it */
+@media (min-width:1061px){.gw-result>div:first-child>.sub{min-height:38px}}
 .gw-result.bad{background:var(--verm-bg);color:var(--ink)}.gw-result.quiet{background:var(--sel);color:var(--ink)}.gw-result.quiet .sub{opacity:1;color:var(--ink3)}
-@media (prefers-color-scheme:dark){.gw-result{background:color-mix(in srgb,var(--moss) 14%,var(--paper));color:var(--ink);border:1px solid color-mix(in srgb,var(--moss) 30%,var(--line2))}.gw-result.bad{background:var(--verm-bg);border-color:color-mix(in srgb,var(--verm) 40%,var(--line2))}.gw-chip.min{background:var(--moss-bg);color:var(--moss)}}
+@media (prefers-color-scheme:dark){.gw-result{background:color-mix(in srgb,var(--ink) 5%,var(--paper));color:var(--ink);border:1px solid var(--line2)}.gw-result.bad{background:var(--verm-bg);border-color:color-mix(in srgb,var(--verm) 40%,var(--line2))}.gw-chip.min{background:var(--moss-bg);color:var(--moss)}}
+/* a verdict with a failure in it never reads as all clear: a vermilion rule down its left edge, light or dark */
+.gw-result.failed{box-shadow:inset 4px 0 0 var(--verm)}
 .gw-result .btn.ghost{background:transparent;color:inherit;border-color:currentColor;opacity:.9}
 .gw-empty{font-size:13px;color:var(--muted);margin:6px 0}
 @media (max-width:760px){.gw-head>div:last-child{text-align:left!important;display:flex;gap:12px;align-items:center}}
@@ -189,7 +198,10 @@ ${BONSAI_CSS}
 .gw-stage.solo{grid-template-columns:minmax(0,1fr)}
 /* beside the tree the inspector is never taller than the tree: what does not fit scrolls inside it */
 .gw-insw{min-width:0}
-@media (min-width:1061px){.gw-stage>.gw-insw{align-self:stretch;contain:size;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
+@media (min-width:1061px){.gw-stage>.gw-insw{align-self:stretch;contain:size;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:18px}
+ /* while more of it waits below, its last lines fade out, so a cut line reads as "scroll for more", never as a clipped one */
+ .gw-stage>.gw-insw.more{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 56px),transparent 100%);mask-image:linear-gradient(to bottom,#000 calc(100% - 56px),transparent 100%)}}
+.gw-dpmore{all:unset;cursor:pointer;display:inline-block;margin-top:4px;font:12px/18px var(--sans);color:var(--ink3);text-decoration:underline;text-underline-offset:3px}.gw-dpmore:hover{color:var(--ink)}.gw-dpmore:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
 /* the mode area keeps its height while a choice is pruned, then closes */
 .gw-modearea{display:flow-root}
 /* the inspector's cards: a failure first, in the run's words, then the claim as what the run did with it */
@@ -204,7 +216,27 @@ ${BONSAI_CSS}
 .gw-one{margin:6px 0 0}
 /* the Journeys card under the tree is half the page wide: there a journey's state goes under its title, so the title is not squeezed */
 .gw-jcard{container-type:inline-size}
-@container (max-width:720px){.gw-jcard .gb-hd .st{grid-row:auto;grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;padding-top:2px;white-space:normal}.gw-jcard .gb-hd .st .tks,.gw-jcard .gb-hd .st .gb-gs{justify-content:flex-start}}`;
+@container (max-width:720px){.gw-jcard .gb-hd .st{grid-row:auto;grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;padding-top:2px;white-space:normal}.gw-jcard .gb-hd .st .tks,.gw-jcard .gb-hd .st .gb-gs{justify-content:flex-start}}
+/* the Outline's journey: its title takes the whole measure, its leaves and counts on the line under where it starts, as in the
+   Journeys card; the rule between two journeys sits on the same edges as the section rules */
+.gw .gb-ol .gb-hd{grid-template-columns:24px minmax(0,1fr)}
+.gw .gb-ol .gb-hd .st{grid-row:auto;grid-column:2;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:2px 10px;padding-top:2px;white-space:normal}.gw .gb-ol .gb-hd .st .tks,.gw .gb-ol .gb-hd .st .gb-gs{justify-content:flex-start}
+.gw .gb-ol>.gb-olb{border-bottom:0;position:relative}.gw .gb-ol>.gb-olb+.gb-olb::before{content:'';position:absolute;left:6px;right:6px;top:0;border-top:1px solid var(--line)}
+/* Max's part checks, part by part: the file, the journeys its knot is on, then its leaves */
+.gw .gb-bp{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin:14px 4px 4px}.gw .gb-bp .gb-sub{margin:0}.gw .gb-bp .gb-sub.code{font:500 12.5px/18px var(--mono);color:var(--ink2)}.gw .gb-bp .on{font:11.5px/16px var(--mono);color:var(--muted)}
+/* one failure sentence everywhere: "Broke at <check>: <message>", the colon held to the check, and the hop on the route under it */
+.gw .gw-onroute{display:block;margin-top:3px;font-weight:400;color:var(--ink2)}.gw .gw-onroute .nw{font-weight:500;color:inherit}
+/* a path breaks only between hops (each arrow with the hop after it), and a file:line reference moves to the next line whole;
+   either breaks after a slash only when it cannot fit on a line of its own */
+.gw-hop,.gw-ref{display:inline-block;max-width:100%}.gw-hop .sep{color:var(--muted)}
+/* where a leaf sits on a pad, drawn with the tree's own pad and leaf */
+.gw-lg.where{gap:4px 14px}.gw-lg.where .lh{font-weight:500;color:var(--ink2);white-space:nowrap}
+svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;overflow:visible;vertical-align:middle}
+.gw-lpad .lp-pad{fill:var(--pad);stroke:var(--pad-edge);stroke-width:.8;stroke-linejoin:round}.gw-lpad .lp-band{fill:var(--pad-shade);opacity:.55}
+.gw-lpad .lp-lf{fill:var(--moss);stroke:color-mix(in srgb,var(--moss) 70%,#000);stroke-width:.8;stroke-linejoin:round}.gw-lpad .lp-lf.dim{fill:none;stroke:var(--pad-edge);stroke-width:.9;opacity:.75}
+.gw-lpad .lp-st{fill:none;stroke:var(--wood);stroke-width:1.2;stroke-linecap:round}.gw-lpad .lp-st.dim{opacity:.45}
+/* a one-journey tree on a phone: the badges on its other pads, keyed under the journey */
+.gw-names li.pol .no{color:var(--ink3)}.gw-names .pt{color:var(--ink3)}.gw-names .gw-jst{display:inline-flex;margin-left:2px}`;
 
 export const GROVE_JS = String.raw`
 /* ---------- Grow: the change's tree, live ---------- */
@@ -251,8 +283,11 @@ const gwBT=String.fromCharCode(96);
    method and its path. */
 function gwCodeText(t){const p=String(t==null?'':t).split(/(?<=[^\s\/]\/)(?=[^\s\/])/);return p.flatMap((x,i)=>i?[h('wbr'),h('span',{class:'nw'},x)]:[h('span',{class:'nw'},x)])}
 /* Every title the page prints goes through here: text between backticks is inline code, set as code without its backticks. */
+/* In plain words a route named in a title ("POST /seats") is one thing: it never breaks between its method and its path. */
+const gwROUTE=/((?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \/\S*)/;
+const gwWords=x=>x.split(gwROUTE).map((y,i)=>i%2?h('span',{class:'nw'},y):y).filter(y=>y!=='');
 function gwRich(t){const p=String(t==null?'':t).split(gwBT);if(p.length%2===0){const last=p.pop();p[p.length-1]+=gwBT+last}
- return p.length<3?[p.join('')]:p.map((x,i)=>i%2?h('code',{class:'gw-code'},...gwCodeText(x)):x).filter(x=>x!=='')}
+ return p.length<3?gwWords(p.join('')):p.flatMap((x,i)=>i%2?[h('code',{class:'gw-code'},...gwCodeText(x))]:gwWords(x)).filter(x=>x!=='')}
 const gwPlain=t=>String(t==null?'':t).split(gwBT).join('');
 /* A scenario titled by the route it is sent through ("POST /api/grow: Reader leaves mid-grow") reads as a test of that one
    endpoint: the route moves to a small line of its own, "via POST /api/grow", and the title is what happens. */
@@ -262,14 +297,33 @@ const gwVia=t=>{const m=gwVIA.exec(String(t==null?'':t));return m?{via:m[1]+' '+
    as a list of nodes may wrap inside, but never right after its dot. */
 function gwFacts(list,cls){const el=h('span',{class:'gw-facts'+(cls?' '+cls:'')});let i=0;
  for(const f of list){if(f===null||f===undefined||f===false||f==='')continue;if(i)el.append(' ');el.append(h('span',{class:Array.isArray(f)?'tk wr':'tk'},i?'· ':'',...[].concat(f)));i++}return el}
-/* A failure in the run's own words, the step first: "Broke at <step>: <message>". */
+/* A file:line reference (or any path) kept whole: it moves to the next line as one piece, and breaks after a slash only when it
+   cannot fit on a line of its own. */
+const gwRef=t=>h('span',{class:'gw-ref'},...gwCodeText(t));
+/* A note in the tracer's words, with the file references in it kept whole. */
+const gwREF=/((?:[\w.@-]+\/)+[\w.@-]+(?::\d+(?::\d+)?)?|[\w.@-]+\.\w+:\d+(?::\d+)?)/;
+function gwNote(t){return String(t==null?'':t).split(gwREF).map((x,i)=>i%2?gwRef(x):x).filter(x=>x!=='')}
+/* A path of hops, in plain words: each hop whole with its arrow before it, so a line breaks only between hops and never ends
+   on an arrow. The tree's card uses it too. */
+function gwHops(labels){const out=[];labels.forEach((l,i)=>{if(i)out.push(' ');out.push(h('span',{class:'gw-hop'},i?h('span',{class:'sep','aria-hidden':'true'},'› '):null,...gwCodeText(gwPlain(l))))});return out}
+/* A failure in the run's own words, one sentence wherever it is said (a card, a row, the Outline, the tree's card):
+   "Broke at <check>: <message>", the colon held to the check's last word so no line starts with it; then, when the run names
+   the hop, "On the route: at|after <hop>" on a line of its own. */
 function gwBroke(r,max){const w=String(r&&r.why||'').trim();const i=w.indexOf(': ');const cut=t=>max?gwCut(t,max):t;
- return !w?[h('b',{},'Failed'),', with no reason recorded']:i>0?[h('span',{class:'k'},'Broke at '),h('b',{},w.slice(0,i)),': '+cut(w.slice(i+2))]:[h('span',{class:'k'},'Broke: '),cut(w)]}
+ const route=r&&r.hop?h('span',{class:'gw-onroute'},'On the route: '+(r.after?'after ':'at '),...gwCodeText(r.hop)):null;
+ if(!w)return [h('b',{},'Failed'),', with no reason recorded',route];
+ if(i<=0)return [h('span',{class:'k'},'Broke: '),cut(w),route];
+ const step=w.slice(0,i),sp=step.lastIndexOf(' ');
+ return [h('span',{class:'k'},'Broke at '),sp>0?h('b',{},step.slice(0,sp+1)):null,h('span',{class:'nw'},h('b',{},step.slice(sp+1)),':'),' '+cut(w.slice(i+2)),route]}
 /* What a scenario claims, said as what the run did with it: proved once it passed, checked while it runs or after it broke,
    and only to be checked before it runs. */
 const gwClaim=x=>{const r=gw.state.run[x.id];return r&&r.st==='pass'?'What it proved':r&&(r.st==='fail'||r.st==='run')?'What it checks':'What it will check'};
 /* A pointer that cannot hover is a finger: what a mouse does by pointing, it does by tapping. */
 const gwTouch=()=>{try{return matchMedia('(hover: none)').matches}catch(e){return false}};
+/* the words follow the pointer the screen has now: a window moved to a touch screen, or a device that switches, says Tap or Point
+   once the switch has settled, not from its next touch. A flip that comes straight back (a screenshot tool resizing the page)
+   repaints nothing; a paint made during one is put right */
+try{matchMedia('(hover: none)').addEventListener('change',()=>{clearTimeout(gw.touchT);gw.touchT=setTimeout(()=>{if(gw.el&&gw.state&&gw.touchAt!==undefined&&gwTouch()!==gw.touchAt)growPaint()},1200)})}catch(e){}
 const gwML=id=>(GW.modes.find(m=>m.id===id)||{label:id}).label;
 /* Which mode grows what a mode leaves out: "Max grows them", or "Standard grows 2, Max grows 5". */
 function gwGrows(list){const by={};for(const x of list)by[x.mode]=(by[x.mode]||0)+1;const ks=GW.modes.map(m=>m.id).filter(k=>by[k]);const n=list.length;
@@ -343,26 +397,31 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  if(pin.startsWith('s:')){gwPut(card,head,gbScenarioCard(pin.slice(2)));return card}
  const id=pin.startsWith('u:')?pin.slice(2):pin;if(!gwUnit(id))return card;
  /* a phone's tapped knot already has its name and place in the card under the tree */
- gwPut(card,head,gwPartCard(id,phone&&!live));
+ gwPut(card,head,gwPartCard(id,phone&&!live,live));
  return card}
 /* A part: the journeys that cross it, how deep tracing went and what each look found, how each layer is proved, and its own
    checks. In the Outline it opens in place under its row, so it leaves out the name the row already shows. A look that found
    nothing says only that; a file the note already names is not named again beside it. */
-function gwPartCard(id,inline){const s=gw.state,v=gw.view;const M=gw.M||gbModel();const u=gwUnit(id);if(!u)return null;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
+function gwPartCard(id,inline,live){const s=gw.state,v=gw.view;const M=gw.M||gbModel();const u=gwUnit(id);if(!u)return null;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
  const on=M.J.filter(j=>j.units.includes(id));const own=s.scenarios.filter(x=>x.unit===id&&!M.J.some(j=>(M.leaves[j.id]||[]).includes(x)));
  const seen=new Set();
  const said=e=>{const loc=e.loc&&!/^[-—–\s]*$/.test(e.loc)?e.loc:'';const file=loc.replace(/:\d+(:\d+)?$/,'');let note=(e.note||'').trim();let at=loc;
   if(file&&note.includes(file)){note=note.replace(file,loc);at=''}if(at&&seen.has(at))at='';if(loc)seen.add(loc);
-  return at||note?h('small',{},gwFacts([at?gwCodeText(at):null,note?[note]:null])):null};
+  return at||note?h('small',{},gwFacts([at?[gwRef(at)]:null,note?gwNote(note):null])):null};
+ /* while it follows the tracer, the panel shows three of the five looks, around the latest (from the first, once all five are
+    in), so it stays shorter than the tree */
+ const rows=GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?said(e):null))});
+ const last=GW.steps.reduce((a,st,ix)=>d[st[0]]?ix:a,-1),from=last>=rows.length-1?0:Math.max(0,Math.min(rows.length-3,last-1)),few=!!live&&!gw.depthAll&&rows.length>3;
  /* its own checks: the ones this mode runs as rows; the ones a bigger mode grows as one line, so a part with many of them does
     not grow the panel past the tree */
  const ownIn=own.filter(gwIn),ownOut=own.filter(x=>!gwIn(x));
- return [inline?null:h('h3',{},u.label),inline?null:h('div',{class:'where'},gwFacts([u.root?'what it depends on':'part',u.unitKind,gwCodeText(u.loc)])),
+ return [inline?null:h('h3',{},u.label),inline?null:h('div',{class:'where'},gwFacts([u.root?'what it depends on':'part',u.unitKind,[gwRef(u.loc)]])),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},on.length?'On '+on.length+' journey'+(on.length===1?'':'s'):'On no journey'),
    on.length?on.map(j=>{const i=(gw.order||[]).indexOf(j.id)+1,n=(M.leaves[j.id]||[]).filter(gwIn).length;return h('button',{class:'gb-ols',on:{click:()=>{gw.pinned='j:'+j.id;gw.pinList=null;gw.refocus='j:'+j.id;growPaint()}}},h('span',{class:'no'},i?String(i):''),h('span',{class:'t'},...gwRich(j.title)),h('span',{class:'bx'},h('span',{class:'gw-n'},n+' scenario'+(n===1?'':'s'))))}):h('p',{class:'small muted',style:'margin:0'},u.root?'No journey in this change reaches it.':'Changed, but nothing in this change reaches it. Max checks it on its own.')),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:6px 10px;margin-bottom:6px;flex-wrap:wrap'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.pips.filter(p=>p==='ok').length+' of 5 found'+((n=>n?' · '+n+' looked, nothing there':'')(dp.pips.filter(p=>p==='none').length))),dp.pips.includes('stop')?h('span',{class:'gw-badge nf'},'trace stops'):null),
-   GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?said(e):null))})),
-  (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},c.reason,h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
+   few?rows.slice(from,from+3):rows,
+   live&&rows.length>3?h('button',{class:'gw-dpmore','data-ol':'dp:more','aria-expanded':String(!few),on:{click:()=>{gw.depthAll=!gw.depthAll;gw.refocus='dp:more';growPaint()}}},few?'Show all '+rows.length+' looks':'Show only the latest 3'):null),
+  (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},...gwNote(c.reason),h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
   own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Checked on its own'),ownIn.map(x=>gbItem(x,{class:'gb-ols',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},[gwBadge(x)])),
    ownOut.length?h('p',{class:'small muted gw-one'},gwFacts([ownOut.length+' part check'+(ownOut.length===1?'':'s'),gwGrows(ownOut)])):null):null]}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
@@ -372,8 +431,8 @@ function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{clas
    tree. Above the strip, every criterion is counted once, as chips with the same marks. */
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
  const open=gw.selCrit?v.criteria.find(c=>c.id===gw.selCrit):null;const ob=open?gwCB(open.status):null;
- const notes=[...s.drift.length?[h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec'),h('span',{},'Changed here, but no criterion covers '+(s.drift.length===1?'it':'them')+'. Confirm '+(s.drift.length===1?'it is':'they are')+' intended, or add '+(s.drift.length===1?'it':'them')+' to the spec.'),s.drift.map(d=>h('span',{class:'gw-loc'},h('span',{class:'nw'},d.what),' ',h('span',{class:'muted'},...gwCodeText(d.loc)))))]:[],
-  ...s.stops.map(x=>h('div',{class:'gw-flag red'},h('b',{},'Tracing stopped at '+((gwUnit(x.unit)||{}).label||x.unit)),h('span',{},x.why+' ',h('span',{class:'gw-loc muted'},...gwCodeText(x.at)))))];
+ const notes=[...s.drift.length?[h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec'),h('span',{},'Changed here, but no criterion covers '+(s.drift.length===1?'it':'them')+'. Confirm '+(s.drift.length===1?'it is':'they are')+' intended, or add '+(s.drift.length===1?'it':'them')+' to the spec.'),s.drift.map(d=>h('span',{class:'gw-loc'},h('span',{class:'nw'},d.what),' ',h('span',{class:'gw-ref muted'},...gwCodeText(d.loc)))))]:[],
+  ...s.stops.map(x=>h('div',{class:'gw-flag red'},h('b',{},'Tracing stopped at '+((gwUnit(x.unit)||{}).label||x.unit)),h('span',{},...gwNote(x.why),' ',h('span',{class:'gw-loc gw-ref muted'},...gwCodeText(x.at)))))];
  const sum=v.criteria.length?gwBuckets():[];
  gwPut(card,h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),
   h('p',{class:'small muted',style:'margin:4px 0 0'},s.spec?'From '+s.spec.source+', '+s.spec.via:s.specMissing?'No spec: '+s.specMissing:'Looking in the PR, linked issues and commits'),
@@ -385,7 +444,7 @@ function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card
   notes.length?h('details',{class:'gw-notes',open:notes.some(n=>n.classList.contains('red'))?true:null},h('summary',{},notes.length+' note'+(notes.length===1?'':'s')+': '+[s.drift.length?s.drift.length+' in the code, not in the spec':null,s.stops.length?'tracing stopped '+s.stops.length+'×':null].filter(Boolean).join(' · ')),notes):null);
  return card}
 function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
- const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms)):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'},'not run');
+ const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms)):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'+(x.flow?'':' nf')},x.flow?'to prove':'no flow yet');
  const real=x.mockOnly?h('span',{class:'gw-badge'},'mock only'):!v?h('span',{class:'gw-badge'},r&&r.st==='pass'?'next':'after mock'):v.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(v.ms)):h('span',{class:'gw-badge warn'},v.na?'mock only':'skipped');
  const note=x.mockOnly||(v&&v.note)||(x.realKey?'Runs against the provider sandbox when '+x.realKey+' is set':'No sandbox known for this provider yet');
  return h('div',{class:'gw-lanes'},h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'mock · stand-in'),mock,h('span',{class:'note'},'Every PR. Can fail, slow down or hang up on purpose.')),h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'real · sandbox'),real,h('span',{class:'note'},note)))}
@@ -405,15 +464,16 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
    h('label',{},'against ',h('input',{class:'mono',style:'min-height:34px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:var(--paper);color:var(--ink);width:200px',value:gw.base||g.base||'',placeholder:g.base||'main',on:{input:e=>{gw.base=e.target.value}}}))),
   h('div',{class:'row'},h('button',{class:'btn','data-testid':'grow-go',disabled:gw.busy||!g.isRepo||!branch||branch===g.base,on:{click:growStart}},'Grow '+(branch||'this branch')),
    !g.isRepo?h('span',{class:'small muted'},'Not a git repo: grow compares a branch with its base.'):branch===g.base?h('span',{class:'small muted'},'This is the base branch. Pick a feature branch below.'):null))}
-/* scenarios that did not run, in the tree's words: no flow yet when nothing proves them, not run when one exists */
+/* scenarios that did not run, in the tree's words: no flow yet when nothing proves them, to prove when one exists */
 function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length,rest=nr.length-nf;
- return (nf?', '+nf+' with no flow yet':'')+(rest?', '+rest+' not run':'')}
-/* The spec's line in the verdict counts each criterion once, in the spec panel's words. */
+ return (nf?', '+nf+' with no flow yet':'')+(rest?', '+rest+' to prove':'')}
+/* The spec's line in the verdict counts each criterion once, in the spec panel's words. A count of none is left out, except
+   "0 need you": it is the one that says nothing waits on the reader. */
 function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
- return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved, '+(B.agent||0)+' agent-checked'+['part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
+ return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved'+['agent','part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
- return h('div',{class:'gw-result','data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),sub),
+ return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),sub),
   h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs')))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
@@ -430,28 +490,45 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
  const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+lbl(s.mode)+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.';
  /* pointing at a mode previews it on the tree, and a line beside the hint says what it keeps and cuts; the hint itself stays.
     A finger cannot point: a tap previews a mode, and while the choice is open a second tap on the same mode chooses it */
- const touch=gwTouch();
+ const touch=gw.touchAt=gwTouch();
  const idle=locked?(touch?'Tap another mode to see what it grows; a new grow proves it.':'Point at another mode to see what it grows; a new grow proves it.'):asked?(touch?'Tap a mode to see it on the tree; tap it again to choose it.':'Point at a mode to see it on the tree.'):'';
  const say=id=>{const el=gw.el&&gw.el.querySelector('[data-testid="grow-mode-preview"]');if(!el)return;if(!id||id===cur&&locked){el.textContent=idle;return}
   const n=v.counts[id],all=s.scenarios.length;
   if(!locked){el.textContent='Preview · '+lbl(id)+' keeps '+n+' of the '+all+' drafted'+(all>n?' and cuts '+(all-n):'')+'.'+(touch?' Tap it again to choose it.':'');return}
   const c=v.counts[cur];el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+', as ghosts on the tree.':n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(gw.preview){gw.preview=null;gbPaint();say(null)}};
- return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':' set'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{class:asked&&m.id==='min'?'rec':null,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every spec criterion':null,
-   on:{click:e=>{if(!asked)return;if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gw.armed)look(m.id)},pointermove:e=>{if(e.movementX||e.movementY)gw.armed=true;if(gw.armed&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
+ return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{class:asked&&m.id==='min'?'rec':null,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every spec criterion':null,
+   on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gw.armed)look(m.id)},pointermove:e=>{if(e.movementX||e.movementY)gw.armed=true;if(gw.armed&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
    /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
-   h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
+   h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label+(s.scenarios.length?' · '+v.counts[m.id]:'')),h('span',{},m.blurb)))),
   h('div',{class:'gw-hintrow'},h('p',{class:'small muted','data-testid':'grow-mode-hint',style:'margin:0'},said),h('span',{class:'small muted gw-more','data-testid':'grow-mode-preview','aria-live':'polite'},idle)))}
 /* Under the tree, top down: on a phone, the journeys its numbers stand for; then one line of what each leaf's look means and one
    of the wood (roots, where tracing stops, a scenario's route and the files on it), each with the tree's own mark; what the mode
    pruned; and, folded, how to read a branch and a pad. */
+/* A one-journey tree on a phone badges its other two pads R (what it refuses) and F (how it fails); under the journey's name,
+   each says what it holds: its riskiest scenario and their state, as the pad's label says it on a wide screen. A pad the mode
+   keeps nothing on gets no row. */
+function gwPolKeys(one){const s=gw.state,M=gw.M;if(!one||!M||!M.J.length)return [];const j=M.J[0];const vis=s.modeBy?s.mode:null,inMode=x=>!s.modeBy||gwIn(x);
+ return [['guard','R','What it refuses'],['failure','F','How it fails']].map(([p,b,t])=>{const list=(M.leaves[j.id]||[]).filter(x=>gbPol(x)===p),inm=list.filter(inMode);if(!inm.length)return null;
+  return h('li',{class:'pol'},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},t),' · ',...gwRich(gwVia(gbOrd(inm)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
+/* Where a leaf sits on a pad, drawn small with the tree's own pad and leaf: the one it names solid, the other two faint. */
+function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:tr,class:'lp-lf'+(pos===k?'':' dim')});
+ return sv('svg',{class:'gw-svg gb gw-lpad',width:42,height:30,viewBox:'0 0 48 34','aria-hidden':'true',focusable:'false'},
+  sv('path',{d:'M15.6 23 L14.8 26.2',class:'lp-st'+(pos==='hang'?'':' dim')}),
+  sv('path',{d:'M4.8 20.1 C3.6 16.5 7.2 14.1 10.8 14.6 C12 11.2 16.8 10 19.9 11.7 C21.8 9.1 27.1 9.1 28.8 11.9 C32.2 10.3 36.7 11.7 37.2 14.8 C40.8 14.3 44.4 16.7 43.2 20.1 C41.5 22.5 36 23.2 24 23.2 C12 23.2 6.5 22.5 4.8 20.1 Z',class:'lp-pad'}),
+  sv('path',{d:'M5.3 20.6 C7.2 22.3 13.2 23.2 24 23.2 C34.8 23.2 40.8 22.3 42.7 20.6 C42 19.7 39.6 18.9 37.2 19.4 C32.4 20.3 15.6 20.3 10.8 19.4 C8.4 18.9 6 19.6 5.3 20.6 Z',class:'lp-band'}),
+  lf('crest','translate(24 5.4) rotate(-90)'),lf('shoulder','translate(41.9 11.9) rotate(-30)'),lf('hang','translate(14.3 30.7) rotate(96)'))}
 function gwKey(){const s=gw.state;const drafted=s.scenarios.length,inm=s.scenarios.filter(gwIn).length;const M=gw.M,B=gw.B;
  const one=!!M&&M.J.length===1,narrow=!!(B&&B.L&&B.L.narrow);const it=(k,t)=>h('span',{class:'gw-li'},gwSw(k),h('span',{},t));
  const onJ=x=>!!M&&M.J.some(j=>(M.leaves[j.id]||[]).includes(x));const out=s.scenarios.filter(x=>!gwIn(x));const outJ=out.filter(onJ).length;
  const buds=!!M&&s.scenarios.some(x=>!onJ(x)&&(!s.modeBy||gwIn(x)));const crack=!!(B&&Object.values(B.knot||{}).some(k=>k.classList.contains('wound')));
  const roots=B&&B.L&&B.L.roots?B.L.roots.filter(r=>r.id).map(r=>M.U[r.id]).filter(Boolean):[];
  const names=narrow&&M&&(gw.order||[]).length?h('ol',{class:'gw-names','aria-label':'The journeys on the tree'},(gw.order||[]).map((id,i)=>{const j=M.J.find(q=>q.id===id);const t=j?j.title:'';
-  return h('li',{},h('span',{class:'no','aria-hidden':'true'},String(i+1)),h('button',{'aria-pressed':String(gw.pinned==='j:'+id),'aria-label':'Journey '+(i+1)+': '+gwPlain(t),on:{click:()=>{gw.pinned=gw.pinned==='j:'+id?null:'j:'+id;growPaint()}}},...gwRich(t)))})):null;
+  return h('li',{},h('span',{class:'no','aria-hidden':'true'},String(i+1)),h('button',{'aria-pressed':String(gw.pinned==='j:'+id),'aria-label':'Journey '+(i+1)+': '+gwPlain(t),on:{click:()=>{gw.pinned=gw.pinned==='j:'+id?null:'j:'+id;growPaint()}}},...gwRich(t)))}),gwPolKeys(one)):null;
+ /* where a leaf sits is the tree's main code: on a journey's pad the happy path stands on the crest, what it refuses on a
+    shoulder, how it fails hangs beneath. A one-journey tree grows those as pads of their own, labelled, so it has no such row */
+ const pm=(k,t)=>h('span',{class:'gw-li'},gwPadMark(k),h('span',{},t));
+ const where=M&&M.J.length>1?h('div',{class:'gw-lg where'},h('span',{class:'lh'},'Where a leaf sits'),pm('crest','happy path'),pm('shoulder','what it refuses'),pm('hang','how it fails')):null;
  const leaves=h('div',{class:'gw-lg'},it('pass','passed'),it('fail','failed'),it('run','running'),it('in','to prove'),it('none','no flow yet'),buds?it('bud','part checked on its own'):null,it('cut','pruned'));
  const route=h('div',{class:'gw-lg'},h('span',{class:'gw-li'},gwSw('route'),h('span',{},'the route a scenario runs · ',h('span',{class:'bad'},'red where it broke'))),it('knot','a file on the route'),it('lit','on the lit route'),crack?it('crack','where it failed'):null);
  const ground=roots.length||s.stops.length?h('div',{class:'gw-lg'},roots.some(u=>u.layer!=='ext')?it('root','a root in the repo'):null,roots.some(u=>u.layer==='ext')?it('ext','over the rim: a service outside'):null,s.stops.length?it('stop','where tracing stops'):null):null;
@@ -459,16 +536,19 @@ function gwKey(){const s=gw.state;const drafted=s.scenarios.length,inm=s.scenari
  const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{gw.howOpen=e.currentTarget.open}}},h('summary',{},'How to read the tree'),
   h('p',{},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.'),
   h('p',{},'On a pad, the happy path sits on the crest, what it refuses on the shoulders, and how it fails hangs beneath.'));
- return [names,h('div',{class:'gw-legend','aria-label':'Legend'},leaves,route,ground),cap,how]}
+ return [names,h('div',{class:'gw-legend','aria-label':'Legend'},where,leaves,route,ground),cap,how]}
 /* The page, top down: the verdict once there is one, the phases (quiet when done), the tracers, the tree with its inspector, then the journeys and the spec side by side, then what the agent built.
    Everything paints into fixed slots so the tree's SVG stays where it is between paints: moving a node resets its transitions, and the limbs would snap instead of grow. */
 function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start','head','verdict','rail','agents','tree','two','error'])S[k]=h('div',{});
  S.card=h('section',{class:'card gw-tree','aria-label':'Tree'});S.bar=h('div',{});S.mode=h('div',{class:'gw-modearea'});S.stage=h('div',{class:'gw-stage'});S.left=h('div',{style:'min-width:0'});S.scroll=h('div',{class:'gb-wrap'});S.legend=h('div',{});S.ins=h('div',{class:'gw-insw'});
  /* the tree is drawn for its width: when the space it has changes enough, draw it again */
  try{new ResizeObserver(()=>{if(gw.state&&gw.tree==='grove'&&gw.B&&gbWidth()!==gw.B.width)growPaint()}).observe(S.scroll)}catch(e){}
+ S.ins.addEventListener('scroll',gwInsFade,{passive:true});try{new ResizeObserver(gwInsFade).observe(S.ins)}catch(e){}
  S.card.append(S.bar,S.mode,S.stage);S.stage.append(S.left,S.ins);S.left.append(S.scroll,S.legend);S.tree.append(S.card);
  gw.el.append(S.start,S.head,S.verdict,S.rail,S.agents,S.tree,S.two,S.error);return gw.slots=S}
 const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
+/* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
+function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
 function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  /* a repaint rebuilds controls; whatever had focus gets it back afterwards, by its key or its test id */
  const fa=document.activeElement,held=fa&&fa!==document.body&&gw.el.contains(fa)?(fa.getAttribute('data-ol')||(fa.getAttribute('data-testid')?'t:'+fa.getAttribute('data-testid'):null)):null;
@@ -486,19 +566,23 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  /* what the rules traced, counted as the header counts it: changed parts, and the dependencies they reach */
  const tids=new Set(rules.flatMap(a=>a.units||[])),tp=[...tids].filter(id=>{const u=gwUnit(id);return !u||!u.root}).length,td=tids.size-tp;
  const traced='traced from source: '+tp+' part'+(tp===1?'':'s')+(td?', '+td+' dependenc'+(td===1?'y':'ies'):'');
- if(s.done&&!live.some(a=>!a.ok))gwSet(S.agents,rules.length||live.length?h('p',{class:'gw-agline'},gwFacts(['✓ rules',rules.length+' lane'+(rules.length===1?'':'s'),[traced],...live.flatMap(a=>['✓ '+(a.model||a.by),[a.brief]])])):null);
+ /* once every lane has finished well, the strip folds to its one line: when tracing ends, not when the verdict lands, so the
+    tree does not move under a reader watching its leaves turn */
+ if(!live.some(a=>!a.done||!a.ok))gwSet(S.agents,rules.length||live.length?h('p',{class:'gw-agline'},gwFacts(['✓ rules',rules.length+' lane'+(rules.length===1?'':'s'),[traced],...live.flatMap(a=>['✓ '+(a.model||a.by),[a.brief]])])):null);
  else gwSet(S.agents,live.length||rules.length?h('div',{class:'gw-agents','aria-live':'polite'},rules.length?h('div',{class:'gw-ag'},h('b',{},'✓ rules · '+rules.length+' lane'+(rules.length===1?'':'s')),h('span',{},traced)):null,live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.model||a.by)+' · '+a.brief),h('span',{title:a.note},a.note)))):null);
  const nj=(s.journeys||[]).length;
  gwSet(S.bar,h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},gwFacts([nj?nj+' journey'+(nj===1?'':'s'):null,(n=>n+' part'+(n===1?'':'s'))(s.units.filter(u=>!u.root).length),(n=>n+' dependenc'+(n===1?'y':'ies'))(s.units.filter(u=>u.root).length)])),
   h('span',{class:'row',style:'gap:10px'},
    h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,'data-ol':'v:'+t,on:{click:()=>{if(gw.tree!==t)gwCalm();gw.tree=t;gw.refocus='v:'+t;gw.reveal=t==='outline'?gw.pinned:null;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
- /* choosing a mode folds its three cards into chips; the area keeps its height while the dropped leaves fall, then closes, so
-    the tree holds still while it is cut */
+ /* the mode area holds one height from the first paint of a grow to its verdict: its three cards are there (waiting) while the
+    tree grows, asked when it is drafted, and stay once one is chosen, so nothing above the tree moves it. Only on a phone,
+    where the cards stack, does a choice fold them into chips: the area keeps its height while the dropped leaves fall, then
+    closes */
  const ask=!!(s.asked&&!s.modeBy);if(gw.modeAsk&&!ask&&s.modeBy&&S.mode.offsetHeight&&!gwQuiet()){const h0=S.mode.offsetHeight;S.mode.style.transition='';S.mode.style.height=h0+'px';clearTimeout(gw.modeT);
   gw.modeT=setTimeout(()=>{S.mode.style.height='auto';const to=S.mode.offsetHeight;S.mode.style.height=h0+'px';void S.mode.offsetHeight;S.mode.style.transition='height .45s cubic-bezier(.3,.7,.3,1)';S.mode.style.height=to+'px';
    gw.modeT=setTimeout(()=>{S.mode.style.height='';S.mode.style.transition=''},500)},1500)}
  gw.modeAsk=ask;
- gwSet(S.mode,s.scenarios.length||s.asked?gwModes():null);
+ gwSet(S.mode,s.scenarios.length||s.asked||!s.done&&!s.blocked?gwModes():null);
  if(gw.tree==='grove'){if(S.left.firstChild!==S.scroll)S.left.replaceChildren(S.scroll,S.legend);
   /* the tree is drawn for the width it gets, so it waits until it is on the page */
   if(!S.scroll.isConnected||!S.scroll.clientWidth){if(!gw.waiting){gw.waiting=true;requestAnimationFrame(()=>{gw.waiting=false;growPaint()})}}
@@ -509,6 +593,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
     while the choice is open does the panel stay beside it, with what each mode proves */
  const alone=gw.tree==='outline'&&!(s.asked&&!s.modeBy);S.stage.classList.toggle('ol',alone);S.card.classList.toggle('olv',alone);
  if(alone)S.ins.replaceChildren();else gwSet(S.ins,gwInspector());S.ins.hidden=alone||!S.ins.firstChild;S.stage.classList.toggle('solo',!S.ins.firstChild);
+ requestAnimationFrame(gwInsFade);
  /* the Outline is the journey list, so it is not repeated below it */
  gwSet(S.two,gw.tree==='outline'?(()=>{const x=gwExt();return h('div',{class:'gw-two'+(x?'':' solo')},gwSpec(),x)})():h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwExt())));
  gwSet(S.error,gw.error?blocked(gw.error):null);
