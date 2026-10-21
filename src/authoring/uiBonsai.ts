@@ -68,6 +68,8 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.none .blade{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2.4 1.6}
 .gb-lf.pre .blade{fill:var(--paper);stroke:var(--line2)}
 .gb-lf.in .rib,.gb-lf.idle .rib,.gb-lf.none .rib,.gb-lf.pre .rib{stroke:var(--moss);opacity:.3}
+/* on a dark page a leaf still to prove is pale, as on a light one, not a dark hole in the pad */
+@media (prefers-color-scheme:dark){.gb-lf.idle .blade,.gb-lf.none .blade{fill:color-mix(in srgb,var(--pad-lit) 58%,var(--ink))}.gb-lf.pre .blade{fill:color-mix(in srgb,var(--pad) 60%,var(--ink3))}}
 .gb-lf .gb-lfi{transform-box:fill-box;transform-origin:center}
 /* one preview grammar: what the mode keeps stays as it is, what it cuts fades in place with a nick at its stalk, what it
    adds appears as a dashed ghost */
