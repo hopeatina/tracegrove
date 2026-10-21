@@ -87,7 +87,7 @@ export const BONSAI_CSS = String.raw`
 .gb .leader{fill:none;stroke:var(--line2);stroke-width:1}
 .gb .badge circle{fill:var(--paper);stroke:var(--ink3);stroke-width:1}.gb .badge text{font:600 11px var(--mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
 .gb .badge.fail circle{stroke:var(--verm);fill:var(--verm-bg)}.gb .badge.sel circle{stroke:var(--ink);stroke-width:2}.gb .badge.pruned{display:none}
-.gb .potcap{font:500 9px var(--mono);letter-spacing:.08em;fill:var(--muted)}.gb .seal rect{fill:none;stroke:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));stroke-width:.8;opacity:.7}.gb .seal text{font:500 8.5px var(--mono);letter-spacing:.08em;fill:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));opacity:.9}.gb .pot{fill:var(--pot)}.gb .pot-rim{fill:var(--pot-rim)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:.8;opacity:.4;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.9;stroke-linecap:round}.gb .cush{fill:var(--pad-shade)}.gb .cush-lt{fill:var(--pad);opacity:.9}.gb .pebble{fill:var(--pebble)}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .pot-sh{fill:var(--pot-rim);opacity:.35}.gb .soil{fill:var(--soil-c)}.gb .moss{fill:var(--pad-shade);opacity:.8}
+.gb .seal rect{fill:none;stroke:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));stroke-width:.8;opacity:.7}.gb .seal text{font:500 8.5px var(--mono);letter-spacing:.08em;fill:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));opacity:.9}.gb .pot{fill:var(--pot)}.gb .pot-rim{fill:var(--pot-rim)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:.8;opacity:.4;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.9;stroke-linecap:round}.gb .cush{fill:var(--pad-shade)}.gb .cush-lt{fill:var(--pad);opacity:.9}.gb .pebble{fill:var(--pebble)}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .pot-sh{fill:var(--pot-rim);opacity:.35}.gb .soil{fill:var(--soil-c)}.gb .moss{fill:var(--pad-shade);opacity:.8}
 .gb .rring{fill:none;stroke:var(--paper);stroke-width:3;opacity:0;transition:opacity .2s}.gb .rt.hl .rring{opacity:1}.gb .rt.sel .rring{opacity:1;stroke:var(--ink);stroke-width:1.6}
 .gb .rt.hl .w,.gb .rt.sel .w{fill:var(--wood-lit)}.gb .rt.hl .rlbl,.gb .rt.sel .rlbl{fill:var(--ink);font-weight:600}.gb.dim .rt:not(.hl):not(.sel){opacity:.32}
 .gb .rt.loose .w{fill:var(--wood-old)}.gb .rt.loose{opacity:.85}.gb .cutface{fill:var(--cut)}.gb .rt.wound .w{stroke:var(--verm);stroke-width:1.2}.gb .rt.wound .rlbl{fill:var(--verm-ink)}
@@ -420,7 +420,7 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* the pot sits under the canopy's mass, so a heavy first branch does not hang off one end */
   const potC=trees.length===1?(lone?0:Math.max(-potL*.2,Math.min(potL*.2,(T0.cx0+T0.cx1)/2*.85))):(Math.min(...xs)+Math.max(...xs))/2;
   if(trees.length>1)potL=Math.max(potL,Math.max(...xs)-Math.min(...xs)+.5*H0);
-  const D=lone?22:Math.max(22,Math.min(44,.8*T0.D));
+  let D=lone?22:Math.max(22,Math.min(44,.8*T0.D));
   let x0=Math.min(edgeL,potC-potL/2-10),x1=Math.max(edgeR,potC+potL/2+10),y0=Math.min(...trees.map(T=>T.y0));
   /* the soil: a low mound inside the pot, highest at the trunk, that the roots lie in and sink into */
   const pa=potC-potL/2,pb=potC+potL/2;
@@ -434,6 +434,14 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const roots=[],deps=[];const taken=new Set();
   trees.forEach((T,i)=>{const ids=[...new Set(T.js.flatMap(j=>(j.units||[]).filter(id=>M.U[id]&&M.U[id].root)))].filter(id=>!taken.has(id));if(!i)for(const u of M.strays)ids.push(u.id);
    ids.slice(0,6).forEach((id,k)=>{taken.add(id);deps.push({id,i,d:k%2?T.S:-T.S,r:Math.floor(k/2),T})})});
+  /* the pot is the repository: its name is always a small seal at the face's lower right. The stores' tags share the face;
+     when they and the seal do not fit side by side, the tags take a row above it and the pot is made deep enough for both */
+  let repo='';try{repo=(state.config&&state.config.project)||String(state.dir||'').split('/').pop()||''}catch(e){}
+  const seal=repo&&potL>90?{t:gwCut(repo,Math.floor((potL-40)/6))}:null;if(seal)seal.w=gbW(seal.t,5.6)+10;
+  const fs=narrow?12:10.5,cw=fs*.61;
+  const tagW=deps.filter(q=>M.U[q.id].layer!=='ext').reduce((a,q)=>a+gbW(gwCut(M.U[q.id].label,22),cw)+10,0);
+  const twoRow=!!seal&&!lone&&tagW>0&&tagW+seal.w+26>potL;if(twoRow)D=Math.max(D,fs*1.15+24);
+  const faceR=pb-8-(seal&&!lone&&!twoRow?seal.w+10:0),tagY=twoRow?4.2+fs*.82:2+(D-2)*.4+fs*.35;
   trees.forEach((T,i)=>{const X=xs[i];const sides=new Set(deps.filter(q=>q.i===i).map(q=>q.d));
    (T.lit?[[-1,.08,0],[1,.07,0]]:[[-1,.13,0],[1,.1,0],[-1,.05,1],[1,.06,1]]).forEach(([d,f,fr])=>{if(!fr&&sides.has(d))f=.05;const len=f*potL+6,a0=X+d*(fr?.04:.3)*T.D;
     const pts=gbBez([[a0,0],[a0+d*.45*len,0],[a0+d*.8*len,0],[a0+d*len,0]],14);const kb=knobs(gbHash('nb'+i+d+fr),14);const w=pts.map((q,ii)=>Math.max(1,((fr?.2:.25)*T.D*Math.pow(1-ii/14,1.5)+.8)*kb[ii][0]));
@@ -449,16 +457,17 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
    roots.push({id,tree:i,d,pts,w,ext,loose,stop:s.stops.some(x=>x.unit===id)})}
   /* names: a store's on the pot face under the root that sinks there, like a plant tag; a third party's beside the pot where
      its root goes down the wall, with "trace stops" when tracing could not follow it out */
-  /* on a phone the pot has no room beside it: a third party's name goes under the pot, at the end its root went down */
-  const fs=narrow?12:10.5,cw=fs*.61;const rl=[];const capN=roots.some(r=>r.id&&!r.ext);let below=0;
+  /* on a phone the pot has no room beside it: a third party's name goes under the pot, from the end of its tail inward */
+  /* the pot is the repository: its name is always a small seal at the face's lower right, and the stores' tags keep clear of it */
+  const rl=[];let below=0;
   for(const r of roots){if(!r.id)continue;const t=gwCut(M.U[r.id].label,22);const tt=r.stop?t+' · trace stops':t;const ww=gbW(tt,cw);
-   if(r.ext&&narrow){rl.push({r,x:r.d>0?pb-2:pa+2,y:D+(capN?30:20)+below*(fs+4),anchor:r.d>0?'end':'start',t,face:false,below:true});below++}
+   if(r.ext&&narrow){const zx=wallX(r.d,D+11)+r.d*1.9;rl.push({r,x:zx-r.d*7,y:D+13.2+fs*.35+below*(fs+4),anchor:r.d>0?'end':'start',t,face:false,below:true});below++}
    else if(r.ext){const y=D*.42,yt=y-fs*.75,yb=y+fs*.45;let edge=wallX(r.d,y);r.pts.forEach((q,ii)=>{if(q[1]>yt-2&&q[1]<yb+2)edge=r.d>0?Math.max(edge,q[0]+r.w[ii]/2):Math.min(edge,q[0]-r.w[ii]/2)});const x=edge+r.d*6;rl.push({r,x,y:y+fs*.35,anchor:r.d>0?'start':'end',t,face:false});if(r.d>0)x1=Math.max(x1,x+ww+8);else x0=Math.min(x0,x-ww-8)}
-   else{const tip=r.pts[r.pts.length-1];rl.push({r,x:Math.max(pa+8+ww/2,Math.min(pb-8-ww/2,tip[0])),y:2+(D-2)*.42+fs*.35,anchor:'middle',t,face:true,ww})}}
-  const face=rl.filter(l=>l.face).sort((a,b)=>a.x-b.x);for(let k=1;k<face.length;k++){const q=face[k],o=face[k-1];const gap=(o.ww+q.ww)/2+10;if(q.x-o.x<gap){if(q.x+gap-(q.x-o.x)+q.ww/2<=pb-6)q.x=o.x+gap;else q.y=o.y+fs+2}}
+   else{const tip=r.pts[r.pts.length-1];rl.push({r,x:Math.max(pa+8+ww/2,Math.min(faceR-ww/2,tip[0])),y:tagY,anchor:'middle',t,face:true,ww})}}
+  const face=rl.filter(l=>l.face).sort((a,b)=>a.x-b.x);for(let k=1;k<face.length;k++){const q=face[k],o=face[k-1];const gap=(o.ww+q.ww)/2+10;if(q.x-o.x<gap){if(o.x+gap+q.ww/2<=faceR)q.x=o.x+gap;else q.y=o.y+fs+2}}
   const stopX=rl.some(l=>l.r.stop&&l.r.ext);
-  const cap=rl.some(l=>l.face);const yb=Math.max(0,...rl.filter(l=>l.below).map(l=>l.y+5));
-  L={trees,xs,potL,potC,D,roots,rl,fs,sy,wallX,cap,x0,x1,y0:y0-8,y1:Math.max(yb,D+(lone?14:16)+(stopX?14:0)+(cap?12:0)),narrow,S,H0,lone};
+  const yb=Math.max(0,...rl.filter(l=>l.below).map(l=>l.y+5));
+  L={trees,xs,potL,potC,D,roots,rl,fs,sy,wallX,seal,x0,x1,y0:y0-8,y1:Math.max(yb,D+(lone?14:16)+(stopX?14:0)),narrow,S,H0,lone};
   const need=L.x1-L.x0+24;if(need<=width||pass===5)break;H0*=Math.max(.55,Math.min(.96,Math.pow((width-24)/need,1.4)));}
  return L}
 
@@ -536,13 +545,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  /* the lip, over the soil's edge: the same clay, lit along its top, with a dark line where it overhangs the wall */
  gSoil.append(sv('g',{class:'lip'},sv('rect',{x:gbF(pa-(lone?2.5:3)),y:-1.2,width:gbF(pl+(lone?5:6)),height:lone?3.6:4.4,rx:1.6,fill:'url(#'+gid+')'}),
   sv('path',{class:'lip-hi',d:'M'+gbF(pa-1.6)+' -.6 L'+gbF(pb+1.6)+' -.6'}),sv('path',{class:'lip-lo',d:'M'+gbF(pa-2)+' '+(lone?'2.3':'3.1')+' L'+gbF(pb+2)+' '+(lone?'2.3':'3.1')})));
- /* the pot is the repository: its name as a small seal low on the pot, clear of the names on its face */
- let repo='';try{repo=(state.config&&state.config.project)||String(state.dir||'').split('/').pop()||''}catch(e){}
- /* the pot is the repository: its name stamped small on the face, or under the pot when the face carries the names of the
-    stores the roots sink into */
- if(repo&&pl>90){const t=gwCut(repo,Math.floor((pl-40)/6));const sw=gbW(t,5.6)+10;
-  if(L.cap)gPot.append(sv('text',{x:gbF(pc),y:gbF(D+(lone?13:15)),'text-anchor':'middle',class:'potcap'},t));
-  else{const y0=lone?D*.38:D*.5-4.5;gPot.append(sv('g',{class:'seal'},sv('rect',{x:gbF(pc-sw/2),y:gbF(y0),width:gbF(sw),height:9,rx:1}),sv('text',{x:gbF(pc),y:gbF(y0+6.7),'text-anchor':'middle'},t)))}}
+ /* the pot is the repository: its name as a small seal, at the face's lower right (centred on a small bowl) */
+ if(L.seal){const t=L.seal.t,sw=L.seal.w,x0=lone?pc-sw/2:pb-10-sw,y0=lone?D*.38:Math.max(8,D-15.6);
+  gPot.append(sv('g',{class:'seal'},sv('rect',{x:gbF(x0),y:gbF(y0),width:gbF(sw),height:9,rx:1}),sv('text',{x:gbF(x0+sw/2),y:gbF(y0+6.7),'text-anchor':'middle'},t)))}
  /* roots: the nebari first, then the named ones over them; a third party's goes over the lip, so it is drawn after it */
  L.roots.forEach((r,i)=>{const id='r'+i+(r.id?':'+r.id:'');const g=sv('g',r.id?{class:'rt dep'+(r.loose?' loose':'')+(r.stop?' stop':''),'data-k':'u:'+r.id,tabindex:-1,role:'button','aria-label':M.U[r.id].label+', what the change depends on'+(r.loose?', on no journey':'')+(r.stop?', where tracing stops':'')}:{});
   const pts=r.pts,n=pts.length;const delay=r.tree*250+80;const wd=piece(id,pts,r.w,'w',g,delay,520);
@@ -607,7 +612,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   T.knots.forEach(kn=>{const q=sh(kn.p);placed.push([q[0]-6,q[1]-6,q[0]+6,q[1]+6])});
   /* and off the journeys' names and the phone's numbers */
   for(const pid in T.lbl){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;placed.push([a,l.y-29,a+l.w,l.y-29+l.hgt])}
-  for(const jid in T.badge||{}){const q=T.badge[jid];placed.push([q.x+X-12,q.y-12,q.x+X+12,q.y+12])}placed.push([L.potC-L.potL/2,-6,L.potC+L.potL/2,L.D+(L.cap?20:0)]);for(let k=0;k<tp.length;k+=2)padBox.push([tp[k][0]-T.tw[k]/2,tp[k][1]-2,tp[k][0]+T.tw[k]/2,tp[k][1]+2]);
+  for(const jid in T.badge||{}){const q=T.badge[jid];placed.push([q.x+X-12,q.y-12,q.x+X+12,q.y+12])}placed.push([L.potC-L.potL/2,-6,L.potC+L.potL/2,L.D+6]);for(let k=0;k<tp.length;k+=2)padBox.push([tp[k][0]-T.tw[k]/2,tp[k][1]-2,tp[k][0]+T.tw[k]/2,tp[k][1]+2]);
   const ov=(r,q)=>Math.max(0,Math.min(r[2],q[2])-Math.max(r[0],q[0]))*Math.max(0,Math.min(r[3],q[3])-Math.max(r[1],q[1]));
   const hits=(r)=>padBox.reduce((a,q)=>a+ov(r,q),0)+placed.reduce((a,q)=>a+ov(r,q),0)*3;
   T.knots.forEach((kn,ki)=>{const p0=sh(kn.p),n=kn.n;const many=kn.ids.length>1;const off=(ki%2?-1:1)*kn.w*.18;const p=[p0[0]+n[0]*off,p0[1]+n[1]*off];
