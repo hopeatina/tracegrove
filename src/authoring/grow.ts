@@ -135,7 +135,7 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[mode]);
   if (!options.prove) for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: s.flow ? `Run with --prove to run ${s.flow}` : 'No flow proves this yet' });
   const res = (st: string) => inRun.filter((s) => state.run[s.id]?.st === st).length;
-  emit({ kind: 'discovery.finished', ran: res('pass') + res('fail'), passed: res('pass'), failed: res('fail'), notRun: res('not_run'), ms: Date.now() - t });
+  emit({ kind: 'discovery.finished', ran: res('pass') + res('fail'), passed: res('pass'), failed: res('fail'), notRun: res('not_run') });
 }
 
 function aborted(ctx: Ctx) {

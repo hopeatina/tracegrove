@@ -44,6 +44,7 @@ export const GROVE_CSS = String.raw`
 .gw-svg .br.tracing{stroke:var(--gold)}
 .gw-svg .br.dead{stroke:var(--verm);stroke-width:2.2;stroke-dasharray:6 6;stroke-dashoffset:0;opacity:0}
 .gw-svg .br.dead.on{opacity:1}
+.gw-svg .pad{fill:var(--moss-bg);opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.4);transition:opacity .8s .5s,transform 1s .5s cubic-bezier(.2,.8,.3,1.2)}.gw-svg .pad.on{opacity:.75;transform:scale(1)}
 .gw-svg .lbl{opacity:0;transition:opacity .45s}.gw-svg .lbl.on{opacity:1}
 .gw-svg .lbl text{font:500 12.5px var(--mono);fill:var(--ink)}
 .gw-svg .lbl text.k{font:11px var(--mono);fill:var(--muted)}
@@ -53,7 +54,7 @@ export const GROVE_CSS = String.raw`
 .gw-svg .hit{cursor:pointer;outline:none}.gw-svg .hit:focus-visible .lbl text:first-child{text-decoration:underline}
 .gw-svg .lf{stroke-width:1.2;transition:fill .4s,stroke .4s,opacity .4s}
 .gw-svg .lf.in{fill:var(--moss-bg);stroke:var(--moss)}.gw-svg .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-svg .lf.fail{fill:var(--verm);stroke:var(--verm)}
-.gw-svg .lf.run{fill:var(--gold);stroke:var(--gold);animation:leaf 1s ease-in-out infinite}.gw-svg .lf.out{fill:none;stroke:var(--line2);opacity:.7}.gw-svg .lf.none{fill:var(--paper);stroke:var(--ink3);stroke-dasharray:2 2}
+.gw-svg .lf.run{fill:var(--gold);stroke:var(--gold);animation:leaf 1s ease-in-out infinite}.gw-svg .lf.out{fill:none;stroke:var(--line2);opacity:.7}.gw-svg .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2.5 1.5}
 .gw-svg .lf.sprout{animation:sprout .5s cubic-bezier(.2,.8,.3,1.3) both}
 @keyframes sprout{from{transform:scale(0)}to{transform:scale(1)}}
 .gw-svg .cursor{fill:var(--gold);stroke:var(--paper);stroke-width:2}
@@ -98,9 +99,13 @@ export const GROVE_CSS = String.raw`
 .gw-modes button b{font-weight:500;font-size:14px}.gw-modes button span{font-size:12.5px;line-height:17px;color:var(--ink3)}
 .gw-modes button[aria-pressed=true]{border-color:var(--forest);box-shadow:inset 0 0 0 1px var(--forest)}
 .gw-modes.ask button{border-color:var(--gold)}
-.gw-sgroup{margin-top:16px}.gw-sgroup h4{display:flex;justify-content:space-between;margin:0 0 6px;font:500 11px/16px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.gw-sc{display:grid;gap:5px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);margin-bottom:8px}
-.gw-sc.failed{border-color:var(--verm)}.gw-sc .rw{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.gw-sc .t{font-weight:500;font-size:14px;line-height:20px}
+.gw-sgroup{margin-top:18px}.gw-sgroup h4{display:flex;justify-content:space-between;margin:0 0 6px;font:500 11px/16px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.gw-sc{border-bottom:1px solid var(--line)}.gw-sc:last-child{border-bottom:0}
+.gw-sc summary{display:flex;align-items:center;gap:10px;min-height:40px;padding:6px 4px;cursor:pointer;list-style:none}.gw-sc summary::-webkit-details-marker{display:none}
+.gw-sc summary:hover{background:var(--sel)}.gw-sc .t{flex:1;min-width:0}.gw-sc .body{display:grid;gap:6px;padding:2px 4px 12px 30px}
+.gw-dot{flex:none;width:9px;height:9px;border-radius:2px 9px;background:var(--moss-bg);border:1.5px solid var(--moss)}.gw-dot.pass{background:var(--moss)}.gw-dot.fail{background:var(--verm);border-color:var(--verm)}.gw-dot.run{background:var(--gold);border-color:var(--gold)}
+.gw-kind{flex:none;width:44px;font:11px/16px var(--mono);color:var(--muted)}
+.gw-sc .t{font-size:14px;line-height:20px}
 .gw-sc .p{font-size:13px;line-height:19px;color:var(--ink3)}.gw-sc .err{font:12px/17px var(--mono);color:var(--verm-ink);background:var(--verm-bg);padding:6px 8px;border-radius:6px;overflow-wrap:anywhere}
 .gw-lanes{display:grid;gap:4px;margin-top:2px}.gw-ln{display:grid;grid-template-columns:118px auto minmax(0,1fr);gap:8px;align-items:center;font-size:12px}.gw-ln .note{color:var(--muted);line-height:16px}
 .gw-xi{display:grid;gap:3px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:19px}.gw-xi:last-child{border:0}
@@ -110,6 +115,7 @@ export const GROVE_CSS = String.raw`
 .gw-result .big{font:400 22px/28px var(--serif)}.gw-result .sub{font-size:13px;line-height:19px;opacity:.85;max-width:760px}
 .gw-result.bad{background:var(--verm-bg);color:var(--ink)}
 .gw-empty{font-size:13px;color:var(--muted);margin:6px 0}
+@media (max-width:760px){.gw-scrollx{overflow-x:auto;margin:0 -12px;padding:0 12px}.gw-scrollx .gw-svg{min-width:760px}.gw-head>div:last-child{text-align:left!important;display:flex;gap:12px;align-items:center}}
 @media (max-width:640px){.gw-rail{grid-template-columns:repeat(3,minmax(0,1fr))}.gw-ln{grid-template-columns:1fr}.gw-head h2{font-size:20px;line-height:26px}}
 @media (prefers-reduced-motion:reduce){.gw-svg .br{transition:none}.gw-svg .lf.sprout,.gw-svg .lf.run,.gw-ag.live b::before{animation:none}}
 `;
@@ -118,7 +124,7 @@ export const GROVE_JS = String.raw`
 /* ---------- Grow: the change's tree, live ---------- */
 const GW=${CONST};
 const gw={el:null,svg:null,G:null,state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
-try{const v=localStorage.getItem('gw-tree');if(v==='outline')gw.tree='outline'}catch(e){}
+try{const v=localStorage.getItem('gw-tree');if(v==='outline'||v==='grove')gw.tree=v;else if(window.innerWidth<700)gw.tree='outline'}catch(e){if(window.innerWidth<700)gw.tree='outline'}
 function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});growPaint();return gw.el}
 async function growStart(){
  if(gw.busy)return;gw.busy=true;gw.error=null;gw.state=null;gw.view=null;gw.events=0;gw.id=null;gw.log=null;gw.pinned=null;gw.selCrit=null;gw.svg=null;gw.G=null;gw.t0=Date.now();growPaint();growTick();
@@ -143,45 +149,47 @@ const gwSel=()=>gw.pinned||gw.state.focus;
 const gwPut=(el,...k)=>{for(const x of k.flat(Infinity))if(x!==null&&x!==undefined&&x!==false)el.append(x)};
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 
+const gwSway=(X,GY,TOP,y)=>X+11*Math.sin(Math.max(0,GY-y)/Math.max(1,GY-TOP)*Math.PI*1.25);
 /* Layout for any tree: limbs alternate sides, the lowest reaching widest, so they nest and never cross. */
 function gwLayout(units){
  const br=units.filter(u=>!u.root).slice(0,14),rt=units.filter(u=>u.root).slice(0,8);
  const crown=br.length%2===1&&br.length>2?br[br.length-1]:null;const sides=br.filter(u=>u!==crown);
  const per=[sides.filter((_,i)=>i%2===0),sides.filter((_,i)=>i%2===1)];const most=Math.max(1,per[0].length,per[1].length);
- const X=500,STEP=66,TOP=crown?150:96,GY=TOP+Math.max(190,(most-1)*STEP+90),L={};
+ const X=500,STEP=66,TOP=crown?130:70,GY=TOP+Math.max(230,(most-1)*STEP+140),L={};
  /* Tips sit in two neat label columns; the lowest limb leaves the trunk lowest and lands lowest, so limbs nest and never cross. */
  per.forEach((list,side)=>{const dir=side===0?-1:1,n=list.length,xt=X+dir*250;
-  list.forEach((u,j)=>{const lift=n>1?j/(n-1):.5;const yt=Math.round(GY-44-side*STEP/2-j*STEP);const ya=Math.round(GY-70-lift*(GY-70-TOP-30)-side*12);
-   L[u.id]={d:'M'+X+' '+ya+' C'+(X+dir*70)+' '+(ya-26)+' '+(xt-dir*110)+' '+yt+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:3.6-lift*1.4}})});
- if(crown)L[crown.id]={d:'M'+X+' '+(TOP+10)+' C'+(X-2)+' '+(TOP-30)+' '+(X+8)+' '+(TOP-60)+' '+(X+4)+' '+(TOP-92),tip:[X+4,TOP-108],anchor:'middle',crown:true,w:2.2};
+  list.forEach((u,j)=>{const lift=n>1?j/(n-1):.5;const yt=Math.round(GY-96-side*STEP/2-j*STEP);const ya=Math.round(GY-40-lift*(GY-40-TOP-40)*.78-side*16);const xa=gwSway(X,GY,TOP,ya);
+   L[u.id]={d:'M'+xa.toFixed(1)+' '+ya+' C'+(xa+dir*60).toFixed(1)+' '+(ya-14)+' '+(xt-dir*120)+' '+(yt+28)+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:4.2-lift*2,pad:[xt-dir*30,yt-6]}})});
+ if(crown){const cx=gwSway(X,GY,TOP,TOP+10);L[crown.id]={d:'M'+cx.toFixed(1)+' '+(TOP+10)+' C'+(cx-2).toFixed(1)+' '+(TOP-30)+' '+(cx+8).toFixed(1)+' '+(TOP-60)+' '+(cx+4).toFixed(1)+' '+(TOP-92),tip:[X+4,TOP-108],anchor:'middle',crown:true,w:2.2,pad:[X+4,TOP-88]}}
  const deep=Math.ceil(rt.length/2);
  rt.forEach((u,j)=>{const dir=j%2===0?-1:1,k=Math.floor(j/2);const xt=X+dir*(240-k*20),yt=GY+56+k*62;
   L[u.id]={d:'M'+(X+dir*4)+' '+(GY+3)+' C'+(X+dir*40)+' '+(GY+40)+' '+(xt-dir*100)+' '+yt+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:2.8,
-   dead:'M'+xt+' '+yt+' C'+(xt-dir*14)+' '+(yt+20)+' '+(xt-dir*30)+' '+(yt+34)+' '+(xt-dir*54)+' '+(yt+46),deadAt:[xt-dir*58,yt+50],dir:-dir}});
+   dead:'M'+xt+' '+yt+' C'+(xt-dir*14)+' '+(yt+20)+' '+(xt-dir*30)+' '+(yt+34)+' '+(xt-dir*54)+' '+(yt+46),deadAt:[xt-dir*60,yt+64],dir:-dir}});
  const H=rt.length?GY+56+(deep-1)*62+70:GY+40;
- return {L,H,X,GY,TOP:crown?TOP:TOP+20,hidden:units.length-br.length-rt.length}}
+ const tops=Object.values(L).filter(g=>!g.dead&&!g.crown).map(g=>+g.d.split(' ')[1]);return {L,H,X,GY,TOP,top:crown?TOP+10:Math.min(GY-40,...tops)-6,hidden:units.length-br.length-rt.length}}
 function gwBuild(){
  const s=gw.state;const lay=gwLayout(s.units);
  const svg=sv('svg',{class:'gw-svg',viewBox:'0 0 1000 '+lay.H,role:'img','aria-label':'The change as a tree: branches are what people use, roots are what it depends on'});
- svg.append(sv('line',{x1:40,y1:lay.GY,x2:960,y2:lay.GY,class:'ground'}),sv('text',{x:44,y:lay.GY-10,class:'glbl'},'BRANCHES · WHAT PEOPLE USE'),sv('text',{x:44,y:lay.GY+22,class:'glbl'},'ROOTS · WHAT IT DEPENDS ON'));
- const G={lay,ids:Object.keys(lay.L).join(','),br:{},lbl:{},pips:{},dead:{},deadLbl:{},leaves:{},cur:{},gBr:sv('g',{}),gLf:sv('g',{}),gCur:sv('g',{})};
- const tr=(f,w)=>sv('path',{d:'M'+lay.X+' '+(lay.GY+4)+' C'+(lay.X-4)+' '+(lay.GY-(lay.GY-lay.TOP)*f*.35)+' '+(lay.X+5)+' '+(lay.GY-(lay.GY-lay.TOP)*f*.7)+' '+lay.X+' '+(lay.GY-(lay.GY-lay.TOP)*f),class:'br trunk',pathLength:1,style:'stroke-width:'+w});
+ svg.append(sv('line',{x1:40,y1:lay.GY,x2:960,y2:lay.GY,class:'ground'}),sv('text',{x:960,y:lay.GY-10,'text-anchor':'end',class:'glbl'},'↑ BRANCHES · WHAT PEOPLE USE'),sv('text',{x:960,y:lay.GY+22,'text-anchor':'end',class:'glbl'},'↓ ROOTS · WHAT IT DEPENDS ON'));
+ const G={lay,ids:Object.keys(lay.L).join(','),br:{},lbl:{},pips:{},dead:{},deadLbl:{},leaves:{},cur:{},gPad:sv('g',{}),gBr:sv('g',{}),gLf:sv('g',{}),gCur:sv('g',{})};
+ const tr=(f,w)=>{const top=lay.GY-(lay.GY-lay.top)*f;let d='';for(let y=lay.GY+4;y>=top;y-=6)d+=(d?' L':'M')+gwSway(lay.X,lay.GY,lay.TOP,y).toFixed(1)+' '+y.toFixed(1);return sv('path',{d,class:'br trunk',pathLength:1,style:'stroke-width:'+w+';stroke-linejoin:round'})};
  G.trunks=[tr(1,5),tr(.62,9),tr(.28,13)];G.gBr.append(...G.trunks);
  s.units.forEach((u,i)=>{const g=lay.L[u.id];if(!g)return;
   const hit=sv('g',{class:'hit','data-unit':u.id,tabindex:0,role:'button','aria-label':u.label+', '+(u.root?'root':'branch')});
   hit.append(sv('path',{d:g.d,stroke:'transparent','stroke-width':18,fill:'none'}));
+  if(g.pad){G.pad=G.pad||{};const [px,py]=g.pad,k=g.crown?.6:1;G.pad[u.id]=sv('g',{class:'pad'},sv('ellipse',{cx:px-30*k,cy:py+3,rx:34*k,ry:14*k}),sv('ellipse',{cx:px,cy:py-5,rx:42*k,ry:18*k}),sv('ellipse',{cx:px+32*k,cy:py+4,rx:30*k,ry:13*k}));G.gPad.append(G.pad[u.id])}
   G.br[u.id]=sv('path',{d:g.d,class:'br '+(u.root?'root':'branch'),pathLength:1,style:'stroke-width:'+g.w.toFixed(1)});hit.append(G.br[u.id]);
   const lb=sv('g',{class:'lbl'});const [x,y]=g.tip;
   lb.append(sv('text',{x,y,'text-anchor':g.anchor},sv('title',{},u.label),(i+1)+'  '+gwCut(u.label,26)),sv('text',{x,y:y+15,'text-anchor':g.anchor,class:'k'},gwCut(u.unitKind+' · '+u.loc.split('/').pop(),32)));
   const px=g.anchor==='end'?x-50:g.anchor==='middle'?x-25:x;G.pips[u.id]=GW.steps.map((_,k)=>{const c=sv('circle',{cx:px+5+k*10,cy:y+27,r:3.6,class:'pip wait'});lb.append(c);return c});
   G.lbl[u.id]=lb;hit.append(lb);G.gBr.append(hit);
-  if(g.dead){G.dead[u.id]=sv('path',{d:g.dead,class:'br dead'});G.deadLbl[u.id]=sv('text',{x:g.deadAt[0],y:g.deadAt[1],'text-anchor':g.dir<0?'start':'end',class:'deadlbl'},'tracing stopped here');G.gBr.append(G.dead[u.id],G.deadLbl[u.id])}});
+  if(g.dead){G.dead[u.id]=sv('path',{d:g.dead,class:'br dead'});G.deadLbl[u.id]=sv('text',{x:g.deadAt[0],y:g.deadAt[1],'text-anchor':g.dir>0?'start':'end',class:'deadlbl'},'tracing stopped here');G.gBr.append(G.dead[u.id],G.deadLbl[u.id])}});
  if(lay.hidden>0)G.gBr.append(sv('text',{x:960,y:lay.GY-10,'text-anchor':'end',class:'more'},'+'+lay.hidden+' more in Outline'));
- svg.append(G.gBr,G.gLf,G.gCur);
+ svg.append(G.gPad,G.gBr,G.gLf,G.gCur);
  const pick=e=>{const t=e.target.closest('[data-unit]');if(t){gw.pinned=t.getAttribute('data-unit');growPaint()}};
  svg.addEventListener('click',pick);svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){pick(e);e.preventDefault()}});
  gw.svg=svg;gw.G=G}
-function gwLeaf(u,i){const p=gw.G.br[u.id];const len=p.getTotalLength();const f=Math.min(.96,.48+i*.075);
+function gwLeaf(u,i){const p=gw.G.br[u.id];const len=p.getTotalLength();const f=u.root?Math.min(.96,.5+i*.09):Math.min(.98,.7+i*.055);
  const a=p.getPointAtLength(len*f-2),b=p.getPointAtLength(len*f+2),m=p.getPointAtLength(len*f);const along=Math.atan2(b.y-a.y,b.x-a.x),side=i%2?1:-1,out=along+side*Math.PI/2.6,off=u.root?9:5;
  return {x:m.x+Math.cos(out)*off,y:m.y+Math.sin(out)*off,rot:out*180/Math.PI}}
 function gwPaintGrove(){
@@ -191,13 +199,14 @@ function gwPaintGrove(){
  const busy=new Set(s.agents.filter(a=>!a.done&&a.unit&&(s.phase===2||s.phase===3||s.phase===5)).map(a=>a.unit));
  for(const t of G.trunks)t.classList.toggle('on',s.trunkAt!==null);
  for(const u of s.units){if(!G.br[u.id])continue;G.br[u.id].classList.add('on');G.br[u.id].classList.toggle('tracing',busy.has(u.id));G.br[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
-  G.lbl[u.id].classList.add('on');G.lbl[u.id].classList.toggle('sel',sel===u.id);G.lbl[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
+  G.lbl[u.id].classList.add('on');if(G.pad&&G.pad[u.id])G.pad[u.id].classList.add('on');G.lbl[u.id].classList.toggle('sel',sel===u.id);G.lbl[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
   (v.depth[u.id]?v.depth[u.id].pips:[]).forEach((st,k)=>G.pips[u.id][k].setAttribute('class','pip '+st));
   const stopped=s.stops.some(x=>x.unit===u.id);if(G.dead[u.id]){G.dead[u.id].classList.toggle('on',stopped);G.deadLbl[u.id].classList.toggle('on',stopped)}}
  const per={};
  for(const sc of s.scenarios){const u=gwUnit(sc.unit);if(!u||!G.br[u.id])continue;const i=per[u.id]=(per[u.id]??-1)+1;let n=G.leaves[sc.id];
-  if(!n){const p=gwLeaf(u,i);n=u.root?sv('circle',{cx:p.x.toFixed(1),cy:p.y.toFixed(1),r:4.6}):sv('path',{d:'M0 0 C4 -6 11 -6 14 0 C11 6 4 6 0 0Z',transform:'translate('+p.x.toFixed(1)+' '+p.y.toFixed(1)+') rotate('+p.rot.toFixed(0)+')'});
-   n.append(sv('title',{},sc.title));n.style.transformBox='fill-box';n.style.transformOrigin='center';G.leaves[sc.id]=n;G.gLf.append(n);n.classList.add('sprout')}
+  if(!n){const p=gwLeaf(u,i);n=u.root?sv('circle',{cx:0,cy:0,r:4.6}):sv('path',{d:'M0 0 C4 -6 11 -6 14 0 C11 6 4 6 0 0Z'});
+   n.append(sv('title',{},sc.title));n.style.transformBox='fill-box';n.style.transformOrigin=u.root?'center':'left center';G.leaves[sc.id]=n;
+   G.gLf.append(sv('g',{transform:'translate('+p.x.toFixed(1)+' '+p.y.toFixed(1)+') rotate('+(u.root?0:p.rot).toFixed(0)+')'},n));n.classList.add('sprout')}
   const r=s.run[sc.id];const st=!gwIn(sc)?'out':r?(r.st==='not_run'?'none':r.st):'in';
   n.setAttribute('class','lf '+st+(n.classList.contains('sprout')?' sprout':'')+(hl&&sc.criteria.includes(gw.selCrit)?' hl':''))}}
 function growCursors(now){if(!gw.svg||!gw.state||gw.tree!=='grove')return;const s=gw.state;const G=gw.G;const keep=new Set();
@@ -249,16 +258,20 @@ function gwScenarios(){const s=gw.state,v=gw.view;const card=h('section',{class:
   h('div',{class:'gw-modes'+(asked?' ask':''),role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'aria-pressed':String((locked?s.mode:(gw.picking||'min'))===m.id),disabled:!asked,
    on:{click:()=>{gw.picking=m.id;growPick(m.id)}}},h('b',{},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
   h('p',{class:'small muted',style:'margin:8px 0 0'},asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+GW.modes.find(m=>m.id===s.mode).label+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.'));
- const groups=[['happy','Happy path'],['sad','Sad path'],['edge','Edge cases'],['regression','Regression']];
- for(const [k,label] of groups){const all=s.scenarios.filter(x=>x.scenarioKind===k);if(!all.length)continue;const vis=all.filter(gwIn),hid=all.length-vis.length;
-  gwPut(card,h('div',{class:'gw-sgroup'},h('h4',{},h('span',{},label),h('span',{},vis.length+(hid?' · +'+hid+' in a larger mode':''))),vis.map(gwCard),!vis.length?h('p',{class:'gw-empty'},hid+' drafted for '+(k==='regression'?'Max':'Standard')):null))}
+ const parts=[];for(const x of s.scenarios){let g=parts.find(p=>p.unit===x.unit);if(!g)parts.push(g={unit:x.unit,list:[]});g.list.push(x)}
+ for(const g of parts){const u=gwUnit(g.unit);const vis=g.list.filter(gwIn),hid=g.list.length-vis.length;if(!u)continue;
+  gwPut(card,h('div',{class:'gw-sgroup'},h('h4',{},h('span',{style:'text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink)'},(s.units.indexOf(u)+1)+'  '+u.label),h('span',{},vis.length+(hid?' · +'+hid+' in a larger mode':''))),
+   vis.map(gwCard),!vis.length?h('p',{class:'gw-empty'},hid+' drafted for a larger mode'):null))}
  return card}
-function gwCard(x){const s=gw.state;const r=s.run[x.id];const u=gwUnit(x.unit);
- return h('div',{class:'gw-sc'+(r&&r.st==='fail'?' failed':'')},h('div',{class:'rw'},h('span',{class:'t'},x.title),gwBadge(x)),h('span',{class:'p'},x.proves),
-  h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):null,x.criteria.map(c=>h('span',{class:'gw-chip'},c)),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
-   u?h('span',{class:'gw-chip',title:u.loc},u.label):null,x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):null,x.by!=='rules'?h('span',{class:'gw-chip agent'},'by '+x.by):null,
-   x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),
-  x.variants.length?gwLanes(x):null,r&&r.st==='fail'?h('div',{class:'err'},r.why||'failed'):null,r&&r.st==='not_run'&&r.why?h('span',{class:'small muted'},r.why):null)}
+function gwCard(x){const s=gw.state;const r=s.run[x.id];const st=r?r.st:'';
+ const dot=h('i',{class:'gw-dot '+(st==='pass'?'pass':st==='fail'?'fail':st==='run'?'run':'')});
+ return h('details',{class:'gw-sc'+(st==='fail'?' failed':''),open:st==='fail'?true:null},h('summary',{},dot,h('span',{class:'gw-kind'},x.scenarioKind),h('span',{class:'t'},x.title),
+   x.variants.length?h('span',{class:'gw-chip',title:'Runs against a stand-in and, with a key, the real sandbox'},'mock + real'):null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)),
+  h('div',{class:'body'},h('span',{class:'p'},x.proves),
+   h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):null,x.criteria.map(c=>h('span',{class:'gw-chip'},c)),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
+    x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):null,
+    x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),
+   x.variants.length?gwLanes(x):null,r&&r.st==='fail'?h('div',{class:'err'},r.why||'failed'):null,r&&r.st==='not_run'&&r.why?h('span',{class:'small muted'},r.why):null))}
 function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
  const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+(r.ms/1000).toFixed(1)+' s'):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'},'not run');
  const real=x.mockOnly?h('span',{class:'gw-badge'},'mock only'):!v?h('span',{class:'gw-badge'},r&&r.st==='pass'?'next':'after mock'):v.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+(v.ms/1000).toFixed(1)+' s'):h('span',{class:'gw-badge warn'},v.na?'mock only':'skipped');
@@ -293,7 +306,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const kids=[];
  const tree=h('section',{class:'card gw-tree','aria-label':'Tree'},h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},s.units.length+' part'+(s.units.length===1?'':'s')+' · '+s.units.filter(u=>!u.root).length+' branches · '+s.units.filter(u=>u.root).length+' roots'),
   h('span',{class:'row',style:'gap:10px'},gw.tree==='outline'?h('label',{class:'small muted',style:'display:inline-flex;gap:6px;align-items:center'},h('input',{type:'checkbox',checked:gw.onlyGaps,on:{change:e=>{gw.onlyGaps=e.target.checked;growPaint()}}}),'Only gaps'):null,
    h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,on:{click:()=>{gw.tree=t;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
- if(gw.tree==='grove'){gwPaintGrove();tree.append(gw.svg)}else tree.append(gwOutline());
+ if(gw.tree==='grove'){gwPaintGrove();tree.append(h('div',{class:'gw-scrollx'},gw.svg))}else tree.append(gwOutline());
  kids.push(h('div',{class:'gw-main'},h('div',{style:'display:grid;gap:18px;min-width:0'},tree,gwScenarios()),h('div',{class:'gw-side'},gwInspector(),gwSpec(),gwExt())));
  if(s.blocked)kids.push(h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))));
  if(s.done){const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');

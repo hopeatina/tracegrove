@@ -62,7 +62,7 @@ export type GrowEventBody =
   | E<'variant.passed', { scenario: string; ms: number; note: string }>
   | E<'variant.skipped', { scenario: string; note: string }>
   | E<'variant.not_applicable', { scenario: string; note: string }>
-  | E<'discovery.finished', { ran: number; passed: number; failed: number; notRun: number; ms: number }>
+  | E<'discovery.finished', { ran: number; passed: number; failed: number; notRun: number }>
   | E<'discovery.blocked', { code: string; detail: string; action: string }>;
 export type GrowEvent = GrowEventBody & { v: typeof GROW_EVENT_VERSION; seq: number; ms: number };
 export type GrowEventKind = GrowEvent['kind'];
