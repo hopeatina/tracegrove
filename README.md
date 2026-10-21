@@ -2,17 +2,169 @@
 
 # tracegrove
 
-**End-to-end tests that check what your app actually did, not just what it said.**
+**End-to-end tests for your whole stack that check what actually happened.**<br>
+Built from reusable steps, replayable from sealed evidence, and written and repaired by your coding agent.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-2f4a3a)](LICENSE)
 [![npm](https://img.shields.io/npm/v/tracegrove?color=2f4a3a)](https://www.npmjs.com/package/tracegrove)
 [![Node 22](https://img.shields.io/badge/node-22.x-2f4a3a)](#requirements)
 
-[Try it](#try-it-in-one-command) · [Examples](#pick-a-scenario) · [Your app](#use-it-on-your-app) · [Your agent](#hand-it-to-your-coding-agent) · [Docs](#documentation)
+[What's different](#whats-different) · [The whole stack](#one-flow-the-whole-stack) · [Reusable](#reusable-steps-not-copy-paste) · [Replayable](#every-run-is-replayable-evidence) · [Agent native](#agent-native) · [Try it](#try-it-in-one-command) · [Docs](#documentation)
 
 </div>
 
-Your voice agent says *"You're all set, your cleaning is booked."* Your API returns `204` for a delete. Your chatbot promises it only talks about your own orders. Tracegrove drives the app the way a user would, then **reads the result back separately** to see whether any of it is true. Every run leaves evidence that anyone can re-verify later.
+Most tests check what one layer said back. A unit test checks a function's return value. A Playwright test checks a page. A Postman check checks one response. None of them asks whether the work really happened across the rest of your stack: the row in the database, the charge at the payment provider, the email that went out, the record another customer must not see.
+
+Tracegrove drives your app through its real front doors (an API, a browser page, an MCP tool, a phone call or a chat). Then it **reads the result back separately**, at every layer the action touched. A flow is a few lines of YAML that you, or your coding agent, write once. Flows are composed from reusable actions, run unchanged on your laptop, in Docker, on staging or read-only in production, and leave a sealed record that anyone can re-verify later.
+
+```bash
+npx tracegrove try        # nine working examples, from a voice receptionist to SaaS billing; add --bug <name> to watch one get caught
+```
+
+## What's different
+
+| | Unit and integration tests<br><sub>Jest, pytest, supertest</sub> | Browser end-to-end<br><sub>Playwright, Cypress</sub> | API tools<br><sub>Postman, Hurl</sub> | **tracegrove** |
+| --- | --- | --- | --- | --- |
+| What is checked | A function or one response | What the page shows | One response at a time | **The effect**: a separate readback from your backend, plus what your app sent to payments, email or webhooks |
+| Who else is tested | Usually nobody | Usually one logged-in user | Whoever owns the token | **Every persona**: a stranger, another tenant or a revoked user is denied in the same flow |
+| Surfaces in one test | One | Browser | HTTP | **HTTP, browser, MCP tools, voice, chat and background jobs** in one flow |
+| Third-party services | Mocked by hand in code | Out of scope | Real or nothing | **Stand-ins** that record what your app sent and can fail, stall or replay on cue |
+| Where it runs | In-process | Against any URL | Against any URL | **Same flow** locally, in Docker or Compose, on staging, and read-only in production, each with its own safety rules |
+| Clean-up | Your problem | Your problem | Your problem | **Tracked for every resource a flow creates**; on staging, a run whose clean-up can't be confirmed fails |
+| What a run leaves | Pass/fail in a log | Traces and videos | A report | **A sealed, hash-chained bundle** anyone can re-verify, compare and hand to a client |
+| Who writes and fixes it | You | You, or a recorder | You | **Your coding agent too**: it discovers the riskiest untested routes, drafts flows, proves them by running them, and heals drift without weakening a check |
+
+Tracegrove doesn't replace your unit tests or your Playwright suite. It covers what they leave out, which is whether a user-visible action did the right thing to everything behind it.
+
+## One flow, the whole stack
+
+```mermaid
+flowchart LR
+  subgraph drive["Drive it like a user"]
+    H[HTTP API] ~~~ B[Browser page] ~~~ M[MCP tool] ~~~ V[Voice call] ~~~ C[Chat] ~~~ J[Background job]
+  end
+  subgraph app["Your app, started for the run"]
+    A[Node · FastAPI · Django · any command<br>or Docker · Compose · a staging URL]
+  end
+  subgraph world["Check the world behind it"]
+    R[Separate readback] ~~~ S[Stand-ins: payments, email,<br>calendars, CRMs, webhooks] ~~~ P[Other personas denied]
+  end
+  drive --> app --> world --> E[(Sealed evidence)]
+  E --> U[Local UI] & K[PR proof card] & O[Client handoff] & G[Your coding agent]
+```
+
+This flow comes from the `saas-billing` example. A card decline is injected at the payment provider. The flow then checks the plan didn't change in the database, the billing contact got exactly one email, and no invoice was issued:
+
+```yaml
+# tracegrove/billing/card-declined.flow.yaml
+title: A declined card keeps the old plan, flags the account and emails the billing contact
+risk: critical
+steps:
+  - name: the processor declines the card
+    standin: payments
+    fail: { route: POST /v1/charges, status: 402, times: 1 }
+  - name: owner tries to upgrade
+    POST: /subscription
+    json: { plan: team }
+    expect: { status: 402, json: { error: payment_failed } }
+  - name: the plan didn't change          # a separate read, not the response above
+    GET: /account
+    observe: true
+    expect: { status: 200, json: { account.plan: starter, account.dunning: true } }
+  - name: the billing contact got one payment-failed email
+    standin: email
+    received: POST /send
+    expect: { calls: 1, json: { "calls[0].json.template": payment_failed } }
+  - name: no invoice was issued
+    GET: /invoices
+    observe: true
+    expect: { status: 200, json: { invoices: [] } }
+```
+
+| Layer | What tracegrove supports |
+| --- | --- |
+| **How a flow drives the app** | HTTP requests · Chromium page actions with video · MCP tool calls · voice calls over RTVI (Pipecat) · HTTP chat · native background jobs |
+| **How the app is started** | Node, FastAPI and Django detected by `init` · any start command · Docker image · Docker Compose · an already deployed URL (preview, staging, production) |
+| **Services your app calls** | `standIns:` record every request to payments, email, calendars, CRMs and automation webhooks, and inject failures, stalls and webhook replays |
+| **Who is acting** | Named personas per flow (`as: intruder`); secrets from env vars, files, AWS Secrets Manager, 1Password or a test-persona broker, never written to disk |
+| **Where results go** | Local UI · `--json` / `--jsonl` for scripts and agents · a proof card on every pull request · a client-ready HTML handoff · an encrypted, sealed archive |
+| **Evidence you already have** | `import-observations` keeps Playwright JSON and JUnit XML reports beside tracegrove's own, clearly marked as imported |
+
+## Reusable steps, not copy-paste
+
+Any sequence of steps can become an **action**: a file with inputs and outputs that flows call with `use:`. Actions can call other actions. They expand into ordinary steps when flows are compiled, so a step inside an action is executed, checked and sealed like any hand-written one.
+
+```yaml
+# tracegrove/actions/billing/upgrade.action.yaml  →  the action billing.upgrade
+title: Upgrade the account and confirm it stuck
+inputs: { plan: team }
+outputs: [invoiceId]
+routes: [POST /subscription, GET /account]
+steps:
+  - name: upgrade
+    POST: /subscription
+    json: { plan: "{plan}" }
+    expect: { status: 200 }
+    save: { invoiceId: invoice.id }
+  - name: the plan changed
+    GET: /account
+    observe: true
+    expect: { status: 200, json: { account.plan: "{plan}" } }
+```
+
+```yaml
+# tracegrove/composed/invoice-privacy.flow.yaml
+title: An invoice from an upgrade is private to its account
+steps:
+  - use: billing.upgrade
+    with: { plan: team }
+  - name: the other tenant can't see it
+    GET: /invoices/{invoiceId}
+    as: other_tenant
+    expect: { status: 404, absent: [invoice] }
+```
+
+- **One flow, many places.** `tracegrove test --env staging` runs the same files against staging with staging's personas. Flows that write are refused in production before they start.
+- **One flow, many people.** `as:` swaps the persona on any step, so "the owner can and the stranger can't" is two lines, not two test files.
+- **What's learned is kept.** `discover --save` writes `tracegrove/catalog.yaml`: every route, the file that handles it, the actions that reach it and the run that confirmed it. A fresh clone, a teammate and the next agent all start from there, not from scratch.
+
+## Every run is replayable evidence
+
+Every run writes a bundle under `.tracegrove/runs/<run>/`: the frozen request, each step's observation, the app's source digest and a hash chain over all of it.
+
+```bash
+npx tracegrove verify-bundle --bundle .tracegrove/runs/<run>/bundle   # re-derive the verdict from the bytes
+npx tracegrove compare --baseline <old>/bundle --candidate <new>/bundle
+npx tracegrove rerun --request <request.json> --output <new.json>     # a fresh attempt on the same frozen cases
+npx tracegrove handoff --client "Acme"                               # one HTML page with every claim and readback
+npx tracegrove seal --run latest --out run.sealed                    # encrypt it to send or archive
+```
+
+- **Re-verify instead of trusting a green tick.** A reviewer, a client or CI can recheck a run without rerunning your app.
+- **Compare across commits.** `compare` lines up two verified runs case by case and says what changed: outcome, contract or selection.
+- **Know when evidence is stale.** Each claim records the source it ran against. Change the code or the check and its sign-off has to be given again (`tracegrove readiness`).
+- **Watch it back.** Browser steps keep a video, voice and chat steps keep the full transcript with tool calls, and the UI's History tab shows every scenario across every run.
+
+## Agent native
+
+Tracegrove was built for coding agents to drive. The person reviews the evidence.
+
+- **An MCP server that works before setup.** `tracegrove mcp` gives Claude Code, Codex or any MCP client `status`, `init`, `discover`, `draft`, `test`, `heal`, `readiness`, `challenge_check` and environment tools. It works in a repo that has never seen tracegrove.
+- **Risk-ranked discovery.** `discover` reads routes from code, the catalog and traffic the app actually served. It lists the riskiest untested ones first: writes, money, permissions and personal data.
+- **Drafts are proven, not just written.** `draft` has Claude Code or Codex write flows. Tracegrove checks them, runs each one end to end and sends failures back for up to two repairs. A draft that never passed is never presented as done.
+- **Heal without cheating.** `heal` fixes setup mistakes and drifted tests, keeps only fixes that pass on re-run, and reports real product bugs instead of editing them away. An agent that disagrees with a check files `challenge_check`, which keeps the claim open for a person.
+- **Agents can't sign off.** `accept` is for people. Each environment sets whether agents may run there (`allow`, `ask` or `deny`), and nothing writes to production.
+- **A stable contract.** Every command takes `--json`. Exit codes are fixed: `0` passed, `1` a check failed, `2` blocked (fix setup, don't retry), `3` infrastructure failed, `4` cancelled.
+
+## What this makes possible
+
+- Prove that a voice agent's *"you're all set"* actually wrote the booking, and that it says *"we'll call you back"* when the booking system is down.
+- Catch a double charge, a trusted client-side price or a replayed webhook before merge. The payments stand-in recorded what your app sent.
+- Show in one flow that a patient sees their own results, another patient gets a 404, the chart read was audited, and no SSN reached the saved evidence.
+- Point an agent at a repo with no tests, and get back flows for its riskiest routes that have already passed.
+- Run the morning's flows against staging with real secret-store identities, and the same flows read-only against production.
+- Put a proof card on every pull request that says which claims hold on this exact commit, with evidence a reviewer can re-verify.
+- Send a client one page that shows what was tested, what passed, and who signed off.
 
 ## Try it in one command
 
@@ -87,6 +239,7 @@ steps:
 ```
 
 Each run starts your app with a fresh data folder and test identities, then cleans up. `init` supports Node, FastAPI and Django apps today. Your app needs a test-only way to accept those identities; [Getting started](docs/getting-started.md) shows how.
+
 
 <details>
 <summary><b>Voice agents and chatbots</b></summary>
@@ -266,7 +419,8 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
 | [PR proof card](docs/pr-proof-card.md) | The GitHub Action and `tracegrove card` |
 | [Security](docs/security.md) | Credentials, redaction, sealed runs |
-| [Agent guide](docs/agent-guide.md) | JSON contracts for coding agents |
+| [Agent guide](docs/agent-guide.md) | JSON contracts for coding agents, [reusable actions and the catalog](docs/agent-guide.md#reusable-actions-and-the-catalog) |
+| [Replay comparison](docs/replay-comparison.md) · [Imported observations](docs/native-observation-import.md) | Comparing runs; keeping Playwright and JUnit reports as evidence |
 | [Browser driver](docs/browser-driver.md) · [MCP driver](docs/mcp-driver.md) · [Native jobs](docs/native-jobs.md) | Other surfaces |
 | [Verified bundles](docs/verified-bundles.md) | What the evidence proves and doesn't |
 | [Architecture](docs/architecture.md) | How a run flows through the compiler, planner, executor and reducer |
