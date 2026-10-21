@@ -43,82 +43,68 @@ const paint = (l: Line, color: boolean) => l.map(([st, t]) => (color && st ? `\x
 export const CW = 56;
 const TRUNK_X = 28;
 type Pt = [number, number];
-type Cell = { x: number; y: number; g: string; f: number; dx: number; dy: number };
+/** One drawn cell of a limb, in growth order: `f` is how far along the limb it sits (0 at the trunk, 1 at the tip). */
+type Cell = { x: number; y: number; g: string; f: number };
+const along = (pts: Array<[number, number, string]>): Cell[] => pts.map(([x, y, g], i) => ({ x, y, g, f: pts.length > 1 ? i / (pts.length - 1) : 1 }));
 
-/** Rasterize a polyline to grid cells, choosing the stroke from the move to the next cell. */
-export function cellsOf(pts: Pt[]): Cell[] {
-  const out: Pt[] = [];
-  for (let i = 1; i < pts.length; i++) {
-    let [x0, y0] = pts[i - 1]!; const [x1, y1] = pts[i]!;
-    const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx - dy;
-    for (;;) {
-      const last = out.at(-1);
-      if (!last || last[0] !== x0 || last[1] !== y0) out.push([x0, y0]);
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err; if (e2 > -dy) { err -= dy; x0 += sx; } if (e2 < dx) { err += dx; y0 += sy; }
-    }
-  }
-  return out.map(([x, y], i, a) => {
-    const prev = a[i - 1]; const nextPt = a[i + 1] ?? [x + (x - (prev?.[0] ?? x)), y + (y - (prev?.[1] ?? y))] as Pt;
-    const dr = nextPt[1] - y, dc = nextPt[0] - x;
-    const g = dr === 0 ? '_' : dc === 0 ? '|' : (dr < 0) === (dc > 0) ? '/' : '\\';
-    return { x, y, g, f: a.length > 1 ? i / (a.length - 1) : 1, dx: dc, dy: dr };
-  });
-}
-
-export type Geometry = { ground: number; height: number; trunk: Cell[]; limbs: Map<string, Cell[]>; tips: Map<string, Pt>; dead: Map<string, Cell[]>; shown: GrowUnit[] };
+export type Geometry = { ground: number; height: number; top: number; limbs: Map<string, Cell[]>; tips: Map<string, Pt>; pads: Map<string, { y: number; from: number; dir: number }>; dead: Map<string, Cell[]>; joins: Map<number, string>; shown: GrowUnit[] };
 const MAX_BRANCHES = 12; const MAX_ROOTS = 6;
 
 /**
- * Lay out limbs for any number of units: branches fan from low and wide to high and upright, starting
- * lower on the trunk the wider they reach; roots fan below the soil. Deterministic for a given tree.
+ * A tiered bonsai for any number of units. Each branch gets its own row, left and right alternating, so
+ * limbs never cross; the lowest reach widest and the highest are short, which gives the tree its taper.
+ * A limb leaves the trunk, turns up once with a rounded elbow, and runs out to a foliage pad that holds
+ * one leaf per scenario. Roots mirror it below the soil, in gold.
  */
 export function layout(units: GrowUnit[]): Geometry {
   const branches = units.filter((u) => !u.root).slice(0, MAX_BRANCHES);
   const roots = units.filter((u) => u.root).slice(0, MAX_ROOTS);
-  const ground = 13; const height = ground + (roots.length ? 9 : 2);
-  const top = ground - 7;
-  const trunk = cellsOf([[TRUNK_X, ground], [TRUNK_X, ground - 3], [TRUNK_X + 1, ground - 4], [TRUNK_X, ground - 6], [TRUNK_X, top]]);
-  const limbs = new Map<string, Cell[]>(); const tips = new Map<string, Pt>(); const dead = new Map<string, Cell[]>();
-  // Branches alternate left and right. On each side the lowest limb reaches widest and the highest is
-  // shortest and most upright, so limbs nest like a real bonsai's and never cross. With an odd count
-  // the last one crowns the trunk.
   const crown = branches.length % 2 === 1 && branches.length > 2 ? branches.at(-1)! : null;
   const sides = branches.filter((u) => u !== crown);
   const perSide = [sides.filter((_, i) => i % 2 === 0), sides.filter((_, i) => i % 2 === 1)];
+  const most = Math.max(1, perSide[0]!.length, perSide[1]!.length);
+  const top = crown ? 3 : 1;
+  const ground = top + 2 * most + 3;
+  const height = ground + 1 + (roots.length ? 2 * Math.ceil(roots.length / 2) + 1 : 0);
+  const limbs = new Map<string, Cell[]>(); const tips = new Map<string, Pt>(); const pads = new Map<string, { y: number; from: number; dir: number }>();
+  const dead = new Map<string, Cell[]>(); const joins = new Map<number, string>();
   perSide.forEach((list, side) => {
     const dir = side === 0 ? -1 : 1;
     list.forEach((u, j) => {
-      const n = list.length;
-      const ys = Math.max(top, ground - 2 - side - j * Math.max(1, Math.floor(6 / Math.max(1, n - 1 || 1))));
-      const lift = j / Math.max(1, n - 1 || 1);
-      const reach = Math.round(23 - lift * 11 - (n > 4 ? j : 0));
-      const xs = TRUNK_X + (dir > 0 ? 1 : 0);
-      const ex = xs + dir * 2, ey = ys - 2;
-      const xt = Math.max(2, Math.min(CW - 3, TRUNK_X + dir * reach));
-      const yt = Math.max(1, Math.round(ey - 1 - lift * Math.max(1, ey - 3)));
-      limbs.set(u.id, cellsOf([[xs, ys], [ex, ey], [Math.round((ex + xt) / 2), Math.round((ey + yt) / 2 + 0.5)], [xt, yt]]));
-      tips.set(u.id, [xt + dir * 2, yt]);
+      const n = list.length; const lift = n > 1 ? j / (n - 1) : 0.5;
+      const y = ground - 3 - side - j * 2;
+      const reach = Math.round(22 - lift * 12);
+      // Out from the trunk along its own row, the tip curling up into the pad above it.
+      const pts: Array<[number, number, string]> = [];
+      for (let x = TRUNK_X + dir; Math.abs(x - TRUNK_X) < reach; x += dir) pts.push([x, y, lift > 0.6 ? '─' : '━']);
+      const end = TRUNK_X + dir * reach;
+      pts.push([end, y, dir < 0 ? '╰' : '╯']);
+      limbs.set(u.id, along(pts)); joins.set(y, (joins.get(y) ?? '') + (dir < 0 ? 'L' : 'R'));
+      pads.set(u.id, { y: y - 1, from: end, dir: -dir });
+      tips.set(u.id, [end + 2 * dir, y]);
     });
   });
-  if (crown) { limbs.set(crown.id, cellsOf([[TRUNK_X, top], [TRUNK_X, top - 2], [TRUNK_X + 2, 2], [TRUNK_X + 2, 1]])); tips.set(crown.id, [TRUNK_X + 2, 0]); }
-  const nr = roots.length;
+  if (crown) {
+    limbs.set(crown.id, along([[TRUNK_X, top + 2, '│'], [TRUNK_X, top + 1, '│']]));
+    pads.set(crown.id, { y: top, from: TRUNK_X - 2, dir: 1 });
+    tips.set(crown.id, [TRUNK_X + 4, top]);
+  }
   roots.forEach((u, j) => {
-    const dir = j % 2 === 0 ? -1 : 1; const k = Math.floor(j / 2); const deep = Math.ceil(nr / 2);
-    const xs = TRUNK_X + (dir > 0 ? 2 : -1), ys = ground + 1;
-    const reach = Math.round(21 - k * (12 / Math.max(1, deep)));
-    const yt = Math.min(height - 2, ground + 2 + k * 2);
-    const xt = Math.max(2, Math.min(CW - 3, TRUNK_X + dir * reach));
-    const ex = xs + dir * 2, ey = ys + 1;
-    limbs.set(u.id, cellsOf([[xs, ys], [ex, ey], [Math.round((ex + xt) / 2), Math.round((ey + yt) / 2)], [xt, yt]]));
-    tips.set(u.id, [xt + dir * 2, yt]);
-    dead.set(u.id, cellsOf([[xt, yt], [xt + dir * 2, Math.min(height - 1, yt + 1)], [xt + dir * 4, Math.min(height - 1, yt + 2)]]));
+    const dir = j % 2 === 0 ? -1 : 1; const k = Math.floor(j / 2);
+    const y = ground + 2 + k * 2;
+    const reach = Math.round(20 - k * 5);
+    const pts: Array<[number, number, string]> = [];
+    for (let x = TRUNK_X + dir; Math.abs(x - TRUNK_X) <= reach; x += dir) pts.push([x, y, '─']);
+    limbs.set(u.id, along(pts)); joins.set(y, (joins.get(y) ?? '') + (dir < 0 ? 'l' : 'r'));
+    const end = TRUNK_X + dir * (reach + 1);
+    dead.set(u.id, along([[end, y, '╌'], [end + dir, y, '╌'], [end + 2 * dir, y, '✕']]));
+    pads.set(u.id, { y, from: end - dir, dir });
+    tips.set(u.id, [end + 4 * dir, y]);
   });
-  return { ground, height, trunk, limbs, tips, dead, shown: [...branches, ...roots] };
+  return { ground, height, top, limbs, tips, pads, dead, joins, shown: [...branches, ...roots] };
 }
 
 const ease = (g: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, g)), 3);
-const ASPECT = 2.1;
 
 export function tracing(s: GrowState): Set<string> {
   return new Set(s.agents.filter((a) => !a.done && a.unit && (s.phase === 2 || s.phase === 3 || s.phase === 5)).map((a) => a.unit!));
@@ -128,53 +114,59 @@ function canvas(s: GrowState, geo: Geometry, elapsed: number): Line[] {
   const ch = Array.from({ length: geo.height }, () => new Array<string>(CW).fill(' '));
   const col = Array.from({ length: geo.height }, () => new Array<Style>(CW).fill(''));
   const put = (x: number, y: number, c: string, st: Style) => {
-    const r = Math.round(y), k = Math.round(x); if (r < 0 || r >= geo.height || k < 0 || k >= CW) return;
-    if (ch[r]![k] === ' ' || (RANK[st] ?? 0) >= (RANK[col[r]![k]!] ?? -1)) { ch[r]![k] = c; col[r]![k] = st; }
+    if (y < 0 || y >= geo.height || x < 0 || x >= CW) return;
+    if (ch[y]![x] === ' ' || (RANK[st] ?? 0) >= (RANK[col[y]![x]!] ?? -1)) { ch[y]![x] = c; col[y]![x] = st; }
   };
-  const draw = (cells: Cell[], g: number, st: Style, dotted = false) => cells.forEach((p, i) => { if (p.f > g || (dotted && i % 2)) return; put(p.x, p.y, dotted ? (p.g === '_' ? '.' : p.g === '|' ? ':' : p.g) : p.g, st); });
-  const at = (cells: Cell[], f: number) => cells[Math.min(cells.length - 1, Math.max(0, Math.round(f * (cells.length - 1))))]!;
-  for (let k = 2; k < CW - 2; k++) put(k, geo.ground, k % 2 ? '~' : '-', 'frame');
+  const busy = tracing(s);
+  const highest = Math.min(geo.ground - 1, ...[...geo.joins.keys()].filter((y) => y < geo.ground));
+  // Soil, then the trunk: thick and flared at the base, with a joint wherever a limb leaves it.
+  for (let k = 2; k < CW - 2; k++) put(k, geo.ground, k % 3 ? '─' : '┈', 'frame');
   if (s.trunkAt !== null) {
     const g = ease((elapsed - s.trunkAt) / 900);
-    draw(geo.trunk, g, 'bark');
-    for (const p of geo.trunk) { if (p.f > g || p.f > 0.5) break; put(p.x + 1, p.y, '|', 'bark'); }
-    if (g > 0.1) { put(TRUNK_X - 1, geo.ground, '/', 'bark'); put(TRUNK_X + 2, geo.ground, '\\', 'bark'); }
-  }
-  const busy = tracing(s); const grown = new Map<string, number>();
-  for (const u of geo.shown) {
-    const cells = geo.limbs.get(u.id)!;
-    const g = ease((elapsed - u.foundAt) / 1100); grown.set(u.id, g);
-    draw(cells, g, busy.has(u.id) ? 'gold' : u.root ? 'root' : 'bark');
-    if (g >= 1 && s.stops.some((x) => x.unit === u.id) && geo.dead.has(u.id)) {
-      const stopAt = s.stops.find((x) => x.unit === u.id) ? s.ms : elapsed;
-      draw(geo.dead.get(u.id)!, ease((elapsed - Math.min(stopAt, elapsed)) / 900 + 0.4), 'fail', true);
+    const crownTop = geo.shown.some((u) => !u.root) && geo.limbs.get(geo.shown.filter((u) => !u.root).at(-1)!.id)?.[0]?.x === TRUNK_X ? geo.top + 3 : highest;
+    const span = geo.ground - crownTop;
+    for (let y = geo.ground - 1; y >= crownTop; y--) {
+      if ((geo.ground - y) / Math.max(1, span) > g) break;
+      const j = geo.joins.get(y) ?? '';
+      put(TRUNK_X, y, j.includes('L') && j.includes('R') ? '╋' : j.includes('L') ? '┫' : j.includes('R') ? '┣' : '┃', 'bark');
+    }
+    if (g > 0.05) { put(TRUNK_X - 1, geo.ground, '╱', 'bark'); put(TRUNK_X, geo.ground, '┻', 'bark'); put(TRUNK_X + 1, geo.ground, '╲', 'bark'); }
+    const rootRows = [...geo.joins.keys()].filter((y) => y > geo.ground);
+    if (rootRows.length && g >= 1) for (let y = geo.ground + 1; y <= Math.max(...rootRows); y++) {
+      const j = geo.joins.get(y) ?? '';
+      put(TRUNK_X, y, j.includes('l') && j.includes('r') ? '┼' : j.includes('l') ? '┤' : j.includes('r') ? '├' : '│', 'root');
     }
   }
-  // Foliage: a clump per scenario, alternating sides along the outer part of its limb.
+  const grown = new Map<string, number>();
+  for (const u of geo.shown) {
+    const g = ease((elapsed - u.foundAt) / 1100); grown.set(u.id, g);
+    const tone: Style = busy.has(u.id) ? 'gold' : u.root ? 'root' : 'bark';
+    for (const p of geo.limbs.get(u.id)!) if (p.f <= g) put(p.x, p.y, p.g, tone);
+    if (g >= 1 && geo.dead.has(u.id) && s.stops.some((x) => x.unit === u.id)) for (const p of geo.dead.get(u.id)!) put(p.x, p.y, p.g, 'fail');
+  }
+  // Foliage: one leaf per scenario on the pad above the limb's end, drafted in moss, then green or red once it runs.
   const per = new Map<string, number>();
   for (const sc of s.scenarios) {
-    const cells = geo.limbs.get(sc.unit); const g = grown.get(sc.unit);
-    if (!cells || !g || g < 1) continue;
-    const i = (per.get(sc.unit) ?? -1) + 1; per.set(sc.unit, i);
+    const pad = geo.pads.get(sc.unit); if (!pad || (grown.get(sc.unit) ?? 0) < 1) continue;
     const unit = geo.shown.find((u) => u.id === sc.unit)!;
-    const p = at(cells, Math.min(1, 0.6 + i * 0.12)), side = i % 2 ? 1 : -1;
-    const vx = p.dx, vy = p.dy * ASPECT, L = Math.hypot(vx, vy) || 1, nx = -vy / L * side, ny = vx / L * side / ASPECT;
-    const lx = p.x + nx * 1.3, ly = p.y + ny * 1.3 - (unit.root ? 0 : 0.4);
+    const i = (per.get(sc.unit) ?? -1) + 1; per.set(sc.unit, i);
     const r = s.run[sc.id]; const st = !inMode(s, sc) ? 'out' : r ? r.st : 'in';
-    const color: Style = st === 'pass' ? 'leaf' : st === 'fail' ? 'fail' : st === 'run' ? 'gold' : 'moss';
-    if (unit.root) { put(lx, ly, st === 'out' ? '·' : st === 'pass' || st === 'fail' ? '●' : '∘', color); continue; }
-    if (st === 'out') { put(lx, ly, '·', 'frame'); continue; }
-    const d = nx >= 0 ? 1 : -1;
-    put(lx, ly, st === 'run' ? SPIN[Math.floor(elapsed / 90) % SPIN.length]! : '&', color); put(lx + d, ly, '&', color); put(lx + 2 * d, ly, '&', color); put(lx + d, ly - 1, '&', color);
+    const tone: Style = st === 'pass' ? 'leaf' : st === 'fail' ? 'fail' : st === 'run' ? 'gold' : st === 'out' ? 'frame' : 'moss';
+    const glyph = st === 'run' ? SPIN[Math.floor(elapsed / 90) % SPIN.length]! : st === 'out' ? '·' : unit.root ? (st === 'pass' ? '●' : st === 'fail' ? '✕' : '∘') : '&';
+    if (unit.root) { put(pad.from - pad.dir * i, pad.y + 1, glyph, tone); continue; }
+    put(pad.from + pad.dir * i, pad.y, glyph, tone);
   }
+  // Numbers at the tips, matching the ledger.
   geo.shown.forEach((u, i) => {
     if ((grown.get(u.id) ?? 0) < 1) return;
     const [x, y] = geo.tips.get(u.id)!; const label = String(i + 1);
     chars(label).forEach((c, k) => put(x + k - (x < TRUNK_X ? label.length - 1 : 0), y, c, busy.has(u.id) || s.focus === u.id ? 'gold' : 'b'));
   });
+  // A tracer is a gold diamond running out along the limb it is reading.
   for (const id of busy) {
     const cells = geo.limbs.get(id); if (!cells || (grown.get(id) ?? 0) < 1) continue;
-    const p = at(cells, 0.15 + 0.85 * ((elapsed / 1500 + Number(id.slice(1)) * 0.27) % 1)); put(p.x, p.y, '◆', 'gold');
+    const f = 0.15 + 0.85 * ((elapsed / 1500 + Number(id.slice(1)) * 0.27) % 1);
+    const p = cells[Math.min(cells.length - 1, Math.round(f * (cells.length - 1)))]!; put(p.x, p.y, '◆', 'gold');
   }
   return ch.map((row, r) => { const line: Line = []; let cur: Style | null = null; let buf = '';
     row.forEach((c, k) => { const st = col[r]![k]!; if (st !== cur) { if (buf) line.push([cur ?? '', buf]); buf = ''; cur = st; } buf += c; });
@@ -240,7 +232,7 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
   shownBranches.slice(0, geo.ground - 2).forEach((u) => ledger.push(led(u)));
   if (shownBranches.length > geo.ground - 2) ledger.push([['dim', `   +${shownBranches.length - (geo.ground - 2)} more branches`]]);
   while (ledger.length < geo.ground) ledger.push([]);
-  ledger.push([['frame', '─'.repeat(10)], ['dim', c ? ` ${c.pr ? `PR #${c.pr}` : c.head ?? c.branch}` : '']]);
+  ledger.push([['frame', '┈'.repeat(RW)]]);
   ledger.push([['root', 'ROOTS'], ['ital', '  what it depends on']]);
   s.units.filter((u) => u.root).forEach((u) => ledger.push(led(u)));
   if (!s.units.some((u) => u.root) && s.phase >= 2) ledger.push([['dim', '   none: no table, cache or third party in the change']]);
@@ -284,20 +276,24 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
   // The scenarios in the chosen mode, with their mock and real lanes.
   if (s.modeBy) {
     const list = s.scenarios.filter((x) => inMode(s, x));
-    const room = view.height ? Math.max(3, view.height - L.length - 8) : list.length;
+    const room = view.height ? Math.max(3, view.height - L.length - 8) : list.length * 2;
     const TITLE = Math.max(20, IN - 51);
     L.push(one([]));
-    L.push(one([['dim', `  ${'kind'.padEnd(11)}${'scenario'.padEnd(TITLE + 1)}${'spec'.padEnd(9)}${'mock'.padEnd(13)}real`]]));
-    for (const x of list.slice(0, room)) {
+    L.push(one([['dim', `     ${'kind'.padEnd(8)}${'scenario'.padEnd(TITLE + 1)}${'spec'.padEnd(9)}${'mock'.padEnd(13)}real`]]));
+    let shown = 0, drawn = 0, lastUnit: string | null = null;
+    for (const x of list) {
+      if (shown >= room) break;
+      if (x.unit !== lastUnit) { const u = s.units.find((y) => y.id === x.unit); lastUnit = x.unit; if (u) { L.push(one([['b', String(s.units.indexOf(u) + 1).padStart(2)], ['', ` ${u.label}`], ['dim', `  ${u.unitKind} · ${u.loc}`]])); shown++; } }
+      shown++; drawn++;
       const r = s.run[x.id]; const v = s.real[x.id];
       const mk: Seg = !r ? ['dim', '○'] : r.st === 'run' ? ['root', sp] : r.st === 'pass' ? ['leaf', '✓'] : r.st === 'fail' ? ['fail', '✕'] : ['dim', '–'];
       const mock: Seg = !r ? ['dim', '·'] : r.st === 'run' ? ['root', 'running'] : r.st === 'pass' ? ['leaf', secs(r.ms)] : r.st === 'fail' ? ['fail', 'failed'] : ['dim', x.flow ? 'not run' : 'no flow yet'];
       const real: Seg = !x.variants.length ? ['', ''] : x.mockOnly ? ['dim', 'mock only'] : !v ? ['dim', '·'] : v.st === 'pass' ? ['leaf', `✓ ${secs(v.ms)} sandbox`] : ['root', v.na ? 'mock only' : 'skipped: no key'];
       const agentMade = x.ext.some((e) => s.ext[e] && s.ext[e]!.state !== 'proven');
-      L.push(one([mk, ['dim', ` ${x.scenarioKind.padEnd(10)} `], ['', pad(x.title, TITLE - 2)], agentMade ? ['root', ' ✎'] : ['', '  '], ['dim', ` ${pad(x.criteria.join(' '), 8)} `], ...fit([mock], 12), ['', ' '], real]));
+      L.push(one([['', '   '], mk, ['dim', ` ${x.scenarioKind.padEnd(7)} `], ['', pad(x.title, TITLE - 2)], agentMade ? ['root', ' ✎'] : ['', '  '], ['dim', ` ${pad(x.criteria.join(' '), 8)} `], ...fit([mock], 12), ['', ' '], real]));
       if (r?.st === 'fail' && r.why) L.push(one([['fail', `    ${r.why}`]]));
     }
-    if (list.length > room) L.push(one([['dim', `  +${list.length - room} more scenarios`]]));
+    if (drawn < list.length) L.push(one([['dim', `  +${list.length - drawn} more scenarios in the log`]]));
   }
   // The result.
   if (s.blocked) { L.push(one([])); L.push(one([['fail', `✕ ${s.blocked.code}`], ['', ` ${s.blocked.detail}`]])); L.push(one([['dim', `  fix: ${s.blocked.action}`]])); }

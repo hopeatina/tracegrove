@@ -28,7 +28,8 @@ export const GROVE_CSS = String.raw`
 @media (max-width:1060px){.gw-main{grid-template-columns:minmax(0,1fr)}}
 .gw-side{display:grid;gap:18px;min-width:0}
 .gw-tree{padding:12px 12px 6px;min-width:0}
-.gw-tree .bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin:0 4px 6px}
+
+.gw-tree .gw-bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin:0 4px 6px}
 .gw-tree .seg2{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
 .gw-tree .seg2 button{border:0;background:var(--paper);min-height:32px;padding:0 12px;font-size:13px;color:var(--ink3)}
 .gw-tree .seg2 button[aria-pressed=true]{background:var(--sel);color:var(--ink);font-weight:500}
@@ -37,10 +38,10 @@ export const GROVE_CSS = String.raw`
 .gw-svg .glbl{font:500 10.5px var(--mono);letter-spacing:.08em;fill:var(--muted)}
 .gw-svg .br{fill:none;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1.1s cubic-bezier(.2,.7,.2,1),stroke .3s,opacity .3s}
 .gw-svg .br.on{stroke-dashoffset:0}
-.gw-svg .br.trunk{stroke:var(--trunk);stroke-width:10}
+.gw-svg .br.trunk{stroke:var(--trunk)}
 .gw-svg .br.branch{stroke:var(--trunk);stroke-width:3.4}
 .gw-svg .br.root{stroke:var(--gold);stroke-width:2.8}
-.gw-svg .br.tracing{stroke:var(--gold);stroke-width:4}
+.gw-svg .br.tracing{stroke:var(--gold)}
 .gw-svg .br.dead{stroke:var(--verm);stroke-width:2.2;stroke-dasharray:6 6;stroke-dashoffset:0;opacity:0}
 .gw-svg .br.dead.on{opacity:1}
 .gw-svg .lbl{opacity:0;transition:opacity .45s}.gw-svg .lbl.on{opacity:1}
@@ -139,34 +140,37 @@ const gwScen=id=>gw.state.scenarios.find(s=>s.id===id);
 const gwRank={min:0,std:1,max:2};
 const gwIn=s=>gwRank[s.mode]<=gwRank[gw.state.mode];
 const gwSel=()=>gw.pinned||gw.state.focus;
+const gwPut=(el,...k)=>{for(const x of k.flat(Infinity))if(x!==null&&x!==undefined&&x!==false)el.append(x)};
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 
 /* Layout for any tree: limbs alternate sides, the lowest reaching widest, so they nest and never cross. */
 function gwLayout(units){
  const br=units.filter(u=>!u.root).slice(0,14),rt=units.filter(u=>u.root).slice(0,8);
- const X=500,GY=360,TOP=246,L={};const crown=br.length%2===1&&br.length>2?br[br.length-1]:null;const sides=br.filter(u=>u!==crown);
- [sides.filter((_,i)=>i%2===0),sides.filter((_,i)=>i%2===1)].forEach((list,side)=>{const dir=side===0?-1:1,n=list.length;
-  list.forEach((u,j)=>{const lift=n>1?j/(n-1):0;const ys=Math.round(GY-20-side*10-lift*(GY-20-TOP-10));const reach=Math.round(300-lift*150);
-   const xt=X+dir*reach,yt=Math.round(Math.max(54,ys-48-lift*(ys-110)));
-   L[u.id]={d:'M'+(X+dir*4)+' '+ys+' C'+(X+dir*46)+' '+(ys-34)+' '+(xt-dir*reach*.42)+' '+(yt+18)+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start'}})});
- if(crown)L[crown.id]={d:'M'+X+' '+TOP+' C'+(X-2)+' 190 '+(X+12)+' 130 '+(X+6)+' 70',tip:[X+6,52],anchor:'middle',crown:true};
+ const crown=br.length%2===1&&br.length>2?br[br.length-1]:null;const sides=br.filter(u=>u!==crown);
+ const per=[sides.filter((_,i)=>i%2===0),sides.filter((_,i)=>i%2===1)];const most=Math.max(1,per[0].length,per[1].length);
+ const X=500,STEP=66,TOP=crown?150:96,GY=TOP+Math.max(190,(most-1)*STEP+90),L={};
+ /* Tips sit in two neat label columns; the lowest limb leaves the trunk lowest and lands lowest, so limbs nest and never cross. */
+ per.forEach((list,side)=>{const dir=side===0?-1:1,n=list.length,xt=X+dir*250;
+  list.forEach((u,j)=>{const lift=n>1?j/(n-1):.5;const yt=Math.round(GY-44-side*STEP/2-j*STEP);const ya=Math.round(GY-70-lift*(GY-70-TOP-30)-side*12);
+   L[u.id]={d:'M'+X+' '+ya+' C'+(X+dir*70)+' '+(ya-26)+' '+(xt-dir*110)+' '+yt+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:3.6-lift*1.4}})});
+ if(crown)L[crown.id]={d:'M'+X+' '+(TOP+10)+' C'+(X-2)+' '+(TOP-30)+' '+(X+8)+' '+(TOP-60)+' '+(X+4)+' '+(TOP-92),tip:[X+4,TOP-108],anchor:'middle',crown:true,w:2.2};
  const deep=Math.ceil(rt.length/2);
- rt.forEach((u,j)=>{const dir=j%2===0?-1:1,k=Math.floor(j/2);const reach=Math.round(290-k*(150/Math.max(1,deep)));const xt=X+dir*reach,yt=GY+52+k*56;
-  L[u.id]={d:'M'+(X+dir*5)+' '+(GY+4)+' C'+(X+dir*48)+' '+(GY+34)+' '+(xt-dir*reach*.4)+' '+(yt-14)+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',
-   dead:'M'+xt+' '+yt+' C'+(xt+dir*16)+' '+(yt+18)+' '+(xt+dir*30)+' '+(yt+34)+' '+(xt+dir*44)+' '+(yt+52),deadAt:[xt+dir*44,yt+70],dir}});
- const H=rt.length?GY+52+(deep-1)*56+110:GY+60;
- return {L,H,X,GY,TOP,hidden:units.length-br.length-rt.length}}
+ rt.forEach((u,j)=>{const dir=j%2===0?-1:1,k=Math.floor(j/2);const xt=X+dir*(240-k*20),yt=GY+56+k*62;
+  L[u.id]={d:'M'+(X+dir*4)+' '+(GY+3)+' C'+(X+dir*40)+' '+(GY+40)+' '+(xt-dir*100)+' '+yt+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:2.8,
+   dead:'M'+xt+' '+yt+' C'+(xt-dir*14)+' '+(yt+20)+' '+(xt-dir*30)+' '+(yt+34)+' '+(xt-dir*54)+' '+(yt+46),deadAt:[xt-dir*58,yt+50],dir:-dir}});
+ const H=rt.length?GY+56+(deep-1)*62+70:GY+40;
+ return {L,H,X,GY,TOP:crown?TOP:TOP+20,hidden:units.length-br.length-rt.length}}
 function gwBuild(){
  const s=gw.state;const lay=gwLayout(s.units);
  const svg=sv('svg',{class:'gw-svg',viewBox:'0 0 1000 '+lay.H,role:'img','aria-label':'The change as a tree: branches are what people use, roots are what it depends on'});
  svg.append(sv('line',{x1:40,y1:lay.GY,x2:960,y2:lay.GY,class:'ground'}),sv('text',{x:44,y:lay.GY-10,class:'glbl'},'BRANCHES · WHAT PEOPLE USE'),sv('text',{x:44,y:lay.GY+22,class:'glbl'},'ROOTS · WHAT IT DEPENDS ON'));
  const G={lay,ids:Object.keys(lay.L).join(','),br:{},lbl:{},pips:{},dead:{},deadLbl:{},leaves:{},cur:{},gBr:sv('g',{}),gLf:sv('g',{}),gCur:sv('g',{})};
- G.trunk=sv('path',{d:'M'+lay.X+' '+(lay.GY+2)+' C'+(lay.X-3)+' '+(lay.GY-36)+' '+(lay.X+4)+' '+(lay.GY-72)+' '+lay.X+' '+lay.TOP,class:'br trunk',pathLength:1});
- G.gBr.append(G.trunk);
+ const tr=(f,w)=>sv('path',{d:'M'+lay.X+' '+(lay.GY+4)+' C'+(lay.X-4)+' '+(lay.GY-(lay.GY-lay.TOP)*f*.35)+' '+(lay.X+5)+' '+(lay.GY-(lay.GY-lay.TOP)*f*.7)+' '+lay.X+' '+(lay.GY-(lay.GY-lay.TOP)*f),class:'br trunk',pathLength:1,style:'stroke-width:'+w});
+ G.trunks=[tr(1,5),tr(.62,9),tr(.28,13)];G.gBr.append(...G.trunks);
  s.units.forEach((u,i)=>{const g=lay.L[u.id];if(!g)return;
   const hit=sv('g',{class:'hit','data-unit':u.id,tabindex:0,role:'button','aria-label':u.label+', '+(u.root?'root':'branch')});
   hit.append(sv('path',{d:g.d,stroke:'transparent','stroke-width':18,fill:'none'}));
-  G.br[u.id]=sv('path',{d:g.d,class:'br '+(u.root?'root':'branch'),pathLength:1});hit.append(G.br[u.id]);
+  G.br[u.id]=sv('path',{d:g.d,class:'br '+(u.root?'root':'branch'),pathLength:1,style:'stroke-width:'+g.w.toFixed(1)});hit.append(G.br[u.id]);
   const lb=sv('g',{class:'lbl'});const [x,y]=g.tip;
   lb.append(sv('text',{x,y,'text-anchor':g.anchor},sv('title',{},u.label),(i+1)+'  '+gwCut(u.label,26)),sv('text',{x,y:y+15,'text-anchor':g.anchor,class:'k'},gwCut(u.unitKind+' · '+u.loc.split('/').pop(),32)));
   const px=g.anchor==='end'?x-50:g.anchor==='middle'?x-25:x;G.pips[u.id]=GW.steps.map((_,k)=>{const c=sv('circle',{cx:px+5+k*10,cy:y+27,r:3.6,class:'pip wait'});lb.append(c);return c});
@@ -185,7 +189,7 @@ function gwPaintGrove(){
  const G=gw.G,v=gw.view,sel=gwSel();const hl=gw.selCrit?((v.criteria.find(c=>c.id===gw.selCrit)||{}).units||[]):null;
  gw.svg.classList.toggle('dim',!!hl);
  const busy=new Set(s.agents.filter(a=>!a.done&&a.unit&&(s.phase===2||s.phase===3||s.phase===5)).map(a=>a.unit));
- G.trunk.classList.toggle('on',s.trunkAt!==null);
+ for(const t of G.trunks)t.classList.toggle('on',s.trunkAt!==null);
  for(const u of s.units){if(!G.br[u.id])continue;G.br[u.id].classList.add('on');G.br[u.id].classList.toggle('tracing',busy.has(u.id));G.br[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
   G.lbl[u.id].classList.add('on');G.lbl[u.id].classList.toggle('sel',sel===u.id);G.lbl[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
   (v.depth[u.id]?v.depth[u.id].pips:[]).forEach((st,k)=>G.pips[u.id][k].setAttribute('class','pip '+st));
@@ -216,10 +220,10 @@ function gwOutline(){const s=gw.state,v=gw.view,sel=gwSel();
    br.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Branches · what people use')),br]:null,rt.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Roots · what it depends on')),rt]:null)))}
 function gwInspector(){const s=gw.state,v=gw.view,id=gwSel();
  const card=h('section',{class:'card gw-ins','aria-label':'Inspector','data-testid':'grow-inspector'});
- if(!id){card.append(h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},s.done?'Select a branch or root to see how deep tracing went.':'Follows the tracer as it works. Select a branch or root to pin it.'));return card}
+ if(!id){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},s.done?'Select a branch or root to see how deep tracing went.':'Follows the tracer as it works. Select a branch or root to pin it.'));return card}
  const u=gwUnit(id);if(!u)return card;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
  const ag=s.agents.find(a=>!a.done&&a.unit===id);
- card.append(h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},gw.pinned?'Pinned':'Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.pinned=null;growPaint()}}},'Follow'):null),
+ gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},gw.pinned?'Pinned':'Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.pinned=null;growPaint()}}},'Follow'):null),
   h('h3',{},u.label),h('div',{class:'where'},(u.root?'root':'branch')+' · '+u.unitKind+' · '+u.loc),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:10px;margin-bottom:6px'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.score+' of 5 checks'),dp.pips.includes('stop')?h('span',{class:'gw-badge miss'},'stopped'):null),
    GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?h('small',{},e.loc+' · '+e.note):null))})),
@@ -231,7 +235,7 @@ function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{clas
  if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return h('span',{class:'gw-badge',title:r.why||''},x.flow?'not run':'no flow yet')}
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
  const t=v.summary;
- card.append(h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),s.criteria.length?h('span',{class:'small muted'},t.proved+' proved · '+t.agentChecked+' agent-checked · '+t.needYou+' need you'):null),
+ gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),s.criteria.length?h('span',{class:'small muted'},t.proved+' proved · '+t.agentChecked+' agent-checked · '+t.needYou+' need you'):null),
   h('p',{class:'small muted',style:'margin:4px 0 8px'},s.spec?'From '+s.spec.source+', '+s.spec.via:s.specMissing?'No spec: '+s.specMissing:'Looking in the PR, linked issues and commits'),
   v.criteria.length?v.criteria.map(c=>h('button',{class:'gw-cr'+(gw.selCrit===c.id?' sel':''),'aria-pressed':gw.selCrit===c.id?'true':'false',on:{click:()=>{gw.selCrit=gw.selCrit===c.id?null:c.id;growPaint()}}},
    h('span',{class:'id'},c.id),h('span',{},c.text,h('small',{},s.unbuilt[c.id]?s.unbuilt[c.id]:c.units.length?'in '+c.units.map(id=>(gwUnit(id)||{}).label).join(', '):'')),h('span',{class:'gw-badge '+c.status.cls},c.status.text))):null,
@@ -241,13 +245,13 @@ function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card
  return card}
 function gwScenarios(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Scenarios','data-testid':'grow-scenarios'});
  const asked=s.asked&&!s.modeBy;const locked=!!s.modeBy;
- card.append(h('div',{class:'row',style:'justify-content:space-between;margin-bottom:10px'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Scenarios'),h('span',{class:'small muted'},s.scenarios.length?s.scenarios.filter(gwIn).length+' in '+GW.modes.find(m=>m.id===s.mode).label.toLowerCase()+' · '+s.scenarios.length+' drafted':'Drafted after tracing')),
+ gwPut(card,h('div',{class:'row',style:'justify-content:space-between;margin-bottom:10px'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Scenarios'),h('span',{class:'small muted'},s.scenarios.length?s.scenarios.filter(gwIn).length+' in '+GW.modes.find(m=>m.id===s.mode).label.toLowerCase()+' · '+s.scenarios.length+' drafted':'Drafted after tracing')),
   h('div',{class:'gw-modes'+(asked?' ask':''),role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'aria-pressed':String((locked?s.mode:(gw.picking||'min'))===m.id),disabled:!asked,
    on:{click:()=>{gw.picking=m.id;growPick(m.id)}}},h('b',{},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
   h('p',{class:'small muted',style:'margin:8px 0 0'},asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+GW.modes.find(m=>m.id===s.mode).label+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.'));
  const groups=[['happy','Happy path'],['sad','Sad path'],['edge','Edge cases'],['regression','Regression']];
  for(const [k,label] of groups){const all=s.scenarios.filter(x=>x.scenarioKind===k);if(!all.length)continue;const vis=all.filter(gwIn),hid=all.length-vis.length;
-  card.append(h('div',{class:'gw-sgroup'},h('h4',{},h('span',{},label),h('span',{},vis.length+(hid?' · +'+hid+' in a larger mode':''))),vis.map(gwCard),!vis.length?h('p',{class:'gw-empty'},hid+' drafted for '+(k==='regression'?'Max':'Standard')):null))}
+  gwPut(card,h('div',{class:'gw-sgroup'},h('h4',{},h('span',{},label),h('span',{},vis.length+(hid?' · +'+hid+' in a larger mode':''))),vis.map(gwCard),!vis.length?h('p',{class:'gw-empty'},hid+' drafted for '+(k==='regression'?'Max':'Standard')):null))}
  return card}
 function gwCard(x){const s=gw.state;const r=s.run[x.id];const u=gwUnit(x.unit);
  return h('div',{class:'gw-sc'+(r&&r.st==='fail'?' failed':'')},h('div',{class:'rw'},h('span',{class:'t'},x.title),gwBadge(x)),h('span',{class:'p'},x.proves),
@@ -284,9 +288,9 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const kids=[];
   h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;growPaint()}}},'New grow'):null)));
  kids.push(h('div',{class:'gw-rail',role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?((en-st)/1000).toFixed(1)+' s':'now'))})));
- const live=s.agents.filter(a=>!s.done||!a.ok);
- if(live.length)kids.push(h('div',{class:'gw-agents','aria-live':'polite'},live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.by+(a.model?' '+a.model:''))+' · '+a.brief),h('span',{title:a.note},a.note)))));
- const tree=h('section',{class:'card gw-tree','aria-label':'Tree'},h('div',{class:'bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},s.units.length+' part'+(s.units.length===1?'':'s')+' · '+s.units.filter(u=>!u.root).length+' branches · '+s.units.filter(u=>u.root).length+' roots'),
+ const rules=s.agents.filter(a=>a.by==='rules'&&a.done&&a.ok),live=s.agents.filter(a=>!rules.includes(a)&&(!s.done||!a.ok||a.by!=='rules'));
+ if(live.length||rules.length)kids.push(h('div',{class:'gw-agents','aria-live':'polite'},rules.length?h('div',{class:'gw-ag'},h('b',{},'✓ rules · '+rules.length+' lanes'),h('span',{},rules.reduce((n,a)=>n+a.units.length,0)+' parts traced from source')):null,live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.model||a.by)+' · '+a.brief),h('span',{title:a.note},a.note)))));
+ const tree=h('section',{class:'card gw-tree','aria-label':'Tree'},h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},s.units.length+' part'+(s.units.length===1?'':'s')+' · '+s.units.filter(u=>!u.root).length+' branches · '+s.units.filter(u=>u.root).length+' roots'),
   h('span',{class:'row',style:'gap:10px'},gw.tree==='outline'?h('label',{class:'small muted',style:'display:inline-flex;gap:6px;align-items:center'},h('input',{type:'checkbox',checked:gw.onlyGaps,on:{change:e=>{gw.onlyGaps=e.target.checked;growPaint()}}}),'Only gaps'):null,
    h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,on:{click:()=>{gw.tree=t;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
  if(gw.tree==='grove'){gwPaintGrove();tree.append(gw.svg)}else tree.append(gwOutline());
