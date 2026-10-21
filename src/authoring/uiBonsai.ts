@@ -135,6 +135,7 @@ export const BONSAI_CSS = String.raw`
 @media (prefers-color-scheme:dark){.gb .sap.rest{stroke:#7b8086}.gb .sap.resto{stroke:#101214;opacity:.95}}
 .gb .kn.unreached .halo,.gb .kn.unreached:hover .halo{opacity:0}.gb .kn.unreached .k1{fill:color-mix(in srgb,var(--muted) 60%,var(--wood))}.gb .kn.unreached .k2{fill:var(--muted);opacity:.5}.gb.dim .kn.unreached{opacity:1}
 .gb .klbl.unreached{fill:var(--muted)}
+.gb .klbl.nofit,.gb .klbl.nofit+.kld{display:none}
 .gb .tiplead{fill:none;stroke:var(--ink3);stroke-width:.9;pointer-events:none;paint-order:stroke}
 .gb .bead{fill:var(--gold);stroke:var(--paper);stroke-width:1.5}.gb .halo{fill:var(--gold);opacity:.22}
 .gb .note{font:11.5px var(--mono);fill:var(--muted)}
@@ -1079,9 +1080,15 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  for(const id in B.klbl)B.klbl[id].classList.toggle('wmute',mute(B.knot[id]?B.knot[id].__ids:[id]));for(const id in B.root)B.root[id].classList.toggle('wmute',mute([id]));
  const rootPart=L.part&&B.root[L.part]?gw.M.U[L.part]:null;
  const hk=gw.hov&&gw.hov.startsWith('u:')?gw.hov.slice(2):null;
- /* the name of the knot pointed at always shows; a lit name it would overprint stays down */
- let hr=null;for(const id in B.klbl){const ids=B.knot[id]?B.knot[id].__ids:[id];if(on&&ids.includes(hk))hr=B.klbl[id].__r}const ov=r=>!!hr&&!!r&&r!==hr&&Math.min(r[2],hr[2])>Math.max(r[0],hr[0])-4&&Math.min(r[3],hr[3])>Math.max(r[1],hr[1])-2;
- for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];kl.classList.toggle('on',on&&(ids.includes(hk)||(rootPart?ids.includes(rootPart.parent):ids.some(q=>litU.has(q)||unU.has(q))&&kl.__fit!==false&&!ov(kl.__r))));kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)))}
+ /* the names that show are placed together now (gbKnotNames): the knot pointed at, the leaf's own hop and a break first;
+    one with no clear place stays off, and the card names the whole path */
+ const want=new Map();for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];
+  const lit=on&&(ids.includes(hk)||(rootPart?ids.includes(rootPart.parent):ids.some(q=>litU.has(q)||unU.has(q)))),brk=(kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute');
+  kl.__want=lit;if(lit||brk)want.set(id,ids.includes(hk)||brk||(!!L.leaf&&ids.includes(L.leaf.unit))?0:1)}
+ const got=new Map();for(const run of B.kplace||[])for(const [id,g] of run(want))got.set(id,g);
+ for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id],g=got.get(id);kl.__fit=!!g;kl.classList.toggle('nofit',!g);
+  if(g){kl.setAttribute('x',gbF(g.x));kl.setAttribute('y',gbF(g.yb));kl.setAttribute('text-anchor',g.anc);kl.__r=g.r;if(kl.__ld)kl.__ld.setAttribute('d','M'+gbP(g.A)+' L'+gbP(g.R))}
+  kl.classList.toggle('on',!!g&&kl.__want);kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)))}
  for(const id in B.root){B.root[id].classList.toggle('hl',litU.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route (gbRoute) for a leaf; for a root, the sap it sends up the trunk to each journey it feeds */
  let d='',dx='',dw='',df='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
@@ -1189,11 +1196,13 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const fs2=9.5*k,cw2=.6*fs2;
  for(const g of shoots){const list=(g.uids||[]).flatMap(id=>M.buds[id]||[]),n=Math.min(4,Math.max(3,list.length)),more=list.length-n;g.cntAt=false;if(more<=0)continue;
   const txt='+'+more,tw=txt.length*cw2,q=g.pts[g.pts.length-1],q0=g.pts[Math.max(0,g.pts.length-3)],m=Math.hypot(q[0]-q0[0],q[1]-q0[1])||1,d=[(q[0]-q0[0])/m,(q[1]-q0[1])/m];
-  for(const R of [6,12,19]){for(const a of [0,-45,45,-90,90]){const th=a*Math.PI/180,u=[d[0]*Math.cos(th)-d[1]*Math.sin(th),d[0]*Math.sin(th)+d[1]*Math.cos(th)],A=[q[0]+u[0]*R*k,q[1]+u[1]*R*k];
+  for(const R of [6,12,19,26]){for(const a of [0,-45,45,-90,90,-135,135]){const th=a*Math.PI/180,u=[d[0]*Math.cos(th)-d[1]*Math.sin(th),d[0]*Math.sin(th)+d[1]*Math.cos(th)],A=[q[0]+u[0]*R*k,q[1]+u[1]*R*k];
     const anc=u[0]>.35?'start':u[0]<-.35?'end':'middle',x0=anc==='start'?A[0]:anc==='end'?A[0]-tw:A[0]-tw/2,yb=A[1]+(u[1]>.5?.8*fs2:u[1]<-.5?-.25*fs2:.3*fs2),r=[x0-1,yb-.78*fs2-1,x0+tw+1,yb+.22*fs2+1];
     if(clear(r)&&baseOK(r,yb)){g.cntAt={x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,y:yb,anc};labs.push(r);bases.push([yb,r]);break}}if(g.cntAt)break}}
- /* the names: each knot's places, nearest first; the knot with fewest clear places is named first, so a crowded run
-    of knots on one branch shares the open ground instead of the first one taking it all */
+ /* The names. Only the names of what is lit show, so they are placed when the lighting changes (gbLight calls run), each
+    against everything above and the names placed before it: the knot pointed at, the leaf's own hop and a break first,
+    then the knot with fewest clear places, so a crowded run of knots on one branch shares the open ground. Each tries its
+    places nearest first. */
  const fs=10*k,cw=.62*fs,D8=[[1,0],[.7071,-.7071],[0,-1],[-.7071,-.7071],[-1,0],[-.7071,.7071],[0,1],[.7071,.7071]];
  const places=e=>{const tw=e.txt.length*cw;let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
   const dirs=D8.slice().sort((a,b)=>(Math.acos(Math.max(-1,Math.min(1,a[0]*v[0]+a[1]*v[1])))-Math.acos(Math.max(-1,Math.min(1,b[0]*v[0]+b[1]*v[1]))))||(Math.abs(b[0])-Math.abs(a[0])));
@@ -1201,10 +1210,13 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   for(const len of [12,24,36])for(const u of dirs){const R0=rr(u),A=[e.p[0]+u[0]*(R0+len*k),e.p[1]+u[1]*(R0+len*k)];let anc,x0,yb;
    if(Math.abs(u[0])>.38){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
    out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5],R:[e.p[0]+u[0]*(R0+1),e.p[1]+u[1]*(R0+1)],A})}return out};
- const QP=Q.map((e,i)=>{const ps=places(e).filter(c=>clear(c.r)&&leadOK(c.R,c.A,e.id));return {e,i,ps}}).sort((a,b)=>(a.ps.length-b.ps.length)||(a.i-b.i));
- for(const {e,ps} of QP){const got=ps.find(c=>clear(c.r)&&baseOK(c.r,c.yb)&&leadOK(c.R,c.A,e.id));if(!got)continue;
-  const kl=sv('text',{x:gbF(got.x),y:gbF(got.yb),'text-anchor':got.anc,class:'klbl'},e.txt);kl.__fit=true;kl.__r=got.r;V.gKl.append(kl,sv('path',{class:'kld',d:'M'+gbP(got.A)+' L'+gbP(got.R)}));B.klbl[e.id]=kl;
-  labs.push(got.r);bases.push([got.yb,got.r]);lines.push([got.R,got.A])}}
+ const base=[labs.slice(),bases.slice(),lines.slice()],free=new Map(Q.map(e=>[e.id,places(e).filter(c=>clear(c.r)&&leadOK(c.R,c.A,e.id))]));
+ for(const e of Q){const kl=sv('text',{x:0,y:0,class:'klbl nofit'},e.txt),ld=sv('path',{class:'kld',d:''});kl.__fit=false;kl.__ld=ld;V.gKl.append(kl,ld);B.klbl[e.id]=kl}
+ const run=want=>{labs.length=0;labs.push(...base[0]);bases.length=0;bases.push(...base[1]);lines.length=0;lines.push(...base[2]);const out=new Map();
+  const P=Q.map((e,i)=>({e,i})).filter(o=>want.has(o.e.id)).sort((a,b)=>(want.get(a.e.id)-want.get(b.e.id))||(free.get(a.e.id).length-free.get(b.e.id).length)||(a.i-b.i));
+  for(const {e} of P){const got=free.get(e.id).find(c=>clear(c.r)&&baseOK(c.r,c.yb)&&leadOK(c.R,c.A,e.id));if(!got)continue;out.set(e.id,got);labs.push(got.r);bases.push([got.yb,got.r]);lines.push([got.R,got.A])}
+  return out};
+ (B.kplace=B.kplace||[]).push(run)}
 /* where a shoot's leaves sit: set alternately along it from just under halfway to near its tip, each a little smaller */
 function gbShootSlots(pts,n){const acc=gbLen(pts),tot=acc[acc.length-1]||1;return Array.from({length:n},(_,i)=>{const t=.42+(.9-.42)*(n===1?0:i/(n-1)),d=t*tot;let k=1;while(k<pts.length-1&&acc[k]<d)k++;
  const a=pts[k-1],b=pts[k],f=(d-acc[k-1])/((acc[k]-acc[k-1])||1),q=[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f],dir=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;return [q[0],q[1],dir+(i%2?50:-50),1-.36*i/Math.max(1,n-1)]})}
