@@ -46,6 +46,8 @@
     "samples",
     "docs/getting-started.md",
     "docs/agent-guide.md",
+    "docs/extending.md",
+    "ROADMAP.md",
     "docs/local-execution-recovery.md",
     "docs/verified-bundles.md",
     "docs/browser-driver.md",

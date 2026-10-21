@@ -37,6 +37,10 @@ For the Python samples, create a virtualenv with `src/samples/fastapi-notes/requ
 
 [docs/architecture.md](docs/architecture.md) explains how a run flows through these pieces.
 
+## Adding an adapter
+
+New surfaces, hosts, framework presets, credential sources, evidence importers and deploy detectors each plug in behind a typed interface and one registry line. [docs/extending.md](docs/extending.md) walks through each kind and the files to touch, and [ROADMAP.md](ROADMAP.md) lists what's planned and which adapters are open for a contributor. Open an issue with the **Adapter request** template before you start, so two people don't build the same one.
+
 ## Ground rules
 
 - **Never weaken a check to get green.** If a test seems wrong, say why in the pull request. The same rule applies to the coding agents tracegrove drives.
