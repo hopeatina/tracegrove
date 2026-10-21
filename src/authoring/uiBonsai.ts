@@ -624,7 +624,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   T.knots.forEach((kn,ki)=>{const p0=sh(kn.p),n=kn.n;const many=kn.ids.length>1;const off=(ki%2?-1:1)*kn.w*.18;const p=[p0[0]+n[0]*off,p0[1]+n[1]*off];
    /* a knot is a swelling in the bark, longer along the wood than across it: its shaded flank, its lit crown, and the grain
       parting round it in two long shallow arcs; a burl is the same, larger */
-   const ra=Math.min(6.4,kn.w*.12+3.6)*(many?1.32:1),rb=ra*.56,ang=Math.atan2(n[1],n[0])*180/Math.PI+90,tg=[n[1],-n[0]];
+   const ra=Math.min(6.4,kn.w*.12+3.6,Math.max(2.2,kn.w*.57))*(many?1.32:1),rb=ra*.56,ang=Math.atan2(n[1],n[0])*180/Math.PI+90,tg=[n[1],-n[0]];
    const ls=(n[0]*-.6+n[1]*-.8)>=0?1:-1,c0=[p[0]-n[0]*ls*1.1,p[1]-n[1]*ls*1.1],c1=[p[0]+n[0]*ls*.6,p[1]+n[1]*ls*.6];
    const E=(c,a,b,cls)=>sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(a),ry:gbF(b),transform:'rotate('+gbF(ang)+' '+gbP(c)+')',class:cls});
    /* grain lines run along the wood and bow out round the swelling, never closing on it */
