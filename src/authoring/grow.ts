@@ -20,7 +20,7 @@ import { agentEnv, claudeResult, describeAgentLine, detectAgents, resolveAgentSe
 import { matchesTemplate } from './traffic.ts';
 import { runTests } from './run.ts';
 import { draftWithAgent } from './workspace.ts';
-import { findSpec, git, grepAt, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
+import { findSpec, git, grepAt, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import {
   GROW_EVENT_VERSION, MODE_RANK, applyGrow, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
   type GrowState, type Layer, type Mode, type ScenarioKind, type Tracer,
@@ -193,7 +193,7 @@ function traceRules(ctx: Ctx, agent: string, lane: { brief: string; units: Chang
     check(u, 'callers', callers.status, callers.loc, callers.note);
     // effects
     const effects = new Map<string, number>();
-    for (const a of u.added) for (const e of EFFECTS) { const m = e.test.exec(a.text); if (m) { const what = e.say(m); if (!effects.has(what)) effects.set(what, a.line); } }
+    for (const a of u.added) if (!isPatternSource(a.text)) for (const e of EFFECTS) { const m = e.test.exec(a.text); if (m) { const what = e.say(m); if (!effects.has(what)) effects.set(what, a.line); } }
     if (u.layer === 'ext') {
       const why = `The call leaves this repo for ${u.label}. What ${u.label} does with it can’t be traced from here.`;
       check(u, 'effects', 'stop', at, why);
@@ -245,7 +245,7 @@ function testsOf(ctx: Ctx, u: ChangeUnit): { status: DepthStatus; loc: string; n
   const changed = new Set(ctx.files.filter((f) => f.role === 'test').map((f) => f.path));
   const pick = hits.find((h) => changed.has(h.file)) ?? hits[0]!;
   const files = new Set(hits.map((h) => h.file)).size;
-  return { status: 'ok', loc: `${pick.file}:${pick.line}`, note: `${files} test file${files === 1 ? '' : 's'} mention it${changed.has(pick.file) ? `; ${basename(pick.file)} changed in this branch` : ''}` };
+  return { status: 'ok', loc: `${pick.file}:${pick.line}`, note: `${files} test file${files === 1 ? ' mentions' : 's mention'} it${changed.has(pick.file) ? `; ${basename(pick.file)} changed in this branch` : ''}` };
 }
 
 function cellsFor(u: ChangeUnit, effects: string[], caller: string | null): Array<[Layer, CellStatus, string, string]> {

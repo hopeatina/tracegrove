@@ -173,6 +173,8 @@ function programName(dir: string): string {
     return pkg.name ?? basename(resolve(dir));
   } catch { return basename(resolve(dir)); }
 }
+/** A line that holds a regular expression or a pattern table describes code; it does not call it. */
+export const isPatternSource = (text: string) => /\\[.()/[\]sbdwS]|\/[^/\n]*\\\(/.test(text);
 const stem = (file: string) => basename(file).replace(/\.[^.]+$/, '');
 const inRanges = (line: number, ranges: Array<[number, number]>) => ranges.some(([a, b]) => line >= a && line <= b);
 
@@ -190,6 +192,7 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
     if (text === null) continue;
     const masked = maskComments(f.path, text).split('\n');
     const addedCode = f.added.filter((a) => (masked[a.line - 1] ?? '').trim().length > 0);
+    const callsCode = addedCode.filter((a) => !isPatternSource(a.text));
     const own: ChangeUnit[] = [];
     // Routes whose declaration or handler body changed.
     const routes = /\.(py|[cm]?[jt]sx?)$/.test(f.path) ? scanSource(f.path, text).filter((r) => r.method !== 'ANY') : [];
@@ -218,13 +221,13 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
         continue;
       }
       if (CLI_FILE.test(f.path)) { folded.push(f); continue; }
-      const kind = JOB_FILE.test(f.path) || addedCode.some((a) => JOB_CODE.test(a.text)) ? 'job' : UI_FILE.test(f.path) ? (/(^|\/)pages?\/|Page\b|Page\.|uiPage/.test(f.path) ? 'page' : 'component') : 'module';
+      const kind = JOB_FILE.test(f.path) || callsCode.some((a) => JOB_CODE.test(a.text)) ? 'job' : UI_FILE.test(f.path) ? (/(^|\/)pages?\/|Page\b|Page\.|uiPage/.test(f.path) ? 'page' : 'component') : 'module';
       own.push({ id: '', label: basename(f.path), kind, layer: kind === 'job' ? 'jobs' : kind === 'module' ? 'lib' : 'ui', root: false, file: f.path, line: first, parent: null, needles, added: addedCode });
     }
     branches.push(...own);
     // Roots the changed lines reach: caches and third-party services, once each.
     const owner = own[0] ?? null;
-    for (const a of addedCode) {
+    for (const a of callsCode) {
       const code = masked[a.line - 1] ?? '';
       for (const p of PROVIDERS) if (p.test.test(code) && !rootKeys.has(p.name)) {
         rootKeys.add(p.name);

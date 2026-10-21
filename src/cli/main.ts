@@ -46,6 +46,7 @@ import { resolveRun, runTests, type TestRunReport } from '../authoring/run.ts';
 import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
+import { growCommand } from './grow.ts';
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { createInterface } from 'node:readline/promises';
@@ -160,6 +161,12 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
   keygen [--name <you>]                                Ed25519 signing key: private in .tracegrove/keys, public in tracegrove/signers/ (commit it)
   sign [--run latest|<dir>] [--key <pem>]              sign a verified run's bundle (TRACEGROVE_SIGNING_KEY signs every test run in CI)
+
+Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
+  grow [--branch <b>] [--base <b>] [--spec <file>]     read the change and its spec (PR, linked issue, commits or --spec), grow its tree,
+       [--mode minimum|standard|max] [--config <c>]    trace every part five ways (rules, then Claude or Codex per lane), draft happy,
+       [--agent claude|codex] [--no-agent]             sad and edge scenarios with mock and real variants, then prove them with real flows;
+       [--no-prove] [--no-gh] [--yes] [--jsonl]        in a terminal, 1/2/3 then Enter picks how much; --jsonl streams the events
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -484,6 +491,12 @@ async function main(argv: string[]): Promise<number> {
         ...(result.ambiguities.length ? ['', `${result.ambiguities.length} place(s) discovery cannot read; \`tracegrove draft\` asks the agent to resolve them and proves the answer:`, ...result.ambiguities.slice(0, 12).map((a) => `  ? ${a.detail}`)] : []),
       ].join('\n'));
       return 0;
+    }
+
+    case 'grow': {
+      const result = await growCommand(args.flags);
+      if (args.flags.json === true) out(args, { log: result.log, state: result.state }, '');
+      return result.code;
     }
 
     case 'check': {
