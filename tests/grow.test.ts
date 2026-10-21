@@ -511,7 +511,7 @@ describe('Grow page', () => {
       await ins.waitFor();
       const step = why.slice(0, why.indexOf(': '));
       // The inspector opens on the first failing journey: where it broke, not the claim the scenario makes.
-      await expect.poll(() => ins.textContent()).toContain('Broke at ' + step);
+      await expect.poll(() => ins.textContent()).toContain('Broke at check “' + step + '”: ');
       expect(await ins.textContent()).not.toContain(failed.proves);
       const check = async () => {
         const found = await page.evaluate(claims, failed.proves);
@@ -535,6 +535,41 @@ describe('Grow page', () => {
       // One set of words for where a leaf sits: the tree's own.
       const text = await page.getByTestId('grow').textContent();
       for (const old of ['what it must refuse', 'and must fail safely', 'End to end through']) expect(text).not.toContain(old);
+    } finally { await browser.close(); }
+  }, 60000);
+
+  it('wraps every legend item inside the legend on a phone, so no mark or word runs past its edge', async () => {
+    const { dir, state } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [390, 360]) {
+        const page = await browser.newPage({ viewport: { width, height: 844 } });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
+        await page.getByTestId('grow-view-grove').click();
+        const legend = page.locator('[data-testid="grow"] .gw-legend');
+        await expect.poll(() => legend.locator('.gw-li').count()).toBeGreaterThan(8);
+        // Each item's right edge, its box or the ink of its words (a word that cannot wrap spills past its box), against the
+        // right edge of the legend's content box.
+        const fit = await legend.evaluate((el) => {
+          const cs = getComputedStyle(el);
+          const edge = el.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+          const items = Array.from(el.querySelectorAll('.gw-li')).map((li) => {
+            const range = document.createRange(); range.selectNodeContents(li);
+            const right = Math.max(li.getBoundingClientRect().right, range.getBoundingClientRect().right, ...Array.from(li.children).map((c) => c.getBoundingClientRect().right));
+            return { text: li.textContent ?? '', over: right - edge };
+          });
+          return { items, scroll: el.scrollWidth - el.clientWidth, page: document.documentElement.scrollWidth - window.innerWidth };
+        });
+        for (const item of fit.items) expect(item.over, width + 'px: ' + item.text).toBeLessThanOrEqual(0.5);
+        expect(fit.items.map((x) => x.text)).toContain('over the rim: a service outside');
+        expect(fit.scroll).toBeLessThanOrEqual(0);
+        expect(fit.page).toBeLessThanOrEqual(0);
+        await page.close();
+      }
     } finally { await browser.close(); }
   }, 60000);
 });
