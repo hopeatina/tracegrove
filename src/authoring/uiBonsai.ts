@@ -90,7 +90,7 @@ export const BONSAI_CSS = String.raw`
 .gb .seal rect{fill:none;stroke:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));stroke-width:.8;opacity:.7}.gb .seal text{font:500 8.5px var(--mono);letter-spacing:.08em;fill:color-mix(in srgb,var(--pot-rim) 60%,var(--ink));opacity:.9}.gb .pot{fill:var(--pot)}.gb .pot-rim{fill:var(--pot-rim)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:.8;opacity:.4;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.9;stroke-linecap:round}.gb .cush{fill:var(--pad-shade)}.gb .cush-lt{fill:var(--pad);opacity:.9}.gb .pebble{fill:var(--pebble)}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .pot-sh{fill:var(--pot-rim);opacity:.35}.gb .soil{fill:var(--soil-c)}.gb .moss{fill:var(--pad-shade);opacity:.8}
 .gb .rring{fill:none;stroke:var(--paper);stroke-width:3;opacity:0;transition:opacity .2s}.gb .rt.hl .rring{opacity:1}.gb .rt.sel .rring{opacity:1;stroke:var(--ink);stroke-width:1.6}
 .gb .rt.hl .w,.gb .rt.sel .w{fill:var(--wood-lit)}.gb .rt.hl .rlbl,.gb .rt.sel .rlbl{fill:var(--ink);font-weight:600}.gb.dim .rt:not(.hl):not(.sel){opacity:.32}
-.gb .rt.loose .w{fill:var(--wood-old)}.gb .rt.loose{opacity:.85}.gb .cutface{fill:var(--cut)}.gb .rt.wound .w{stroke:var(--verm);stroke-width:1.2}.gb .rt.wound .rlbl{fill:var(--verm-ink)}
+.gb .rt.loose .w{fill:var(--wood-old)}.gb .rt.loose{opacity:.62}.gb .rt.wound .w{stroke:var(--verm);stroke-width:1.2}.gb .rt.wound .rlbl{fill:var(--verm-ink)}
 .gb .rlbl{font:10.5px var(--mono);fill:var(--ink2);paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}.gb .rlbl.face{fill:color-mix(in srgb,var(--pot-rim) 40%,var(--ink));stroke:none;font-weight:500}.gb .rlbl .nt{fill:var(--muted);font-weight:400}
 .gb .tail{fill:none;stroke-width:1.4;stroke-dasharray:3 4;stroke-linecap:round}.gb .tailend{fill:var(--paper);stroke:var(--muted);stroke-width:1.1;opacity:.6}
 .gb .sapu{fill:none;stroke:var(--paper);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
@@ -441,8 +441,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const fs=narrow?12:10.5,cw=fs*.61;
   const tagW=deps.filter(q=>M.U[q.id].layer!=='ext').reduce((a,q)=>a+gbW(gwCut(M.U[q.id].label,22),cw)+10,0);
   const twoRow=!!seal&&!lone&&tagW>0&&tagW+seal.w+26>potL;if(twoRow)D=Math.max(D,fs*1.15+24);
-  const faceR=pb-8-(seal&&!lone&&!twoRow?seal.w+10:0),tagY=twoRow?4.2+fs*.82:2+(D-2)*.4+fs*.35;
-  trees.forEach((T,i)=>{const X=xs[i];const sides=new Set(deps.filter(q=>q.i===i).map(q=>q.d));
+  const faceR=pb-8-(seal&&!lone&&!twoRow?seal.w+10:0),tagY=twoRow?4.2+fs*.82:seal&&!lone?D-11.1+fs*.35:2+(D-2)*.4+fs*.35;
+  trees.forEach((T,i)=>{const X=xs[i];const sides=new Set(deps.filter(q=>q.i===i&&T.js.some(j=>(j.units||[]).includes(q.id))).map(q=>q.d));
    (T.lit?[[-1,.08,0],[1,.07,0]]:[[-1,.13,0],[1,.1,0],[-1,.05,1],[1,.06,1]]).forEach(([d,f,fr])=>{if(!fr&&sides.has(d))f=.05;const len=f*potL+6,a0=X+d*(fr?.04:.3)*T.D;
     const pts=gbBez([[a0,0],[a0+d*.45*len,0],[a0+d*.8*len,0],[a0+d*len,0]],14);const kb=knobs(gbHash('nb'+i+d+fr),14);const w=pts.map((q,ii)=>Math.max(1,((fr?.2:.25)*T.D*Math.pow(1-ii/14,1.5)+.8)*kb[ii][0]));
     roots.push({id:null,tree:i,d,pts:pts.map((q,ii)=>[q[0],sy(q[0])+(fr?1.4+ii*.1:0)-w[ii]*.2+kb[ii][1]*.5+(ii>10?(ii-10)*1.3:0)]),w})})});
@@ -453,7 +453,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
     pts=gbResample(gbSmooth([...run,[rim+d*1.2,-3],[rim+d*4.4,-1.6],[rim+d*6.6,1.6],[rim+d*6.4,5.8],[wallX(d,D*.34)+d*3.4,D*.34],[wallX(d,D*.62)+d*2.4,D*.62]],3),30);
     w=pts.map((q,ii)=>Math.max(2.6,(.26*T.D*Math.pow(1-Math.min(1,ii/30*1.25),1.3)+2.6)*(ii<18?kb[ii][0]:1)-Math.max(0,ii-24)*.12))}
    else{const len=Math.max(16,Math.min(reach-14,(.2+.07*r)*potL+8));pts=gbBez([[xa,0],[X+d*.38*len,0],[X+d*.74*len,0],[X+d*len,0]],22);
-    w=pts.map((q,ii)=>Math.max(.9,(.3*T.D*Math.pow(1-ii/22,1.5)+.9)*kb[ii][0]));pts=pts.map((q,ii)=>[q[0],sy(q[0])-w[ii]*.2+kb[ii][1]*.5+(ii>17?(ii-17)*1.1:0)])}
+    /* a root no journey uses lies apart from the flare, both ends sunk in the soil */
+    w=pts.map((q,ii)=>Math.max(.9,(loose?.17*T.D*Math.sin(Math.PI*(ii+1.5)/25):.3*T.D*Math.pow(1-ii/22,1.5))+.9)*kb[ii][0]);pts=pts.map((q,ii)=>[q[0],sy(q[0])-w[ii]*.2+kb[ii][1]*.5+(ii>17?(ii-17)*1.1:0)+(loose&&ii<5?(5-ii)*.9:0)])}
    roots.push({id,tree:i,d,pts,w,ext,loose,stop:s.stops.some(x=>x.unit===id)})}
   /* names: a store's on the pot face under the root that sinks there, like a plant tag; a third party's beside the pot where
      its root goes down the wall, with "trace stops" when tracing could not follow it out */
@@ -552,7 +553,6 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  L.roots.forEach((r,i)=>{const id='r'+i+(r.id?':'+r.id:'');const g=sv('g',r.id?{class:'rt dep'+(r.loose?' loose':'')+(r.stop?' stop':''),'data-k':'u:'+r.id,tabindex:-1,role:'button','aria-label':M.U[r.id].label+', what the change depends on'+(r.loose?', on no journey':'')+(r.stop?', where tracing stops':'')}:{});
   const pts=r.pts,n=pts.length;const delay=r.tree*250+80;const wd=piece(id,pts,r.w,'w',g,delay,520);
   if(r.id){g.insertBefore(sv('path',{d:wd.getAttribute('d'),class:'rring'}),wd);
-   if(r.loose){const nn=gbNorm(pts,0);g.append(sv('ellipse',{class:'cutface',cx:gbF(pts[0][0]),cy:gbF(pts[0][1]),rx:1.1,ry:gbF(r.w[0]/2),transform:'rotate('+gbF(Math.atan2(nn[1],nn[0])*180/Math.PI-90)+' '+gbP(pts[0])+')'}))}
    g.append(sv('path',{d:gbLine(pts),class:'hitl','stroke-width':14}));
    if(r.stop){const e=pts[n-1];const z=r.ext?[L.wallX(r.d,D+11)+r.d*1.9,D+11]:[e[0]+r.d*2,e[1]+7];const gid='gb-fade'+N+'-'+i;
     defs.append(sv('linearGradient',{id:gid,gradientUnits:'userSpaceOnUse',x1:gbF(e[0]),y1:gbF(e[1]),x2:gbF(z[0]),y2:gbF(z[1])},sv('stop',{offset:0,style:'stop-color:var(--muted);stop-opacity:1'}),sv('stop',{offset:1,style:'stop-color:var(--muted);stop-opacity:.15'})));
