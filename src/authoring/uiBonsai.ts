@@ -118,7 +118,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
 .gb-hd{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 12px;align-items:start;width:100%;text-align:left;border:0;background:none;padding:10px 6px;border-radius:8px;cursor:pointer;color:var(--ink);list-style:none;font:inherit}
 .gb-hd::-webkit-details-marker{display:none}.gb-hd:hover,.sel>.gb-hd{background:var(--sel)}.gb-olb>.gb-hd[aria-pressed=true]{box-shadow:inset 3px 0 0 var(--ink)}
 .gb-hd .no{font:600 13px/22px var(--mono);color:var(--muted);text-align:center;grid-row:span 2}
-.gb-hd .tt{font:500 15px/22px var(--sans);min-width:0;overflow-wrap:anywhere}.gb-hd .tt .by{font:11px/16px var(--mono);color:var(--gold);margin-left:6px}
+.gb-hd .tt{font:500 15px/22px var(--sans);min-width:0;overflow-wrap:anywhere}.gb-hd .tt .by{font:11px/16px var(--mono);color:var(--gold);margin-left:6px;display:inline-block}/* an atomic inline, so it wraps on its own and never takes the title's last word with it */
 .gb-hd .wh{grid-column:2;font:11.5px/16px var(--mono);color:var(--muted);overflow-wrap:anywhere}
 .gb-hd .st{grid-column:3;grid-row:1/span 2;display:grid;justify-items:end;gap:6px;padding-top:4px;font:11.5px/16px var(--mono);color:var(--muted);white-space:nowrap}
 .gb-hd .st .f{color:var(--verm-ink)}.gb-hd .st .p{color:var(--moss)}.gb-hd .st .r{color:var(--gold)}
@@ -735,7 +735,10 @@ const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id=
 function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;const width=gbWidth();
  const pc=list=>['happy','guard','failure'].map(p=>list.filter(x=>gbPol(x)===p).length).join('.');
  const key=(sap?'sap:'+s.units.map(u=>u.id).join(','):M.trees.map(t=>t.js.map(j=>j.id+'='+j.units.join('+')+'#'+pc(M.leaves[j.id])).join(';')).join('|'))+'|jin='+M.jin.map(u=>u.id).join(',')+'|'+M.strays.map(u=>u.id).join(',')+'|'+(s.stops.map(x=>x.unit).join(','))+'|w='+width+(gbRoom(M,sap)?'|room':'');
- if(!gw.B||gw.B.key!==key){gbBuild(M,width,key,sap)}
+ /* a rebuild (the layout changed, say when a chosen mode stops reserving room for Max shoots) keeps what was showing, so
+    the leaves and shoots a mode drops still fall and fade rather than vanish */
+ if(!gw.B||gw.B.key!==key){const O=gw.B;gw.prevIn={};gw.prevShown={};gw.prevBuds=O?O.budsShown:undefined;
+  if(O){for(const id in O.leaf)gw.prevIn[id]=O.leaf[id].__in;for(const id in O.pad)gw.prevShown[id]=O.pad[id].shown}gbBuild(M,width,key,sap)}
  const B=gw.B;gw.M=M;const vis=s.modeBy?s.mode:s.asked&&gw.picking?gw.picking:null;/* a preview: before a mode is chosen, what each would keep; once one is set, what another would keep or add, as ghosts */const pv=gw.preview&&gw.preview!==(s.modeBy?s.mode:null)?gw.preview:null;let n=0;const quiet=gwQuiet();
  const order=sap?[]:gbOrder(M);gw.order=order.map(j=>j.id);
  /* one tab stop into the tree: the first journey in the order the list and the inspector use */
@@ -744,7 +747,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  for(const j of order){n++;const all=M.leaves[j.id];let mainCut=false;
   for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid];const list=gbOrd(P.leaves);const g=P.geo;let shown=0,failed=false,cutN=0;const kept=new Set(),grown=new Set();
    list.forEach((x,i)=>{const sl=g.slot.get(x.id)||[0,-g.PH*.5,0];let el=B.leaf[x.id];const now=performance.now();
-    if(!el){el=gbLeafEl(x,g.L,g.W,sl[4]);P.lg.append(el);B.leaf[x.id]=el;el.__j=j.id;el.__p=pid;
+    if(!el){el=gbLeafEl(x,g.L,g.W,sl[4]);P.lg.append(el);B.leaf[x.id]=el;el.__j=j.id;el.__p=pid;el.__in=(gw.prevIn||{})[x.id];
      if(!quiet&&el.__inner.animate){const t0=gbT('pad:'+pid,P.delay)+320+i*40;if(now-t0<260)el.__inner.animate([{transform:'scale(0)'},{transform:'scale(1)'}],{duration:260,delay:t0-now,easing:'cubic-bezier(.2,.8,.3,1.3)',fill:'backwards'})}}
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
@@ -767,7 +770,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    const falling=list.some(x=>B.leaf[x.id]&&B.leaf[x.id].classList.contains('cut'));const pruned=!!vis&&list.length>0&&!shown;const bare=!list.length;const cut=pruned&&!falling;const back=cut&&!!pv&&list.some(x=>gbRank[x.mode]<=gbRank[pv]);
    P.el.setAttribute('class','pad'+(P.crown?' crown':'')+(P.b&&P.b.back?' back':'')+(bare?' bare':'')+(gk!==kk?' pv-grow':'')+(failed?' failed':'')+(gw.pinned==='j:'+j.id?' sel':''));
    P.el.setAttribute('aria-label',(P.pol?'Journey '+n+', '+(P.pol==='failure'?'the ways it fails':'what it refuses'):'Journey '+n+', '+j.title)+(pruned?', pruned in '+gbModeName(vis):''));
-   if(cut&&!P.cutDone){P.cutDone=true;if(!quiet&&P.shown&&P.jg.animate){P.jg.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(20px)',opacity:0}],{duration:450,easing:'ease-in'}).onfinish=()=>{if(P.cutDone)P.jg.classList.add('pruned')}}else P.jg.classList.add('pruned')}
+   if(P.shown===undefined)P.shown=(gw.prevShown||{})[pid];if(cut&&!P.cutDone){P.cutDone=true;if(!quiet&&P.shown&&P.jg.animate){P.jg.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(20px)',opacity:0}],{duration:450,easing:'ease-in'}).onfinish=()=>{if(P.cutDone)P.jg.classList.add('pruned')}}else P.jg.classList.add('pruned')}
    if(!cut){P.cutDone=false;P.jg.classList.remove('pruned')}P.shown=!cut;
    const willCut=!!pv&&!P.crown&&list.length>0&&cutN===list.length;P.jg.classList.toggle('pv-cut',willCut);P.jg.classList.toggle('pv-back',back);
    const E=B.brEl[pid];if(E){const was=E.stub.classList.contains('on');E.stub.classList.toggle('on',cut&&!back);if(cut&&!was&&!quiet&&E.stub.animate)E.stub.animate([{opacity:0},{opacity:1}],{duration:300,delay:350,fill:'backwards'});
@@ -789,7 +792,8 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     Shoots spread along a pad's crest from its outer end, leaning out less the further in they are. Each holds its
     checks as small leaves set alternately along it, with a bud at its tip; more than three are counted in its card. A burl's
     files share one shoot. Pointing at a mode shows these as ghosts, or fades the ones it would prune. */
- const showBuds=pv?(pv==='max'||vis==='max'):vis?vis==='max':true;
+ /* pointing at a smaller mode keeps the shoots where they are, faded, as everything else it would cut */
+ const showBuds=pv?(pv==='max'||!vis||vis==='max'):vis?vis==='max':true;B.budsShown=showBuds;
  if(!B.shoots){B.shoots={};const load={},last={},plan=[];const T0=B.L.trees[0];const crownId=T0&&T0.apex?T0.apex.id:null;
   for(const uid in M.buds){const kel=B.knot[uid];const hk=kel?kel.__ids[0]:uid;if(B.shoots[hk]){B.budG[uid]=B.shoots[hk];continue}
    const ids=kel?kel.__ids:[uid];const js=(gw.order||[]).filter(jid=>B.pad[jid]&&!B.pad[jid].pol&&M.J.some(q=>q.id===jid&&q.units.some(id=>ids.includes(id))));
@@ -817,10 +821,15 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   list.forEach((x,i)=>{let el=B.bud[x.id];if(i>=g.slots.length){if(el)el.classList.add('gone');return}
    if(!el){const q=g.slots[i];el=sv('g',{class:'gb-lf bud','data-k':'s:'+x.id,tabindex:-1,role:'button'},sv('g',{class:'gb-lfi'},sv('circle',{r:7,cx:6,class:'hitc'}),sv('path',{d:gbLeafD(12,6),transform:'translate(6 0)',class:'blade'})));
     el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)';el.__u=g.ids[0];el.__base=g.base;g.g.append(el);B.bud[x.id]=el}
-   const im=showBuds&&(inMode(x)||pv==='max');const cut=!!pv&&pv!=='max'&&inMode(x);
+   /* while a dropped shoot fades, its leaves stay on it */
+   const fad=!showBuds&&!!(g.fade||(g.on===undefined?gw.prevBuds:g.on));const im=(showBuds||fad)&&(inMode(x)||pv==='max'||fad);const cut=!!pv&&pv!=='max'&&inMode(x);
    el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)?' pv-add':'')+(im&&cut?' pv-out':''));
    el.setAttribute('aria-label',(x.scenarioKind==='regression'?'Existing flow: ':'Part check: ')+x.title+', '+gbStateWord(x).t+(i===g.slots.length-1&&list.length>g.slots.length?'; and '+(list.length-g.slots.length)+' more checks here, in the Outline':''))});
-  const any=list.some(inMode);g.g.style.display=showBuds&&(any||pv==='max')?'':'none';g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',!!pv&&pv!=='max'&&any)}
+  /* shoots a chosen mode drops wither and fade, rather than vanish */
+  const any=list.some(inMode),on=showBuds&&(any||pv==='max'),was=g.on===undefined?gw.prevBuds:g.on;g.on=on;
+  if(on){g.g.style.display='';if(g.fade){g.fade.cancel();g.fade=null}}
+  else if(was&&!quiet&&g.g.animate&&!g.fade){g.g.style.display='';g.fade=g.g.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(5px)'}],{duration:520,delay:200,easing:'ease-in',fill:'forwards'});g.fade.onfinish=()=>{g.fade=null;if(!g.on)g.g.style.display='none'}}
+  else if(!g.fade)g.g.style.display='none';g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',!!pv&&pv!=='max'&&any)}
  /* a knot's name never sits on a shoot that is showing */
  const budBox=showBuds?Object.values(B.budG).filter(g=>g.g.style.display!=='none').map(g=>{const xs=g.slots.map(q=>q[0]),ys=g.slots.map(q=>q[1]);return [Math.min(...xs)-11,Math.min(...ys)-11,Math.max(...xs)+11,Math.max(...ys)+11]}):[];
  for(const id in B.klbl){const r=B.klbl[id].__r;B.klbl[id].__clash=!!r&&budBox.some(q=>Math.min(r[2],q[2])>Math.max(r[0],q[0])&&Math.min(r[3],q[3])>Math.max(r[1],q[1]))}
