@@ -115,7 +115,7 @@ export const BONSAI_CSS = String.raw`
 .gb-tip{position:absolute;z-index:3;width:max-content;max-width:300px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font-size:13px;line-height:18px;color:var(--ink)}
 .gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .gb-tip .st{font:12px/17px var(--mono);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
-.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px;overflow-wrap:anywhere}.gb-tip .hop{white-space:nowrap}
+.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px}.gb-tip .hop{white-space:nowrap}
 .gb-tip .st b{display:inline;font-weight:600}.gb-tip .st .k{font:inherit;text-transform:none;letter-spacing:0;color:inherit}.gb-tip.dock{box-shadow:0 10px 32px rgb(0 0 0 / .18)}
 .gb-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 6px;font:12px/18px var(--sans);color:var(--ink3)}
 .gb-key i,i.gb-g{display:inline-block;flex:none;width:11px;height:7px;border-radius:7px 1px;vertical-align:0;margin-right:5px;border:1.2px solid var(--moss);background:var(--moss)}
@@ -462,7 +462,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* label boxes, local to each tree */
   for(const T of trees){T.lbl={};for(const pd of T.padList){const j=T.js.find(q=>q.id===pd.jid);const l=pd.pol?lblOf('',pd.leaves,pd.leaves.length):lblOf(j.title,null,pd.leaves.length);const o=T.origin[pd.id],g=pd.geo,b=pd.b;
     /* on a phone the tree carries numbers, outside the canopy on a short leader */
-    if(!l){if(narrow&&!sap&&!pd.pol){/* beside the pad, below its shoulder leaves, on a leader that starts outside the foliage */const sd=b?b.dir:-(T.S||S),ax=o[0]+sd*(g.PW/2+3),ay=o[1]-g.PH*(b?.15:.55),bx=ax+sd*(g.L*.35+13),by=ay;(T.badge=T.badge||{})[pd.jid]={x:bx,y:by,ax,ay};T.x0=Math.min(T.x0,bx-12);T.x1=Math.max(T.x1,bx+12);T.y0=Math.min(T.y0,by-14)}continue}
+    if(!l){if(narrow&&!sap){/* beside the pad, below its shoulder leaves, on a leader that starts outside the foliage; a one-journey tree's
+      guard and failure pads get a letter (R, F) the key under the tree explains */const sd=b?b.dir:-(T.S||S),ax=o[0]+sd*(g.PW/2+3),ay=o[1]-g.PH*(b?.15:.55),bx=ax+sd*(g.L*.35+13),by=ay;(T.badge=T.badge||{})[pd.pol?'p:'+pd.id:pd.jid]=pd.pol?{x:bx,y:by,ax,ay,pid:pd.id,jid:pd.jid,pol:pd.pol}:{x:bx,y:by,ax,ay};T.x0=Math.min(T.x0,bx-12);T.x1=Math.max(T.x1,bx+12);T.y0=Math.min(T.y0,by-14)}continue}
     const n=l.lines.length;
     if(!b){const y=o[1]-g.PH-g.L*.6-13-16*n;T.lbl[pd.id]={...l,x:o[0],y,anchor:'middle',dir:0,pol:pd.pol,jid:pd.jid};T.y0=Math.min(T.y0,y-30);T.x0=Math.min(T.x0,o[0]-l.w/2);T.x1=Math.max(T.x1,o[0]+l.w/2)}
     else{const x=o[0]+b.dir*(g.PW/2+16),ay=o[1]-g.PH*.45;T.lbl[pd.id]={...l,x,y:ay-l.hgt/2+24,anchor:b.dir<0?'end':'start',dir:b.dir,ax:o[0]+b.dir*g.PW/2,ay,pol:pd.pol,jid:pd.jid};T.y0=Math.min(T.y0,ay-l.hgt/2-6);if(b.dir<0)T.x0=Math.min(T.x0,x-l.w);else T.x1=Math.max(T.x1,x+l.w)}}
@@ -703,9 +704,11 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
       const b0=[a[0]+ns[0]*(wk/2-1.2),a[1]+ns[1]*(wk/2-1.2)],tip=[b0[0]+v0[0]*len*.72,b0[1]+v0[1]*len*.72-len*.42];
       const c1=[b0[0]+v0[0]*len*.48,b0[1]+v0[1]*len*.48],c2=[tip[0]-v0[0]*len*.06,tip[1]+len*.3],pts=gbBez([b0,c1,c2,tip],10);
       const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]),r=[Math.min(...xs)-9,Math.min(...ys)-9,Math.max(...xs)+9,Math.max(...ys)+5];
-      const near=bases.reduce((m,q)=>Math.min(m,Math.hypot(q[0]-b0[0],q[1]-b0[1])),1e9);
-      const sc=hits(r)+out(r)*400+(near<18?400+(18-near)*40:0)+Math.abs(off)*2+(th===45?0:12)+(len===32?0:16)+(pref&&ns[0]*pref<0?60:0);
+      const near=bases.reduce((m,q)=>Math.min(m,Math.hypot(q[0]-b0[0],q[1]-b0[1])),1e9),gapMin=L.narrow?30:18;
+      const sc=hits(r)+out(r)*400+(near<gapMin?400+(gapMin-near)*40:0)+Math.abs(off)*2+(th===45?0:12)+(len===32?0:16)+(pref&&ns[0]*pref<0?60:0);
       if(!best||sc<best.sc)best={sc,pts,b0,tip,c1,c2,r,kk}}}
+    /* on a phone a shoot that has no clear air of its own joins the nearest one, so the branch does not grow a hedge */
+    const gs=B.shootGeo||[];if(gs.length&&(!best||(L.narrow&&best.sc>=400))){const a=pl[k0];const nb=gs.reduce((m,g)=>Math.hypot(g.base[0]-a[0],g.base[1]-a[1])<Math.hypot(m.base[0]-a[0],m.base[1]-a[1])?g:m,gs[0]);nb.uids.push(...uids);return}
     if(!best)return;placed.push(best.r);bases.push(best.b0);const {b0,c1,c2,tip}=best,cv=[b0,c1,c2,tip];
     const slot=i=>{const t=[.46,.68,.86][i],q=gbCubic(cv,t),q2=gbCubic(cv,Math.min(1,t+.04)),dir=Math.atan2(q2[1]-q[1],q2[0]-q[0])*180/Math.PI;return [q[0],q[1],dir+(i%2?50:-50),[1,.82,.66][i]]};
     (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:b0,tip,slots:[0,1,2].map(slot),route:[...best.pts.slice().reverse(),...routeOf(best.kk)]})};
@@ -774,8 +777,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    gLbl.append(gl);B.lbl[pid]={el:gl,eb,t2,t3,tl,w:l.w,pol:l.pol,jid:l.jid};anim('lbl:'+pid,gl,B.pad[pid].delay+250,350,'fade')}
   /* on a phone the names go in the list under the tree; the tree carries their numbers, just outside each pad */
   for(const jid in (T.badge||{})){const q=T.badge[jid];const bx=q.x+X,ax=q.ax+X;
-   const gl=sv('g',{class:'badge','data-k':'j:'+jid},sv('path',{class:'leader',d:'M'+gbF(ax)+' '+gbF(q.ay)+' L'+gbF(bx+(bx>ax?-10:bx<ax?10:0))+' '+gbF(q.y+(bx===ax?10:0))}),sv('circle',{cx:gbF(bx),cy:gbF(q.y),r:L.narrow?10*GB_NK:10}),sv('text',{x:gbF(bx),y:gbF(q.y)},''));
-   gLbl.append(gl);B.lbl[jid]={el:gl,num:gl.lastChild,badge:true,jid}}
+   const gl=sv('g',q.pid?{class:'badge pol','data-k':'j:'+q.jid,'data-pad':q.pid}:{class:'badge','data-k':'j:'+jid},sv('path',{class:'leader',d:'M'+gbF(ax)+' '+gbF(q.ay)+' L'+gbF(bx+(bx>ax?-10:bx<ax?10:0))+' '+gbF(q.y+(bx===ax?10:0))}),sv('circle',{cx:gbF(bx),cy:gbF(q.y),r:L.narrow?10*GB_NK:10}),sv('text',{x:gbF(bx),y:gbF(q.y)},q.pol==='failure'?'F':q.pol?'R':''));
+   gLbl.append(gl);if(q.pid)B.lbl[q.pid]={el:gl,num:gl.lastChild,badge:true,jid:q.jid,pid:q.pid};else B.lbl[jid]={el:gl,num:gl.lastChild,badge:true,jid}}
  });
  if(L.trees.length&&M.jin.length>3&&!sap){const T=L.trees[0],p=T.tp[gbNear(T.ty,.4)];gJin.append(sv('text',{x:gbF(p[0]-T.S*28),y:gbF(p[1]),'text-anchor':T.S>0?'end':'start',class:'note'},'+'+(M.jin.length-3)+' changed, on no journey'))}
  /* the bark's light comes in once the wood it lies on has grown */
@@ -900,7 +903,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     E.cutmk.classList.toggle('on',willCut);E.cuttag.classList.toggle('on',willCut);if(willCut)E.cuttag.textContent='cut · '+list.length}
    P.pruned=pruned;P.cut=cut;if(!P.pol&&cut)mainCut=true}
   /* each label speaks for its own pad: the journey's name or its riskiest guard or failure, then their state, one colour per word */
-  for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(!lb||lb.badge)continue;const list=P.leaves;
+  for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(lb&&lb.pid){const inm=P.leaves.filter(inMode);lb.el.setAttribute('class','badge pol'+(inm.some(x=>s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(inm.length?'':' pruned')+(gw.pinned==='j:'+j.id?' sel':''))}if(!lb||lb.badge)continue;const list=P.leaves;
    lb.eb.textContent=(P.pol&&M.J.length===1?'':'JOURNEY '+n+' · ')+(P.pol==='guard'?'WHAT IT REFUSES':P.pol==='failure'?'HOW IT FAILS':(gbSURFW[j.surface]||'START'));
    /* the state fills one line as wide as the name above it, then a second */
    const tk=gbTok(list,j,vis,inMode),room=Math.max(20,Math.floor((lb.w-18)/6.7));const l1=[],l2=[];let used=0;
@@ -1016,7 +1019,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom=''};
  if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))){hide();return}
  const s=gw.state,M=gw.M;/* a path breaks only between its hops */
- const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return [...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map((u,i)=>h('span',{class:'hop'},(i?' › ':'')+u.label)).flatMap((n,i)=>i?[' ',n]:[n])};
+ const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return gwHops([...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map(u=>u.label))};
  tip.replaceChildren();
  if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
   gwPut(tip,h('span',{class:'k'},(j?{happy:'happy path',guard:'what it refuses',failure:'how it fails'}[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')+(x.criteria.length?' · '+x.criteria.join(' '):'')),h('b',{},x.title),
