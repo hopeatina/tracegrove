@@ -11,6 +11,9 @@ inputs:
   env:
     description: Environment to test (local, staging, or one declared in the config).
     default: local
+  preview-url:
+    description: "Address of this PR's preview deployment, exported as PREVIEW_URL for an environment whose target url is env:PREVIEW_URL. On a deployment_status event, pass github.event.deployment_status.target_url."
+    default: ''
   tracegrove:
     description: Command that runs tracegrove.
     default: npx --yes tracegrove
@@ -33,9 +36,10 @@ runs:
     - name: Run flows
       if: inputs.run == 'true'
       shell: bash
-      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', TG_ENV: '${{ inputs.env }}' }
+      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', TG_ENV: '${{ inputs.env }}', TG_PREVIEW_URL: '${{ inputs.preview-url }}' }
       run: |
         status=0
+        if [ -n "$TG_PREVIEW_URL" ]; then export PREVIEW_URL="$TG_PREVIEW_URL"; fi
         while IFS= read -r dir; do
           [ -z "$dir" ] && continue
           $TG test --config "$dir" --env "$TG_ENV" || status=$?
@@ -66,7 +70,7 @@ runs:
         TG: '${{ inputs.tracegrove }}'
         TITLE: '${{ inputs.title }}'
         LINK: '${{ steps.upload.outputs.artifact-url }}'
-        SHA: '${{ github.event.pull_request.head.sha || github.sha }}'
+        SHA: '${{ github.event.pull_request.head.sha || github.event.deployment.sha || github.sha }}'
         OUT: '${{ runner.temp }}/tracegrove-card'
       run: |
         mapfile -t dirs < <(printf '%s\n' "$DIRS" | sed '/^$/d')
@@ -78,16 +82,24 @@ runs:
           require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `verdict=${card.verdict}\n`);
         ' "$OUT.json"
     - name: Post or update the PR comment
-      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      if: inputs.comment == 'true' && (github.event_name == 'pull_request' || github.event_name == 'deployment_status')
       continue-on-error: true
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         PR: ${{ github.event.pull_request.number }}
+        SHA: ${{ github.event.deployment.sha }}
+        TG_ENV: ${{ inputs.env }}
         BODY: ${{ runner.temp }}/tracegrove-card.md
       run: |
-        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- tracegrove-proof -->")) | .id' | head -n1)
+        # A preview run has no PR in its event: find the open PR for the deployed commit.
+        if [ -z "$PR" ]; then PR=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty'); fi
+        if [ -z "$PR" ]; then echo "no open pull request for $SHA; the card is in the job summary"; exit 0; fi
+        # One comment per environment, so a preview card does not overwrite the local one.
+        marker='<!-- tracegrove-proof -->'
+        if [ "$TG_ENV" != "local" ]; then marker="<!-- tracegrove-proof:$TG_ENV -->"; sed -i "1s|^<!-- tracegrove-proof -->|$marker|" "$BODY"; fi
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n1)
         if [ -n "$id" ]; then gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$BODY" >/dev/null
         else gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$BODY" >/dev/null; fi
     - name: Fail on a contradicted claim

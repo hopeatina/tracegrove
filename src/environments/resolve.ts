@@ -1,7 +1,7 @@
 /** Resolve a named environment with class defaults, and pick the active one (flag > TRACEGROVE_ENV > settings > local). */
 import { Blocked } from '../core/errors.ts';
 import type { AuthoringConfig } from '../authoring/schema.ts';
-import { CLASS_POLICY, DEFAULT_CLASS, LOCAL_ENVIRONMENT, targetKind, type EnvironmentConfig, type ResolvedEnvironment } from './schema.ts';
+import { CLASS_POLICY, DEFAULT_CLASS, LOCAL_ENVIRONMENT, URL_RULE, targetKind, type EnvironmentConfig, type ResolvedEnvironment } from './schema.ts';
 
 export function environmentNames(config: Pick<AuthoringConfig, 'environments'>): string[] {
   const declared = Object.keys(config.environments ?? {});
@@ -13,7 +13,7 @@ export function resolveEnvironment(config: Pick<AuthoringConfig, 'environments'>
   if (!declared && name !== 'local') {
     throw new Blocked([{ code: 'unknown_environment', detail: `no environment named ${name}; declared: ${environmentNames(config).join(', ')}`, owner: 'agent', action: 'run tracegrove env list, or add it with tracegrove env add' }]);
   }
-  const env: EnvironmentConfig = declared ?? LOCAL_ENVIRONMENT;
+  const env: EnvironmentConfig = declared ? withRuntimeValues(name, declared) : LOCAL_ENVIRONMENT;
   const kind = targetKind(env.target);
   const cls = env.class ?? DEFAULT_CLASS[kind];
   const policy = CLASS_POLICY[cls];
@@ -28,6 +28,22 @@ export function resolveEnvironment(config: Pick<AuthoringConfig, 'environments'>
   }
   if (problems.length) throw new Blocked(problems.map(detail => ({ code: 'invalid_environment', detail: `environments.${name}: ${detail}`, owner: 'developer', action: `edit environments.${name} in tracegrove.config.yaml` })));
   return { name, config: env, kind, class: cls, writes, agents: env.agents ?? policy.agents, implicit: !declared };
+}
+
+/** Replace env:NAME in a url target with the variable's value, so every consumer sees the real origin. */
+function withRuntimeValues(name: string, env: EnvironmentConfig, vars: NodeJS.ProcessEnv = process.env): EnvironmentConfig {
+  const target = env.target;
+  if (!('url' in target)) return env;
+  const read = (field: string, ref: string): string => {
+    const value = vars[ref.slice(4)]?.trim();
+    if (!value) throw new Blocked([{ code: 'environment_value_missing', detail: `environments.${name}.${field} reads ${ref}, which is not set`, owner: 'operator',
+      action: `set ${ref.slice(4)} (in CI, from the deployment, e.g. the preview URL), or choose another environment` }]);
+    return value;
+  };
+  const url = target.url.startsWith('env:') ? read('target.url', target.url) : target.url;
+  if (url !== target.url && !URL_RULE.safeParse(url).success) throw new Blocked([{ code: 'invalid_environment', detail: `environments.${name}.target.url: ${target.url} is ${JSON.stringify(url)}, not an https URL`, owner: 'operator', action: `set ${target.url.slice(4)} to the deployment's https origin` }]);
+  const expect = target.release?.expect?.startsWith('env:') ? read('target.release.expect', target.release.expect) : target.release?.expect;
+  return { ...env, target: { ...target, url, ...(target.release ? { release: { ...target.release, ...(expect === undefined ? {} : { expect }) } } : {}) } };
 }
 
 export type EnvironmentSource = 'flag' | 'TRACEGROVE_ENV' | 'settings' | 'default';
