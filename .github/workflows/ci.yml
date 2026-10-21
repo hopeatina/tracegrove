@@ -10,9 +10,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
-    # Set the repository variable CI_RUNNER to a self-hosted runner label (e.g. tracegrove-mac) to run here
-    # instead of on hosted minutes. Pull requests from forks always use a hosted runner.
-    runs-on: ${{ (vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true) && vars.CI_RUNNER || 'ubuntu-latest' }}
+    # The repository variable CI_RUNNER (a JSON label list, e.g. ["tracegrove-mini","linux-arm64"]) moves this job
+    # to a self-hosted runner; unset, it runs hosted. Fork pull requests always run hosted.
+    # Setup: docs/self-hosted-runner.md
+    runs-on: ${{ (vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true) && fromJSON(vars.CI_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +31,10 @@ jobs:
           echo "TRACEGROVE_PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
       - run: npm ci
       - name: Install pinned Chromium and system dependencies for real UI tests
-        run: npx --no-install playwright install --with-deps chromium
+        # The self-hosted VM has Chromium's system libraries preinstalled and its runner user has no sudo.
+        run: |
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then npx --no-install playwright install chromium
+          else npx --no-install playwright install --with-deps chromium; fi
       - run: npm run verify
       - run: npm run test:conformance
       - run: npm run build
@@ -56,6 +60,8 @@ jobs:
           if-no-files-found: ignore
       - name: Qualify clean native and mocked Docker lanes
         id: container-qualification
+        # The self-hosted runner has no Docker; the containers job below covers these lanes there.
+        if: runner.environment == 'github-hosted'
         run: |
           npm run test:container -- native-real
           npm run test:container -- offline-contract
@@ -136,3 +142,26 @@ jobs:
           name: evidence-bundle
           path: ${{ runner.temp }}/out/bundle
           if-no-files-found: ignore
+  containers:
+    # Docker lanes stay on a hosted runner when verify runs self-hosted (the shared VM's Docker belongs to other jobs).
+    if: vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Qualify clean native and mocked Docker lanes
+        id: container-qualification
+        run: |
+          npm run test:container -- native-real
+          npm run test:container -- offline-contract
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.container-qualification.outcome != 'skipped'
+        with:
+          name: container-qualification
+          path: artifacts/qa/container-*
+          if-no-files-found: error
