@@ -20,6 +20,7 @@ import { riskOf } from './discoveryEvents.ts';
 import { agentEnv, claudeResult, describeAgentLine, detectAgents, resolveAgentSettings, DEFAULT_MODELS, type AgentSettings } from './agent.ts';
 import { matchesTemplate } from './traffic.ts';
 import { runTests } from './run.ts';
+import type { TestRunReport } from './runReport.ts';
 import { draftWithAgent, latestObservedRun } from './workspace.ts';
 import { PROVIDERS, findSpec, git, grepAt, harnessOf, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, routesOf, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import { journeysOf, reachGraph, words } from './growReach.ts';
@@ -766,18 +767,30 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[state.mode]);
   if (!config) { for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: 'No tracegrove.config.yaml found; run tracegrove init, or pass --config' }); return; }
   const flows = loadFlows(config);
-  const results = new Map<string, { ok: boolean; ms: number; run: string | null; why: string }>();
+  const results = new Map<string, { ok: boolean; ms: number; run: string | null; why: string; hop?: string; after?: boolean }>();
+  /* Where a failed run broke, so the tree can mark that hop: the route whose step failed, or, when a check on other evidence
+     failed (a stand-in's calls, say), the last route the flow called before it. */
+  const hopOf = (c: TestRunReport['cases'][number]): { hop?: string; after?: boolean } => {
+    const http = (x: { method: string }) => /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(x.method);
+    const i = c.failure ? c.steps.findIndex((x) => x.name === c.failure!.step || x.id === c.failure!.step) : -1;
+    const at = c.steps[i];
+    if (!at) return {};
+    if (http(at)) return { hop: `${at.method} ${at.path}` };
+    const before = c.steps.slice(0, i).reverse().find(http);
+    return before ? { hop: `${before.method} ${before.path}`, after: true } : {};
+  };
   const runFlow = async (caseId: string) => {
     const cached = results.get(caseId); if (cached) return cached;
     const flow = flows.find((f) => f.caseId === caseId);
     const t = Date.now();
-    let result: { ok: boolean; ms: number; run: string | null; why: string };
+    let result: { ok: boolean; ms: number; run: string | null; why: string; hop?: string; after?: boolean };
     try {
       const { report } = await runTests({ configPath: config, grep: flow?.file ?? caseId, ...(ctx.signal ? { signal: ctx.signal } : {}) });
       const c = report.cases.find((x) => x.caseId === caseId);
       const ok = !!c && c.outcome === 'passed' && report.bundleVerified === true;
       result = { ok, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir),
-        why: ok ? '' : c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.bundleVerified === false ? 'the run evidence did not verify' : report.blockers[0]?.detail ?? 'the flow did not run' };
+        why: ok ? '' : c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.bundleVerified === false ? 'the run evidence did not verify' : report.blockers[0]?.detail ?? 'the flow did not run',
+        ...(ok || !c ? {} : hopOf(c)) };
     } catch (error) {
       result = { ok: false, ms: Date.now() - t, run: null, why: (error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400) };
     }
@@ -795,7 +808,7 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     emit({ kind: 'scenario.running', scenario: s.id, flow: s.flow! });
     const r = await runFlow(s.flow!);
     if (r.ok) { emit({ kind: 'scenario.passed', scenario: s.id, took: r.ms, run: r.run }); real(s); }
-    else emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why });
+    else emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why, ...(r.hop ? { hop: r.hop, after: !!r.after } : {}) });
   }
   // Scenarios no flow proves: an agent may write flows for them, which tracegrove then runs.
   let open = inRun.filter((s) => !s.flow && !state.run[s.id]);

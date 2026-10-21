@@ -66,7 +66,7 @@ export type GrowEventBody =
   | E<'flows.checked', { scenarios: number; runnable: number; config: string | null }>
   | E<'scenario.running', { scenario: string; flow: string }>
   | E<'scenario.passed', { scenario: string; took: number; run: string | null }>
-  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string }>
+  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string; hop?: string; after?: boolean }>
   | E<'scenario.not_run', { scenario: string; why: string }>
   | E<'variant.passed', { scenario: string; took: number; note: string }>
   | E<'variant.skipped', { scenario: string; note: string }>
@@ -81,7 +81,8 @@ export type GrowUnit = Omit<Of<'unit.found'>, 'kind' | 'v' | 'seq'> & { id: stri
 export type GrowJourney = Omit<Of<'journey.found'>, 'kind' | 'v' | 'seq' | 'journey'> & { id: string; titleBy: Tracer | 'spec' | 'rules' };
 export type GrowAgent = { id: string; brief: string; by: Tracer; model: string | null; units: string[]; unit: string | null; note: string; done: boolean; ok: boolean; said: string[] };
 export type GrowScenario = Omit<Of<'scenario.drafted'>, 'kind' | 'v' | 'seq' | 'scenario'> & { id: string };
-export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null };
+/** A failed run's hop: the route whose step broke, or (after) the last route called before a failed check on other evidence. */
+export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null; hop?: string; after?: boolean };
 export type GrowState = {
   phase: number; phaseAt: Record<number, number>; ms: number;
   change: Of<'change.read'> | null; files: Array<Of<'file.changed'>>;
@@ -152,7 +153,7 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'flows.checked': s.flows = e; break;
     case 'scenario.running': s.run[e.scenario] = { st: 'run' }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
     case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run }; break;
-    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
     case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why }; break;
     case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
