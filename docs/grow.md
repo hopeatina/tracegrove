@@ -28,7 +28,13 @@ tracegrove grow --jsonl > grow.jsonl     # the raw event stream, one JSON object
 
 Every run is saved to `.tracegrove/discovery/<branch>.jsonl`. Each line is one event with `v: "tracegrove.discovery-event/v1"`, a sequence number `seq` and `ms` since the start. Fold the events with `applyGrow` from `src/authoring/growState.ts` to rebuild the state at any point; the terminal frame (`renderGrove`) and the Discover tab both draw from that state.
 
-In the UI, `POST /api/grow` (session token required) streams `session`, `event`, `state` and `done` server-sent events, and `POST /api/grow/mode` answers the mode question.
+In the UI, `POST /api/grow` (session token required) streams `session`, `event`, `state` and `done` server-sent events, and `POST /api/grow/mode` answers the mode question. `GET /api/grow/last?branch=` returns the saved grow of a branch, which the Discover tab reopens on load.
+
+## The tree in the browser
+
+The Discover tab draws the change as a bonsai. The trunk is one tapered shape whose movement is seeded by the branch name, so a change keeps its posture between runs. Limbs leave the trunk low and wide and climb shorter, so the silhouette tapers; each carries a foliage pad that is tinted by proof (plain while drafted, deeper green once every scenario in the chosen mode passed, red when one failed, pulsing gold while one runs). Every scenario is a leaf on its own twig: filled when it passed, red when it failed, dashed when no flow proves it, hollow when it belongs to a larger mode. Gold roots below the soil are what the change depends on; a dashed red root is where tracing had to stop. Labels sit in two columns off the tree, joined by hairline leaders, with five pips under each for how deep the part was checked.
+
+The page reads top down: the verdict, the phases, the tracers, the tree with its inspector, then the scenarios (grouped by part, only the selected part and failures open) beside the spec (one chip per criterion; pick one and the tree lights the parts that serve it). The outline view carries the same facts as a table for trees too large to draw.
 
 ## Exit codes
 

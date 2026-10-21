@@ -104,6 +104,20 @@ describe('grow', () => {
     expect(state.ext[state.extOrder[0]!]?.state).toBe('review');
   });
 
+  it('proves a branch that is not checked out from a worktree with the checkout’s packages and its own build', async () => {
+    const dir = repo();
+    const out = join(temp(), 'built.txt');
+    write(dir, 'package.json', JSON.stringify({ name: 'shop', bin: { shop: 'cli.mjs' }, scripts: { build: `node -e "require('fs').writeFileSync(process.env.GROW_TEST_OUT, process.cwd())"` } }));
+    git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'build script');
+    git(dir, 'checkout', '-q', 'main');
+    mkdirSync(join(dir, 'node_modules', 'left-pad'), { recursive: true });
+    process.env.GROW_TEST_OUT = out;
+    try { await grow({ dir, branch: 'refunds', base: 'main', prove: false, gh: false, agent: { off: true } }); } finally { delete process.env.GROW_TEST_OUT; }
+    const built = readFileSync(out, 'utf8');
+    expect(built).not.toBe(dir);
+    expect(built).toContain('tracegrove-grow-');
+    expect(git(dir, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
+  });
   it('reports a missing base as blocked rather than throwing', async () => {
     const dir = repo();
     const { state } = await grow({ dir, branch: 'refunds', base: 'nope', prove: false, gh: false, agent: { off: true } });

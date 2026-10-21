@@ -8,8 +8,8 @@
  * a criterion resting on agent-written pieces nobody reviewed is "agent-checked", never "proved"; a
  * scenario without a flow is "not proven yet", never green.
  */
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
@@ -98,7 +98,18 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
 
 function worktreeFor(dir: string, branch: string): string | null {
   const path = join(mkdtempSync(join(tmpdir(), 'tracegrove-grow-')), 'tree');
-  try { git(dir, ['worktree', 'add', '--detach', path, branch]); return path; } catch { return null; }
+  try { git(dir, ['worktree', 'add', '--detach', path, branch]); } catch { return null; }
+  prepareWorktree(dir, path);
+  return path;
+}
+/** A fresh worktree has the branch's sources and nothing else. Installed packages come from the checkout next door;
+ *  a build script runs so what proves the branch is the branch's own build, not a stale one. A failed build is left for the flows to report. */
+function prepareWorktree(home: string, work: string): void {
+  for (const dep of ['node_modules', '.venv']) if (existsSync(join(home, dep)) && !existsSync(join(work, dep))) { try { symlinkSync(join(home, dep), join(work, dep), 'dir'); } catch { /* the flows will say what is missing */ } }
+  let scripts: Record<string, unknown> = {};
+  try { scripts = (JSON.parse(readFileSync(join(work, 'package.json'), 'utf8')) as { scripts?: Record<string, unknown> }).scripts ?? {}; } catch { return; }
+  if (typeof scripts.build !== 'string') return;
+  spawnSync('npm', ['run', 'build', '--silent'], { cwd: work, stdio: 'ignore', timeout: 10 * 60_000, env: { ...process.env, CI: '1' } });
 }
 function removeWorktree(dir: string, path: string) {
   try { git(dir, ['worktree', 'remove', '--force', path]); } catch { /* already gone */ }
