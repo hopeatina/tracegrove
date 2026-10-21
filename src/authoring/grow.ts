@@ -9,7 +9,7 @@
  * scenario without a flow is "not proven yet", never green.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
@@ -21,7 +21,7 @@ import { agentEnv, claudeResult, describeAgentLine, detectAgents, resolveAgentSe
 import { matchesTemplate } from './traffic.ts';
 import { runTests } from './run.ts';
 import { draftWithAgent } from './workspace.ts';
-import { findSpec, git, grepAt, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
+import { findSpec, git, grepAt, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import {
   GROW_EVENT_VERSION, MODE_RANK, applyGrow, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
   type GrowState, type Layer, type Mode, type ScenarioKind, type Tracer,
@@ -568,7 +568,7 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
   const draftable = open.filter((s) => routeUnits.has(s.unit));
   if (agent && draftable.length && !ctx.signal?.aborted) {
     const root = dirname(config);
-    const intent = ['Write tracegrove flows that prove these scenarios for this change, one flow per scenario:',
+    const intent = ['Write tracegrove flows that prove these scenarios for this change, one flow per scenario, titled after the scenario. Write nothing else: no flows for other routes.',
       ...draftable.map((s) => { const u = ctx.units.find((x) => x.id === s.unit)!; return `- ${u.label}: ${s.title}. Proves: ${s.proves}`; })].join('\n');
     emit({ kind: 'agent.started', agent: 'd1', brief: 'drafting flows', by: agent.provider as Tracer, model: agent.model, units: [...new Set(draftable.map((s) => s.unit))] });
     try {
@@ -578,7 +578,13 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
       for (const file of drafted.agent.files) {
         const ext = `x${++x}`;
         const flow = drafted.prove?.flows.find((f) => f.file === file);
-        const target = flow ? draftable.find((s) => { const u = ctx.units.find((y) => y.id === s.unit)!; return !state.run[s.id] && flow.served.some((sv) => sv.startsWith(`${u.method} `) && matchesTemplate(u.path!, sv.slice(sv.indexOf(' ') + 1))); }) : undefined;
+        // A written flow speaks for a scenario only when it reached that scenario's route and says the same thing.
+        const title = (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })();
+        const said = termsOf(title);
+        const target = flow ? draftable.map((s) => { const u = ctx.units.find((y) => y.id === s.unit)!;
+          const reached = flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
+          const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
+          return { s, score: !state.run[s.id] && reached && shared >= 2 ? shared : 0 }; }).filter((x) => x.score).sort((a, b) => b.score - a.score)[0]?.s : undefined;
         emit({ kind: 'extension.written', ext, extKind: file.endsWith('.action.yaml') ? 'action' : 'flow', name: basename(file), path: relative(ctx.dir, join(root, file)),
           why: 'No existing flow proved this scenario.', state: 'unproven', need: 'Counts once its run passes end to end; review it before relying on it.', unit: target?.unit ?? null });
         if (!flow || !target) continue;

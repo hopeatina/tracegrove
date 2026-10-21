@@ -4,7 +4,7 @@
  * stream with --jsonl.
  */
 import { grow, type GrowOptions } from '../authoring/grow.ts';
-import { type GrowState, type Mode } from '../authoring/growState.ts';
+import { type GrowEvent, type GrowState, type Mode } from '../authoring/growState.ts';
 import { plainLine, renderGrove } from './renderGrove.ts';
 import { relative, resolve } from 'node:path';
 
@@ -15,7 +15,7 @@ export type GrowFlags = { dir?: string | undefined; branch?: string | undefined;
 const MODE_NAMES: Record<string, Mode> = { min: 'min', minimum: 'min', std: 'std', standard: 'std', max: 'max', maximum: 'max' };
 export const modeOf = (name: string | undefined): Mode | null => (name ? MODE_NAMES[name.toLowerCase()] ?? null : null);
 
-export async function growCommand(flags: GrowFlags, write: (text: string) => void = (t) => process.stdout.write(t)): Promise<{ code: number; state: GrowState; log: string | null }> {
+export async function growCommand(flags: GrowFlags, write: (text: string) => void = (t) => process.stdout.write(t)): Promise<{ code: number; state: GrowState; events: GrowEvent[]; log: string | null }> {
   const out = process.stdout;
   const tty = !!out.isTTY && !flags.json && !flags.jsonl;
   const color = tty && !process.env.NO_COLOR;
@@ -67,5 +67,5 @@ export async function growCommand(flags: GrowFlags, write: (text: string) => voi
   } else if (!flags.json && !flags.jsonl) write(`${renderGrove(result.state, { width: 118, elapsed: result.state.ms + 5000, clock: result.state.ms, color: false, log }).join('\n')}\n`);
   const s = result.state;
   const code = s.blocked ? (s.blocked.code === 'discovery_cancelled' ? 4 : 2) : s.done && s.done.failed > 0 ? 1 : 0;
-  return { code, state: s, log };
+  return { code, state: s, events: result.events, log };
 }
