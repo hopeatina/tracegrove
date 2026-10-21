@@ -116,7 +116,7 @@ export const GROVE_CSS = String.raw`
 .gw-result.bad{background:var(--verm-bg);color:var(--ink)}
 .gw-empty{font-size:13px;color:var(--muted);margin:6px 0}
 @media (max-width:760px){.gw-scrollx{overflow-x:auto;margin:0 -12px;padding:0 12px}.gw-scrollx .gw-svg{min-width:760px}.gw-head>div:last-child{text-align:left!important;display:flex;gap:12px;align-items:center}}
-@media (max-width:640px){.gw-rail{grid-template-columns:repeat(3,minmax(0,1fr))}.gw-ln{grid-template-columns:1fr}.gw-head h2{font-size:20px;line-height:26px}}
+@media (max-width:640px){.gw-ol thead{display:none}.gw-ol tr.u{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:10px 8px;border-bottom:1px solid var(--line)}.gw-ol tr.u td{padding:0;border:0;background:none!important}.gw-ol tr.u.sel,.gw-ol tr.u:hover{background:var(--sel)}.gw-ol tr.u td:first-child{grid-column:1/-1}.gw-ol tr.grp td{display:block}.gw-ol .gw-chip{white-space:nowrap}.gw-rail{grid-template-columns:repeat(3,minmax(0,1fr))}.gw-ln{grid-template-columns:1fr}.gw-head h2{font-size:20px;line-height:26px}}
 @media (prefers-reduced-motion:reduce){.gw-svg .br{transition:none}.gw-svg .lf.sprout,.gw-svg .lf.run,.gw-ag.live b::before{animation:none}}
 `;
 
