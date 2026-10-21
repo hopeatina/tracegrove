@@ -58,7 +58,6 @@ export const GROVE_CSS = String.raw`
 .gw-lay{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:start;font-size:13px}.gw-lay small{display:block;font:11px/15px var(--mono);color:var(--muted)}
 .gw-strip{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
 .gw-cc{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--paper);font:500 12.5px/16px var(--mono);color:var(--ink2)}
-.gw-cc i{width:8px;height:8px;border-radius:50%;background:var(--line2)}.gw-cc i.pass{background:var(--moss)}.gw-cc i.warn,.gw-cc i.run{background:var(--gold)}.gw-cc i.fail,.gw-cc i.miss{background:var(--verm)}.gw-cc i.cov,.gw-cc i.code{background:var(--indigo)}.gw-cc i.open{background:var(--paper);border:1.5px solid var(--muted)}
 .gw-cc:hover{border-color:var(--line2)}.gw-cc[aria-pressed=true]{border-color:var(--ink);background:var(--sel);color:var(--ink)}
 .gw-cdet{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:start;padding:10px 6px 6px;font-size:13px;line-height:19px}
 .gw-cdet .id{font:600 12px/19px var(--mono);color:var(--ink3)}.gw-cdet small{display:block;color:var(--muted);font-size:12px}
@@ -104,7 +103,85 @@ export const GROVE_CSS = String.raw`
 @media (max-width:760px){.gw-head>div:last-child{text-align:left!important;display:flex;gap:12px;align-items:center}}
 @media (max-width:640px){.gw-ol thead{display:none}.gw-ol tr.u td[data-h]::before{content:attr(data-h);display:block;font:500 10px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.gw-ol tr.u{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:10px 8px;border-bottom:1px solid var(--line)}.gw-ol tr.u td{padding:0;border:0;background:none!important}.gw-ol tr.u.sel,.gw-ol tr.u:hover{background:var(--sel)}.gw-ol tr.u td:first-child{grid-column:1/-1}.gw-ol tr.grp td{display:block}.gw-ol .gw-chip{white-space:nowrap}.gw-rail{grid-template-columns:repeat(3,minmax(0,1fr))}.gw-ln{grid-template-columns:1fr}.gw-head h2{font-size:20px;line-height:26px}.gw-sgroup .list{padding-left:8px}}
 @media (prefers-reduced-motion:reduce){.gw-ag.live b::before{animation:none}}
-${BONSAI_CSS}`;
+${BONSAI_CSS}
+/* ---------- The page around the tree: after the tree's own styles, so these win where they meet ---------- */
+.gw-code{font:.92em/1 var(--mono);background:var(--code);border-radius:4px;padding:1px 4px;overflow-wrap:anywhere}
+/* legend marks: small drawings of what the tree draws, in its wood and leaf colours, light and dark */
+.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3))}
+@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
+.gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
+.gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
+.gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
+.gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .rim{fill:var(--sw-rim)}
+.gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
+.gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 22%,var(--paper))}.gw-sw .pot{fill:color-mix(in srgb,var(--ochre) 26%,var(--line2))}
+.gw-sw .rt{fill:none;stroke:var(--sw-wood);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.gw-sw .tl{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linecap:round}.gw-sw .te{fill:var(--paper);stroke:var(--muted);stroke-width:1.1}
+.gw-sw .case{fill:none;stroke:var(--paper);stroke-width:3.2;stroke-linecap:round;opacity:.9}.gw-sw .rte{fill:none;stroke:var(--ink);stroke-width:1.3;stroke-linecap:round;stroke-dasharray:2 3}.gw-sw .rte.bad{stroke:var(--verm)}
+.gw-sw .ring{fill:none;stroke:var(--ink);stroke-width:1}.gw-sw .crk{fill:none;stroke:var(--verm);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.gw-g{display:inline-flex;flex:none;align-items:center;line-height:0}.gw .gb-row>.gw-g{flex:none;margin-top:5px}.gw .gb-row>.gw-n{flex:none;margin-left:auto;padding-left:12px;white-space:nowrap}.gb-gs .gw-sw{vertical-align:0}
+.gw-legend{display:grid;gap:4px;margin:6px 6px 2px;font:12px/18px var(--sans);color:var(--ink3)}
+.gw-lg{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;min-width:0}
+.gw-li{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-width:0}.gw-li .bad{color:var(--verm-ink)}
+.gw-cap{margin:8px 6px 2px}
+.gw-howto{margin:4px 6px 2px;font:12.5px/18px var(--sans);color:var(--ink3)}
+.gw-howto>summary{display:inline-flex;align-items:baseline;gap:6px;min-height:28px;padding:4px 0;cursor:pointer;list-style:none;color:var(--ink3)}
+.gw-howto>summary::-webkit-details-marker{display:none}.gw-howto>summary::before{content:'▸';flex:none;font-size:10px;color:var(--muted)}.gw-howto[open]>summary::before{content:'▾'}
+.gw-howto>summary:hover{color:var(--ink)}.gw-howto p{margin:0 0 6px;max-width:74ch}
+/* the journeys a phone's tree numbers instead of naming: number and title side by side, a long title wrapping beside its number */
+.gw-names{list-style:none;margin:8px 6px 10px;padding:0;display:grid;gap:6px;font:13px/19px var(--sans);color:var(--ink2)}
+.gw-names li{display:grid;grid-template-columns:2.5ch minmax(0,1fr);align-items:baseline;column-gap:4px}
+.gw-names .no{font:600 12px/19px var(--mono);color:var(--muted)}
+.gw-names button{all:unset;cursor:pointer;border-radius:4px;overflow-wrap:anywhere}.gw-names button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}.gw-names button[aria-pressed=true]{text-decoration:underline;text-underline-offset:3px}
+/* the choice: Minimum is recommended while it is open; drawn, so the chip's text is unchanged */
+.gw-modes.ask b[data-rec]::after{content:'Recommended';display:inline-block;margin-left:8px;padding:0 6px;border-radius:4px;background:var(--gold-bg);color:var(--gold);font:500 10px/17px var(--mono);letter-spacing:.06em;text-transform:uppercase;vertical-align:1px}
+.gw-modes.ask button:hover{border-color:var(--ink3)}.gw-modes.ask button{align-content:start}
+/* a criterion's state, in the leaf palette: proved moss, partly proved half moss, failed red, needs you a gold mark of its own */
+.gw-sd{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.gw-sd.proved{background:var(--moss)}.gw-sd.agent{background:var(--gold)}.gw-sd.run{background:var(--gold);box-shadow:0 0 0 2px var(--gold-bg)}
+.gw-sd.part{background:linear-gradient(90deg,var(--moss) 50%,var(--paper) 50%);border:1.5px solid var(--moss)}
+.gw-sd.toprove{background:var(--paper);border:1.5px solid var(--moss)}.gw-sd.code{background:var(--paper);border:1.5px dashed var(--moss)}
+.gw-sd.open{background:var(--paper);border:1.5px solid var(--ink3)}.gw-sd.failed{background:var(--verm)}
+.gw-sd.needs{width:10px;height:9px;border-radius:0;background:var(--gold);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.gw-sum{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+.gw-sp{display:inline-flex;align-items:center;gap:6px;min-height:22px;padding:0 8px;border-radius:5px;border:1px solid transparent;font:500 11.5px/16px var(--mono);background:var(--sel);color:var(--ink2);white-space:nowrap}
+.gw-sp.proved,.gw-sp.part,.gw-sp.toprove,.gw-sp.code{background:var(--moss-bg);color:var(--moss)}.gw-sp.failed{background:var(--verm-bg);color:var(--verm-ink)}
+.gw-sp.agent,.gw-sp.run,.gw-sp.needs{background:var(--gold-bg);color:var(--gold)}.gw-sp.open{background:none;border-color:var(--line2);color:var(--ink3)}
+.gw-cdet .gw-sp{margin-top:1px}
+.gw-chip .gw-sd{margin-right:5px;width:8px;height:8px}.gw-chip .gw-sd.needs{width:9px;height:8px}
+/* the table that helps choose a mode: fixed columns, numbers under their headers */
+.gw .gw-cmp{table-layout:fixed}.gw .gw-cmp th:first-child{width:56%}.gw .gw-cmp th.n,.gw .gw-cmp td.n{width:14.6%;text-align:right;padding:4px 0 6px 12px}.gw .gw-cmp td.n{padding:7px 0 7px 12px}
+.gw .gw-cmp .jt{display:grid;grid-template-columns:2ch minmax(0,1fr);gap:0 4px;align-items:baseline}.gw .gw-cmp .jt .no{margin:0}
+.gw-cmp .sh{display:none}
+@media (min-width:1061px),(max-width:640px){.gw-cmp .lg{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.gw-cmp .sh{display:inline}}
+/* a path breaks only between hops, and each arrow stays with the hop before it */
+.gw .gw-path{gap:4px 6px}.gw .gw-path .hop{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;max-width:100%;min-width:0}
+.gw .gw-path .hop button{white-space:normal;overflow-wrap:anywhere;text-align:left}.gw .gw-path .sep{flex:none}
+/* a journey's state in words: each count whole, wrapping between counts */
+.gw .gb-hd .st .tks{display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:.5em;min-width:0;max-width:100%}.gw .gb-hd .st .tk{display:inline-block;white-space:nowrap}
+.gw .gb-hd .st .gb-gs{justify-content:flex-end}
+/* folds: the marker stays with its words */
+.gw .gb-olf>summary{flex-wrap:nowrap;align-items:baseline;gap:8px}.gw .gb-olf>summary::before{flex:none}.gw .gb-olf>summary>.sm{min-width:0}
+/* the Outline: one column, the same width as a page of text; what is selected opens in place */
+.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
+.gw .gb-ol{max-width:960px}
+@media (min-width:641px){.gw .gb-ol .gb-ols{grid-template-columns:13px minmax(0,max-content) auto;justify-content:start}.gw .gb-ol .gb-ols .bx{justify-content:flex-start}}
+.gw .gb-olr{grid-template-columns:18px minmax(0,1fr) auto}
+.gw-stop{grid-column:2/-1;justify-self:start;white-space:normal;overflow-wrap:anywhere;font:12px/17px var(--sans);color:var(--ink3);border-left:2px dashed var(--line2);padding:1px 0 1px 8px;margin-top:2px}.gw-stop b{font:500 11px/17px var(--mono);color:var(--ink2)}
+.gw-olcard{margin:2px 8px 12px 31px;padding:4px 14px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.gw-olcard .sec:first-child{margin-top:8px}
+.gw-ol tr.det>td{padding:2px 8px 14px;border-bottom:1px solid var(--line);background:var(--sel)}.gw-ol tr.det .gw-olcard{margin:0}
+.gw-mocknote{font:12px/18px var(--sans);color:var(--ink3);margin:10px 6px 0}.gw-mocknote .gw-chip{margin-right:6px}
+.gw-rail .ph b{white-space:normal;overflow:visible}
+@media (max-width:640px){.gw .gb-olr{grid-template-columns:18px minmax(0,1fr)}.gw-ol tr.det{display:block}.gw-ol tr.det>td{display:block;padding:8px}.gw-olcard{margin:2px 0 12px;padding:4px 10px 10px}.gw .gb-hd .st .tks,.gw .gb-hd .st .gb-gs{justify-content:flex-start}.gw .gb-hd .st{white-space:normal;min-width:0}}
+/* a long title pushes the clock and New grow onto their own line: they keep to the right edge, as beside a short one */
+@media (min-width:761px){.gw-head>div:last-child{margin-left:auto}}
+/* in the Outline, the spec card alone takes the Outline's measure, not half the page */
+.gw-two.solo{grid-template-columns:minmax(0,986px)}
+.gw-clock>span{white-space:nowrap}.gw .gb-hd .tt .by{white-space:nowrap}
+/* a phone: the page's own lines sit in from the edge, like the text inside the cards */
+@media (max-width:480px){.gw-head,.gw-rail,.gw-agline{padding-left:16px;padding-right:16px}.gw .card{padding:16px}.gw .gw-tree{padding:12px 11px 8px}.gw-result{padding:16px}
+ .gw-head>div:last-child{justify-content:space-between;width:100%}.gw-head .gw-clock{min-width:0}.gw-head>div:last-child>.btn{margin-top:0!important;flex:none}.gw-agline{overflow-wrap:anywhere}}`;
 
 export const GROVE_JS = String.raw`
 /* ---------- Grow: the change's tree, live ---------- */
@@ -143,6 +220,54 @@ const gwPut=(el,...k)=>{for(const x of k.flat(Infinity))if(x!==null&&x!==undefin
 const gwDur=ms=>ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(1)+' s';
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 const gwQuiet=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
+/* A pointer resting where a control appears is not pointing at it: a mode is previewed on hover only once the pointer has moved. */
+document.addEventListener('pointermove',e=>{if(e.movementX||e.movementY)gw.armed=true},{passive:true});
+/* ---------- Words and marks the whole page shares ---------- */
+const gwBT=String.fromCharCode(96);
+/* Every title the page prints goes through here: text between backticks is inline code, set as code without its backticks. */
+function gwRich(t){const p=String(t==null?'':t).split(gwBT);if(p.length%2===0){const last=p.pop();p[p.length-1]+=gwBT+last}
+ return p.length<3?[p.join('')]:p.map((x,i)=>i%2?h('code',{class:'gw-code'},x):x).filter(x=>x!=='')}
+const gwPlain=t=>String(t==null?'':t).split(gwBT).join('');
+const gwML=id=>(GW.modes.find(m=>m.id===id)||{label:id}).label;
+/* One phrasing for what a mode leaves out, wherever it is said: "Pruned by Minimum: 2 (Standard grows them)". Where the count
+   is already in view, without it: "Pruned by Minimum (Max grows them)". */
+function gwPruned(list,mode,bare){const by={};for(const x of list)by[x.mode]=(by[x.mode]||0)+1;const ks=GW.modes.map(m=>m.id).filter(k=>by[k]);const n=list.length;
+ return 'Pruned by '+gwML(mode)+(bare?'':': '+n)+' ('+(ks.length===1?gwML(ks[0])+' grows '+(n===1?'it':'them'):ks.map(k=>gwML(k)+' grows '+by[k]).join(', '))+')'}
+/* The legend's marks are the tree's own, drawn small: a leaf in each state (a failed one with its bite), a part's sprig, a
+   pruned stub with its cut face, a root in the soil and one over the rim, where tracing stops, a scenario's route on the wood,
+   and the files on it. */
+const gwF=v=>Math.round(v*100)/100;
+const gwCub=(p,t)=>{const u=1-t;return [0,1].map(k=>u*u*u*p[0][k]+3*u*u*t*p[1][k]+3*u*t*t*p[2][k]+t*t*t*p[3][k])};
+function gwLeafD(L,W,bite){const a=-L/2,b=L/2,P=q=>gwF(q[0])+' '+gwF(q[1]);const up=[[a,0],[a+.22*L,-.62*W],[b-.32*L,-.62*W],[b,0]];let top='M'+P(up[0])+' C'+P(up[1])+' '+P(up[2])+' '+P(up[3]);
+ if(bite){const c=[L*.12,-W*.66],r=W*.5,pts=[];for(let i=0;i<=18;i++){const q=gwCub(up,i/18),d=Math.hypot(q[0]-c[0],q[1]-c[1]);pts.push(d<r?[c[0]+(q[0]-c[0])/(d||1)*r,c[1]+(q[1]-c[1])/(d||1)*r]:q)}top='M'+pts.map(P).join(' L')}
+ return top+' C'+P([b-.32*L,.62*W])+' '+P([a+.22*L,.62*W])+' '+P([a,0])+'Z'}
+const gwSvg=(w,hh,...k)=>sv('svg',{class:'gw-sw',width:gwF(w*1.2),height:gwF(hh*1.2),viewBox:'0 0 '+w+' '+hh,'aria-hidden':'true',focusable:'false'},...k);
+function gwSw(k){
+ if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
+ if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
+ if(k==='cut')return gwSvg(16,12,sv('g',{transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
+ if(k==='root')return gwSvg(18,12,sv('rect',{x:0,y:5,width:18,height:7,class:'dirt'}),sv('path',{d:'M.5 5 L17.5 5',class:'soil'}),sv('path',{d:'M1 2.6 C5.6 2.8 9.8 5.4 16.8 10.4 C17 10.6 16.7 11 16.4 10.9 C9.2 7.4 5.4 6 1 6.2 Z',class:'wd'}));
+ if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
+ if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
+ if(k==='route')return gwSvg(32,10,sv('rect',{x:0,y:2.3,width:32,height:5.4,rx:2.7,class:'wd'}),sv('path',{d:'M2.6 5 L29.4 5',class:'case'}),sv('path',{d:'M2.6 5 L20.6 5',class:'rte'}),sv('path',{d:'M23 5 L29.4 5',class:'rte bad'}));
+ if(k==='knot')return gwSvg(14,10,sv('ellipse',{cx:7,cy:5,rx:4.5,ry:2.5,class:'wl'}));
+ if(k==='lit')return gwSvg(16,12,sv('ellipse',{cx:8,cy:6,rx:4.5,ry:2.5,class:'wl'}),sv('ellipse',{cx:8,cy:6,rx:6.6,ry:4.4,class:'ring'}));
+ if(k==='crack')return gwSvg(14,12,sv('ellipse',{cx:7,cy:6,rx:4.8,ry:3,class:'wl'}),sv('path',{d:'M5 3.3 L7.4 5.4 L6 6.6 L8.6 8.8',class:'crk'}));
+ return null}
+/* A criterion's state as a bucket: every criterion lands in exactly one, so the counts always add up to the criteria. */
+const gwCB=st=>{const c=st.cls;return c==='pass'?'proved':c==='warn'?'agent':c==='fail'?'failed':c==='miss'?'needs':c==='open'?'open':c==='run'?'run':c==='cov'?(/ of /.test(st.text)?'part':'toprove'):c==='code'?'code':'wait'};
+const gwCBO=['proved','agent','part','run','toprove','code','wait','open','failed','needs'];
+const gwCBL=(b,n)=>b==='needs'?(n===1?'needs you':'need you'):{proved:'proved',agent:'agent-checked',part:'partly proved',run:'running',toprove:'to prove',code:'found in code',wait:'not traced yet',open:'not proven yet',failed:'failed'}[b];
+const gwCBT={proved:'Every scenario serving it passed',agent:'Passed, resting on agent-written work nobody has reviewed yet',part:'Some of the scenarios serving it passed; the rest did not run',run:'A scenario serving it is running',toprove:'Scenarios serve it; none has run',code:'Found in the code; no scenario serves it yet',wait:'Not traced yet',open:'Scenarios serve it, but none of them ran',failed:'A scenario serving it failed',needs:'Not found in this change: say whether it is built, or take it out of the spec'};
+const gwSD=b=>h('span',{class:'gw-sd '+b,'aria-hidden':'true'});
+function gwBuckets(){const n={};for(const c of gw.view.criteria){const b=gwCB(c.status);n[b]=(n[b]||0)+1}return gwCBO.filter(b=>n[b]).map(b=>[b,n[b]])}
+/* A criterion as a chip that carries its state's mark, wherever criteria are listed. */
+function gwCrit(id){const c=gw.view.criteria.find(q=>q.id===id);const b=c?gwCB(c.status):'wait';return h('span',{class:'gw-chip',title:c?gwPlain(c.text)+' · '+c.status.text:id},gwSD(b),id)}
+/* The chip on a scenario that runs both ways, and the line that says what it means. */
+const gwMockChip=()=>h('span',{class:'gw-chip',title:'Runs against a stand-in on every PR, and against the real provider sandbox when its key is set'},'mock + sandbox');
+const gwMockNote=()=>h('p',{class:'gw-mocknote'},gwMockChip(),'runs against a stand-in on every PR, and against the provider’s real sandbox when its key is set.');
+/* Pointing at a row lights its part of the tree; leaving one view for the other lets go of whatever was lit, so nothing stays highlighted by a row that is gone. */
+function gwCalm(){gw.hov=null;gw.hovEl=null;for(const el of document.querySelectorAll('[data-sid].hl'))el.classList.remove('hl');if(gw.B&&gw.B.tip)gw.B.tip.hidden=true}
 /* The inspector: whatever is pinned (a journey, a scenario or a part); otherwise the part being traced while it runs,
    and once it is done the first failing journey, else the headline one. */
 function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
@@ -151,10 +276,12 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  /* while the choice is open, the panel helps make it: how many scenarios each mode proves on each journey */
  if(!pin&&s.asked&&!s.modeBy&&M.J.length){const order=gw.order&&gw.order.length?gw.order:M.J.map(j=>j.id);const upto=(list,m)=>list.filter(x=>gbRank[x.mode]<=gbRank[m]).length;
   const loose=s.scenarios.filter(x=>!M.J.some(j=>(M.leaves[j.id]||[]).includes(x)));
+  /* beside the tree the panel is narrow, so the columns are headed Min, Std and Max there; a reader of the page hears the names */
+  const SH={min:'Min',std:'Std',max:'Max'};const th=m=>h('th',{class:'n',scope:'col'},h('span',{class:'lg'},m.label),h('span',{class:'sh','aria-hidden':'true',title:m.label},SH[m.id]||m.label));
   gwPut(card,h('span',{class:'who'},'Before you choose'),h('h3',{},'What each mode proves'),
-   h('table',{class:'gw-cmp'},h('thead',{},h('tr',{},h('th',{},'Journey'),GW.modes.map(m=>h('th',{class:'n'},m.label)))),
-    h('tbody',{},order.map((jid,i)=>{const j=M.J.find(q=>q.id===jid);if(!j)return null;const ls=M.leaves[jid]||[];return h('tr',{'data-ol':'j:'+jid,on:{mouseenter:()=>gbLit2('j:'+jid),mouseleave:()=>gbLit2(null)}},h('td',{},h('b',{class:'no'},String(i+1)),j.title),GW.modes.map(m=>h('td',{class:'n'},String(upto(ls,m.id)))))}),
-     loose.length?h('tr',{},h('td',{class:'muted'},'Parts on their own, and existing flows'),GW.modes.map(m=>h('td',{class:'n'},String(upto(loose,m.id))))):null,
+   h('table',{class:'gw-cmp'},h('thead',{},h('tr',{},h('th',{scope:'col'},'Journey'),GW.modes.map(th))),
+    h('tbody',{},order.map((jid,i)=>{const j=M.J.find(q=>q.id===jid);if(!j)return null;const ls=M.leaves[jid]||[];return h('tr',{'data-ol':'j:'+jid,on:{mouseenter:()=>gbLit2('j:'+jid),mouseleave:()=>gbLit2(null)}},h('td',{},h('div',{class:'jt'},h('b',{class:'no'},String(i+1)),h('span',{},...gwRich(j.title)))),GW.modes.map(m=>h('td',{class:'n'},String(upto(ls,m.id)))))}),
+     loose.length?h('tr',{},h('td',{class:'muted'},'Part checks and existing flows'),GW.modes.map(m=>h('td',{class:'n'},String(upto(loose,m.id))))):null,
      h('tr',{class:'tot'},h('td',{},'Scenarios'),GW.modes.map(m=>h('td',{class:'n'},String(v.counts[m.id])))))),
    h('p',{class:'small muted',style:'margin:10px 0 0'},'Point at a mode to see it on the tree: what it keeps stays, what it cuts fades. Nothing runs until you pick.'));return card}
  if(!pin){if(!s.done&&s.focus&&!(s.asked&&!s.modeBy)){pin='u:'+s.focus;const ag=s.agents.find(a=>!a.done&&a.unit===s.focus);who='Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')}
@@ -163,28 +290,40 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  const head=h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},who),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.refocus=gw.pinned;gw.pinned=null;growPaint()}}},s.done?'Unpin':'Follow'):null);
  if(pin.startsWith('j:')){gwPut(card,head,gbJourneyCard(pin.slice(2)));return card}
  if(pin.startsWith('s:')){gwPut(card,head,gbScenarioCard(pin.slice(2)));return card}
- const id=pin.startsWith('u:')?pin.slice(2):pin;const u=gwUnit(id);if(!u)return card;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
- const on=M.J.filter(j=>j.units.includes(id));const own=s.scenarios.filter(x=>x.unit===id&&!M.J.some(j=>(M.leaves[j.id]||[]).includes(x)));
- gwPut(card,head,h('h3',{},u.label),h('div',{class:'where'},(u.root?'what it depends on':'part')+' · '+u.unitKind+' · '+u.loc),
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},on.length?'On '+on.length+' journey'+(on.length===1?'':'s'):'On no journey'),
-   on.length?on.map(j=>h('button',{class:'gb-row',on:{click:()=>{gw.pinned='j:'+j.id;gw.refocus='j:'+j.id;growPaint()}}},h('span',{},j.title),h('span',{class:'small muted'},(M.leaves[j.id]||[]).filter(gwIn).length+' scenarios'))):h('p',{class:'small muted',style:'margin:0'},'Changed, but nothing in this change reaches it. Max checks it on its own.')),
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:10px;margin-bottom:6px'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.pips.filter(p=>p==='ok').length+' of 5 found'+((n=>n?' · '+n+' looked, nothing there':'')(dp.pips.filter(p=>p==='none').length))),dp.pips.includes('stop')?h('span',{class:'gw-badge nf'},'trace stops'):null),
-   GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?h('small',{},e.loc+' · '+e.note):null))})),
-  (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},c.reason,h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
-  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Checked on its own'),own.map(x=>h('button',{class:'gb-row',on:{click:()=>{gw.pinned='s:'+x.id;growPaint()}}},h('span',{},x.title),gwBadge(x)))):null);
+ const id=pin.startsWith('u:')?pin.slice(2):pin;if(!gwUnit(id))return card;
+ gwPut(card,head,gwPartCard(id,false));
  return card}
+/* A part: the journeys that cross it, how deep tracing went and what each look found, how each layer is proved, and its own
+   checks. In the Outline it opens in place under its row, so it leaves out the name the row already shows. A look that found
+   nothing says only that; a file the note already names is not named again beside it. */
+function gwPartCard(id,inline){const s=gw.state,v=gw.view;const M=gw.M||gbModel();const u=gwUnit(id);if(!u)return null;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
+ const on=M.J.filter(j=>j.units.includes(id));const own=s.scenarios.filter(x=>x.unit===id&&!M.J.some(j=>(M.leaves[j.id]||[]).includes(x)));
+ const seen=new Set();
+ const said=e=>{const loc=e.loc&&!/^[-—–\s]*$/.test(e.loc)?e.loc:'';const file=loc.replace(/:\d+(:\d+)?$/,'');let note=(e.note||'').trim();let at=loc;
+  if(file&&note.includes(file)){note=note.replace(file,loc);at=''}if(at&&seen.has(at))at='';if(loc)seen.add(loc);
+  const t=[at,note].filter(Boolean).join(' · ');return t?h('small',{},t):null};
+ return [inline?null:h('h3',{},u.label),inline?null:h('div',{class:'where'},(u.root?'what it depends on':'part')+' · '+u.unitKind+' · '+u.loc),
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},on.length?'On '+on.length+' journey'+(on.length===1?'':'s'):'On no journey'),
+   on.length?on.map(j=>h('button',{class:'gb-row',on:{click:()=>{gw.pinned='j:'+j.id;gw.refocus='j:'+j.id;growPaint()}}},h('span',{},...gwRich(j.title)),h('span',{class:'small muted gw-n'},(n=>n+' scenario'+(n===1?'':'s'))((M.leaves[j.id]||[]).filter(gwIn).length)))):h('p',{class:'small muted',style:'margin:0'},u.root?'No journey in this change reaches it.':'Changed, but nothing in this change reaches it. Max checks it on its own.')),
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:6px 10px;margin-bottom:6px;flex-wrap:wrap'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.pips.filter(p=>p==='ok').length+' of 5 found'+((n=>n?' · '+n+' looked, nothing there':'')(dp.pips.filter(p=>p==='none').length))),dp.pips.includes('stop')?h('span',{class:'gw-badge nf'},'trace stops'):null),
+   GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?said(e):null))})),
+  (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},c.reason,h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
+  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Checked on its own'),own.map(x=>h('button',{class:'gb-row',on:{click:()=>{gw.pinned='s:'+x.id;growPaint()}}},gbGlyph(x),h('span',{},...gwRich(x.title)),gwBadge(x)))):null]}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
  if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms));
  if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return h('span',{class:'gw-badge'+(x.flow?'':' nf'),title:r.why||''},x.flow?'to prove':'no flow yet')}
-/* The spec as a strip of criteria: one chip each, its dot the status; the chosen one opens below and lights its parts in the tree. */
+/* The spec as a strip of criteria: one chip each, its mark the status; the chosen one opens below and lights its parts in the
+   tree. Above the strip, every criterion is counted once, as chips with the same marks. */
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
- const t=v.summary;const open=gw.selCrit?v.criteria.find(c=>c.id===gw.selCrit):null;
+ const open=gw.selCrit?v.criteria.find(c=>c.id===gw.selCrit):null;const ob=open?gwCB(open.status):null;
  const notes=[...s.drift.length?[h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec'),h('span',{},'Changed here, but no criterion covers '+(s.drift.length===1?'it':'them')+'. Confirm '+(s.drift.length===1?'it is':'they are')+' intended, or add '+(s.drift.length===1?'it':'them')+' to the spec.'),s.drift.map(d=>h('span',{class:'mono small'},d.what+' ',h('span',{class:'muted'},d.loc))))]:[],
   ...s.stops.map(x=>h('div',{class:'gw-flag red'},h('b',{},'Tracing stopped at '+((gwUnit(x.unit)||{}).label||x.unit)),h('span',{},x.why+' ',h('span',{class:'mono small muted'},x.at))))];
- gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),s.criteria.length?h('span',{class:'small muted'},t.proved+' proved · '+t.agentChecked+' agent-checked · '+(t.notProven?t.notProven+' not proven yet · ':'')+t.needYou+' need you'):null),
+ const sum=v.criteria.length?gwBuckets():[];
+ gwPut(card,h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),
   h('p',{class:'small muted',style:'margin:4px 0 0'},s.spec?'From '+s.spec.source+', '+s.spec.via:s.specMissing?'No spec: '+s.specMissing:'Looking in the PR, linked issues and commits'),
-  v.criteria.length?h('div',{class:'gw-strip',role:'group','aria-label':'Criteria'},v.criteria.map(c=>h('button',{class:'gw-cc','aria-pressed':gw.selCrit===c.id?'true':'false',title:c.text+' · '+c.status.text,on:{click:()=>{gw.selCrit=gw.selCrit===c.id?null:c.id;growPaint()}}},h('i',{class:c.status.cls}),c.id))):null,
-  open?h('div',{class:'gw-cdet'},h('span',{class:'id'},open.id),h('span',{},open.text,h('small',{},s.unbuilt[open.id]?s.unbuilt[open.id]:open.units.length?'in '+open.units.map(id=>(gwUnit(id)||{}).label).join(', '):'No part of the change matched its words yet.')),h('span',{class:'gw-badge '+open.status.cls},open.status.text)):
+  sum.length?h('div',{class:'gw-sum','data-testid':'grow-spec-summary','aria-label':v.criteria.length+' criteria'},sum.map(([b,n])=>h('span',{class:'gw-sp '+b,title:gwCBT[b]},gwSD(b),n+' '+gwCBL(b,n)))):null,
+  v.criteria.length?h('div',{class:'gw-strip',role:'group','aria-label':'Criteria'},v.criteria.map(c=>h('button',{class:'gw-cc','aria-pressed':gw.selCrit===c.id?'true':'false',title:gwPlain(c.text)+' · '+c.status.text,on:{click:()=>{gw.selCrit=gw.selCrit===c.id?null:c.id;growPaint()}}},gwSD(gwCB(c.status)),c.id))):null,
+  open?h('div',{class:'gw-cdet'},h('span',{class:'id'},open.id),h('span',{},...gwRich(open.text),h('small',{},s.unbuilt[open.id]?s.unbuilt[open.id]:open.units.length?'in '+open.units.map(id=>(gwUnit(id)||{}).label).join(', '):'No part of the change matched its words yet.')),h('span',{class:'gw-sp '+ob,title:gwCBT[ob]},gwSD(ob),open.status.text)):
    v.criteria.length?h('p',{class:'gw-empty',style:'margin:6px 0 0'},'Pick a criterion to see which parts serve it; the tree lights them.'):null,
   s.dropped.length?h('div',{class:'gw-flag red'},h('b',{},s.dropped.length+' agent claim'+(s.dropped.length===1?'':'s')+' dropped'),h('span',{},s.dropped.slice(0,3).map(x=>x.why).join('; ')+(s.dropped.length>3?'; and more':''))):null,
   notes.length?h('details',{class:'gw-notes',open:notes.some(n=>n.classList.contains('red'))?true:null},h('summary',{},notes.length+' note'+(notes.length===1?'':'s')+': '+[s.drift.length?s.drift.length+' in the code, not in the spec':null,s.stops.length?'tracing stopped '+s.stops.length+'×':null].filter(Boolean).join(' · ')),notes):null);
@@ -213,13 +352,19 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
 /* scenarios that did not run, in the tree's words: no flow yet when nothing proves them, not run when one exists */
 function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length,rest=nr.length-nf;
  return (nf?', '+nf+' with no flow yet':'')+(rest?', '+rest+' not run':'')}
-function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');
- return h('div',{class:'gw-result','data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),
-  h('div',{class:'sub'},(s.criteria.length?'Spec: '+t.proved+' of '+t.criteria+' criteria proved, '+t.agentChecked+' agent-checked'+(t.notProven?', '+t.notProven+' not proven yet':'')+', '+t.needYou+' need you. ':'No spec to check against. ')+(fail?'First failure: '+fail.title+'. ':'')+(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''))),
+/* The spec's line in the verdict counts each criterion once, in the spec panel's words. */
+function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
+ return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved, '+(B.agent||0)+' agent-checked'+['part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
+function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
+ gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(fail.title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
+ return h('div',{class:'gw-result','data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),sub),
   h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs')))}
 /* How much to prove sits right above the tree it prunes; hovering a choice previews the cut. */
 function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;const locked=!!s.modeBy;
  const cur=locked?s.mode:(gw.picking||null),lbl=id=>GW.modes.find(m=>m.id===id).label;
+ /* the choice opens with the whole drafted tree: no mode is chosen or previewed until the pointer moves onto a chip or a chip takes focus,
+    so a pointer that happens to rest where a chip appears previews nothing */
+ if(asked&&gw.askFor!==(gw.id||'saved')){gw.askFor=gw.id||'saved';gw.armed=false;if(gw.preview){gw.preview=null}}
  const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+lbl(s.mode)+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.';
  /* pointing at a mode previews it on the tree, and a line beside the hint says what it keeps and cuts; the hint itself stays */
  const idle=locked?'Point at another mode to see what it grows; a new grow proves it.':asked?'Point at a mode to see it on the tree.':'';
@@ -228,23 +373,29 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   if(!locked){el.textContent='Preview · '+lbl(id)+' keeps '+n+' of the '+all+' drafted'+(all>n?' and cuts '+(all-n):'')+'.';return}
   const c=v.counts[cur];el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+', as ghosts on the tree.':n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{if(gw.preview){gw.preview=null;gbPaint();say(null)}};
- return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':' set'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'data-testid':'grow-mode-'+m.id,'aria-pressed':String((locked?s.mode:(gw.picking||'min'))===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':null,
-   on:{click:()=>{if(!asked)return;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>look(m.id),focus:()=>look(m.id),mouseleave:away,blur:away}},h('b',{},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
+ return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':' set'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every spec criterion':null,
+   on:{click:()=>{if(!asked)return;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gw.armed)look(m.id)},pointermove:e=>{if(e.movementX||e.movementY)gw.armed=true;if(gw.armed&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:away,blur:away}},
+   /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
+   h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
   h('div',{class:'gw-hintrow'},h('p',{class:'small muted','data-testid':'grow-mode-hint',style:'margin:0'},said),h('span',{class:'small muted gw-more','data-testid':'grow-mode-preview','aria-live':'polite'},idle)))}
-/* The key under the tree: what a branch is, where a leaf sits on its pad and why, and what each leaf's colour means. */
+/* Under the tree, top down: on a phone, the journeys its numbers stand for; then one line of what each leaf's look means and one
+   of the wood (roots, where tracing stops, a scenario's route and the files on it), each with the tree's own mark; what the mode
+   pruned; and, folded, how to read a branch and a pad. */
 function gwKey(){const s=gw.state;const drafted=s.scenarios.length,inm=s.scenarios.filter(gwIn).length;const M=gw.M,B=gw.B;
- const one=!!M&&M.J.length===1,narrow=!!(B&&B.L&&B.L.narrow);const lf=(c,t)=>h('span',{},h('i',{class:c}),t);const left=drafted-inm;
- const onJ=x=>!!M&&M.J.some(j=>(M.leaves[j.id]||[]).includes(x));const out=s.scenarios.filter(x=>!gwIn(x));const outJ=out.filter(onJ).length,outP=out.length-outJ;
+ const one=!!M&&M.J.length===1,narrow=!!(B&&B.L&&B.L.narrow);const it=(k,t)=>h('span',{class:'gw-li'},gwSw(k),h('span',{},t));
+ const onJ=x=>!!M&&M.J.some(j=>(M.leaves[j.id]||[]).includes(x));const out=s.scenarios.filter(x=>!gwIn(x));const outJ=out.filter(onJ).length;
  const buds=!!M&&s.scenarios.some(x=>!onJ(x)&&(!s.modeBy||gwIn(x)));const crack=!!(B&&Object.values(B.knot||{}).some(k=>k.classList.contains('wound')));
- const roots=B&&B.L?B.L.roots.filter(r=>r.id).map(r=>M.U[r.id]).filter(Boolean):[];
- const modeOf=m=>GW.modes.find(q=>q.id===m).label;const partModes=[...new Set(out.filter(x=>!onJ(x)).map(x=>modeOf(x.mode)))];
- return [h('div',{class:'gb-key'},h('span',{},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.')),
-  h('div',{class:'gb-key'},h('span',{},'On a pad, the happy path sits on the crest, guards on the shoulders, and the ways it fails hang beneath.')),
-  h('div',{class:'gb-key'},lf('','passed'),lf('fail','failed'),lf('run','running'),lf('in','to prove'),lf('none','no flow yet'),crack?lf('crack','where it failed'):null,buds?lf('bud','a part checked on its own (Max)'):null,lf('cut','pruned, cut back')),
-  roots.length?h('div',{class:'gb-key'},roots.some(u=>u.layer!=='ext')?lf('root','a root: what it depends on in the repo'):null,roots.some(u=>u.layer==='ext')?lf('root ext','over the rim: a service outside it'):null,s.stops.length?lf('stop','where tracing stops'):null):null,
-  h('div',{class:'gb-key'},lf('kroute','the route a scenario runs, leaf to roots; red where it broke'),lf('kring','a file on that route')),
-  narrow&&M?h('ol',{class:'gb-names'},(gw.order||[]).map(id=>h('li',{},h('button',{class:'gb-nm','aria-pressed':String(gw.pinned==='j:'+id),on:{click:()=>{gw.pinned=gw.pinned==='j:'+id?null:'j:'+id;growPaint()}}},(M.J.find(j=>j.id===id)||{}).title||'')))):null,
-  s.modeBy&&left>0?h('div',{class:'gb-cap'},modeOf(s.mode)+' keeps '+inm+' of the '+drafted+' drafted scenarios. Pruned: '+[outJ?outJ+' on journeys (the cut stubs and stems)':null,outP?outP+' part and regression checks that only '+partModes.join(' and ')+' grows':null].filter(Boolean).join('; ')+'.'):null]}
+ const roots=B&&B.L&&B.L.roots?B.L.roots.filter(r=>r.id).map(r=>M.U[r.id]).filter(Boolean):[];
+ const names=narrow&&M&&(gw.order||[]).length?h('ol',{class:'gw-names','aria-label':'The journeys on the tree'},(gw.order||[]).map((id,i)=>{const j=M.J.find(q=>q.id===id);const t=j?j.title:'';
+  return h('li',{},h('span',{class:'no','aria-hidden':'true'},String(i+1)),h('button',{'aria-pressed':String(gw.pinned==='j:'+id),'aria-label':'Journey '+(i+1)+': '+gwPlain(t),on:{click:()=>{gw.pinned=gw.pinned==='j:'+id?null:'j:'+id;growPaint()}}},...gwRich(t)))})):null;
+ const leaves=h('div',{class:'gw-lg'},it('pass','passed'),it('fail','failed'),it('run','running'),it('in','to prove'),it('none','no flow yet'),buds?it('bud','part checked on its own'):null,it('cut','pruned'));
+ const route=h('div',{class:'gw-lg'},h('span',{class:'gw-li'},gwSw('route'),h('span',{},'the route a scenario runs · ',h('span',{class:'bad'},'red where it broke'))),it('knot','a file on the route'),it('lit','on the lit route'),crack?it('crack','where it failed'):null);
+ const ground=roots.length||s.stops.length?h('div',{class:'gw-lg'},roots.some(u=>u.layer!=='ext')?it('root','a root in the repo'):null,roots.some(u=>u.layer==='ext')?it('ext','over the rim: a service outside'):null,s.stops.length?it('stop','where tracing stops'):null):null;
+ const cap=s.modeBy&&out.length?h('div',{class:'gb-cap gw-cap'},gwML(s.mode)+' keeps '+inm+' of the '+drafted+' drafted. '+gwPruned(out,s.mode)+'.'+(outJ?' On the tree, '+(outJ===out.length?(outJ===1?'it is the cut stub on its journey.':'they are the cut stubs and stems on the journeys.'):outJ===1?'1 of them is the cut stub on its journey.':outJ+' of them are the cut stubs and stems on the journeys.'):'')):null;
+ const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{gw.howOpen=e.currentTarget.open}}},h('summary',{},'How to read the tree'),
+  h('p',{},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.'),
+  h('p',{},'On a pad, the happy path sits on the crest, guards on the shoulders, and the ways it fails hang beneath.'));
+ return [names,h('div',{class:'gw-legend','aria-label':'Legend'},leaves,route,ground),cap,how]}
 /* The page, top down: the verdict once there is one, the phases (quiet when done), the tracers, the tree with its inspector, then the journeys and the spec side by side, then what the agent built.
    Everything paints into fixed slots so the tree's SVG stays where it is between paints: moving a node resets its transitions, and the limbs would snap instead of grow. */
 function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start','head','verdict','rail','agents','tree','two','error'])S[k]=h('div',{});
@@ -263,18 +414,20 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  const v=gw.view;const c=s.change;
  gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
    h('div',{class:'sub'},c?((c.pr?'#'+c.pr+' · ':'')+c.files+' files · +'+c.adds+' −'+c.dels+(c.untraced?' · '+c.untraced+' small parts not traced':'')+(s.spec?' · spec: '+s.spec.source:'')):'')),
-  h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gw.saved?'saved '+ago(gw.saved)+' · took '+gwFmt(s.ms):gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.pinned=null;growPaint()}}},'New grow'):null)));
+  h('div',{style:'text-align:right'},h('div',{class:'gw-clock'},gw.saved?[h('span',{},'saved '+ago(gw.saved)),' · ',h('span',{},'took '+gwFmt(s.ms))]:gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.pinned=null;growPaint()}}},'New grow'):null)));
  gwSet(S.verdict,s.blocked?h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))):null,s.done?gwResult():null);
  gwSet(S.rail,h('div',{class:'gw-rail'+(s.done?' quiet':''),role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?((en-st)/1000).toFixed(1)+' s':'now'))})));
  const rules=s.agents.filter(a=>a.by==='rules'&&a.done&&a.ok),live=s.agents.filter(a=>!rules.includes(a)&&(!s.done||!a.ok||a.by!=='rules'));
- const traced=(n=>n+' part'+(n===1?'':'s')+' traced from source')(rules.reduce((n,a)=>n+a.units.length,0));
+ /* what the rules traced, counted as the header counts it: changed parts, and the dependencies they reach */
+ const tids=new Set(rules.flatMap(a=>a.units||[])),tp=[...tids].filter(id=>{const u=gwUnit(id);return !u||!u.root}).length,td=tids.size-tp;
+ const traced='traced from source: '+tp+' part'+(tp===1?'':'s')+(td?', '+td+' dependenc'+(td===1?'y':'ies'):'');
  if(s.done&&!live.some(a=>!a.ok))gwSet(S.agents,rules.length||live.length?h('p',{class:'gw-agline'},'✓ rules · '+rules.length+' lane'+(rules.length===1?'':'s')+' · '+traced+live.map(a=>' · ✓ '+(a.model||a.by)+' · '+a.brief).join('')):null);
  else gwSet(S.agents,live.length||rules.length?h('div',{class:'gw-agents','aria-live':'polite'},rules.length?h('div',{class:'gw-ag'},h('b',{},'✓ rules · '+rules.length+' lane'+(rules.length===1?'':'s')),h('span',{},traced)):null,live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.model||a.by)+' · '+a.brief),h('span',{title:a.note},a.note)))):null);
  const nj=(s.journeys||[]).length;
  gwSet(S.bar,h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},(nj?nj+' journey'+(nj===1?'':'s')+' · ':'')+s.units.filter(u=>!u.root).length+' part'+(s.units.filter(u=>!u.root).length===1?'':'s')+' · '+(n=>n+' dependenc'+(n===1?'y':'ies'))(s.units.filter(u=>u.root).length)),
   h('span',{class:'row',style:'gap:10px'},
-   h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,'data-ol':'v:'+t,on:{click:()=>{gw.tree=t;gw.refocus='v:'+t;gw.reveal=t==='outline'?gw.pinned:null;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
+   h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,'data-ol':'v:'+t,on:{click:()=>{if(gw.tree!==t)gwCalm();gw.tree=t;gw.refocus='v:'+t;gw.reveal=t==='outline'?gw.pinned:null;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
  gwSet(S.mode,s.scenarios.length||s.asked?gwModes():null);
  if(gw.tree==='grove'){if(S.left.firstChild!==S.scroll)S.left.replaceChildren(S.scroll,S.legend);
   /* the tree is drawn for the width it gets, so it waits until it is on the page */
@@ -282,9 +435,12 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
   else{gbPaint();if(S.scroll.firstChild!==gw.svg)S.scroll.replaceChildren(gw.svg,gw.B.tip)}
   gwSet(S.legend,s.scenarios.length?gwKey():null)}
  else S.left.replaceChildren(gbOutline());
- gwSet(S.ins,gwInspector());
+ /* the Outline already lists every journey and opens what is selected in place, so it stands alone at a readable width; only
+    while the choice is open does the panel stay beside it, with what each mode proves */
+ const alone=gw.tree==='outline'&&!(s.asked&&!s.modeBy);S.stage.classList.toggle('ol',alone);S.ins.hidden=alone;
+ if(alone)S.ins.replaceChildren();else gwSet(S.ins,gwInspector());
  /* the Outline is the journey list, so it is not repeated below it */
- gwSet(S.two,gw.tree==='outline'?h('div',{class:'gw-two'},gwSpec(),gwExt()):h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwExt())));
+ gwSet(S.two,gw.tree==='outline'?(()=>{const x=gwExt();return h('div',{class:'gw-two'+(x?'':' solo')},gwSpec(),x)})():h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwExt())));
  gwSet(S.error,gw.error?blocked(gw.error):null);
  /* focus stays where it was across a repaint: on the row, button or part of the tree that was used, or what was let go of */
  const find=k=>k.startsWith('t:')?gw.el.querySelector('[data-testid="'+k.slice(2).replace(/["\\]/g,'')+'"]'):[...gw.el.querySelectorAll('[data-ol]')].find(e=>e.getAttribute('data-ol')===k)||(gw.tree==='grove'&&gw.svg?[...gw.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k):null);

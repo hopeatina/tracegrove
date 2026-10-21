@@ -839,29 +839,32 @@ function gbCursors(now){const B=gw.B,s=gw.state;if(!B||!s||gw.tree!=='grove')ret
  for(const id in B.knot)B.knot[id].classList.toggle('trace',keep.size>0&&s.agents.some(a=>!a.done&&keep.has(a.id)&&gwAt(a,now+performance.timeOrigin)===id))}
 
 /* ---------- Journeys: the list the tree draws, and the inspector's cards ---------- */
+/* The path a journey crosses, hop by hop. A hop never breaks inside and its arrow stays with it, so a line breaks only between
+   hops and never starts with an arrow. */
 function gbPathEl(j,wound){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
- return h('div',{class:'gb-path'},order.flatMap((u,i)=>[i?h('span',{class:'sep'},'›'):null,h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},u.label)]))}
+ return h('div',{class:'gb-path gw-path'},order.map((u,i)=>h('span',{class:'hop'},h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwRich(u.label)),
+  i<order.length-1?h('span',{class:'sep','aria-hidden':'true'},'›'):null)))}
 function gbJourneyCard(jid){const s=gw.state,M=gw.M;const j=M.J.find(q=>q.id===jid);if(!j)return null;const n=(gw.order||[]).indexOf(jid)+1;
- const list=M.leaves[jid];const inm=list.filter(x=>!s.modeBy||gwIn(x));const later=m=>list.filter(x=>x.mode===m&&!gwIn(x)).length;const wound=list.map(x=>gbWound(M,j,x)).find(Boolean);
+ const list=M.leaves[jid];const inm=list.filter(x=>!s.modeBy||gwIn(x));const cut=s.modeBy?list.filter(x=>!gwIn(x)):[];const wound=list.map(x=>gbWound(M,j,x)).find(Boolean);
  const crit=[...M.crit(j)].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
- return [h('h3',{style:'font:500 17px/24px var(--sans)'},j.title),h('div',{class:'where'},'Journey '+(n||'')+' · starts '+(gbWHERE[j.surface]||'')+' at '+((M.U[j.entry]||{}).label||'')+(j.by&&j.by!=='rules'?' · named by '+(j.by==='spec'?'the spec':j.by):'')),
+ return [h('h3',{style:'font:500 17px/24px var(--sans)'},...gwRich(j.title)),h('div',{class:'where'},'Journey '+(n||'')+' · starts '+(gbWHERE[j.surface]||'')+' at '+((M.U[j.entry]||{}).label||'')+(j.by&&j.by!=='rules'?' · named by '+(j.by==='spec'?'the spec':j.by):'')),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,wound)),
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios · '+(s.modeBy?inm.length+' in '+GW.modes.find(m=>m.id===s.mode).label.toLowerCase():inm.length+' drafted')),
-   inm.length?gbROLE.map(([p,t])=>{const g=gbOrd(inm.filter(x=>gbPol(x)===p));return g.length?[h('div',{class:'gb-sub',style:'margin:8px 0 2px'},t),...g.map(x=>h('button',{class:'gb-row','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.refocus='s:'+x.id;growPaint()}}},gbGlyph(x),h('span',{},x.title),gwBadge(x)))]:null}).flat():h('p',{class:'gw-empty'},'None in this mode.'),
-   s.modeBy&&(later('std')||later('max'))?h('p',{class:'small muted',style:'margin:6px 0 0'},'Pruned: '+[later('std')?later('std')+' in Standard':null,later('max')?later('max')+' in Max':null].filter(Boolean).join(', ')+'.'):null),
-  crit.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Spec it answers'),h('div',{class:'gw-chips'},crit.map(c=>h('span',{class:'gw-chip'},c)))):null]}
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios · '+(s.modeBy?inm.length+' in '+gwML(s.mode):inm.length+' drafted')),
+   inm.length?gbROLE.map(([p,t])=>{const g=gbOrd(inm.filter(x=>gbPol(x)===p));return g.length?[h('div',{class:'gb-sub',style:'margin:8px 0 2px'},t),...g.map(x=>h('button',{class:'gb-row','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.refocus='s:'+x.id;growPaint()}}},gbGlyph(x),h('span',{},...gwRich(x.title)),gwBadge(x)))]:null}).flat():h('p',{class:'gw-empty'},'None in this mode.'),
+   cut.length?h('p',{class:'small muted',style:'margin:6px 0 0'},gwPruned(cut,s.mode)+'.'):null),
+  crit.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Spec it answers'),h('div',{class:'gw-chips'},crit.map(gwCrit))):null]}
 function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=>q.id===sid);if(!x)return null;const j=M.J.find(q=>M.leaves[q.id].includes(x));const r=s.run[x.id];
- return [h('h3',{style:'font-family:var(--sans);font-weight:500'},x.title),h('div',{class:'where'},(j?gbROLEW[gbPol(x)]+' · journey: '+j.title:(x.scenarioKind==='regression'?'existing flow':'part check')+' · '+((M.U[x.unit]||{}).label||''))),
-  h('div',{class:'sec'},h('div',{class:'row',style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},GW.modes.find(m=>m.id===x.mode).label.toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
-   h('p',{class:'small',style:'margin:8px 0 0;color:var(--ink2)'},x.proves),r&&r.st==='fail'?h('div',{class:'gw-flag red'},h('b',{},'Failed'),h('span',{class:'mono small'},r.why||'')):null),
+ return [h('h3',{style:'font-family:var(--sans);font-weight:500'},...gwRich(x.title)),h('div',{class:'where'},...(j?[gbROLEW[gbPol(x)]+' · journey: ',...gwRich(j.title)]:[(x.scenarioKind==='regression'?'existing flow':'part check')+' · '+((M.U[x.unit]||{}).label||'')])),
+  h('div',{class:'sec'},h('div',{class:'row',style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
+   h('p',{class:'small',style:'margin:8px 0 0;color:var(--ink2)'},...gwRich(x.proves)),r&&r.st==='fail'?h('div',{class:'gw-flag red'},h('b',{},'Failed'),h('span',{class:'mono small'},r.why||'')):null),
   j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'End to end through'),gbPathEl(j,gbWound(M,j,x))):null,
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},x.flow?h('span',{class:'gw-chip built'},x.flow):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(c=>h('span',{class:'gw-chip'},c)),
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},x.flow?h('span',{class:'gw-chip built'},x.flow):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
     x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),x.variants.length?gwLanes(x):null)]}
 
 /* ---------- The lists: the tree's journeys as rows ---------- */
 /* A scenario's glyph in a list is the legend's own: passed, failed, running, to prove, no flow yet, or pruned. */
-function gbGlyph(x){const s=gw.state,r=s.run[x.id];const c=s.modeBy&&!gwIn(x)?'cut':!r?(!s.modeBy&&!gwIn(x)?'in pre':'in'):r.st==='pass'?'':r.st==='fail'?'fail':r.st==='run'?'run':x.flow?'in':'none';
- return h('i',{class:'gb-g '+c,'aria-hidden':'true'})}
+function gbGlyph(x){const s=gw.state,r=s.run[x.id];const c=s.modeBy&&!gwIn(x)?'cut':!r?(!s.modeBy&&!gwIn(x)?'pre':'in'):r.st==='pass'?'pass':r.st==='fail'?'fail':r.st==='run'?'run':x.flow?'in':'none';
+ const g=gwSw(c);g.setAttribute('width','13');g.setAttribute('height','10');return h('span',{class:'gw-g gb-g '+c,'aria-hidden':'true'},g)}
 const gbROLE=[['happy','Happy path'],['guard','Guards · what it must refuse'],['failure','Fails · and must fail safely']];
 const gbROLEW={happy:'happy path',guard:'guard',failure:'fails'};
 /* Scenarios in the order a pad holds them: the happy path, then guards, then failures; the minimum's first in each, pruned last. */
@@ -871,53 +874,64 @@ const gbNarrowList=()=>{try{return matchMedia('(max-width:1060px)').matches}catc
 function gbOlPin(k){gw.pinned=gw.pinned===k?null:k;gw.refocus=k;growPaint()}
 const gbOlOpen=(key,dflt)=>gw.open&&key in gw.open?gw.open[key]:!!dflt;
 function gbOlFold(key,sum,kids,dflt){const open=gbOlOpen(key,dflt);const el=h('details',{class:'gb-olf',open:open?true:null});
- gwPut(el,h('summary',{'data-ol':'f:'+key,on:{click:e=>{e.preventDefault();(gw.open||(gw.open={}))[key]=!open;gw.refocus='f:'+key;growPaint()}}},sum),open?kids:null);return el}
+ gwPut(el,h('summary',{'data-ol':'f:'+key,on:{click:e=>{e.preventDefault();(gw.open||(gw.open={}))[key]=!open;gw.refocus='f:'+key;growPaint()}}},h('span',{class:'sm'},sum)),open?kids:null);return el}
 /* Pointing at a row lights its leaf and route on the tree, without the tree's card. */
 const gbLit2=k=>{if(gw.tree==='grove'&&gw.B)gbHover(k,null)};
 /* A scenario as a row: its leaf, its title, its state. Pinned, it opens in place when the inspector is out of sight. A pruned
    one is named and struck through, with the mode that grows it. */
 function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw.pinned===k;
- if(s.modeBy&&!gwIn(x))return h('div',{class:'gb-ols cut','data-sid':x.id},gbGlyph(x),h('span',{class:'t'},x.title),h('span',{class:'bx'},h('span',{class:'gw-badge'},'in '+gbModeName(x.mode))));
+ if(s.modeBy&&!gwIn(x))return h('div',{class:'gb-ols cut','data-sid':x.id},gbGlyph(x),h('span',{class:'t'},...gwRich(x.title)),h('span',{class:'bx'},h('span',{class:'gw-badge'},gwML(x.mode)+' grows it')));
  return [h('button',{class:'gb-ols'+(pin?' sel':''),'data-sid':x.id,'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k),mouseenter:()=>gbLit2(k),mouseleave:()=>gbLit2(null)}},
-   gbGlyph(x),h('span',{class:'t'},x.title),
-   h('span',{class:'bx'},x.variants.length?h('span',{class:'gw-chip',title:'Runs against a stand-in and, with a key, the real sandbox'},'mock + real'):null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x))),
+   gbGlyph(x),h('span',{class:'t'},...gwRich(x.title)),
+   h('span',{class:'bx'},x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x))),
   r&&r.st==='fail'&&!(pin&&inline)?h('div',{class:'err'},gwCut(r.why||'failed',180)):null,pin&&inline?gbRowBody(x):null]}
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
- gwPut(el,h('span',{},x.proves),h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gbModeName(x.mode).toLowerCase()),x.criteria.map(c=>h('span',{class:'gw-chip'},c)),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
-   x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):h('span',{class:'gw-chip missing'},'no flow yet'),
+ gwPut(el,h('span',{},...gwRich(x.proves)),h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.criteria.map(gwCrit),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
+   /* the row's badge already says "no flow yet"; the body names the flow when there is one */
+   x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):null,
    x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),
-  x.variants.length?gwLanes(x):null,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},r.why||'failed'):null,r&&r.st==='not_run'&&r.why?h('span',{class:'small muted'},r.why):null);return el}
+  x.variants.length?gwLanes(x):null,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},r.why||'failed'):null,r&&r.st==='not_run'&&r.why&&x.flow?h('span',{class:'small muted'},r.why):null);return el}
 /* A journey as the lists draw it: its number and name as on the tree, where it starts, its state in the tree's words, the path
    it crosses, then its scenarios by what they prove, in the order its pad holds them. What the mode cut is listed by name. */
 function gbJourneyBlock(j,n,M,fold){const s=gw.state;const list=M.leaves[j.id]||[];const inm=gbOrd(list.filter(x=>!s.modeBy||gwIn(x))),out=gbByRole(list.filter(x=>s.modeBy&&!gwIn(x)));
  const key='j:'+j.id,pinned=gw.pinned===key,mine=!!gw.pinned&&list.some(x=>gw.pinned==='s:'+x.id);
  const wound=list.map(x=>gbWound(M,j,x)).find(Boolean);const fail=list.some(x=>s.run[x.id]&&s.run[x.id].st==='fail');
- const toks=gbTok(list,j,s.modeBy?s.mode:null,x=>!s.modeBy||gwIn(x));const inline=fold||gbNarrowList();
- const head=[h('span',{class:'no'},String(n)),h('span',{class:'tt','data-testid':'grow-ol-title-'+n},j.title,j.by&&j.by!=='rules'?h('span',{class:'by'},j.by==='spec'?'from the spec':j.by):null),
+ /* a journey the mode cut entirely says so in the page's one phrasing for pruning */
+ const toks=s.modeBy&&list.length&&!inm.length?[[gwPruned(list,s.mode),'n']]:gbTok(list,j,s.modeBy?s.mode:null,x=>!s.modeBy||gwIn(x));const inline=fold||gw.tree==='outline'||gbNarrowList();
+ const head=[h('span',{class:'no'},String(n)),h('span',{class:'tt','data-testid':'grow-ol-title-'+n},...gwRich(j.title),j.by&&j.by!=='rules'?h('span',{class:'by'},j.by==='spec'?'from the spec':j.by):null),
   h('span',{class:'wh'},'starts '+(gbWHERE[j.surface]||'')+' at '+((M.U[j.entry]||{}).label||'')),
-  h('span',{class:'st'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,h('span',{},toks.flatMap((w,i)=>[i?' · ':null,h('span',{class:w[1]},w[0])])))];
+  /* each count is whole and the line wraps between counts, its dot staying with the count before it */
+  h('span',{class:'st'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,h('span',{class:'tks'},toks.map((w,i)=>h('span',{class:'tk'},h('span',{class:w[1]},w[0]),i<toks.length-1?h('span',{class:'n'},' ·'):null))))];
  const body=h('div',{class:'gb-olx'});
  gwPut(body,gbPathEl(j,wound),!list.length?h('p',{class:'gw-empty'},'Scenarios appear here as they are drafted.'):null,
   gbROLE.map(([p,t])=>{const g=inm.filter(x=>gbPol(x)===p);return g.length?[h('div',{class:'gb-sub'},t),g.map(x=>gbRow(x,inline))]:null}),
   list.length&&!inm.length?h('p',{class:'gw-empty'},'None in '+gbModeName(s.mode)+'.'):null,
-  out.length?gbOlFold('cut:'+j.id,out.length+' pruned by '+gbModeName(s.mode)+' · '+[...new Set(out.map(x=>gbModeName(x.mode)))].join(' and ')+' grows '+(out.length===1?'it':'them'),out.map(x=>gbRow(x))):null);
+  out.length?gbOlFold('cut:'+j.id,gwPruned(out,s.mode),out.map(x=>gbRow(x))):null);
  if(fold){const open=gbOlOpen(key,pinned||mine||fail);const el=h('details',{class:'gb-jr'+(fail?' failed':'')+(pinned||mine?' sel':''),open:open?true:null});
   gwPut(el,h('summary',{class:'gb-hd','data-ol':key,on:{click:e=>{e.preventDefault();(gw.open||(gw.open={}))[key]=!open;gw.pinned=!open?key:gw.pinned===key?null:gw.pinned;gw.refocus=key;growPaint()},mouseenter:()=>gbLit2(key),mouseleave:()=>gbLit2(null)}},head),open?body:null);return el}
  const el=h('section',{class:'gb-olb'+(pinned||mine?' sel':''),'aria-label':'Journey '+n});
  gwPut(el,h('button',{class:'gb-hd','data-ol':key,'aria-pressed':String(pinned),on:{click:()=>gbOlPin(key)}},head),body);return el}
-/* Parts checked on their own and the existing flows the change reaches: Max's buds, by part, named even when pruned. */
+/* Parts checked on their own and the existing flows the change reaches: Max's buds, by part, named even when pruned. The fold
+   says how many and which mode grows them: before a choice, the modes that would; after it, whether this one did. */
 function gbBudFolds(M){const s=gw.state;const own=[],reg=[];for(const u of s.units)for(const x of (M.buds[u.id]||[]))(x.scenarioKind==='regression'?reg:own).push(x);
- const fold=(key,title,list)=>{if(!list.length)return null;const inm=list.filter(x=>!s.modeBy||gwIn(x));
+ const grows=list=>{const by={};for(const x of list)by[x.mode]=(by[x.mode]||0)+1;const ks=GW.modes.map(m=>m.id).filter(k=>by[k]);
+  return ks.length===1?(ks[0]==='max'?'Max only':ks[0]==='std'?'Standard and Max':'every mode'):ks.map(k=>by[k]+' from '+gwML(k)).join(', ')};
+ const note=list=>{if(!s.modeBy)return grows(list);const inm=list.filter(gwIn),out=list.filter(x=>!gwIn(x));
+  return !out.length?'in '+gwML(s.mode):!inm.length?gwPruned(out,s.mode,true):inm.length+' in '+gwML(s.mode)+' · '+gwPruned(out,s.mode)};
+ const fold=(key,what,list)=>{if(!list.length)return null;
   const byPart=[...new Set(list.map(x=>x.unit))].map(id=>[h('div',{class:'gb-sub'},(M.U[id]||{}).label||id),list.filter(x=>x.unit===id).map(x=>gbRow(x,true))]);
-  return gbOlFold(key,h('span',{},title+' · '+list.length+(s.modeBy?(inm.length?', '+inm.length+' in '+gbModeName(s.mode):', grown only in Max'):', in Max')),h('div',{class:'gb-olx'},byPart.flat(Infinity)))};
- return [fold('own','Parts checked on their own',own),fold('reg','Existing flows the change reaches',reg)]}
+  return gbOlFold(key,what(list.length)+' · '+note(list),h('div',{class:'gb-olx'},byPart.flat(Infinity)))};
+ return [fold('own',n=>n+' part check'+(n===1?'':'s'),own),fold('reg',n=>n+' existing flow'+(n===1?'':'s')+' the change reaches',reg)]}
 /* What the change depends on, as the tree plants it: services over the rim, the repo's own stores in the soil; each says which
    journeys feed from it, and where tracing could not follow. */
 function gbOlRoots(M,order){const s=gw.state;const roots=s.units.filter(u=>u.root);
+ /* a root's row draws it as the legend does, says which journeys it feeds and, in full, where tracing could not follow; selected,
+    its card opens under it */
  const row=u=>{const k='u:'+u.id,pin=gw.pinned===k;const feeds=order.map((j,i)=>j.units.includes(u.id)?i+1:0).filter(Boolean);const stop=s.stops.find(x=>x.unit===u.id);
-  return h('button',{class:'gb-olr'+(pin?' sel':''),'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k)}},h('i',{class:'rg'+(u.layer==='ext'?' ext':''),'aria-hidden':'true'}),
+  return [h('button',{class:'gb-olr'+(pin?' sel':''),'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k)}},h('span',{class:'gw-g','aria-hidden':'true'},gwSw(u.layer==='ext'?'ext':'root')),
    h('span',{class:'t'},u.label,h('small',{},u.unitKind+' · '+u.loc)),h('span',{class:'fd'},feeds.length?'feeds journey'+(feeds.length===1?' ':'s ')+feeds.join(', '):'on no journey'),
-   stop?h('span',{class:'gw-chip missing',title:stop.why+' · '+stop.at},'trace stops · '+gwCut(stop.why,64)):null)};
+   stop?h('span',{class:'gw-stop'},h('b',{},'trace stops'),' · '+stop.why+' ',h('span',{class:'mono'},stop.at)):null),
+   pin?h('div',{class:'gw-olcard'},gwPartCard(u.id,true)):null]};
  const svc=roots.filter(u=>u.layer==='ext'),soil=roots.filter(u=>u.layer!=='ext');
  return [h('div',{class:'gb-olh'},'Roots · what it depends on'),!roots.length?h('p',{class:'gw-empty',style:'margin:0 6px'},'None traced: the change depends on nothing outside its own files.'):null,
   svc.length?[h('div',{class:'gb-sub'},'Over the rim · services it calls'),svc.map(row)]:null,soil.length?[h('div',{class:'gb-sub'},'In the soil · stores in this repository'),soil.map(row)]:null]}
@@ -932,13 +946,15 @@ function gbOlParts(M,order){const s=gw.state,v=gw.view;const parts=s.units.filte
  const all=parts.map(u=>({u,w:gaps(u)})),gn=all.filter(o=>o.w.length).length;const rows=all.filter(o=>!gw.onlyGaps||o.w.length);
  const lit=new Set(),p=gw.pinned||'';if(p.startsWith('u:'))lit.add(p.slice(2));else if(p.startsWith('j:')||p.startsWith('s:')){const j=p.startsWith('j:')?M.J.find(q=>q.id===p.slice(2)):M.J.find(q=>M.leaves[q.id].some(x=>x.id===p.slice(2)));if(j)for(const id of j.units)lit.add(id)}else if(s.focus)lit.add(s.focus);
  const tr=({u,w})=>{const d=v.depth[u.id]||{pips:[]};const f=d.pips.filter(q=>q==='ok').length;const crit=v.criteria.filter(c=>c.units.includes(u.id)).map(c=>c.id);const on=order.map((j,i)=>j.units.includes(u.id)?i+1:0).filter(Boolean);const k='u:'+u.id;
-  return h('tr',{class:'u'+(lit.has(u.id)?' sel':''),tabindex:0,'data-ol':k,'data-unit':u.id,'aria-selected':String(gw.pinned===k),on:{click:()=>gbOlPin(k),keydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();gbOlPin(k)}}}},
+  /* a selected part opens its card in a row of its own under it */
+  return [h('tr',{class:'u'+(lit.has(u.id)?' sel':''),tabindex:0,'data-ol':k,'data-unit':u.id,'aria-selected':String(gw.pinned===k),on:{click:()=>gbOlPin(k),keydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();gbOlPin(k)}}}},
    h('td',{},h('div',{class:'nm'},u.label),h('div',{class:'loc'},u.unitKind+' · '+u.loc),w.length?h('div',{class:'gw-chips',style:'margin-top:4px'},w.slice(0,2).map(t=>h('span',{class:'gw-chip missing'},t))):null),
    h('td',{'data-h':'Depth'},h('span',{class:'gw-pips','aria-label':f+' of 5 found'},d.pips.map(q=>h('i',{class:q}))),h('div',{class:'loc'},f+' of 5 found'+(d.pips.includes('stop')?' · stopped':''))),
    h('td',{'data-h':'Layers'},h('div',{class:'gw-chips'},(s.cells[u.id]||[]).map(c=>h('span',{class:'gw-chip '+c.status,title:c.reason},GW.layers[c.layer])))),
    h('td',{'data-h':'Spec',class:'loc'},crit.length?crit.join(' '):s.drift.some(x=>x.unit===u.id)?'not in spec':'—'),
-   h('td',{'data-h':'Journeys',class:'loc'},on.length?on.join(', '):'none'))};
- const table=h('div',{class:'scroll'},h('table',{class:'gw-ol'},h('thead',{},h('tr',{},['Part','Depth','Layers','Spec','Journeys'].map(t=>h('th',{},t)))),h('tbody',{},rows.length?rows.map(tr):h('tr',{},h('td',{colspan:5,class:'gw-empty'},'No gaps.')))));
+   h('td',{'data-h':'Journeys',class:'loc'},on.length?on.join(', '):'none')),
+   gw.pinned===k?h('tr',{class:'det'},h('td',{colspan:5},h('div',{class:'gw-olcard'},gwPartCard(u.id,true)))):null]};
+ const table=h('div',{class:'scroll'},h('table',{class:'gw-ol'},h('thead',{},h('tr',{},['Part','Depth','Layers','Spec','Journeys'].map(t=>h('th',{},t)))),h('tbody',{},rows.length?rows.flatMap(tr):h('tr',{},h('td',{colspan:5,class:'gw-empty'},'No gaps.')))));
  const ctl=gn&&gn<all.length?h('label',{class:'small muted',style:'display:inline-flex;gap:6px;align-items:center;margin:2px 6px 6px'},h('input',{type:'checkbox',checked:gw.onlyGaps,on:{change:e=>{gw.onlyGaps=e.target.checked;growPaint()}}}),'Only the '+gn+' with a gap'):null;
  const pk=(c,t)=>h('span',{},h('span',{class:'gw-pips'},h('i',{class:c})),' '+t);
  return gbOlFold('parts',h('span',{},'Parts · '+parts.length+' changed'+(gn?' · '+gn+' with a gap':'')),[ctl,table,h('div',{class:'gb-pk'},pk('ok','found'),pk('none','looked, nothing there'),pk('stop','trace stops'),pk('','not looked yet'))])}
@@ -953,13 +969,14 @@ function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrder
  if(gw.olPin!==gw.pinned){gw.olPin=gw.pinned;const p=gw.pinned||'',O=gw.open||(gw.open={});
   if(p.startsWith('u:')){const u=M.U[p.slice(2)];if(u&&!u.root)O.parts=true}
   else if(p.startsWith('s:')){const x=s.scenarios.find(q=>q.id===p.slice(2));const j=x&&M.J.find(q=>M.leaves[q.id].includes(x));if(x&&!j)O[x.scenarioKind==='regression'?'reg':'own']=true;else if(x&&s.modeBy&&!gwIn(x))O['cut:'+j.id]=true}}
- const el=h('div',{class:'gb-ol','data-testid':'grow-outline',on:{keydown:gbOlKeys}});const lf=(c,t)=>h('span',{},h('i',{class:c}),t);
+ const el=h('div',{class:'gb-ol','data-testid':'grow-outline',on:{keydown:gbOlKeys}});const lf=(c,t)=>h('span',{class:'gw-li'},gwSw(c),h('span',{},t));
  gwPut(el,M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface. Grow again to trace journeys.'):null,
   order.length?null:h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,false)),
   M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null,
   gbBudFolds(M),gbOlRoots(M,order),gbOlParts(M,order),
-  s.scenarios.length?h('div',{class:'gb-key',style:'margin-top:14px'},lf('','passed'),lf('fail','failed'),lf('run','running'),lf('in','to prove'),lf('none','no flow yet'),s.modeBy&&s.scenarios.some(x=>!gwIn(x))?lf('cut','pruned, named under its journey'):null):null);
+  s.scenarios.length?h('div',{class:'gw-legend',style:'margin-top:14px'},h('div',{class:'gw-lg'},lf('pass','passed'),lf('fail','failed'),lf('run','running'),lf('in','to prove'),lf('none','no flow yet'),s.modeBy&&s.scenarios.some(x=>!gwIn(x))?lf('cut','pruned, named under its journey'):null)):null,
+  s.scenarios.some(x=>x.variants.length)?gwMockNote():null);
  return el}
 /* Under the tree: the same journeys, folded, a failing or selected one open. */
 function gbJourneys(){const s=gw.state,M=gw.M||gbModel();const card=h('section',{class:'card','aria-label':'Journeys','data-testid':'grow-scenarios'});const order=gbOrderOf(M);
@@ -967,6 +984,7 @@ function gbJourneys(){const s=gw.state,M=gw.M||gbModel();const card=h('section',
   h('span',{class:'small muted'},!s.scenarios.length?'Drafted after tracing':s.modeBy?s.scenarios.filter(gwIn).length+' scenarios in '+gbModeName(s.mode)+' · '+s.scenarios.length+' drafted':s.scenarios.length+' drafted · '+s.scenarios.filter(gwIn).length+' in Minimum')),
   M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface, links between parts not recorded. Grow again to trace journeys.'):null,
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,true)),gbBudFolds(M),
-  M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Nothing in this change reaches '+(M.jin.length===1?'it':'them')+'; Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null);
+  M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Nothing in this change reaches '+(M.jin.length===1?'it':'them')+'; Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null,
+  s.scenarios.some(x=>x.variants.length)?gwMockNote():null);
  return card}
 `;
