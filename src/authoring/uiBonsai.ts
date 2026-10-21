@@ -1149,9 +1149,13 @@ function gbBudFolds(M){const s=gw.state;const own=[],reg=[];for(const u of s.uni
   return ks.length===1?(ks[0]==='max'?'Max only':ks[0]==='std'?'Standard and Max':'every mode'):ks.map(k=>by[k]+' from '+gwML(k)).join(', ')};
  const note=list=>{if(!s.modeBy)return [grows(list)];const inm=list.filter(gwIn),out=list.filter(x=>!gwIn(x));
   return !out.length?['in '+gwML(s.mode)]:!inm.length?[gwPruned(out,s.mode,true)]:[inm.length+' in '+gwML(s.mode),gwPruned(out,s.mode)]};
+ /* part by part: the file, the journeys its knot is on (by their numbers on the tree), then its leaves. In the Outline of a grow
+    set to Max they are a third of what it proves and more, so there they open by default */
+ const order=gw.order||[];const onJ=id=>order.map((jid,i)=>{const j=M.J.find(q=>q.id===jid);return j&&j.units.includes(id)?i+1:0}).filter(Boolean);
+ const open=gw.tree==='outline'&&!!s.modeBy&&s.mode==='max';
  const fold=(key,what,list)=>{if(!list.length)return null;
-  const byPart=[...new Set(list.map(x=>x.unit))].map(id=>[h('div',{class:'gb-sub code'},...gwCodeText(gwPlain((M.U[id]||{}).label||id))),list.filter(x=>x.unit===id).map(x=>gbRow(x,gw.tree==='outline'))]);
-  return gbOlFold(key,gwFacts([what(list.length),...note(list).map(t=>[t])]),h('div',{class:'gb-olx'},byPart.flat(Infinity)))};
+  const byPart=[...new Set(list.map(x=>x.unit))].map(id=>{const on=onJ(id);return [h('div',{class:'gb-bp'},h('div',{class:'gb-sub code'},...gwCodeText(gwPlain((M.U[id]||{}).label||id))),h('span',{class:'on'},on.length?((M.U[id]||{}).root?'feeds journey':'its knot is on journey')+(on.length===1?' ':'s ')+on.join(', '):'on no journey')),list.filter(x=>x.unit===id).map(x=>gbRow(x,gw.tree==='outline'))]});
+  return gbOlFold(key,gwFacts([what(list.length),...note(list).map(t=>[t])]),h('div',{class:'gb-olx'},byPart.flat(Infinity)),open)};
  return [fold('own',n=>n+' part check'+(n===1?'':'s'),own),fold('reg',n=>n+' existing flow'+(n===1?'':'s')+' the change reaches',reg)]}
 /* A section of the Outline: a plain heading over a rule, what it holds after it in grey. Mono capitals are left to the groups
    inside a section. */
