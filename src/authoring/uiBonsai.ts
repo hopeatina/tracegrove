@@ -1106,7 +1106,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  else{const id=k.slice(2);const u=M.U[id];if(!u){hide();return}const on=M.J.filter(j=>j.units.includes(id));
   const stop=s.stops.find(x=>x.unit===id);
   gwPut(tip,h('span',{class:'k'},u.root?(u.layer==='ext'?'depends on · outside the repo':'depends on · in the repo'):'part'),h('b',{},u.label),h('div',{class:'path'},u.loc),
-   h('div',{class:'st'},u.root?(on.length?'Feeds '+(on.length===1?'journey '+((gw.order||[]).indexOf(on[0].id)+1)+': '+gwCut(on[0].title,48):on.length+' of '+M.J.length+' journeys'):'No journey in this change reaches it, so it lies loose'):on.length?(on.length===1?'On 1 journey: '+on[0].title:on.length+' of '+M.J.length+' journeys pass through it'):'Changed, but no journey in this change reaches it'),
+   h('div',{class:'st'},u.root?(on.length?gbFeeds(on.map(j=>(gw.order||[]).indexOf(j.id)+1).sort((a,b)=>a-b))+(on.length===1?': '+gwCut(on[0].title,48):''):'No journey in this change reaches it, so it lies loose'):on.length?(on.length===1?'On 1 journey: '+on[0].title:on.length+' of '+M.J.length+' journeys pass through it'):'Changed, but no journey in this change reaches it'),
    stop?h('div',{class:'st'},'Tracing stops here: '+gwCut(stop.why,120)):null)}
  tip.hidden=false;const wrap=tip.parentNode;if(!wrap)return;
  /* on a phone there is no room beside anything: the card sits under the drawing, full width, and the drawing stays clear */
