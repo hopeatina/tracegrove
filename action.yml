@@ -14,6 +14,12 @@ inputs:
   preview-url:
     description: "Address of this PR's preview deployment, exported as PREVIEW_URL for an environment whose target url is env:PREVIEW_URL. On a deployment_status event, pass github.event.deployment_status.target_url."
     default: ''
+  signing-key:
+    description: Ed25519 private key (PEM) that signs every verified run, usually a repository secret. Its public half goes in tracegrove/signers/ so the card shows the runs as trusted.
+    default: ''
+  attest:
+    description: "Also publish a GitHub artifact attestation (Sigstore, keyless) for each handoff report. The calling workflow needs permissions id-token: write and attestations: write."
+    default: 'false'
   tracegrove:
     description: Command that runs tracegrove.
     default: npx --yes tracegrove
@@ -36,7 +42,7 @@ runs:
     - name: Run flows
       if: inputs.run == 'true'
       shell: bash
-      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', TG_ENV: '${{ inputs.env }}', TG_PREVIEW_URL: '${{ inputs.preview-url }}' }
+      env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', TG_ENV: '${{ inputs.env }}', TG_PREVIEW_URL: '${{ inputs.preview-url }}', TRACEGROVE_SIGNING_KEY: '${{ inputs.signing-key }}' }
       run: |
         status=0
         if [ -n "$TG_PREVIEW_URL" ]; then export PREVIEW_URL="$TG_PREVIEW_URL"; fi
@@ -46,6 +52,7 @@ runs:
         done <<< "$DIRS"
         echo "tracegrove test finished with exit $status; the card reports each claim"
     - name: Handoff reports
+      id: handoff
       shell: bash
       env: { DIRS: '${{ inputs.directories }}', TG: '${{ inputs.tracegrove }}', OUT: '${{ runner.temp }}/tracegrove-proof' }
       run: |
@@ -55,6 +62,12 @@ runs:
           [ -z "$dir" ] && continue
           i=$((i+1)); $TG handoff --dir "$dir" --out "$OUT/$i-$(basename "$(cd "$dir" && pwd)").html" >/dev/null || true
         done <<< "$DIRS"
+        if ls "$OUT"/*.html >/dev/null 2>&1; then echo "reports=true" >> "$GITHUB_OUTPUT"; fi
+    - name: Attest handoff reports
+      if: inputs.attest == 'true' && steps.handoff.outputs.reports == 'true'
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-path: ${{ runner.temp }}/tracegrove-proof/*.html
     - name: Upload handoff reports
       id: upload
       uses: actions/upload-artifact@v4
