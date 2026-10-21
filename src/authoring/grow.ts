@@ -601,7 +601,7 @@ function criticalJourneys(ctx: Ctx, linkedTo: (unit: string) => string[]): Set<s
 
 /**
  * Scenarios by journey. A journey's own scenarios prove it end to end from where a person starts. The minimum
- * is a critical cut: each critical journey's happy path and its single riskiest failure, plus, for each spec
+ * is a critical cut: each critical journey's happy path and its single riskiest guard or failure, plus, for each spec
  * criterion they leave unanswered, the one scenario that answers it; other journeys and the other ways each one
  * fails are standard. Max adds every part on its own (a route's contract, a module through its callers, a third
  * party's errors) and regressions. Every criterion linked to the change is carried by a scenario, and the
@@ -678,7 +678,10 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
     carryAll(list, crit);
     for (const t of list) if (t.auth) authDone.add((t.on ?? entry).id);
     const happy = list.find((t) => t.kind === 'happy');
-    const riskiest = list.filter((t) => t.kind !== 'happy').sort((a, b) => b.risk - a.risk)[0];
+    // The riskiest guard or failure: one the tree hangs or shoulders, before an edge the path must still work at.
+    const polOf = (t: Drafted) => t.polarity ?? polarityOf(t);
+    const byRisk = (a: Drafted, b: Drafted) => b.risk - a.risk;
+    const riskiest = list.filter((t) => t.kind !== 'happy' && polOf(t) !== 'happy').sort(byRisk)[0] ?? list.filter((t) => t.kind !== 'happy').sort(byRisk)[0];
     const isCritical = critical.has(j.id);
     // The UI lines this journey's screens add, which a browser flow's controls are matched against.
     const added = browser ? ctx.files.filter((f) => parts.some((p) => p.layer === 'ui' && (p.file === f.path || p.also?.includes(f.path)))).flatMap((f) => f.added.map((a) => a.text)).join('\n') : '';
@@ -686,8 +689,8 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
       const on = t.on ?? entry;
       const flow = browser && !t.on ? (t.kind === 'happy' ? browserFlowFor(j, parts, added, flows, taken, seen) : null) : flowFor(on, t, flows, taken);
       const [mode, why]: [Mode, string] = isCritical && (t === happy || t === riskiest)
-        ? ['min', t.criteria.length ? carries(t) : t === happy ? 'happy path of a critical journey' : 'riskiest failure of this journey']
-        : ['std', t.kind !== 'happy' ? 'other failure path' : isCritical ? 'another happy path' : 'happy path of a journey outside the critical cut'];
+        ? ['min', t.criteria.length ? carries(t) : t === happy ? 'happy path of a critical journey' : 'riskiest guard or failure of this journey']
+        : ['std', polOf(t) === 'failure' ? 'another way it fails' : polOf(t) === 'guard' ? 'another guard' : isCritical ? 'another happy path' : 'happy path of a journey outside the critical cut'];
       plan.push({ j, on, t, flow, mode, why, critical: isCritical });
     }
   }
@@ -705,7 +708,7 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
   for (const p of plan) put(p.on, p.t, p.mode, p.why, p.j, 'journey', p.flow);
 
   // Flows this branch adds or changes are the author's own proof: each one that reaches a journey's routes is a scenario
-  // of that journey. One already proving a journey's path or riskiest failure is drafted above; the rest join the
+  // of that journey. One already proving a journey's path or riskiest guard or failure is drafted above; the rest join the
   // minimum only when they restate a criterion, and are standard otherwise.
   const flowRoot = config ? relative(ctx.dir, dirname(config)) : '';
   const changed = new Set(ctx.files.map((f) => f.path));
@@ -717,7 +720,9 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
     const refuses = f.steps.some((st) => st.expectStatus !== null && st.expectStatus >= 400);
     const criteria = ctx.criteria.filter((c) => restates(f.title, c.text)).map((c) => c.id);
     for (const id of criteria) if (!state.linked[id]?.some((l) => l.unit === on.id)) emit({ kind: 'criterion.linked', id, unit: on.id, why: `${f.caseId}, which this branch adds, says it and reaches ${on.label}` });
-    const t: Drafted = { kind: refuses ? 'sad' : 'edge', title: f.title, proves: `${f.caseId}, which this branch adds, holds end to end.`, risk: 0, criteria, polarity: flowPolarity(f) };
+    // A flow that answers 200 can still be a guard: "never charges the card" is a rule the path must keep.
+    const fp = flowPolarity(f), byTitle = polarityOf({ kind: refuses ? 'sad' : 'edge', title: f.title });
+    const t: Drafted = { kind: refuses ? 'sad' : 'edge', title: f.title, proves: `${f.caseId}, which this branch adds, holds end to end.`, risk: 0, criteria, polarity: fp === 'happy' && byTitle === 'guard' ? 'guard' : fp };
     put(on, t, criteria.length ? 'min' : 'std', criteria.length ? carries(t) : 'a flow this branch adds', j, 'journey', f.caseId);
   }
 

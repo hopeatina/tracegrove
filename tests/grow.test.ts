@@ -248,8 +248,8 @@ describe('grow', () => {
       const own = state.scenarios.filter((x) => x.journey === j.id && x.level === 'journey');
       const min = own.filter((x) => x.mode === 'min');
       if (inMin.has(j.title)) {
-        // A critical journey's minimum: its happy path and its single riskiest failure, nothing else.
-        expect(min.map((x) => x.modeWhy)).toEqual(['happy path of a critical journey', 'riskiest failure of this journey']);
+        // A critical journey's minimum: its happy path and its single riskiest guard or failure, nothing else.
+        expect(min.map((x) => x.modeWhy)).toEqual(['happy path of a critical journey', 'riskiest guard or failure of this journey']);
         expect(min[0]!.scenarioKind).toBe('happy');
       } else {
         expect(min).toEqual([]);
@@ -271,12 +271,12 @@ describe('grow', () => {
       if (x.mode === 'max') expect(x.modeWhy).toMatch(/^(part on its own|regression)$/);
     }
     expect(state.scenarios.find((x) => x.level === 'journey' && x.scenarioKind === 'happy')).toMatchObject({ mode: 'min', modeWhy: expect.stringMatching(/^carries C1/) });
-    expect(state.scenarios.find((x) => x.title === 'Without a session it is refused')).toMatchObject({ polarity: 'guard', mode: 'min', modeWhy: 'riskiest failure of this journey' });
-    expect(state.scenarios.find((x) => x.title === 'An invalid body is refused')).toMatchObject({ polarity: 'guard', mode: 'std', modeWhy: 'other failure path' });
+    expect(state.scenarios.find((x) => x.title === 'Without a session it is refused')).toMatchObject({ polarity: 'guard', mode: 'min', modeWhy: 'riskiest guard or failure of this journey' });
+    expect(state.scenarios.find((x) => x.title === 'An invalid body is refused')).toMatchObject({ polarity: 'guard', mode: 'std', modeWhy: 'another guard' });
     expect(state.scenarios.find((x) => x.title === 'Stripe errors are surfaced')).toMatchObject({ polarity: 'failure', mode: 'max', modeWhy: 'part on its own' });
   });
 
-  it('keeps an agent\u2019s scenarios that name no criteria to the cut: the happy path takes what works, the riskiest failure joins it, the rest are standard', async () => {
+  it('keeps an agent\u2019s scenarios that name no criteria to the cut: the happy path takes what works, the riskiest guard or failure joins it, the rest are standard', async () => {
     const dir = repo();
     const scenarios = [
       { kind: 'happy', title: 'Refund goes through', proves: 'A refund is created.', criteria: [] },
@@ -303,7 +303,7 @@ describe('grow', () => {
     const title = (id: string | null | undefined) => state.journeys.find((j) => j.id === id)?.title;
     expect([...new Set(state.scenarios.filter((x) => x.mode === 'min').map((x) => title(x.journey)))].sort()).toEqual(['POST /alpha', 'POST /beta', 'POST /gamma']);
     for (const j of state.journeys.filter((x) => ['POST /alpha', 'POST /beta', 'POST /gamma'].includes(x.title))) {
-      expect(state.scenarios.filter((x) => x.journey === j.id && x.mode === 'min').map((x) => x.modeWhy)).toEqual(['happy path of a critical journey', 'riskiest failure of this journey']);
+      expect(state.scenarios.filter((x) => x.journey === j.id && x.mode === 'min').map((x) => x.modeWhy)).toEqual(['happy path of a critical journey', 'riskiest guard or failure of this journey']);
     }
   });
 

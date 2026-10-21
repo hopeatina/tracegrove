@@ -24,6 +24,7 @@ export const UI_HTML = String.raw`<!doctype html>
 @media (prefers-color-scheme:dark){:root{--stone:#0C1210;--paper:#121A17;--line:#1F2A25;--line2:#2E3B35;--sel:#1A2420;--ink:#ECE6D8;--ink2:#D5CFC1;--ink3:#A9A699;--muted:#8B8A7F;
  --trunk:#D5CFC1;--twig:#3D4A43;--moss:#A9D28A;--moss-bg:#18261C;--new:#D9EFC0;--gold:#D8B25E;--gold-bg:#2A2416;--verm:#EF6A5A;--verm-bg:#33191A;--verm-ink:#F6A79C;--ochre:#D77C55;--ochre-bg:#2E1E16;--ochre-ink:#EDB79D;
  --indigo:#9AAEE8;--indigo-bg:#1B2233;--forest:#ECE6D8;--on-forest:#0C1210;--bar:#1A2420;--code:#0F1613;--soil:#3D4A43}}
+:root{color-scheme:light dark}input[type=checkbox]{accent-color:var(--moss)}
 *{box-sizing:border-box}html,body{margin:0;background:var(--stone);color:var(--ink);font:15px/22px var(--sans)}
 button{font:inherit;color:inherit;cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}
 :focus-visible{outline:2px solid var(--moss);outline-offset:2px;border-radius:6px}
