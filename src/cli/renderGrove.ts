@@ -107,7 +107,8 @@ export function layout(units: GrowUnit[]): Geometry {
 const ease = (g: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, g)), 3);
 
 export function tracing(s: GrowState): Set<string> {
-  return new Set(s.agents.filter((a) => !a.done && a.unit && (s.phase === 2 || s.phase === 3 || s.phase === 5)).map((a) => a.unit!));
+  // An agent between reports is still reading one of its units; show it moving through them.
+  return new Set(s.agents.filter((a) => !a.done && (a.unit || a.units.length) && (s.phase === 2 || s.phase === 3 || s.phase === 5)).map((a) => a.unit ?? a.units[Math.floor(s.ms / 1600) % a.units.length]!));
 }
 
 function canvas(s: GrowState, geo: Geometry, elapsed: number): Line[] {
@@ -249,8 +250,9 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
   // Honesty: what the spec missed, what is not built, where tracing stopped, what an agent wrote or got wrong.
   const notes: Line[] = [];
   for (const d of s.drift) notes.push([['root', '▲ not in spec   '], ['', pad(d.what, 40)], ['dim', ` ${d.loc}`]]);
-  for (const [id, why] of Object.entries(s.unbuilt)) notes.push([['fail', '✕ not built     '], ['', `${id}: ${cut(s.criteria.find((x) => x.id === id)?.text ?? '', 54)}`], ['dim', `  ${cut(why, 40)}`]]);
-  for (const x of s.stops) notes.push([['fail', '╌ stopped       '], ['', pad(s.units.find((u) => u.id === x.unit)?.label ?? x.unit, 18)], ['dim', ` ${x.why}`]]);
+  for (const [id, why] of Object.entries(s.unbuilt)) notes.push([['fail', '✕ not found     '], ['', `${id}: ${cut(s.criteria.find((x) => x.id === id)?.text ?? '', 54)}`], ['dim', `  ${cut(why, 40)}`]]);
+  const stopSeen = new Set<string>();
+  for (const x of s.stops) if (!stopSeen.has(x.unit) && stopSeen.add(x.unit)) notes.push([['fail', '╌ stopped       '], ['', pad(s.units.find((u) => u.id === x.unit)?.label ?? x.unit, 18)], ['dim', ` ${x.why}`]]);
   for (const x of s.dropped.slice(0, 3)) notes.push([['fail', '✕ claim dropped '], ['dim', `${x.agent} ${x.why}`]]);
   if (s.dropped.length > 3) notes.push([['dim', `                 +${s.dropped.length - 3} more dropped claims`]]);
   for (const id of s.extOrder) { const x = s.ext[id]!; notes.push([['root', '✎ agent wrote   '], ['', pad(x.extKind, 20)], ['', ` ${pad(x.path.split('/').pop() ?? x.path, 34)} `], [x.state === 'proven' ? 'leaf' : x.state === 'review' ? 'root' : 'dim', x.state === 'proven' ? 'proven' : x.state === 'review' ? 'needs your review' : x.state === 'draft' ? 'draft, unused' : 'not proven yet']]); }
@@ -288,9 +290,9 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
       const r = s.run[x.id]; const v = s.real[x.id];
       const mk: Seg = !r ? ['dim', '○'] : r.st === 'run' ? ['root', sp] : r.st === 'pass' ? ['leaf', '✓'] : r.st === 'fail' ? ['fail', '✕'] : ['dim', '–'];
       const mock: Seg = !r ? ['dim', '·'] : r.st === 'run' ? ['root', 'running'] : r.st === 'pass' ? ['leaf', secs(r.ms)] : r.st === 'fail' ? ['fail', 'failed'] : ['dim', x.flow ? 'not run' : 'no flow yet'];
-      const real: Seg = !x.variants.length ? ['', ''] : x.mockOnly ? ['dim', 'mock only'] : !v ? ['dim', '·'] : v.st === 'pass' ? ['leaf', `✓ ${secs(v.ms)} sandbox`] : ['root', v.na ? 'mock only' : 'skipped: no key'];
+      const real: Seg = !x.variants.length ? ['', ''] : x.mockOnly ? ['dim', 'mock only'] : !v ? ['dim', 'after mock'] : v.st === 'pass' ? ['leaf', `✓ ${secs(v.ms)} sandbox`] : ['root', v.na ? 'mock only' : 'skipped: no key'];
       const agentMade = x.ext.some((e) => s.ext[e] && s.ext[e]!.state !== 'proven');
-      L.push(one([['', '   '], mk, ['dim', ` ${x.scenarioKind.padEnd(7)} `], ['', pad(x.title, TITLE - 2)], agentMade ? ['root', ' ✎'] : ['', '  '], ['dim', ` ${pad(x.criteria.join(' '), 8)} `], ...fit([mock], 12), ['', ' '], real]));
+      L.push(one([['', '   '], mk, ['dim', ` ${x.scenarioKind.padEnd(7)} `], ['', pad(x.title, TITLE - 2)], agentMade ? ['dim', ' ✎'] : ['', '  '], ['dim', ` ${pad(x.criteria.join(' '), 8)} `], ...fit([mock], 12), ['', ' '], real]));
       if (r?.st === 'fail' && r.why) L.push(one([['fail', `    ${r.why}`]]));
     }
     if (drawn < list.length) L.push(one([['dim', `  +${list.length - drawn} more scenarios in the log`]]));
@@ -301,8 +303,8 @@ export function renderGrove(s: GrowState, view: GroveView): string[] {
     const t = growSummary(s);
     L.push(one([]));
     L.push(one([['b', `${t.passed}/${t.scenarios} proved`], ['', '  '], [t.failed ? 'fail' : 'dim', `${t.failed} failed`], ['dim', `  ${t.notRun} not run`],
-      ...(t.criteria ? [['dim', '  · spec '] as Seg, ['leaf', `${t.proved} proved`] as Seg, ['', ' '] as Seg, ['root', `${t.agentChecked} agent-checked`] as Seg, ['', ' '] as Seg, [t.needYou ? 'fail' : 'dim', `${t.needYou} need you`] as Seg] : []),
-      ...(t.toReview ? [['dim', '  · '] as Seg, ['root', `${t.toReview} agent-written to review`] as Seg] : [])]));
+      ...(t.criteria ? [['dim', '  · spec '] as Seg, ['leaf', `${t.proved} proved`] as Seg, ['', ' '] as Seg, ['root', `${t.agentChecked} agent-checked`] as Seg, ['dim', ` ${t.notProven} not proven yet `] as Seg, [t.needYou ? 'fail' : 'dim', `${t.needYou} need you`] as Seg] : []),
+      ...(t.toReview ? [['dim', '  · '] as Seg, ['root', `${t.toReview} to review`] as Seg] : [])]));
     L.push(one([['dim', view.log ? `log ${view.log} · ` : ''], ['dim', 'open it in tracegrove ui → Discover']]));
   }
   L.push(rule('╰', null, '╯'));

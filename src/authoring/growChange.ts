@@ -94,15 +94,17 @@ export function grepAt(dir: string, branch: string, needles: string[], limit = 2
 }
 
 /** The pull request for a branch, when the GitHub CLI is installed and signed in. Never required. */
+const gh = (dir: string, args: string[]) => execFileSync('gh', args, { cwd: dir, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+/** The open PR for a branch: `gh pr view` first, then the REST API, for hosts where GraphQL is unavailable. */
 export function pullRequestFor(dir: string, branch: string): PullRequest | null {
-  try {
-    const out = execFileSync('gh', ['pr', 'view', branch.replace(/^origin\//, ''), '--json', 'number,title,body,url'], { cwd: dir, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
-    const pr = JSON.parse(out) as Partial<PullRequest>;
-    return typeof pr.number === 'number' ? { number: pr.number, title: String(pr.title ?? ''), body: String(pr.body ?? ''), url: String(pr.url ?? '') } : null;
-  } catch { return null; }
+  const name = branch.replace(/^origin\//, '');
+  const shape = (pr: Partial<PullRequest> & { html_url?: string } | undefined) => (pr && typeof pr.number === 'number' ? { number: pr.number, title: String(pr.title ?? ''), body: String(pr.body ?? ''), url: String(pr.url && !pr.url.includes('api.github.com') ? pr.url : pr.html_url ?? '') } : null);
+  try { return shape(JSON.parse(gh(dir, ['pr', 'view', name, '--json', 'number,title,body,url'])) as Partial<PullRequest>); } catch { /* try REST */ }
+  try { return shape((JSON.parse(gh(dir, ['api', `repos/{owner}/{repo}/pulls?head={owner}:${name}&state=all&per_page=1`])) as Array<Partial<PullRequest> & { html_url?: string }>)[0]); } catch { return null; }
 }
 function issueBody(dir: string, n: number): { title: string; body: string } | null {
-  try { return JSON.parse(execFileSync('gh', ['issue', 'view', String(n), '--json', 'title,body'], { cwd: dir, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] })) as { title: string; body: string }; } catch { return null; }
+  try { return JSON.parse(gh(dir, ['issue', 'view', String(n), '--json', 'title,body'])) as { title: string; body: string }; } catch { /* try REST */ }
+  try { const i = JSON.parse(gh(dir, ['api', `repos/{owner}/{repo}/issues/${n}`])) as { title?: string; body?: string | null }; return { title: String(i.title ?? ''), body: String(i.body ?? '') }; } catch { return null; }
 }
 
 const CRITERIA_HEADING = /^#{1,6}\s*(acceptance|criteria|requirements|spec|done when|definition of done|what should be true|success)/i;
@@ -255,10 +257,12 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
 }
 
 const STOP = new Set('this that with from into when then than they them their there have will would should could must been being were what which while where your about after before each every only also just more most other some such very none true false null undefined return const function export import default async await class type string number boolean value values item items data file files line lines text test tests'.split(' '));
+/** A light stem so “notes”, “noted” and “note” meet, without cutting “notes” down to “not”. */
+const wordStem = (w: string) => w.replace(/ies$/, 'y').replace(/(ss|x|ch|sh)es$/, '$1').replace(/(?<=..)(ing|ed)$/, '').replace(/(?<!s)s$/, '');
 /** Words worth matching between a criterion and the code: lowercase, four letters or more, light stemming. */
 export function termsOf(text: string): Set<string> {
   const words = text.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/);
-  return new Set(words.filter((w) => w.length >= 4 && !STOP.has(w)).map((w) => w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '')).filter((w) => w.length >= 4));
+  return new Set(words.filter((w) => w.length >= 4 && !STOP.has(w)).map(wordStem).filter((w) => w.length >= 4 && !STOP.has(w)));
 }
 
 /** Shared words between a criterion and a unit, strongest evidence first; empty when they do not meet. */
@@ -269,7 +273,7 @@ export function matchCriterion(criterion: string, unit: Pick<ChangeUnit, 'label'
   for (const a of unit.added) for (const t of termsOf(a.text)) counts.set(t, (counts.get(t) ?? 0) + 1);
   const named = [...want].filter((t) => name.has(t));
   const body = [...want].filter((t) => !name.has(t) && (counts.get(t) ?? 0) >= 1);
-  return named.length >= 1 && named.length + body.length >= 2 ? [...named, ...body] : body.length >= 3 ? body : [];
+  return named.length >= 2 || (named.length >= 1 && named.length + body.length >= 3) ? [...named, ...body] : body.length >= 4 ? body : [];
 }
 
 export const dirOf = (path: string) => dirname(path);

@@ -123,9 +123,9 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'claim.dropped': s.dropped.push(e); break;
     case 'layer.needed': { const list = (s.cells[e.unit] ??= []); const i = list.findIndex((c) => c.layer === e.layer); if (i >= 0) list[i] = e; else list.push(e); break; }
     case 'trace.stopped': s.stops.push(e); break;
-    case 'criterion.linked': { const list = (s.linked[e.id] ??= []); if (!list.some((l) => l.unit === e.unit)) list.push({ unit: e.unit, why: e.why }); delete s.unbuilt[e.id]; break; }
+    case 'criterion.linked': { const list = (s.linked[e.id] ??= []); if (!list.some((l) => l.unit === e.unit)) list.push({ unit: e.unit, why: e.why }); delete s.unbuilt[e.id]; s.drift = s.drift.filter((d) => d.unit !== e.unit); break; }
     case 'criterion.unbuilt': if (!s.linked[e.id]?.length) s.unbuilt[e.id] = e.why; break;
-    case 'drift.found': if (!s.drift.some((d) => d.unit === e.unit)) s.drift.push(e); break;
+    case 'drift.found': if (!s.drift.some((d) => d.unit === e.unit) && !Object.values(s.linked).some((l) => l.some((x) => x.unit === e.unit))) s.drift.push(e); break;
     case 'agent.done': { const a = agent(e.agent); if (a) Object.assign(a, { done: true, ok: e.ok, unit: null, note: e.note }); break; }
     case 'extension.written': s.ext[e.ext] = { ...e, provenBy: null }; if (!s.extOrder.includes(e.ext)) s.extOrder.push(e.ext); break;
     case 'extension.proven': { const x = s.ext[e.ext]; if (x) { x.state = 'proven'; x.provenBy = e.by; } break; }
@@ -157,13 +157,13 @@ export const depthOf = (s: GrowState, unit: string): Array<DepthStatus | 'wait'>
 /** Checks that reached an answer: evidence found, or a confirmed absence. A stop is not depth. */
 export const depthScore = (s: GrowState, unit: string) => depthOf(s, unit).filter((x) => x === 'ok' || x === 'none').length;
 
-export type CriterionStatus = { cls: 'pass' | 'warn' | 'fail' | 'miss' | 'run' | 'cov' | 'code' | 'wait'; text: string };
+export type CriterionStatus = { cls: 'pass' | 'warn' | 'fail' | 'miss' | 'run' | 'cov' | 'code' | 'wait' | 'open'; text: string };
 /**
  * Where one spec criterion stands. "proved" needs every scenario serving it to pass with nothing
  * resting on an agent-written piece a person has not reviewed; otherwise it is "agent-checked".
  */
 export function criterionStatus(s: GrowState, id: string): CriterionStatus {
-  if (s.unbuilt[id]) return { cls: 'miss', text: 'not built' };
+  if (s.unbuilt[id]) return { cls: 'miss', text: 'not found' };
   const sc = s.scenarios.filter((x) => x.criteria.includes(id) && inMode(s, x));
   const ran = sc.filter((x) => s.run[x.id] && s.run[x.id]!.st !== 'not_run');
   if (sc.some((x) => s.run[x.id]?.st === 'fail')) return { cls: 'fail', text: 'failed' };
@@ -173,7 +173,7 @@ export function criterionStatus(s: GrowState, id: string): CriterionStatus {
   }
   if (sc.some((x) => s.run[x.id]?.st === 'run')) return { cls: 'run', text: 'running' };
   if (ran.length) return { cls: 'cov', text: `${ran.length} of ${sc.length} proved` };
-  if (s.done && sc.length) return { cls: 'warn', text: 'not proven yet' };
+  if (s.done && sc.length) return { cls: 'open', text: 'not proven yet' };
   if (sc.length) return { cls: 'cov', text: `${sc.length} scenario${sc.length > 1 ? 's' : ''}` };
   if (s.linked[id]?.length) return { cls: 'code', text: 'found in code' };
   return { cls: 'wait', text: s.phase >= 2 ? 'tracing' : 'listed' };
@@ -192,7 +192,7 @@ export function growSummary(s: GrowState) {
   const inRun = s.scenarios.filter((x) => inMode(s, x));
   return {
     proved: crit.filter((c) => c.cls === 'pass').length, agentChecked: crit.filter((c) => c.cls === 'warn').length,
-    needYou: crit.filter((c) => c.cls === 'miss' || c.cls === 'fail').length, criteria: crit.length,
+    needYou: crit.filter((c) => c.cls === 'miss' || c.cls === 'fail').length, notProven: crit.filter((c) => c.cls === 'open').length, criteria: crit.length,
     scenarios: inRun.length, passed: inRun.filter((x) => s.run[x.id]?.st === 'pass').length, failed: inRun.filter((x) => s.run[x.id]?.st === 'fail').length,
     notRun: inRun.filter((x) => s.run[x.id]?.st === 'not_run').length, realPassed: Object.values(s.real).filter((v) => v.st === 'pass').length,
     toReview: s.extOrder.filter((x) => s.ext[x]!.state !== 'proven').length,

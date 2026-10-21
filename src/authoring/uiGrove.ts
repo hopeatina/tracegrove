@@ -145,7 +145,8 @@ const gwUnit=id=>gw.state.units.find(u=>u.id===id);
 const gwScen=id=>gw.state.scenarios.find(s=>s.id===id);
 const gwRank={min:0,std:1,max:2};
 const gwIn=s=>gwRank[s.mode]<=gwRank[gw.state.mode];
-const gwSel=()=>gw.pinned||gw.state.focus;
+const gwAt=(a,now)=>a.unit||(a.units.length?a.units[Math.floor(now/1600)%a.units.length]:null);
+const gwSel=()=>gw.pinned||gw.state.focus||(gw.state.done?(gw.state.units.find(u=>gw.view.gaps[u.id])||gw.state.units[0]||{}).id:null);
 const gwPut=(el,...k)=>{for(const x of k.flat(Infinity))if(x!==null&&x!==undefined&&x!==false)el.append(x)};
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 
@@ -196,7 +197,7 @@ function gwPaintGrove(){
  const s=gw.state;if(!gw.svg||gw.G.ids!==Object.keys(gwLayout(s.units).L).join(','))gwBuild();
  const G=gw.G,v=gw.view,sel=gwSel();const hl=gw.selCrit?((v.criteria.find(c=>c.id===gw.selCrit)||{}).units||[]):null;
  gw.svg.classList.toggle('dim',!!hl);
- const busy=new Set(s.agents.filter(a=>!a.done&&a.unit&&(s.phase===2||s.phase===3||s.phase===5)).map(a=>a.unit));
+ const busy=new Set(s.agents.filter(a=>!a.done&&(s.phase===2||s.phase===3||s.phase===5)).map(a=>gwAt(a,Date.now())).filter(Boolean));
  for(const t of G.trunks)t.classList.toggle('on',s.trunkAt!==null);
  for(const u of s.units){if(!G.br[u.id])continue;G.br[u.id].classList.add('on');G.br[u.id].classList.toggle('tracing',busy.has(u.id));G.br[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
   G.lbl[u.id].classList.add('on');if(G.pad&&G.pad[u.id])G.pad[u.id].classList.add('on');G.lbl[u.id].classList.toggle('sel',sel===u.id);G.lbl[u.id].classList.toggle('hl',!!hl&&hl.includes(u.id));
@@ -210,7 +211,7 @@ function gwPaintGrove(){
   const r=s.run[sc.id];const st=!gwIn(sc)?'out':r?(r.st==='not_run'?'none':r.st):'in';
   n.setAttribute('class','lf '+st+(n.classList.contains('sprout')?' sprout':'')+(hl&&sc.criteria.includes(gw.selCrit)?' hl':''))}}
 function growCursors(now){if(!gw.svg||!gw.state||gw.tree!=='grove')return;const s=gw.state;const G=gw.G;const keep=new Set();
- if(s.phase===2||s.phase===3||s.phase===5)for(const a of s.agents){if(a.done||!a.unit||!G.br[a.unit])continue;keep.add(a.id);const p=G.br[a.unit];const len=p.getTotalLength();
+ if(s.phase===2||s.phase===3||s.phase===5)for(const a of s.agents){const at=gwAt(a,now+performance.timeOrigin);if(a.done||!at||!G.br[at])continue;keep.add(a.id);const p=G.br[at];const len=p.getTotalLength();
   const f=((now/1600)+a.id.charCodeAt(1)*.23)%1;const pt=p.getPointAtLength(len*(.15+.85*f));const c=G.cur[a.id]||(G.cur[a.id]=G.gCur.appendChild(sv('circle',{r:5,class:'cursor'})));c.setAttribute('cx',pt.x);c.setAttribute('cy',pt.y)}
  for(const id in G.cur)if(!keep.has(id)){G.cur[id].remove();delete G.cur[id]}}
 function gwOutline(){const s=gw.state,v=gw.view,sel=gwSel();
@@ -244,20 +245,20 @@ function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{clas
  if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return h('span',{class:'gw-badge',title:r.why||''},x.flow?'not run':'no flow yet')}
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
  const t=v.summary;
- gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),s.criteria.length?h('span',{class:'small muted'},t.proved+' proved · '+t.agentChecked+' agent-checked · '+t.needYou+' need you'):null),
+ gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Spec'),s.criteria.length?h('span',{class:'small muted'},t.proved+' proved · '+t.agentChecked+' agent-checked · '+(t.notProven?t.notProven+' not proven yet · ':'')+t.needYou+' need you'):null),
   h('p',{class:'small muted',style:'margin:4px 0 8px'},s.spec?'From '+s.spec.source+', '+s.spec.via:s.specMissing?'No spec: '+s.specMissing:'Looking in the PR, linked issues and commits'),
   v.criteria.length?v.criteria.map(c=>h('button',{class:'gw-cr'+(gw.selCrit===c.id?' sel':''),'aria-pressed':gw.selCrit===c.id?'true':'false',on:{click:()=>{gw.selCrit=gw.selCrit===c.id?null:c.id;growPaint()}}},
    h('span',{class:'id'},c.id),h('span',{},c.text,h('small',{},s.unbuilt[c.id]?s.unbuilt[c.id]:c.units.length?'in '+c.units.map(id=>(gwUnit(id)||{}).label).join(', '):'')),h('span',{class:'gw-badge '+c.status.cls},c.status.text))):null,
-  s.drift.map(d=>h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec: '+d.what),h('span',{},d.why+' ',h('span',{class:'mono small muted'},d.loc)))),
+  s.drift.length?h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec'),h('span',{},'Changed here, but no criterion covers '+(s.drift.length===1?'it':'them')+'. Confirm '+(s.drift.length===1?'it is':'they are')+' intended, or add '+(s.drift.length===1?'it':'them')+' to the spec.'),s.drift.map(d=>h('span',{class:'mono small'},d.what+' ',h('span',{class:'muted'},d.loc)))):null,
   s.stops.map(x=>h('div',{class:'gw-flag red'},h('b',{},'Tracing stopped at '+((gwUnit(x.unit)||{}).label||x.unit)),h('span',{},x.why+' ',h('span',{class:'mono small muted'},x.at)))),
   s.dropped.length?h('div',{class:'gw-flag red'},h('b',{},s.dropped.length+' agent claim'+(s.dropped.length===1?'':'s')+' dropped'),h('span',{},s.dropped.slice(0,3).map(x=>x.why).join('; ')+(s.dropped.length>3?'; and more':''))):null);
  return card}
 function gwScenarios(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Scenarios','data-testid':'grow-scenarios'});
  const asked=s.asked&&!s.modeBy;const locked=!!s.modeBy;
  gwPut(card,h('div',{class:'row',style:'justify-content:space-between;margin-bottom:10px'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Scenarios'),h('span',{class:'small muted'},s.scenarios.length?s.scenarios.filter(gwIn).length+' in '+GW.modes.find(m=>m.id===s.mode).label.toLowerCase()+' · '+s.scenarios.length+' drafted':'Drafted after tracing')),
-  h('div',{class:'gw-modes'+(asked?' ask':''),role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'aria-pressed':String((locked?s.mode:(gw.picking||'min'))===m.id),disabled:!asked,
+  h('div',{class:'gw-modes'+(asked?' ask':''),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{'data-testid':'grow-mode-'+m.id,'aria-pressed':String((locked?s.mode:(gw.picking||'min'))===m.id),disabled:!asked,
    on:{click:()=>{gw.picking=m.id;growPick(m.id)}}},h('b',{},m.label+' · '+v.counts[m.id]),h('span',{},m.blurb)))),
-  h('p',{class:'small muted',style:'margin:8px 0 0'},asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+GW.modes.find(m=>m.id===s.mode).label+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.'));
+  h('p',{class:'small muted','data-testid':'grow-mode-hint',style:'margin:8px 0 0'},asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+GW.modes.find(m=>m.id===s.mode).label+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.'));
  const parts=[];for(const x of s.scenarios){let g=parts.find(p=>p.unit===x.unit);if(!g)parts.push(g={unit:x.unit,list:[]});g.list.push(x)}
  for(const g of parts){const u=gwUnit(g.unit);const vis=g.list.filter(gwIn),hid=g.list.length-vis.length;if(!u)continue;
   gwPut(card,h('div',{class:'gw-sgroup'},h('h4',{},h('span',{style:'text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink)'},(s.units.indexOf(u)+1)+'  '+u.label),h('span',{},vis.length+(hid?' · +'+hid+' in a larger mode':''))),
@@ -288,8 +289,8 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
  return h('div',{class:'card gw-start','data-testid':'grow-start'},h('span',{class:'label'},'Grow a change'),
   h('h1',{style:'margin:0;font-size:26px;line-height:32px;max-width:none'},branch&&branch!==g.base?'What does '+branch+' change, and is it proved?':'Pick a branch to grow'),
   h('p',{class:'small muted',style:'margin:0'},'tracegrove reads the branch and its spec, grows the change as a tree, traces every part five ways, drafts happy, sad and edge scenarios, and proves them with real flows.'),
-  h('div',{class:'opts'},h('label',{},h('input',{type:'checkbox',checked:gw.prove,on:{change:e=>{gw.prove=e.target.checked}}}),'Prove with real flows'),
-   h('label',{title:available?'':'No agent installed; the rules trace everything'},h('input',{type:'checkbox',checked:gw.agent&&available,disabled:!available,on:{change:e=>{gw.agent=e.target.checked}}}),available?'Trace with '+name+' ('+(a.model||'CLI default')+')':'Rules only (no agent installed)'),
+  h('div',{class:'opts'},h('label',{},h('input',{type:'checkbox','data-testid':'grow-prove',checked:gw.prove,on:{change:e=>{gw.prove=e.target.checked}}}),'Prove with real flows'),
+   h('label',{title:available?'':'No agent installed; the rules trace everything'},h('input',{type:'checkbox','data-testid':'grow-agent',checked:gw.agent&&available,disabled:!available,on:{change:e=>{gw.agent=e.target.checked}}}),available?'Trace with '+name+' ('+(a.model||'CLI default')+')':'Rules only (no agent installed)'),
    h('label',{},'against ',h('input',{class:'mono',style:'min-height:34px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:var(--paper);color:var(--ink);width:200px',value:gw.base||g.base||'',placeholder:g.base||'main',on:{input:e=>{gw.base=e.target.value}}}))),
   h('div',{class:'row'},h('button',{class:'btn','data-testid':'grow-go',disabled:gw.busy||!g.isRepo||!branch||branch===g.base,on:{click:growStart}},'Grow '+(branch||'this branch')),
    !g.isRepo?h('span',{class:'small muted'},'Not a git repo: grow compares a branch with its base.'):branch===g.base?h('span',{class:'small muted'},'This is the base branch. Pick a feature branch below.'):null))}
@@ -311,7 +312,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const kids=[];
  if(s.blocked)kids.push(h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))));
  if(s.done){const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');
   kids.push(h('div',{class:'gw-result','data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+(t.notRun?', '+t.notRun+' not run yet':'')),
-   h('div',{class:'sub'},(s.criteria.length?'Spec: '+t.proved+' of '+t.criteria+' criteria proved, '+t.agentChecked+' agent-checked, '+t.needYou+' need you. ':'No spec to check against. ')+(fail?'First failure: '+fail.title+'. ':'')+(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''))),
+   h('div',{class:'sub'},(s.criteria.length?'Spec: '+t.proved+' of '+t.criteria+' criteria proved, '+t.agentChecked+' agent-checked'+(t.notProven?', '+t.notProven+' not proven yet':'')+', '+t.needYou+' need you. ':'No spec to check against. ')+(fail?'First failure: '+fail.title+'. ':'')+(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''))),
    h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs'))))}
  if(gw.error)kids.push(blocked(gw.error));
  gw.el.replaceChildren(...kids)}

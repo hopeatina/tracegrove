@@ -9,7 +9,8 @@
  * scenario without a flow is "not proven yet", never green.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Blocked } from '../core/errors.ts';
@@ -89,6 +90,25 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
   const criteria = 'missing' in spec ? [] : spec.criteria;
   if ('missing' in spec) emit({ kind: 'spec.missing', why: spec.missing });
   else { emit({ kind: 'spec.found', source: spec.source, via: spec.via, criteria: spec.criteria.length }); for (const c of spec.criteria) emit({ kind: 'criterion.found', id: c.id, text: c.text }); }
+  // Agents and flows read files on disk, so a branch that is not checked out gets its own worktree:
+  // what runs is the branch under review, not whatever happens to be in the working copy.
+  const work = info.current === branch ? null : worktreeFor(dir, branch);
+  try { await traceAndProve(dir, work, options, state, emit, { branch, base, files, units, criteria, onDisk: info.current === branch || work !== null }); } finally { if (work && !state.extOrder.some((x) => state.ext[x]!.extKind !== 'breakdown')) removeWorktree(dir, work); }
+}
+
+function worktreeFor(dir: string, branch: string): string | null {
+  const path = join(mkdtempSync(join(tmpdir(), 'tracegrove-grow-')), 'tree');
+  try { git(dir, ['worktree', 'add', '--detach', path, branch]); return path; } catch { return null; }
+}
+function removeWorktree(dir: string, path: string) {
+  try { git(dir, ['worktree', 'remove', '--force', path]); } catch { /* already gone */ }
+  rmSync(dirname(path), { recursive: true, force: true });
+}
+
+async function traceAndProve(home: string, work: string | null, options: GrowOptions, state: GrowState, emit: (e: GrowEventBody) => void,
+  change: { branch: string; base: string; files: FileChange[]; units: ChangeUnit[]; criteria: Criterion[]; onDisk: boolean }): Promise<void> {
+  const { branch, base, files, units, criteria } = change;
+  const dir = work ?? home;
   const ctx: Ctx = { dir, branch, base, files, units, criteria, state, emit, signal: options.signal, callers: new Map(), proposals: new Map() };
 
   // Phase 1: the tree.
@@ -102,7 +122,7 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
   const lanes = lanesOf(units);
   lanes.forEach((lane, i) => traceRules(ctx, `r${i + 1}`, lane));
   for (const c of criteria) if (!state.linked[c.id]?.length) emit({ kind: 'criterion.unbuilt', id: c.id, why: 'No changed code shares its words. An agent can check it by meaning.' });
-  const agent = agentFor(dir, options, info.current === branch);
+  const agent = agentFor(dir, options, change.onDisk);
   if (agent.settings) {
     await Promise.all(lanes.map((lane, i) => traceWithAgent(ctx, `a${i + 1}`, lane, agent.settings!)));
     for (const c of criteria) if (!state.linked[c.id]?.length) emit({ kind: 'criterion.unbuilt', id: c.id, why: 'Neither the rules nor the agent found code that serves it in this change.' });
@@ -111,7 +131,8 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
 
   // Phase 3: scenarios, from the agent's proposals where it made them, from templates elsewhere.
   emit({ kind: 'phase.started', phase: 3 });
-  const config = findConfig(dir, options.config ?? null);
+  const explicit = options.config ? relative(home, resolve(home, options.config)) : null;
+  const config = findConfig(dir, explicit && !explicit.startsWith('..') ? explicit : options.config ? resolve(home, options.config) : null);
   const flows = config ? loadFlows(config) : [];
   if (agent.settings && ctx.proposals.size) emit({ kind: 'extension.written', ext: 'x1', extKind: 'breakdown', name: 'Tree and scenario breakdown',
     path: `${STATE_DIR}/discovery/${slug(branch)}.jsonl`, why: 'Units come straight from the diff and every cited line was checked. Which scenarios matter is the agent’s judgment.',
@@ -273,7 +294,7 @@ function agentFor(dir: string, options: GrowOptions, checkedOut: boolean): { set
   try { settings = resolveAgentSettings(dir, config, { provider: options.agent?.provider ?? null, model: options.agent?.model ?? null }); } catch (error) { return { settings: null, why: (error as Error).message }; }
   if (settings.provider === 'none') return { settings: null, why: 'No agent selected, so the rules traced everything. Choose Claude or Codex for a deeper trace.' };
   if (!detectAgents()[settings.provider]) return { settings: null, why: `${settings.provider === 'claude' ? 'Claude Code' : 'Codex'} is not installed, so the rules traced everything.` };
-  if (!checkedOut) return { settings: null, why: 'The agent reads files on disk, and this branch is not checked out, so the rules traced everything.' };
+  if (!checkedOut) return { settings: null, why: 'The agent reads files on disk, and git could not check this branch out beside your working copy, so the rules traced everything.' };
   return { settings, why: null };
 }
 
@@ -430,7 +451,9 @@ function findConfig(dir: string, explicit: string | null): string | null {
 function loadFlows(configPath: string): FlowRow[] {
   try { return compileProject(configPath).flows.map((f) => ({ caseId: f.caseId, title: f.title, file: f.file, steps: f.steps })); } catch { return []; }
 }
-const sameRoute = (u: ChangeUnit, s: { method: string; path: string }) => s.method === u.method && (matchesTemplate(u.path!, s.path) || matchesTemplate(s.path, u.path!) || s.path === u.path);
+// A literal route (/notes/count) is reached only by that literal path; a flow step on /notes/{noteId} could be any note.
+const sameRoute = (u: ChangeUnit, s: { method: string; path: string }) => s.method === u.method
+  && (s.path === u.path || (u.path!.includes('{') && (matchesTemplate(u.path!, s.path) || matchesTemplate(s.path, u.path!))));
 function flowFor(u: ChangeUnit, t: Template, flows: FlowRow[], taken: Set<string>): string | null {
   if (u.kind !== 'route') return null;
   const fits = (s: FlowRow['steps'][number]) => !sameRoute(u, s) ? false
@@ -440,6 +463,20 @@ function flowFor(u: ChangeUnit, t: Template, flows: FlowRow[], taken: Set<string
   const f = flows.find((x) => !taken.has(`${x.caseId}:${t.kind}${t.auth ? ':auth' : ''}`) && x.steps.some(fits));
   if (!f) return null;
   taken.add(`${f.caseId}:${t.kind}${t.auth ? ':auth' : ''}`); return f.caseId;
+}
+
+const AUTH_WORDS = /\btoken|\bsession|sign(?:ed)?[ -]?(?:in|out)|log[ -]?in|\bauth|anonymous|unauthori|permission|forbidden/i;
+const FAILURE_WORDS = /reject|refus|invalid|\berror|\bfail/i;
+/** Which criteria a rules template can speak for: auth edges take the criteria about tokens and sessions, happy paths the rest, failures those phrased as a refusal. */
+function criteriaFor(ctx: Ctx, u: ChangeUnit, t: Template, linked: string[]): string[] {
+  const text = (id: string) => ctx.criteria.find((c) => c.id === id)?.text ?? '';
+  if (t.auth) {
+    const ids = ctx.criteria.filter((c) => AUTH_WORDS.test(c.text)).map((c) => c.id);
+    for (const id of ids) if (!ctx.state.linked[id]?.some((l) => l.unit === u.id)) ctx.emit({ kind: 'criterion.linked', id, unit: u.id, why: `${u.label} has a signed-out edge, which is what it describes` });
+    return ids;
+  }
+  if (t.kind === 'happy') return linked.filter((id) => !AUTH_WORDS.test(text(id)) || !FAILURE_WORDS.test(text(id)));
+  return linked.filter((id) => FAILURE_WORDS.test(text(id)) && !AUTH_WORDS.test(text(id)));
 }
 
 function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null) {
@@ -457,7 +494,7 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null) {
       ? proposed.map((p, i) => ({ kind: p.kind, title: p.title, proves: p.proves, criteria: p.criteria.length ? p.criteria : crit, risk: p.kind === 'happy' ? 0 : 10 - i,
           ...(u.layer === 'ext' && /time ?out|slow|unreachable|hang/i.test(p.title) ? { mockOnly: `${u.label} can’t be made slow or unreachable on demand, so this fault runs against the stand-in only` } : {}),
           ...(/session|token|signed.out|unauth|forbidden|permission/i.test(p.title) ? { auth: true } : {}) }))
-      : base.map((t) => ({ ...t, criteria: crit }));
+      : base.map((t) => ({ ...t, criteria: criteriaFor(ctx, u, t, crit) }));
     const failures = list.filter((t) => t.kind !== 'happy').sort((a, b) => b.risk - a.risk);
     const riskiest = failures[0];
     for (const t of list) {
