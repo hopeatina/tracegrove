@@ -509,7 +509,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
 
 /* Wood grows by elongation: the tip comes out thin and thickens behind it, never a wipe across finished wood. */
 function gbPart(pts,w,e,floor){const n=pts.length-1,x=e*n,k=Math.floor(x),f=x-k;const sub=pts.slice(0,k+1);if(k<n&&f>0)sub.push([pts[k][0]+(pts[k+1][0]-pts[k][0])*f,pts[k][1]+(pts[k+1][1]-pts[k][1])*f]);if(sub.length<2)return '';
- const m=sub.length-1,th=.1+.9*Math.pow(e,1.2),tl=Math.max(2,m*.14);return gbRib(sub,sub.map((_,i)=>w[Math.min(i,n)]*th*Math.max(.3,Math.min(1,(m-i)/tl+.3))),0,sub.length-1,floor)}
+ /* growing wood is already its own shape, a little slighter, and the growing tip draws to a point: never a tube */
+ const m=sub.length-1,th=.62+.38*Math.pow(e,1.2),tl=Math.max(3,m*.18);return gbRib(sub,sub.map((_,i)=>w[Math.min(i,n)]*th*Math.max(.14,Math.min(1,(m-i)/tl+.14))),0,sub.length-1,floor)}
 function gbGrowRun(B){const P=B.grow;if(!P.length)return;for(const g of P){g.full=g.el.getAttribute('d');g.el.setAttribute('d',gbPart(g.pts,g.w,0,g.floor))}
  const end=Math.max(...P.map(g=>g.t0+g.ms));
  const step=now=>{if(gw.B!==B)return;for(const g of P){if(g.done)continue;const p=(now-g.t0)/g.ms;if(p<=0)continue;if(p>=1){g.el.setAttribute('d',g.full);g.done=true;continue}g.el.setAttribute('d',gbPart(g.pts,g.w,1-Math.pow(1-p,2.2),g.floor))}
@@ -595,7 +596,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    B.root[r.id]=g;B.pos[r.id]=pts[Math.min(n-1,Math.floor(n*(r.ext?.5:.6)))];B.nav.push('u:'+r.id);B.navEl['u:'+r.id]=g}
   /* a store's root lies on the soil, not sunk in it, and a fine stake runs from where it goes under to its tag on the face */
   if(r.id&&!r.ext){const l=L.rl.find(q=>q.r===r&&q.face);const e=pts[n-1];if(l&&Math.abs(l.x-e[0])<l.ww/2+30){const ty=l.y-L.fs*.82;
-   g.insertBefore(sv('path',{class:'stake',d:'M'+gbP([e[0],e[1]+1.5])+' L'+gbP([l.x,ty])}),g.firstChild)}}
+   const sk=sv('path',{class:'stake',d:'M'+gbP([e[0],e[1]+1.5])+' L'+gbP([l.x,ty])});g.insertBefore(sk,g.firstChild);anim('stake:'+id,sk,delay+560,300,'fade')}}
   (r.id?gRootX:gRoot).append(g)});
  for(const l of L.rl){const t=sv('text',{x:gbF(l.x),y:gbF(l.y),'text-anchor':l.anchor,class:'rlbl'+(l.face?' face':''),style:'font-size:'+L.fs+'px'},l.t,l.r.stop?sv('tspan',{class:'nt'},' · trace stops'):null);(B.root[l.r.id]||gRoot).append(t);anim('rl:'+l.r.id,t,l.r.tree*250+560,300,'fade')}
  let lightAt=0;
@@ -753,8 +754,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  if(svg.animate)for(const [el,delay,ms,kind] of B.anim){if(kind==='fade')el.animate([{opacity:0},{opacity:1}],{duration:ms,delay,fill:'backwards'});else if(kind==='pop')el.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1)',opacity:1}],{duration:ms,delay,easing:'cubic-bezier(.2,.8,.3,1.1)',fill:'backwards'})}
  gbGrowRun(B);
  return B}
-/* A tap that lands between leaves picks the nearest leaf within 14 px, so single leaves can be chosen on a phone. */
-function gbNearLeaf(e){const B=gw.B;if(!B||e.pointerType==='mouse')return null;let best=null,bd=14;
+/* A tap that lands between leaves picks the nearest leaf within 22 px, so a finger can choose a single leaf on a phone. */
+function gbNearLeaf(e){const B=gw.B;if(!B||e.pointerType==='mouse')return null;let best=null,bd=22;
  for(const id in B.leaf){const el=B.leaf[id];if(el.classList.contains('gone'))continue;const r=el.getBoundingClientRect();const d=Math.hypot(r.left+r.width/2-e.clientX,r.top+r.height/2-e.clientY);if(d<bd){bd=d;best='s:'+id}}return best}
 
 /* The same leaf with a bite out of its upper edge: how a failed scenario looks, in any theme and on any ground. */
