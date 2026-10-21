@@ -56,10 +56,10 @@ export type GrowEventBody =
   | E<'mode.chosen', { mode: Mode; by: 'flag' | 'you' | 'default' }>
   | E<'flows.checked', { scenarios: number; runnable: number; config: string | null }>
   | E<'scenario.running', { scenario: string; flow: string }>
-  | E<'scenario.passed', { scenario: string; ms: number; run: string | null }>
-  | E<'scenario.failed', { scenario: string; ms: number; run: string | null; why: string }>
+  | E<'scenario.passed', { scenario: string; took: number; run: string | null }>
+  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string }>
   | E<'scenario.not_run', { scenario: string; why: string }>
-  | E<'variant.passed', { scenario: string; ms: number; note: string }>
+  | E<'variant.passed', { scenario: string; took: number; note: string }>
   | E<'variant.skipped', { scenario: string; note: string }>
   | E<'variant.not_applicable', { scenario: string; note: string }>
   | E<'discovery.finished', { ran: number; passed: number; failed: number; notRun: number }>
@@ -139,10 +139,10 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'mode.chosen': s.asked = false; s.mode = e.mode; s.modeBy = e.by; break;
     case 'flows.checked': s.flows = e; break;
     case 'scenario.running': s.run[e.scenario] = { st: 'run' }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.ms, run: e.run }; break;
-    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.ms, run: e.run, why: e.why }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run }; break;
+    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
     case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why }; break;
-    case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.ms, note: e.note }; break;
+    case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
     case 'variant.not_applicable': s.real[e.scenario] = { st: 'not_run', note: e.note, na: true }; break;
     case 'discovery.finished': s.done = e; s.focus = null; break;

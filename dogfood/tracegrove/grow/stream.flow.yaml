@@ -1,0 +1,19 @@
+title: Grow streams a feature branch's tree to the UI, only with the session token, and refuses a stale mode pick
+risk: critical
+tags: [ui, grow, security]
+steps:
+  - name: no token, no stream
+    POST: /api/grow
+    as: none
+    json: { branch: notes-count, base: main, mode: min, prove: false, agent: false }
+    expect: { status: 403, json: { error: missing session token } }
+
+  - name: the stream runs to the end
+    POST: /api/grow
+    json: { branch: notes-count, base: main, mode: min, prove: false, agent: false }
+    expect: 200
+
+  - name: a mode pick for a grow that is not waiting is refused
+    POST: /api/grow/mode
+    json: { id: not-a-grow, mode: std }
+    expect: 409

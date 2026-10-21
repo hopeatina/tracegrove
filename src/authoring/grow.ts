@@ -559,8 +559,8 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     if (ctx.signal?.aborted) break;
     emit({ kind: 'scenario.running', scenario: s.id, flow: s.flow! });
     const r = await runFlow(s.flow!);
-    if (r.ok) { emit({ kind: 'scenario.passed', scenario: s.id, ms: r.ms, run: r.run }); real(s); }
-    else emit({ kind: 'scenario.failed', scenario: s.id, ms: r.ms, run: r.run, why: r.why });
+    if (r.ok) { emit({ kind: 'scenario.passed', scenario: s.id, took: r.ms, run: r.run }); real(s); }
+    else emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why });
   }
   // Scenarios no flow proves: an agent may write flows for them, which tracegrove then runs.
   let open = inRun.filter((s) => !s.flow && !state.run[s.id]);
@@ -585,8 +585,8 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
         const sc = state.scenarios.find((y) => y.id === target.id)!;
         sc.ext = [...new Set([...sc.ext, ext])];
         emit({ kind: 'scenario.running', scenario: target.id, flow: flow.caseIds[0] ?? file });
-        if (flow.outcome === 'proven') { emit({ kind: 'scenario.passed', scenario: target.id, ms: 0, run: flow.run }); emit({ kind: 'extension.proven', ext, by: target.id }); }
-        else emit({ kind: 'scenario.failed', scenario: target.id, ms: 0, run: flow.run, why: flow.detail ?? flow.outcome });
+        if (flow.outcome === 'proven') { emit({ kind: 'scenario.passed', scenario: target.id, took: 0, run: flow.run }); emit({ kind: 'extension.proven', ext, by: target.id }); }
+        else emit({ kind: 'scenario.failed', scenario: target.id, took: 0, run: flow.run, why: flow.detail ?? flow.outcome });
       }
       emit({ kind: 'agent.done', agent: 'd1', ok: drafted.agent.exitCode === 0, note: `${drafted.agent.files.length} file${drafted.agent.files.length === 1 ? '' : 's'} written` });
     } catch (error) {

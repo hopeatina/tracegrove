@@ -59,7 +59,7 @@ const MAX_BRANCHES = 12; const MAX_ROOTS = 6;
 export function layout(units: GrowUnit[]): Geometry {
   const branches = units.filter((u) => !u.root).slice(0, MAX_BRANCHES);
   const roots = units.filter((u) => u.root).slice(0, MAX_ROOTS);
-  const crown = branches.length % 2 === 1 && branches.length > 2 ? branches.at(-1)! : null;
+  const crown = branches.length % 2 === 1 ? branches.at(-1)! : null;
   const sides = branches.filter((u) => u !== crown);
   const perSide = [sides.filter((_, i) => i % 2 === 0), sides.filter((_, i) => i % 2 === 1)];
   const most = Math.max(1, perSide[0]!.length, perSide[1]!.length);
@@ -179,7 +179,7 @@ function canvas(s: GrowState, geo: Geometry, elapsed: number): Line[] {
 const PIP: Record<DepthStatus | 'wait', Seg> = { ok: ['leaf', '●'], none: ['leaf', '○'], stop: ['fail', '✕'], wait: ['frame', '·'] };
 const CELL_MARK = { built: ['leaf', '✓'], indirect: ['root', '~'], missing: ['fail', '✕'] } as const;
 const fmt = (ms: number) => { const sec = Math.max(0, ms) / 1000; return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${(sec % 60).toFixed(1).padStart(4, '0')}`; };
-const secs = (ms: number | undefined) => `${((ms ?? 0) / 1000).toFixed(1)}s`;
+const secs = (ms: number | undefined) => ((ms ?? 0) < 1000 ? `${Math.round(ms ?? 0)} ms` : `${((ms ?? 0) / 1000).toFixed(1)} s`);
 
 /** One frame as plain or colored lines. `width` below 118 stacks the ledger under the tree. */
 export function renderGrove(s: GrowState, view: GroveView): string[] {

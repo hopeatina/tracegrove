@@ -148,20 +148,21 @@ const gwIn=s=>gwRank[s.mode]<=gwRank[gw.state.mode];
 const gwAt=(a,now)=>a.unit||(a.units.length?a.units[Math.floor(now/1600)%a.units.length]:null);
 const gwSel=()=>gw.pinned||gw.state.focus||(gw.state.done?(gw.state.units.find(u=>gw.view.gaps[u.id])||gw.state.units[0]||{}).id:null);
 const gwPut=(el,...k)=>{for(const x of k.flat(Infinity))if(x!==null&&x!==undefined&&x!==false)el.append(x)};
+const gwDur=ms=>ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(1)+' s';
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 
 const gwSway=(X,GY,TOP,y)=>X+11*Math.sin(Math.max(0,GY-y)/Math.max(1,GY-TOP)*Math.PI*1.25);
 /* Layout for any tree: limbs alternate sides, the lowest reaching widest, so they nest and never cross. */
 function gwLayout(units){
  const br=units.filter(u=>!u.root).slice(0,14),rt=units.filter(u=>u.root).slice(0,8);
- const crown=br.length%2===1&&br.length>2?br[br.length-1]:null;const sides=br.filter(u=>u!==crown);
+ const crown=br.length%2===1?br[br.length-1]:null;const sides=br.filter(u=>u!==crown);
  const per=[sides.filter((_,i)=>i%2===0),sides.filter((_,i)=>i%2===1)];const most=Math.max(1,per[0].length,per[1].length);
- const X=500,STEP=66,TOP=crown?130:70,GY=TOP+Math.max(230,(most-1)*STEP+140),L={};
+ const X=500,STEP=66,TOP=crown?130:70,GY=TOP+(sides.length?Math.max(230,(most-1)*STEP+140):150),L={};
  /* Tips sit in two neat label columns; the lowest limb leaves the trunk lowest and lands lowest, so limbs nest and never cross. */
  per.forEach((list,side)=>{const dir=side===0?-1:1,n=list.length,xt=X+dir*250;
   list.forEach((u,j)=>{const lift=n>1?j/(n-1):.5;const yt=Math.round(GY-96-side*STEP/2-j*STEP);const ya=Math.round(GY-40-lift*(GY-40-TOP-40)*.78-side*16);const xa=gwSway(X,GY,TOP,ya);
    L[u.id]={d:'M'+xa.toFixed(1)+' '+ya+' C'+(xa+dir*60).toFixed(1)+' '+(ya-14)+' '+(xt-dir*120)+' '+(yt+28)+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:4.2-lift*2,pad:[xt-dir*30,yt-6]}})});
- if(crown){const cx=gwSway(X,GY,TOP,TOP+10);L[crown.id]={d:'M'+cx.toFixed(1)+' '+(TOP+10)+' C'+(cx-2).toFixed(1)+' '+(TOP-30)+' '+(cx+8).toFixed(1)+' '+(TOP-60)+' '+(cx+4).toFixed(1)+' '+(TOP-92),tip:[X+4,TOP-108],anchor:'middle',crown:true,w:2.2,pad:[X+4,TOP-88]}}
+ if(crown){const cx=gwSway(X,GY,TOP,TOP+10);L[crown.id]={d:'M'+cx.toFixed(1)+' '+(TOP+10)+' C'+(cx-2).toFixed(1)+' '+(TOP-30)+' '+(cx+8).toFixed(1)+' '+(TOP-60)+' '+(cx+4).toFixed(1)+' '+(TOP-92),tip:[cx+40,TOP-88],anchor:'start',crown:true,w:2.6,pad:[cx+4,TOP-92]}}
  const deep=Math.ceil(rt.length/2);
  rt.forEach((u,j)=>{const dir=j%2===0?-1:1,k=Math.floor(j/2);const xt=X+dir*(240-k*20),yt=GY+56+k*62;
   L[u.id]={d:'M'+(X+dir*4)+' '+(GY+3)+' C'+(X+dir*40)+' '+(GY+40)+' '+(xt-dir*100)+' '+yt+' '+xt+' '+yt,tip:[xt+dir*12,yt+4],anchor:dir<0?'end':'start',w:2.8,
@@ -220,28 +221,28 @@ function gwOutline(){const s=gw.state,v=gw.view,sel=gwSel();
   const lv=s.scenarios.filter(x=>x.unit===u.id).map(x=>{const r=s.run[x.id];return h('i',{class:!gwIn(x)?'out':r?r.st:'',title:x.title})});
   return h('tr',{class:'u'+(sel===u.id?' sel':''),tabindex:0,'data-unit':u.id,on:{click:()=>{gw.pinned=u.id;growPaint()},keydown:e=>{if(e.key==='Enter'){gw.pinned=u.id;growPaint()}}}},
    h('td',{},h('div',{class:'nm'},(s.units.indexOf(u)+1)+' '+u.label),h('div',{class:'loc'},u.unitKind+' · '+u.loc)),
-   h('td',{},h('span',{class:'gw-pips','aria-label':d.score+' of 5 checks'},d.pips.map(p=>h('i',{class:p}))),h('div',{class:'loc'},d.score+'/5')),
+   h('td',{},h('span',{class:'gw-pips','aria-label':d.score+' of 5 checked'},d.pips.map(p=>h('i',{class:p}))),h('div',{class:'loc'},d.pips.filter(p=>p==='ok').length+' found · '+d.score+'/5')),
    h('td',{},h('div',{class:'gw-chips'},(s.cells[u.id]||[]).map(c=>h('span',{class:'gw-chip '+c.status,title:c.reason},GW.layers[c.layer])))),
    h('td',{class:'loc'},crit.length?crit.join(' '):drift?h('span',{class:'gw-chip indirect'},'not in spec'):'—'),
    h('td',{},h('span',{class:'gw-mini'},lv)))};
  const br=s.units.filter(u=>!u.root).map(row).filter(Boolean),rt=s.units.filter(u=>u.root).map(row).filter(Boolean);
  return h('div',{class:'scroll'},h('table',{class:'gw-ol','data-testid':'grow-outline'},h('thead',{},h('tr',{},['Part','Depth','Layers','Spec','Scenarios'].map(t=>h('th',{},t)))),
   h('tbody',{},!br.length&&!rt.length?h('tr',{},h('td',{colspan:5,class:'gw-empty'},gw.onlyGaps?'No gaps.':'Parts appear here as they are found.')):null,
-   br.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Branches · what people use')),br]:null,rt.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Roots · what it depends on')),rt]:null)))}
+   br.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Branches · what people use')),...br]:null,rt.length?[h('tr',{class:'grp'},h('td',{colspan:5},'Roots · what it depends on')),...rt]:null)))}
 function gwInspector(){const s=gw.state,v=gw.view,id=gwSel();
  const card=h('section',{class:'card gw-ins','aria-label':'Inspector','data-testid':'grow-inspector'});
  if(!id){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},s.done?'Select a branch or root to see how deep tracing went.':'Follows the tracer as it works. Select a branch or root to pin it.'));return card}
  const u=gwUnit(id);if(!u)return card;const d=s.depth[id]||{};const dp=v.depth[id]||{pips:[],score:0};
  const ag=s.agents.find(a=>!a.done&&a.unit===id);
- gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},gw.pinned?'Pinned':'Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.pinned=null;growPaint()}}},'Follow'):null),
+ gwPut(card,h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},gw.pinned?'Pinned':s.done&&!s.focus?(v.gaps[id]?'The first part with a gap':'The first part'):'Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.pinned=null;growPaint()}}},'Follow'):null),
   h('h3',{},u.label),h('div',{class:'where'},(u.root?'root':'branch')+' · '+u.unitKind+' · '+u.loc),
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:10px;margin-bottom:6px'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.score+' of 5 checks'),dp.pips.includes('stop')?h('span',{class:'gw-badge miss'},'stopped'):null),
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How deep it went'),h('div',{class:'row',style:'gap:10px;margin-bottom:6px'},h('span',{class:'gw-pips'},dp.pips.map(p=>h('i',{class:p}))),h('b',{style:'font-weight:500;font-size:13px'},dp.score+' of 5 checked · '+dp.pips.filter(p=>p==='ok').length+' found'),dp.pips.includes('stop')?h('span',{class:'gw-badge miss'},'stopped'):null),
    GW.steps.map(([k,label])=>{const e=d[k];const st=e?e.status:'wait';return h('div',{class:'gw-dp '+st},h('span',{class:'m'},{ok:'✓',none:'○',stop:'✕',wait:'·'}[st]),h('span',{class:'n'},label,e&&e.by!=='rules'?h('span',{class:'by'},e.by):null,e?h('small',{},e.loc+' · '+e.note):null))})),
   (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},c.reason,h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
-  (()=>{const sc=s.scenarios.filter(x=>x.unit===id);return sc.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios'),sc.map(x=>h('div',{class:'row',style:'justify-content:space-between;gap:8px;font-size:13px;padding:3px 0;'+(gwIn(x)?'':'opacity:.55')},h('span',{style:'min-width:0'},x.title),gwBadge(x)))):null})());
+  (()=>{const sc=s.scenarios.filter(x=>x.unit===id);return sc.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios'),sc.map(x=>h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:8px;font-size:13px;padding:3px 0;'+(gwIn(x)?'':'opacity:.55')},h('span',{style:'min-width:0;flex:1'},x.title),gwBadge(x)))):null})());
  return card}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
- if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+(r.ms/1000).toFixed(1)+' s');
+ if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms));
  if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return h('span',{class:'gw-badge',title:r.why||''},x.flow?'not run':'no flow yet')}
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
  const t=v.summary;
@@ -274,8 +275,8 @@ function gwCard(x){const s=gw.state;const r=s.run[x.id];const st=r?r.st:'';
     x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),
    x.variants.length?gwLanes(x):null,r&&r.st==='fail'?h('div',{class:'err'},r.why||'failed'):null,r&&r.st==='not_run'&&r.why?h('span',{class:'small muted'},r.why):null))}
 function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
- const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+(r.ms/1000).toFixed(1)+' s'):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'},'not run');
- const real=x.mockOnly?h('span',{class:'gw-badge'},'mock only'):!v?h('span',{class:'gw-badge'},r&&r.st==='pass'?'next':'after mock'):v.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+(v.ms/1000).toFixed(1)+' s'):h('span',{class:'gw-badge warn'},v.na?'mock only':'skipped');
+ const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms)):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'},'not run');
+ const real=x.mockOnly?h('span',{class:'gw-badge'},'mock only'):!v?h('span',{class:'gw-badge'},r&&r.st==='pass'?'next':'after mock'):v.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(v.ms)):h('span',{class:'gw-badge warn'},v.na?'mock only':'skipped');
  const note=x.mockOnly||(v&&v.note)||(x.realKey?'Runs against the provider sandbox when '+x.realKey+' is set':'No sandbox known for this provider yet');
  return h('div',{class:'gw-lanes'},h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'mock · stand-in'),mock,h('span',{class:'note'},'Every PR. Can fail, slow down or hang up on purpose.')),h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'real · sandbox'),real,h('span',{class:'note'},note)))}
 function gwExt(){const s=gw.state;if(!s.extOrder.length)return null;const ids=s.extOrder;
@@ -303,8 +304,8 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const kids=[];
  kids.push(h('div',{class:'gw-rail',role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?((en-st)/1000).toFixed(1)+' s':'now'))})));
  const rules=s.agents.filter(a=>a.by==='rules'&&a.done&&a.ok),live=s.agents.filter(a=>!rules.includes(a)&&(!s.done||!a.ok||a.by!=='rules'));
- if(live.length||rules.length)kids.push(h('div',{class:'gw-agents','aria-live':'polite'},rules.length?h('div',{class:'gw-ag'},h('b',{},'✓ rules · '+rules.length+' lanes'),h('span',{},rules.reduce((n,a)=>n+a.units.length,0)+' parts traced from source')):null,live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.model||a.by)+' · '+a.brief),h('span',{title:a.note},a.note)))));
- const tree=h('section',{class:'card gw-tree','aria-label':'Tree'},h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},s.units.length+' part'+(s.units.length===1?'':'s')+' · '+s.units.filter(u=>!u.root).length+' branches · '+s.units.filter(u=>u.root).length+' roots'),
+ if(live.length||rules.length)kids.push(h('div',{class:'gw-agents','aria-live':'polite'},rules.length?h('div',{class:'gw-ag'},h('b',{},'✓ rules · '+rules.length+' lane'+(rules.length===1?'':'s')),h('span',{},(n=>n+' part'+(n===1?'':'s')+' traced from source')(rules.reduce((n,a)=>n+a.units.length,0)))):null,live.map(a=>h('div',{class:'gw-ag'+(a.done?(a.ok?'':' bad'):' live')},h('b',{},(a.done?(a.ok?'✓ ':'✕ '):'')+(a.by==='rules'?'rules':a.model||a.by)+' · '+a.brief),h('span',{title:a.note},a.note)))));
+ const tree=h('section',{class:'card gw-tree','aria-label':'Tree'},h('div',{class:'gw-bar'},h('span',{class:'gw-eyebrow',style:'margin:0'},s.units.length+' part'+(s.units.length===1?'':'s')+' · '+(n=>n+' branch'+(n===1?'':'es'))(s.units.filter(u=>!u.root).length)+' · '+(n=>n+' root'+(n===1?'':'s'))(s.units.filter(u=>u.root).length)),
   h('span',{class:'row',style:'gap:10px'},gw.tree==='outline'?h('label',{class:'small muted',style:'display:inline-flex;gap:6px;align-items:center'},h('input',{type:'checkbox',checked:gw.onlyGaps,on:{change:e=>{gw.onlyGaps=e.target.checked;growPaint()}}}),'Only gaps'):null,
    h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,on:{click:()=>{gw.tree=t;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
  if(gw.tree==='grove'){gwPaintGrove();tree.append(h('div',{class:'gw-scrollx'},gw.svg))}else tree.append(gwOutline());
