@@ -359,7 +359,7 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
  const maxV=js.length===1?2:0;let left=A.length,nv=0;
  for(const p of ['failure','guard']){if(nv>=maxV)break;const n=A.filter(x=>gbPol(x)===p).length;if(n&&n<left){left-=n;nv++;items.push({id:apex.id+'~'+p,j:apex,pol:p,w:Math.max(.6,M.weight(apex)*n/A.length)})}}
  const m=items.length,lit=!m;const vp=new Set(items.filter(it=>it.pol).map(it=>it.pol));
- const h1=m>=7?.27:m===1?.42:.31;const hs=[];for(let i=0,h=h1;i<m;i++){hs.push(h);h+=(.86-h)*.4}
+ const h1=m>=7?.27:m===1?.54:.31;const hs=[];for(let i=0,h=h1;i<m;i++){hs.push(h);h+=(.86-h)*.4}
  const side=items.map((_,i)=>i%2?-S:S),back=items.map((_,i)=>m>=3&&i%3===2);
  const carry={};for(const j of js)for(const id of j.units)if(!U[id].root)carry[id]=(carry[id]||0)+1;
  const ownOf=j=>j.units.filter(id=>!U[id].root&&carry[id]===1);
@@ -369,8 +369,9 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
     crown, whose underside clears the highest pad below it, so there is no bare pole and no pad sits on another. */
  const leavesOf=pd=>pd.pol?A.filter(x=>gbPol(x)===pd.pol):pd.crown?A.filter(x=>!vp.has(gbPol(x))):(M.leaves[pd.jid]||[]);
  const padList=[{id:apex.id,jid:apex.id,pol:null,crown:true,i:-1,b:null},...items.map((it,i)=>({id:it.id,jid:it.j.id,pol:it.pol,crown:false,i,b:null}))];
- /* the apex is the tree's crowning dome: its crest a third again as wide as the largest crest below it */
- for(const pd of [...padList.slice(1),padList[0]]){pd.leaves=leavesOf(pd);const cm=pd.crown?1.3*Math.max(0,...padList.slice(1).map(q=>{const c=q.geo.cs.find(c=>c.role==='crest');return c?c.a:0})):0;pd.geo=gbPadGeo(pd.leaves,H,pd.crown?0:side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,cm)}
+ /* the apex is the tree's crowning dome: its crest a third again as wide as the largest crest below it, its own shoulder
+    reaching out on the side away from the first branch, so the canopy balances over the roots */
+ for(const pd of [...padList.slice(1),padList[0]]){pd.leaves=leavesOf(pd);const cm=pd.crown?1.3*Math.max(0,...padList.slice(1).map(q=>{const c=q.geo.cs.find(c=>c.role==='crest');return c?c.a:0})):0;pd.geo=gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,cm)}
  const cpd=padList[0];
  const crc=cpd.geo.cs.find(c=>c.role==='crest'),gap=.022*H,inC=.32*crc.h-crc.bot-.035*H,lift=.02*H+6;let need=lit?.84*H:m<=1?.22*H:m<=2?.27*H:.38*H;
  /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
