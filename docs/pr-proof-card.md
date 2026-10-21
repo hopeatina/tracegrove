@@ -40,6 +40,9 @@ A failing claim also becomes an error annotation on its flow file, and the step 
 | `title` | `tracegrove` | The card's heading |
 | `comment` | `true` | Post or update the PR comment; the card always goes to the job summary |
 | `fail-on-contradiction` | `true` | Fail the step when a claim fails |
+| `preview-url` | | This PR's preview address, exported as `PREVIEW_URL` ([per-PR previews](environments.md#previews)) |
+| `signing-key` | | Ed25519 private key (PEM) that signs every verified run ([signed evidence](signed-evidence.md)) |
+| `attest` | `false` | Also publish a keyless GitHub artifact attestation for each handoff report |
 
 On pull requests from forks the token is read-only, so the comment is skipped and the card appears in the job summary only.
 
@@ -49,4 +52,4 @@ On pull requests from forks the token is read-only, so the comment is skipped an
 
 ## Limits
 
-The card reports saved evidence; it doesn't sign it. "Verified" means the bundle's digests check out on the runner, not that a third party can prove which workflow produced it. Signing bundles with GitHub build attestations is planned.
+"Verified" means the bundle's digests check out on the runner. Without `signing-key` or `attest`, that doesn't tell a third party who produced it. With them, runs are signed by a key committed in `tracegrove/signers/` and handoff reports carry a GitHub attestation of the workflow that made them ([signed evidence](signed-evidence.md)).

@@ -86,7 +86,7 @@ One self-contained HTML file (no external requests, light and dark mode) you can
 - the verdict and counts,
 - every claim with its four states, the conversation transcript as chat bubbles, tool calls, and the backend readbacks,
 - who signed off on what, and every waiver with its reason,
-- **what this does not cover**: for example, that text-injected voice tests skip speech recognition and telephony, that bundles are unsigned, and whether redaction was on.
+- **what this does not cover**: for example, that text-injected voice tests skip speech recognition and telephony, whether the runs were [signed](signed-evidence.md) and by whom, and whether redaction was on.
 
 If the run contains client data, turn on redaction first ([security.md](security.md)).
 
