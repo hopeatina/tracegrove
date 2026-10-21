@@ -23,6 +23,12 @@ export function latestGrowLog(dir: string): string | null {
   return logs[0] ?? null;
 }
 
+/** Where a clip goes by default: `.tracegrove/clips/<branch>/`. */
+export function clipDir(dir: string, events: GrowEvent[]): string {
+  const branch = (events.find((e) => e.kind === 'change.read') as { branch?: string } | undefined)?.branch ?? 'change';
+  return join(resolve(dir), '.tracegrove', 'clips', branch.replace(/[^A-Za-z0-9._-]+/g, '-'));
+}
+
 export function readGrowLog(path: string): GrowEvent[] {
   return parseEventLog(readFileSync(path, 'utf8'));
 }

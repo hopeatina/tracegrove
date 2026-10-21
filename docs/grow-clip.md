@@ -8,6 +8,7 @@ that did not run stays pale, and the closing frame counts all three.
 ```sh
 tracegrove grow            # read, trace, draft and prove the change on this branch
 tracegrove clip            # record the newest grow log as a clip
+tracegrove grow --record   # or both in one go
 ```
 
 It writes to `.tracegrove/clips/<branch>/`:
