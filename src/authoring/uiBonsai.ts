@@ -32,17 +32,19 @@ export const BONSAI_CSS = String.raw`
 .gb .jin{fill:var(--paper);stroke:var(--wood-old);stroke-width:.9;stroke-linejoin:round}
 .gb .vein{display:none;fill:none}.gb .vein.live{display:inline;stroke:var(--gold);stroke-width:1.4;stroke-linecap:round;stroke-dasharray:3 5;animation:gbflow 1s linear infinite}
 @keyframes gbflow{to{stroke-dashoffset:-16}}
-.gb .kn .k0{fill:var(--wood-shade);opacity:.42}.gb .kn .k1{fill:var(--wood-lit);opacity:.8}.gb .kn .kg{fill:none;stroke:var(--wood-shade);stroke-width:.8;stroke-linecap:round;opacity:.4}
+.gb .kn .k0{fill:var(--wood-shade);opacity:.62}.gb .kn .k1{fill:var(--wood-lit);opacity:.8}.gb .kn .kg{fill:none;stroke:var(--wood-shade);stroke-width:.8;stroke-linecap:round;opacity:.4}
 .gb .kn .ring{fill:none;stroke:var(--ink);stroke-width:1;opacity:0;transition:opacity .2s}
-.gb .kn.on .ring,.gb .kn:hover .ring{opacity:.85}.gb .kn.trace .ring{opacity:.9;stroke:var(--gold);stroke-width:1.4}
-.gb .kn .crack{display:none;fill:none;stroke:var(--verm);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gb .kn.wound .crack{display:inline}.gb .kn.wound .ring{opacity:1;stroke:var(--verm);stroke-width:1.2}
+/* a lit knot glows from inside the bark; no annotation ring is drawn on the wood */
+.gb .kn .halo{fill:var(--gold);opacity:0;filter:blur(2.2px);transition:opacity .2s}.gb .kn.on .halo,.gb .kn:hover .halo{opacity:.55}.gb .kn.trace .halo{opacity:.75}
+.gb .kn .crack{display:none;fill:none;stroke:var(--verm);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gb .kn.wound .crack{display:inline}.gb .kn.wound .halo{opacity:.5;fill:var(--verm)}.gb .kn.wound.on .halo{opacity:.7}
 .gb .klbl{font:500 10px var(--mono);fill:var(--ink2);paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round;opacity:0;transition:opacity .2s;pointer-events:none}.gb .klbl.on{opacity:1}.gb .klbl.wound{opacity:1;fill:var(--verm-ink)}.gb .kld{fill:none;stroke:var(--ink3);stroke-width:.8;opacity:0;transition:opacity .2s;pointer-events:none}.gb .klbl.on+.kld,.gb .klbl.wound+.kld{opacity:.8}
 .gb .vein,.gb .tw,.gb .sap,.gb .leader,.gb .grain{pointer-events:none}.gb .hitc{fill:transparent;stroke:none}.gb .hitl{fill:none;stroke:transparent;stroke-linecap:round}
 .gb [data-k]{cursor:pointer;outline:none}
 .gb .kn:focus-visible .ring{opacity:1;stroke:var(--ink)}.gb .rt:focus-visible .rring{opacity:1;stroke:var(--ink);stroke-width:3}.gw-svg.gb:focus{outline:none}.gb .filsh{fill:color-mix(in srgb,var(--wood) 55%,#000);opacity:.3;filter:blur(1px)}
 .gb-lf:focus-visible .blade{stroke:var(--ink);stroke-width:2}.gb-lf:focus-visible .hitc{stroke:var(--ink);stroke-width:1.1;stroke-dasharray:2 2}
 .gb .pfill,.gb .pband,.gb .pghost{transition:d .5s ease,fill .25s}.gb .pfill{stroke:var(--pad-edge);stroke-width:.8;stroke-linejoin:round}
-.gb .pband{fill:var(--pad-shade);opacity:.55;pointer-events:none}
+.gb .pband{fill:var(--pad-shade);opacity:.55;pointer-events:none}.gb .ptex,.gb .prim{pointer-events:none;transition:d .5s ease}.gb .ptex{opacity:.5}.gb .ptex .sts{fill:var(--pad-shade)}.gb .ptex .stl,.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .prim{fill:none;stroke:var(--pad-lit);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.gb.dim .jg:not(.hl) .ptex,.gb.dim .jg:not(.hl) .prim,.gb .jg.pv-cut .ptex,.gb .jg.pv-cut .prim,.gb .jg.crown.pruned .ptex,.gb .jg.crown.pruned .prim{opacity:.2}.gb .pad.bare .ptex,.gb .pad.bare .prim{display:none}
 .gb .pghost{fill:none;stroke:none}.gb .pad.pv-grow .pghost{fill:var(--pad);fill-opacity:.32;stroke:var(--moss);stroke-width:1;stroke-dasharray:3 3}
 .gb .pad:focus-visible .pfill{stroke:var(--ink);stroke-width:1.5}.gb .pad.back .pfill{fill:var(--pad-back)}
 .gb .pad .bud0{display:none;fill:var(--pad-shade);stroke:var(--moss);stroke-width:.8}.gb .pad.bare .bud0{display:inline}.gb .pad.bare .pfill,.gb .pad.bare .pband{display:none}
@@ -52,7 +54,7 @@ export const BONSAI_CSS = String.raw`
 .gb.dim .jg:not(.hl) .pfill{fill:var(--pad-dim)}.gb.dim .jg:not(.hl) .pband{opacity:.15}.gb.dim .jg:not(.hl) .gb-lf{opacity:.32}.gb.dim .kn:not(.on):not(.wound){opacity:.55}.gb.lfdim .jg.hl .gb-lf:not(.hl):not(.sel){opacity:.45}
 .gb .stub{display:none}.gb .stub.on{display:inline}.gb .stub .sw{fill:var(--wood)}.gb .cutf{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.7}.gb .mlbl{font:600 10.5px var(--mono);fill:var(--muted)}
 .gb .cutmk{display:none;fill:none;stroke:var(--verm);stroke-width:1.6;stroke-dasharray:3 2.5;stroke-linecap:round}.gb .cuttag{display:none;font:600 10.5px var(--mono);fill:var(--verm-ink)}.gb .cutmk.on,.gb .cuttag.on{display:inline}
-.gb .tw{fill:var(--wood)}.gb .tw.old{fill:var(--wood-old)}
+.gb .tw{fill:var(--wood)}.gb .tw.shoot{fill:color-mix(in srgb,var(--wood) 52%,var(--moss))}.gb path.tipbud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.8}.gb .tw.old{fill:var(--wood-old)}
 .gb .tipbud path{fill:var(--moss-bg);stroke:var(--moss);stroke-width:1}
 .gb-lf{transition:transform .45s cubic-bezier(.2,.7,.2,1),opacity .3s}
 .gb-lf .blade{stroke-width:.9;stroke-linejoin:round;transition:fill .35s,stroke .35s}
@@ -70,29 +72,33 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.in .rib,.gb-lf.idle .rib,.gb-lf.none .rib,.gb-lf.pre .rib{stroke:var(--moss);opacity:.3}
 /* on a dark page a passed leaf is the bright solid one, so a leaf still to prove is an outline in the pad's own tone: not
    pale like a passed leaf, and not a dark hole in the pad */
-@media (prefers-color-scheme:dark){.gb-lf.idle .blade,.gb-lf.none .blade{fill:var(--pad);stroke:var(--moss);stroke-width:1.2}.gb-lf.pre .blade{fill:var(--pad-shade);stroke:var(--ink3)}
+@media (prefers-color-scheme:dark){.gb-lf.idle .blade,.gb-lf.none .blade{fill:var(--paper);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1.2}.gb-lf.pre .blade{fill:var(--paper);stroke:var(--ink3)}.gb .ptex{opacity:.3}.gb .lip-hi{opacity:.6}
  .gb-lf.idle .rib,.gb-lf.none .rib{opacity:.5}}
 .gb-lf .gb-lfi{transform-box:fill-box;transform-origin:center}
 /* one preview grammar: what the mode keeps stays as it is, what it cuts fades in place with a nick at its stalk, what it
    adds appears as a dashed ghost */
-.gb-lf.pv-out .gb-lfi{opacity:.36}.gb-lf.pv-out .blade{stroke-dasharray:2 1.6}.gb-lf.pv-out .nick{display:inline}.gb-lf.pv-add .gb-lfi{opacity:.55}.gb-lf.pv-add .blade{stroke-dasharray:2 1.6;stroke-width:1.1}
-.gb-lf.cut .gb-lfi{animation:gbfall .9s cubic-bezier(.45,0,.75,.55) both}.gb-lf.gone .gb-lfi{display:none}.gb-lf.gone .hitc{display:none}.gb-lf.bud.gone{display:none}
-.gb-lf.hl .blade{stroke:var(--ink);stroke-width:1.6}.gb-lf.sel .blade{stroke:var(--ink);stroke-width:2}
+.gb-lf.pv-out .gb-lfi,.gb-lf.pre .gb-lfi{opacity:.26}.gb-lf.pv-out .blade,.gb-lf.pre .blade{stroke:var(--ink3);stroke-dasharray:1.6 1.4;fill:var(--paper)}.gb-lf.pv-out .nick,.gb-lf.pre .nick{display:inline}.gb-lf.pv-add .gb-lfi{opacity:.55}.gb-lf.pv-add .blade{stroke-dasharray:2 1.6;stroke-width:1.1}
+.gb-lf.cut .gb-lfi{animation:gbfall .62s cubic-bezier(.5,0,.85,.4) both}.gb-lf.gone .gb-lfi{display:none}.gb-lf.gone .hitc{display:none}.gb-lf.bud.gone{display:none}
+.gb-lf.hl .gb-lfi,.gb-lf.sel .gb-lfi{filter:drop-shadow(0 0 1.8px var(--gold)) drop-shadow(0 0 .6px var(--gold))}.gb-lf.hl .blade{stroke-width:1.4}.gb-lf.sel .blade{stroke:var(--ink);stroke-width:1.6}
 .gb .bud .blade{stroke-width:1}.gb .bud.none .blade{stroke-dasharray:1.6 1.2}
 .gb .bmore{font:600 9.5px var(--mono);fill:var(--muted)}
-@keyframes gbfall{20%{opacity:1;transform:translate(calc(var(--fx,8px)*.15),calc(var(--fy,64px)*.06)) rotate(calc(var(--fr,34deg)*.25))}to{transform:translate(var(--fx,8px),var(--fy,64px)) rotate(var(--fr,34deg));opacity:0}}
+@keyframes gbfall{12%{opacity:1;transform:translate(0,0) rotate(calc(var(--fr,24deg)*.35))}60%{opacity:.85}to{transform:translate(var(--fx,6px),var(--fy,110px)) rotate(var(--fr,24deg));opacity:0}}
+/* the snip: two blades closing at the cut, gone in a moment */
+.gb .snip{fill:none;stroke:var(--ink);stroke-width:1.2;stroke-linecap:round;pointer-events:none;animation:gbsnip .32s ease-out both}@keyframes gbsnip{0%{opacity:0;transform:scale(1.6)}25%{opacity:1;transform:scale(1)}to{opacity:0}}
 @keyframes gbpulse{50%{transform:scale(1.2)}}
 .gb.dim .bud:not(.hl),.gb.dim .lbl:not(.hl),.gb.dim .bmore{opacity:.3}
-.gb .lbl text.t{font:500 13px var(--sans);fill:var(--ink)}.gb .lbl text.t.v{font:400 12.5px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v.out{fill:var(--muted);text-decoration:line-through}.gb .lbl text.st{font:11px var(--mono);fill:var(--muted)}
+/* a previewed mode's ghosts are not part of what is pinned: they stay readable over the dimming */
+.gb.dim .gb-lf.bud.pv-add,.gb.dim .jg:not(.hl) .gb-lf.pv-add{opacity:1}.gb .shscar{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.5;pointer-events:none}
+.gb .lbl text.t{font:400 13px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v{font:400 12.5px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v.out{fill:var(--muted);text-decoration:line-through}.gb .lbl text.st{font:11px var(--mono);fill:var(--muted)}.gb .lbl tspan.x{fill:var(--ink3);text-decoration:line-through;text-decoration-color:var(--line2)}
 .gb .lbl tspan.code{font-family:var(--mono);font-size:.92em}
 .gb .lbl text.eb{font:500 10px var(--mono);letter-spacing:.08em;fill:var(--muted)}.gb .st .f{fill:var(--verm-ink)}.gb .st .p{fill:var(--moss)}.gb .st .r{fill:var(--gold)}.gb .st .n{fill:var(--muted)}
-.gb .lbl.hl text.t,.gb .lbl.sel text.t{font-weight:650}.gb .lbl.pruned{display:none}.gb .lbl.back text.t{fill:var(--ink3)}
+.gb .lbl.hl text.t,.gb .lbl.sel text.t{font-weight:600;fill:var(--ink)}.gb .lbl.pruned{display:none}.gb .lbl.back text.t{fill:var(--ink3)}
 .gb .lbl .num{font:600 11px var(--mono);fill:var(--muted)}
 .gb .leader{fill:none;stroke:var(--line2);stroke-width:1}
-.gb .badge circle{fill:var(--paper);stroke:var(--ink3);stroke-width:1}.gb .badge text{font:600 11px var(--mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.gb .badge circle{fill:var(--paper);stroke:var(--ink3);stroke-width:1}.gb .badge text{font:600 11px var(--mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}.gb.nw .badge text{font-size:14px}.gb.nw .klbl{font-size:12.8px;stroke-width:3.8px}.gb.nw .mlbl,.gb.nw .cuttag{font-size:13.4px}.gb.nw .note{font-size:14.7px}
 .gb .badge.fail circle{stroke:var(--verm);fill:var(--verm-bg)}.gb .badge.sel circle{stroke:var(--ink);stroke-width:2}.gb .badge.pruned{display:none}
 /* the repository's seal is pressed into the clay: a dark recessed stamp with light letters, unlike a store's plain tag */
-.gb .seal rect{fill:color-mix(in srgb,var(--pot-dk) 78%,var(--ink));stroke:color-mix(in srgb,var(--pot-dk) 60%,#000);stroke-width:.5}.gb .seal text{font:600 8px var(--mono);letter-spacing:.06em;fill:var(--pot-lit)}
+.gb .seal rect{fill:color-mix(in srgb,var(--pot-dk) 78%,var(--ink));stroke:color-mix(in srgb,var(--pot-dk) 60%,#000);stroke-width:.5}.gb .seal text{font:600 7px var(--mono);letter-spacing:.04em;fill:var(--pot-lit)}
 @media (prefers-color-scheme:dark){.gb .seal rect{fill:color-mix(in srgb,var(--pot-dk) 70%,#000)}.gb .seal text{fill:var(--ink2)}}
 .gb .stake{fill:none;stroke:color-mix(in srgb,var(--pot-rim) 55%,var(--ink));stroke-width:.7;stroke-dasharray:1.2 1.6;opacity:.8}.gb .rt.hl .stake,.gb .rt.sel .stake{stroke:var(--ink);opacity:1}.gb .pot{fill:var(--pot)}.gb .pot-rim{fill:var(--pot-rim)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:.8;opacity:.4;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.9;stroke-linecap:round}.gb .cush{fill:var(--pad-shade)}.gb .cush-lt{fill:var(--pad);opacity:.9}.gb .pebble{fill:var(--pebble)}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .pot-sh{fill:var(--pot-rim);opacity:.35}.gb .soil{fill:var(--soil-c)}.gb .moss{fill:var(--pad-shade);opacity:.8}
 .gb .rring{fill:none;stroke:var(--paper);stroke-width:3;opacity:0;transition:opacity .2s}.gb .rt.hl .rring{opacity:1}.gb .rt.sel .rring{opacity:1;stroke:var(--ink);stroke-width:1.6}
@@ -100,8 +106,8 @@ export const BONSAI_CSS = String.raw`
 .gb .rt.loose .w{fill:var(--wood-old)}.gb .rt.loose{opacity:.62}.gb .rt.wound .w{stroke:var(--verm);stroke-width:1.2}.gb .rt.wound .rlbl{fill:var(--verm-ink)}
 .gb .rlbl{font:10.5px var(--mono);fill:var(--ink2);paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}.gb .rlbl.face{fill:color-mix(in srgb,var(--pot-rim) 40%,var(--ink));stroke:none;font-weight:500}.gb .rlbl .nt{fill:var(--muted);font-weight:400}
 .gb .tail{fill:none;stroke-width:1.4;stroke-dasharray:3 4;stroke-linecap:round}.gb .tailend{fill:var(--paper);stroke:var(--muted);stroke-width:1.1;opacity:.6}
-.gb .sapu{fill:none;stroke:var(--paper);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
-.gb .sap{fill:none;stroke:var(--ink);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2 5;animation:gbflow .7s linear infinite;pointer-events:none}
+.gb .sapu{fill:none;stroke:var(--gold);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;opacity:.38;filter:blur(1.6px);pointer-events:none}
+.gb .sap{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3 4;animation:gbflow .7s linear infinite;pointer-events:none}
 .gb .sap.bad{stroke:var(--verm);stroke-width:2.8;stroke-dasharray:none;animation:none}.gb .sap.rest{stroke:var(--muted);opacity:.75;animation:none;stroke-dasharray:1.5 4}
 .gb .tiplead{fill:none;stroke:var(--ink3);stroke-width:.9;pointer-events:none;paint-order:stroke}
 .gb .bead{fill:var(--gold);stroke:var(--paper);stroke-width:1.5}.gb .halo{fill:var(--gold);opacity:.22}
@@ -109,7 +115,8 @@ export const BONSAI_CSS = String.raw`
 .gb-tip{position:absolute;z-index:3;width:max-content;max-width:300px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font-size:13px;line-height:18px;color:var(--ink)}
 .gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .gb-tip .st{font:12px/17px var(--mono);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
-.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px;overflow-wrap:anywhere}
+.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px;overflow-wrap:anywhere}.gb-tip .hop{white-space:nowrap}
+.gb-tip .st b{display:inline;font-weight:600}.gb-tip .st .k{font:inherit;text-transform:none;letter-spacing:0;color:inherit}.gb-tip.dock{box-shadow:0 10px 32px rgb(0 0 0 / .18)}
 .gb-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 6px;font:12px/18px var(--sans);color:var(--ink3)}
 .gb-key i,i.gb-g{display:inline-block;flex:none;width:11px;height:7px;border-radius:7px 1px;vertical-align:0;margin-right:5px;border:1.2px solid var(--moss);background:var(--moss)}
 .gb-key i.fail,i.gb-g.fail{background:var(--verm);border-color:var(--verm)}.gb-key i.none,i.gb-g.none{background:var(--paper);border-style:dashed}.gb-key i.in,i.gb-g.in{background:var(--paper)}i.gb-g.pre{opacity:.5}
@@ -179,7 +186,11 @@ function gbSpline(cp,n){const o=[];for(let i=0;i<cp.length-1;i++){const a=cp[i-1
  for(let k=0;k<n;k++){const t=k/n,t2=t*t,t3=t2*t;o.push([0,1].map(j=>.5*(2*b[j]+(-a[j]+c[j])*t+(2*a[j]-5*b[j]+4*c[j]-d[j])*t2+(-a[j]+3*b[j]-3*c[j]+d[j])*t3)))}}o.push(cp[cp.length-1].slice());return o}
 function gbResample(pts,n){const L=[0];for(let i=1;i<pts.length;i++)L.push(L[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));const tot=L[L.length-1]||1;const o=[];let j=0;
  for(let i=0;i<=n;i++){const d=tot*i/n;while(j<L.length-2&&L[j+1]<d)j++;const f=Math.min(1,(d-L[j])/((L[j+1]-L[j])||1));o.push([pts[j][0]+(pts[j+1][0]-pts[j][0])*f,pts[j][1]+(pts[j+1][1]-pts[j][1])*f])}return o}
+const GB_NK=1.28;
 const gbBez=(p,n)=>Array.from({length:n+1},(_,i)=>gbCubic(p,i/n));
+/* the index a given distance back along a polyline from i, or forward from it */
+const gbBack=(pts,i,r)=>{let k=i;while(k>0&&Math.hypot(pts[k][0]-pts[i][0],pts[k][1]-pts[i][1])<r)k--;return k};
+const gbFwd=(pts,i,r)=>{let k=i;while(k<pts.length-1&&Math.hypot(pts[k][0]-pts[i][0],pts[k][1]-pts[i][1])<r)k++;return k};
 function gbNorm(pts,i){const n=pts.length-1;const a=pts[Math.max(0,i-1)],b=pts[Math.min(n,i+1)];const dx=b[0]-a[0],dy=b[1]-a[1],m=Math.hypot(dx,dy)||1;return[-dy/m,dx/m]}
 /* A piece of wood as a filled ribbon: width w[i] across the centreline, out along one edge and back along the other. On the
    inside of a bend the edge never reaches past the bend's centre, so a tight curve pinches instead of folding into a spike. */
@@ -236,10 +247,10 @@ function gbT(k,delay){const G=gw.seen.gt||(gw.seen.gt={});if(G[k]===undefined)G[
    happy path seated on the crest, guards out on the shoulders, the ways it fails hanging on stalks from the underside,
    toward the pad's outer end (dir) so they clear the branch; in each group the minimum's leaves come first.
    Coordinates are the pad's own: x from its middle, y up from the lowest point of its underside. */
-function gbPadGeo(list,H,dir,seed,crown){const n=list.length;/* a bigger tree has bigger pads and leaves, not the same pads on a longer pole; a phone's smaller tree, smaller ones */const z=Math.max(.6,Math.pow(H/560,.75));const L0=Math.max(16,Math.min(23*z,H*.046));const L=n>16?L0*.62:n>9?L0*.74:n>5?L0*.86:L0,W=L*.52,s=L*.92;
+function gbPadGeo(list,H,dir,seed,crown){const n=list.length;/* a bigger tree has bigger pads and leaves, not the same pads on a longer pole; a phone's smaller tree, smaller ones */const z=Math.max(.6,Math.pow(H/560,.75));const L0=Math.max(9,Math.min(12.5,12*z,H*.026));const L=n>16?L0*.62:n>9?L0*.74:n>5?L0*.86:L0,W=L*.52,s=L*.92;
  const g={happy:[],guard:[],failure:[]};for(const x of gbOrd(list))g[gbPol(x)].push(x);
  const nh=Math.min(g.happy.length,6),ng=Math.min(g.guard.length,6),nf=g.failure.length;
- const PW=Math.max(64*z,Math.min(240*z,Math.max(18*z*(nh+ng)+48*z,nf*s*.85+L*1.2)))+L*.9*Math.max(0,Math.ceil(ng/2)-1);const PH=crown?Math.max(34*z,Math.min(72*z,.5*PW)):Math.max(26*z,Math.min(56*z,.4*PW));
+ const PW=Math.max(84*z,Math.min(250*z,Math.max(20*z*(nh+ng)+64*z,nf*s*.85+L*1.2)))+L*.9*Math.max(0,Math.ceil(ng/2)-1);const PH=crown?Math.max(38*z,Math.min(74*z,.48*PW)):Math.max(30*z,Math.min(58*z,.4*PW));
  const d=dir||1,cc=crown?0:-.22*d;
  /* the crest: highest a little toward the trunk, falling to both ends */
  const prof=u=>{const t=(u-cc)/(u>=cc?1-cc:1+cc);return -PH*(.3+.7*Math.pow(Math.max(0,1-t*t),.6))};
@@ -284,7 +295,12 @@ function gbPadPts(g,circ,xa,xb){const n=56,top=[],bot=[];
  for(let i=1;i<n;i++)top[i][1]=Math.min(bot[i][1],(top[i-1][1]+2*top[i][1]+top[i+1][1])/4);
  for(let i=1;i<n;i++)bot[i][1]=Math.max(top[i][1],(bot[i-1][1]+2*bot[i][1]+bot[i+1][1])/4);
  return {top,bot}}
-const gbPadD=(o,q)=>'M'+q.top.map(p=>gbP([o[0]+p[0],o[1]+p[1]])).join(' L')+' L'+q.bot.slice().reverse().map(p=>gbP([o[0]+p[0],o[1]+p[1]])).join(' L')+'Z';
+/* the crest is foliage, not a cloud: it breaks into small irregular scallops, one every two samples, the leaf mass's own edge */
+const gbPadD=(o,q)=>{const t=q.top,P=p=>gbP([o[0]+p[0],o[1]+p[1]]);let d='M'+P(t[0]);
+ for(let i=2;i<t.length;i+=2){const m=t[i-1],sl=Math.abs(t[i][1]-t[i-2][1])/((t[i][0]-t[i-2][0])||1),amp=(1.4+1.6*((i*7919%13)/13))/(1+sl*1.5);d+=' Q'+P([m[0],m[1]-amp])+' '+P(t[i])}
+ if((t.length-1)%2)d+=' L'+P(t[t.length-1]);return d+' L'+q.bot.slice().reverse().map(P).join(' L')+'Z'};
+/* the lit rim along the crest, where the light catches the outer leaves */
+const gbPadRim=(o,q)=>{const t=q.top,n=t.length-1,a=Math.round(n*.06),z=Math.round(n*.94);return 'M'+t.slice(a,z+1).map(p=>gbP([o[0]+p[0],o[1]+p[1]+1.3])).join(' L')};
 /* the darker band along the underside, where the foliage is in its own shade */
 const gbPadBand=(o,q,t)=>'M'+q.bot.map(p=>gbP([o[0]+p[0],o[1]+p[1]])).join(' L')+' L'+q.bot.map((p,i)=>[p[0],Math.max(q.top[i][1],p[1]-t)]).reverse().map(p=>gbP([o[0]+p[0],o[1]+p[1]])).join(' L')+'Z';
 /* Chaikin's corners, so a route through the wood bends like sap, not like a circuit trace. */
@@ -330,7 +346,8 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
  else{cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;items.forEach((it,i)=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*H/Ht]);last=i});
   /* with one or two branches the apex leans away from the first, so the tree's mass stays over its roots */
-  if(last>=0&&hs[last]<.74)cp.push([(hs[last]+1)/2,-side[last]*.022*H/Ht]);cp.push([1,m<=2?-S*.08:.008*S])}
+  /* and above it the leader keeps moving, in bends that shrink toward the top, so the upper trunk is never a straight pole */
+  if(last>=0&&hs[last]<.8){const h0=hs[last],q=1-h0;cp.push([h0+q*.32,-side[last]*.03*H/Ht]);if(q>.32)cp.push([h0+q*.66,side[last]*.012*H/Ht])}cp.push([1,m<=2?-S*.08:.008*S])}
  const tp=gbResample(gbSpline(cp.map(([t,x])=>[x*Ht,-t*Ht]),14),96);
  const top=tp[tp.length-1];for(let i=1;i<=4;i++)tp.push([top[0]-S*.012*H*i/4,top[1]-.035*H*i/4]);
  const ty=tp.map(p=>-p[1]/Ht);
@@ -361,14 +378,16 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
   const cx=P0[0]+dir*(inner+g.PW/2);const ic=gbNear(pts.map(q=>q[0]),cx);const o=[cx,pts[ic][1]+w[ic]*.15-g.botAt(0)];
   /* Ramification: where the branch reaches its pad it forks, two or three secondary branches leaving it at a shallow angle,
      fanning out and up into the foliage they carry, each tapering to a twig; a leaf's sap runs along them. */
-  const fk=gbRng(gbHash(key+':fork:'+it.id));const twigs=[[-.1,27],[.12,16],[.33,31]].map(([s,ang],ti)=>{const d0=inner+s*g.PW;let ii=-1,bd=1e9;
-   pts.forEach((q,jj)=>{const dd=Math.abs((q[0]-P0[0])*dir-d0);if(dd<bd){bd=dd;ii=jj}});if(ii<2||ii>pts.length-4)return null;
+  const fk=gbRng(gbHash(key+':fork:'+it.id));const used=[];const twigs=[[.02,24],[.17,14],[.34,29]].map(([s,ang],ti)=>{const d0=inner+s*g.PW;let ii=-1,bd=1e9;
+   pts.forEach((q,jj)=>{const dd=Math.abs((q[0]-P0[0])*dir-d0);if(dd<bd){bd=dd;ii=jj}});
+   /* a fork leaves the branch only where the foliage is close over it, so no bare wire spans open air up to the pad */
+   const gap=jj=>pts[jj][1]-(o[1]+g.botAt(Math.max(-g.PW/2,Math.min(g.PW/2,pts[jj][0]-o[0]))));while(ii>=2&&ii<pts.length-4&&gap(ii)>13)ii++;if(ii<2||ii>pts.length-4||used.some(u=>Math.abs(u-ii)<4))return null;used.push(ii);
    const a0=pts[ii],t=[pts[ii+2][0]-pts[ii-2][0],pts[ii+2][1]-pts[ii-2][1]],th=Math.atan2(t[1],t[0])-dir*(ang+8*(fk()-.5))*Math.PI/180;
    let len=(.4-.06*ti)*g.PW*(.85+.3*fk());const dv=[Math.cos(th),Math.sin(th)];let e=[a0[0]+dv[0]*len,a0[1]+dv[1]*len];
    /* it ends inside the pad: never past its far end, never through its crest, and at least a few pixels up into the foliage */
    const lx=x=>Math.max(-g.PW*.44,Math.min(g.PW*.44,x-o[0]));const ex=lx(e[0]);e=[o[0]+ex,Math.max(o[1]+g.topAt(ex)+g.PH*.3,Math.min(e[1],o[1]+g.botAt(ex)-6))];
    const m1=[a0[0]+dv[0]*len*.38,a0[1]+dv[1]*len*.38],t2=gbBez([a0,m1,[e[0]-(e[0]-a0[0])*.25,e[1]+(a0[1]-e[1])*.12],e],10);
-   return {pts:t2,w:t2.map((_,jj)=>Math.max(1,w[ii]*.45*Math.pow(1-jj/10,1.2)+jj/10*.9)),at:ii/(pts.length-1)}}).filter(Boolean);
+   return {pts:t2,w:t2.map((_,jj)=>Math.max(1,w[ii]*.68*Math.pow(1-jj/10,1.1)+jj/10*1)),at:ii/(pts.length-1)}}).filter(Boolean);
   return {it,j:it.j,id:it.id,pol:it.pol,i,h,dir,k,back:back[i],pts,w,len,acc,R,inner,exit:Math.max(1,acc.findIndex(d=>d>=Tk*.5)),tip:pts[pts.length-1],b,Tk,o,twigs}});
  const pads={},origin={};const cr=tp[tp.length-5];
  for(const pd of padList){pads[pd.id]=pd;if(pd.crown)origin[pd.id]=[cr[0],cr[1]+inC];else{pd.b=br[pd.i];origin[pd.id]=pd.b.o}}
@@ -377,9 +396,9 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
  /* the apex is ramified like the pads, not a Y: three or four branchlets leave the leader at different heights and uneven
     angles, longer on the side the crown leans to, each ending up in the dome */
  const cfk=gbRng(gbHash(key+':apex'));const lean=-(S||1)*(m<=2?1:.4);
- const ctw=[[-.37,2],[.13,0],[.4,3],[-.1,1]].slice(0,cg.PW>70?4:3).map(([f,dk],ti)=>{const lx=(f+(cfk()-.5)*.08)*cg.PW*(f*lean>0?1.08:.92);const e=[co[0]+lx,co[1]+cg.botAt(lx)-5-cfk()*cg.PH*.18];
+ const ctw=[[-.37,5],[.13,1],[.4,8],[-.1,3]].slice(0,cg.PW>70?4:3).map(([f,dk],ti)=>{const lx=(f+(cfk()-.5)*.08)*cg.PW*.62*(f*lean>0?1.08:.92);const e=[co[0]+lx,co[1]+cg.botAt(lx)-cg.PH*(.22+cfk()*.12)];
   const a0=tp[Math.max(1,kc-dk)],rs=a0[1]-e[1];if(rs<6)return null;
-  const t2=gbBez([a0,[a0[0]+(e[0]-a0[0])*.3,a0[1]-rs*.25],[e[0]-(e[0]-a0[0])*.3,e[1]+rs*.3],e],10);return {pts:t2,w:t2.map((_,jj)=>Math.max(1,tw[Math.max(1,kc-dk)]*.4*Math.pow(1-jj/10,1.2)+jj/10*.9))}}).filter(Boolean);
+  const t2=gbBez([a0,[a0[0]+(e[0]-a0[0])*.3,a0[1]-rs*.25],[e[0]-(e[0]-a0[0])*.3,e[1]+rs*.3],e],10);return {pts:t2,w:t2.map((_,jj)=>Math.max(1,tw[Math.max(1,kc-dk)]*.55*Math.pow(1-jj/10,1.1)+jj/10*1))}}).filter(Boolean);
  /* Knots: parts the journeys share sit low on the trunk (most shared lowest, callee below caller); a journey's own parts sit
     on the bare wood of its branch, deepest nearest the trunk; the headline journey's own parts on the upper trunk. */
  const depth=id=>{let s=0,n=0;for(const j of js){const i=j.units.indexOf(id);if(i>=0){s+=i/Math.max(1,j.units.length-1);n++}}return n?s/n:0};
@@ -417,8 +436,11 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
 
 /* The whole drawing: trees placed side by side in one pot, labels beside their pads, roots in the soil. */
 function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.branch)||'grove';const S=gbHash('side:'+brn)<.5?-1:1;const narrow=width<720;
+ /* a phone draws the tree on a canvas a quarter wider and lets the drawing scale down whole, so its proportions hold instead
+    of the trunk being squashed to fit; its text is set larger to match */
+ if(narrow&&!sap)width*=GB_NK;
  const trees0=sap?[{js:[{id:'sap',title:'',entry:null,units:s.units.filter(u=>!u.root).map(u=>u.id)}],leaves:0}]:M.trees;
- const main=trees0[0];const nj=main?main.js.length:1;let H0=sap?220:Math.max(300,Math.min(nj===1?640:780,width*(nj===1?.6:.74)));if(narrow)H0=Math.max(H0,width*1.3);
+ const main=trees0[0];const nj=main?main.js.length:1;let H0=sap?220:Math.max(300,Math.min(nj===1?780:900,width*(nj===1?.76:.86)));if(narrow)H0=Math.max(H0,width*1.3);
  /* a journey's name in at most three lines beside its pad, then its status */
  /* a pad's label: an eyebrow (journey number and where it starts, or which of its paths this is), the journey's name in
     at most three lines, or a guard or failure pad's own scenarios, then its status */
@@ -427,12 +449,12 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   if(i<words.length){let l=lines[nl-1];while(gbPlain(l).length>max-1&&l.includes(' '))l=l.slice(0,l.lastIndexOf(' '));if((l.split(gbBT).length-1)%2)l+=gbBT;lines[nl-1]=l.replace(/[\s,.;:]+$/,'')+'…'}
   for(let k=0;k<lines.length-1;k++)if((lines[k].split(gbBT).length-1)%2){lines[k]+=gbBT;lines[k+1]=gbBT+lines[k+1]}
   return lines};
- /* a journey's pad: its name in at most three lines; a single journey's guard or failure pad: its riskiest one, then how many more */
+ /* a journey's pad: its name in at most two lines (the whole of it is in the card); a single journey's guard or failure pad: its riskiest one, then how many more */
  /* its state can need a second line once it has run (failed, passed, no flow yet, pruned), so a pad with three or more
     scenarios keeps room for one */
  const lblOf=(title,list,n)=>{if(narrow||sap)return null;let lines;
-  if(list){list=gbOrd(list);lines=wrap(list[0].title,30,3)}
-  else lines=wrap(title,30,3);
+  if(list){list=gbOrd(list);lines=wrap(list[0].title,32,2)}
+  else lines=wrap(title,32,2);
   return {lines,hgt:lines.length*16+32+(n>=3?14:0),w:Math.max(...lines.map(l=>gbW(gbPlain(l),7.1)),150)+18}};
  let L=null;
  for(let pass=0;pass<6;pass++){
@@ -454,7 +476,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* the pot sits under the canopy's mass, so a heavy first branch does not hang off one end */
   const potC=trees.length===1?(lone?0:Math.max(-potL*.2,Math.min(potL*.2,(T0.cx0+T0.cx1)/2*.85))):(Math.min(...xs)+Math.max(...xs))/2;
   if(trees.length>1)potL=Math.max(potL,Math.max(...xs)-Math.min(...xs)+.5*H0);
-  let D=lone?22:Math.max(22,Math.min(44,.8*T0.D));
+  /* a shallow pot: its depth about a ninth of the tree's height */
+  let D=lone?22:Math.max(18,Math.min(40,.11*T0.Ht,.8*T0.D));
   let x0=Math.min(edgeL,potC-potL/2-10),x1=Math.max(edgeR,potC+potL/2+10),y0=Math.min(...trees.map(T=>T.y0));
   /* the soil: a low mound inside the pot, highest at the trunk, that the roots lie in and sink into */
   const pa=potC-potL/2,pb=potC+potL/2;
@@ -471,10 +494,11 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* the pot is the repository: its name is always a small seal at the face's lower right. The stores' tags share the face;
      when they and the seal do not fit side by side, the tags take a row above it and the pot is made deep enough for both */
   let repo='';try{repo=(state.config&&state.config.project)||String(state.dir||'').split('/').pop()||''}catch(e){}
-  const seal=repo&&potL>90?{t:gwCut(repo,Math.floor((potL-40)/6))}:null;if(seal)seal.w=gbW(seal.t,5.6)+10;
-  const fs=narrow?12:10.5,cw=fs*.61;
+  const midCut=(t,n)=>t.length<=n?t:t.slice(0,Math.ceil((n-1)/2))+'\u2026'+t.slice(t.length-Math.floor((n-1)/2));
+  const seal=repo&&potL>90?{t:midCut(repo,Math.max(8,Math.floor((Math.max(potL*.36,96)-8)/4.9)))}:null;if(seal)seal.w=gbW(seal.t,4.9)+8;
+  const fs=narrow?12*GB_NK:10.5,cw=fs*.61;
   const tagW=deps.filter(q=>M.U[q.id].layer!=='ext').reduce((a,q)=>a+gbW(gwCut(M.U[q.id].label,22),cw)+10,0);
-  const twoRow=!!seal&&!lone&&tagW>0&&tagW+seal.w+26>potL;if(twoRow)D=Math.max(D,fs*1.15+24);
+  const twoRow=!!seal&&!lone&&tagW>0&&(!narrow||tagW+seal.w+26>potL);if(twoRow)D=Math.max(D,fs*1.15+20);
   const faceR=pb-8-(seal&&!lone&&!twoRow?seal.w+10:0),tagY=twoRow?4.2+fs*.82:seal&&!lone?D-11.1+fs*.35:2+(D-2)*.4+fs*.35;
   trees.forEach((T,i)=>{const X=xs[i];const sides=new Set(deps.filter(q=>q.i===i&&T.js.some(j=>(j.units||[]).includes(q.id))).map(q=>q.d));
    /* the nebari: surface roots that leave the flare as its own wood, thick where they part from it, and thin out over the soil */
@@ -507,23 +531,24 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const need=L.x1-L.x0+24;if(need<=width||pass===5)break;H0*=Math.max(.55,Math.min(.96,Math.pow((width-24)/need,1.4)));}
  return L}
 
-/* Wood grows by elongation: the tip comes out thin and thickens behind it, never a wipe across finished wood. */
-function gbPart(pts,w,e,floor){const n=pts.length-1,x=e*n,k=Math.floor(x),f=x-k;const sub=pts.slice(0,k+1);if(k<n&&f>0)sub.push([pts[k][0]+(pts[k+1][0]-pts[k][0])*f,pts[k][1]+(pts[k+1][1]-pts[k][1])*f]);if(sub.length<2)return '';
- /* growing wood is already its own shape, a little slighter, and the growing tip draws to a point: never a tube */
- const m=sub.length-1,th=.62+.38*Math.pow(e,1.2),tl=Math.max(3,m*.18);return gbRib(sub,sub.map((_,i)=>w[Math.min(i,n)]*th*Math.max(.14,Math.min(1,(m-i)/tl+.14))),0,sub.length-1,floor)}
-function gbGrowRun(B){const P=B.grow;if(!P.length)return;for(const g of P){g.full=g.el.getAttribute('d');g.el.setAttribute('d',gbPart(g.pts,g.w,0,g.floor))}
- const end=Math.max(...P.map(g=>g.t0+g.ms));
- const step=now=>{if(gw.B!==B)return;for(const g of P){if(g.done)continue;const p=(now-g.t0)/g.ms;if(p<=0)continue;if(p>=1){g.el.setAttribute('d',g.full);g.done=true;continue}g.el.setAttribute('d',gbPart(g.pts,g.w,1-Math.pow(1-p,2.2),g.floor))}
-  if(now<end+30)requestAnimationFrame(step)};requestAnimationFrame(step)}
+/* Wood grows out along its own spine: the finished, textured wood is uncovered from its base to its tip by a broad stroke
+   drawn down the centre line, so what grows is the real limb at its real taper, never a thin worm that swells afterwards. */
+function gbGrowRun(B){const P=B.grow;if(!P.length)return;const defs=B.svg.querySelector('defs');
+ for(const g of P){if(!g.pts||!defs)continue;const id='gbgm'+gw.gbN+'-'+(B.gm=(B.gm||0)+1);
+  const sp=sv('path',{d:gbLine(g.pts),fill:'none',stroke:'#fff','stroke-width':gbF(Math.max(...g.w)*1.15+8),'stroke-linecap':'butt','stroke-linejoin':'round',pathLength:1000,'stroke-dasharray':'1000 1001','stroke-dashoffset':1000});
+  g.m=sv('mask',{id,maskUnits:'userSpaceOnUse',x:-10000,y:-10000,width:20000,height:20000},sp);g.sp=sp;defs.append(g.m);g.el.setAttribute('mask','url(#'+id+')')}
+ const end=Math.max(...P.map(g=>g.t0+g.ms));const fin=g=>{g.done=true;g.el.removeAttribute('mask');if(g.m)g.m.remove()};
+ const step=now=>{if(gw.B!==B)return;for(const g of P){if(g.done||!g.sp)continue;const p=(now-g.t0)/g.ms;if(p<=0)continue;if(p>=1){fin(g);continue}g.sp.setAttribute('stroke-dashoffset',gbF(1000*Math.pow(1-p,2.2)))}
+  if(now<end+30)requestAnimationFrame(step);else for(const g of P)if(!g.done&&g.sp)fin(g)};requestAnimationFrame(step)}
 
 /* Build the SVG once per shape; later paints only move leaves and toggle classes. */
 function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap);const quiet=gwQuiet(),now=performance.now();const N=gw.gbN=(gw.gbN||0)+1;
  const W=Math.max(width,L.x1-L.x0+24),vx=(L.x0+L.x1)/2-W/2,vy=L.y0-14,VH=L.y1-vy+8;
- const svg=sv('svg',{class:'gw-svg gb',tabindex:'-1',viewBox:gbF(vx)+' '+gbF(vy)+' '+gbF(W)+' '+gbF(VH),role:'group','aria-label':'The change as a bonsai: each branch is an end-to-end journey, each leaf one of its scenarios, knots are the files it passes through, roots what it depends on'});
+ const svg=sv('svg',{class:'gw-svg gb'+(L.narrow&&!sap?' nw':''),tabindex:'-1',viewBox:gbF(vx)+' '+gbF(vy)+' '+gbF(W)+' '+gbF(VH),role:'group','aria-label':'The change as a bonsai: each branch is an end-to-end journey, each leaf one of its scenarios, knots are the files it passes through, roots what it depends on'});
  const defs=sv('defs',{});const clipId='gb-wood'+N,softId='gb-soft'+N;const clip=sv('clipPath',{id:clipId});
  defs.append(clip,sv('filter',{id:softId,x:'-10%',y:'-10%',width:'120%',height:'120%'},sv('feGaussianBlur',{stdDeviation:'2.2'})));svg.append(defs);
  /* foliage is lit from above: the crest lighter, the body its own green, the underside in shade */
- const padG='gb-pad'+N;defs.append(sv('linearGradient',{id:padG,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:0,style:'stop-color:var(--pad-lit)'}),sv('stop',{offset:.55,style:'stop-color:var(--pad)'}),sv('stop',{offset:1,style:'stop-color:var(--pad-shade)'})));
+ const padG='gb-pad'+N;defs.append(sv('pattern',{id:padG+'s',patternUnits:'userSpaceOnUse',width:31,height:23},...[[10.0,3.5,-58,'s',1.6],[11.3,1.3,59,'s',1.2],[13.0,5.5,38,'s',1.7],[29.4,14.5,-55,'s',1.5],[30.3,1.1,-36,'s',1.2],[3.7,7.1,-24,'s',1.7],[5.8,2.2,-54,'s',1.7],[15.4,12.2,10,'s',2.0],[11.2,5.7,-24,'l',1.3],[17.8,12.1,17,'l',1.4],[30.4,2.7,37,'s',1.4],[28.9,9.7,-51,'l',1.7],[27.1,7.2,19,'s',1.7],[14.1,19.3,-1,'s',1.8],[1.9,16.1,44,'s',1.5],[20.7,0.5,48,'s',1.7],[15.3,5.0,3,'s',1.3],[12.1,20.0,-50,'s',1.5],[8.6,3.1,40,'l',1.4],[12.9,8.3,27,'l',1.3],[5.5,5.3,-11,'s',1.9],[5.7,6.5,-33,'s',1.5],[17.6,21.9,61,'l',1.8],[22.9,10.5,30,'s',1.5],[14.9,9.2,-22,'s',1.3],[5.0,7.8,-57,'s',1.7]].map(([x,y,a,c,rx])=>sv('ellipse',{cx:x,cy:y,rx,ry:rx*.5,transform:'rotate('+a+' '+x+' '+y+')',class:'st'+c}))));defs.append(sv('linearGradient',{id:padG,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:0,style:'stop-color:var(--pad-lit)'}),sv('stop',{offset:.55,style:'stop-color:var(--pad)'}),sv('stop',{offset:1,style:'stop-color:var(--pad-shade)'})));
  /* the traced route is drawn over everything, but where it runs inside a pad it shows faintly, as sap under foliage */
  const rmId='gb-rm'+N,rMask=sv('mask',{id:rmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));defs.append(rMask);
  const B={key,L,svg,grow:[],anim:[],pad:{},padsOf:{},brEl:{},leaf:{},clump:{},bud:{},budG:{},knot:{},klbl:{},root:{},lbl:{},vein:{},pos:{},nav:[],navEl:{},cur:{},jinEl:{}};
@@ -584,7 +609,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   sv('path',{class:'lip-hi',d:'M'+gbF(pa-1.6)+' -.6 L'+gbF(pb+1.6)+' -.6'}),sv('path',{class:'lip-lo',d:'M'+gbF(pa-2)+' '+(lone?'2.3':'3.1')+' L'+gbF(pb+2)+' '+(lone?'2.3':'3.1')})));
  /* the pot is the repository: its name as a small seal, at the face's lower right (centred on a small bowl) */
  if(L.seal){const t=L.seal.t,sw=L.seal.w,x0=lone?pc-sw/2:pb-10-sw,y0=lone?D*.38:Math.max(8,D-15.6);
-  gPot.append(sv('g',{class:'seal'},sv('rect',{x:gbF(x0),y:gbF(y0),width:gbF(sw),height:9,rx:1}),sv('text',{x:gbF(x0+sw/2),y:gbF(y0+6.7),'text-anchor':'middle'},t)))}
+  gPot.append(sv('g',{class:'seal'},sv('rect',{x:gbF(x0),y:gbF(y0),width:gbF(sw),height:8,rx:1}),sv('text',{x:gbF(x0+sw/2),y:gbF(y0+5.9),'text-anchor':'middle'},t)))}
  /* roots: the nebari first, then the named ones over them; a third party's goes over the lip, so it is drawn after it */
  L.roots.forEach((r,i)=>{const id='r'+i+(r.id?':'+r.id:'');const g=sv('g',r.id?{class:'rt dep'+(r.ext?' ext':' store')+(r.loose?' loose':'')+(r.stop?' stop':''),'data-k':'u:'+r.id,tabindex:-1,role:'button','aria-label':M.U[r.id].label+', what the change depends on'+(r.loose?', on no journey':'')+(r.stop?', where tracing stops':'')}:{});
   const pts=r.pts,n=pts.length;const delay=r.tree*250+80;const wd=piece(id,pts,r.w,'w',g,delay,520);
@@ -596,7 +621,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    B.root[r.id]=g;B.pos[r.id]=pts[Math.min(n-1,Math.floor(n*(r.ext?.5:.6)))];B.nav.push('u:'+r.id);B.navEl['u:'+r.id]=g}
   /* a store's root lies on the soil, not sunk in it, and a fine stake runs from where it goes under to its tag on the face */
   if(r.id&&!r.ext){const l=L.rl.find(q=>q.r===r&&q.face);const e=pts[n-1];if(l&&Math.abs(l.x-e[0])<l.ww/2+30){const ty=l.y-L.fs*.82;
-   const sk=sv('path',{class:'stake',d:'M'+gbP([e[0],e[1]+1.5])+' L'+gbP([l.x,ty])});g.insertBefore(sk,g.firstChild);anim('stake:'+id,sk,delay+560,300,'fade')}}
+   const sx=Math.max(l.x-l.ww/2+3,Math.min(l.x+l.ww/2-3,e[0]));const sk=sv('path',{class:'stake',d:'M'+gbP([sx,e[1]+1.5])+' L'+gbP([sx,ty])});g.insertBefore(sk,g.firstChild);anim('stake:'+id,sk,delay+560,300,'fade')}}
   (r.id?gRootX:gRoot).append(g)});
  for(const l of L.rl){const t=sv('text',{x:gbF(l.x),y:gbF(l.y),'text-anchor':l.anchor,class:'rlbl'+(l.face?' face':''),style:'font-size:'+L.fs+'px'},l.t,l.r.stop?sv('tspan',{class:'nt'},' · trace stops'):null);(B.root[l.r.id]||gRoot).append(t);anim('rl:'+l.r.id,t,l.r.tree*250+560,300,'fade')}
  let lightAt=0;
@@ -651,14 +676,14 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   T.knots.forEach(kn=>{const q=sh(kn.p);placed.push([q[0]-6,q[1]-6,q[0]+6,q[1]+6])});
   /* and off the journeys' names and the phone's numbers */
   for(const pid in T.lbl){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;placed.push([a,l.y-29,a+l.w,l.y-29+l.hgt])}
-  for(const jid in T.badge||{}){const q=T.badge[jid];placed.push([q.x+X-12,q.y-12,q.x+X+12,q.y+12])}placed.push([L.potC-L.potL/2-4,L.narrow?-11:-16,L.potC+L.potL/2+4,L.D+6]);for(let k=0;k<tp.length;k+=2)padBox.push([tp[k][0]-T.tw[k]/2,tp[k][1]-2,tp[k][0]+T.tw[k]/2,tp[k][1]+2]);
+  for(const jid in T.badge||{}){const q=T.badge[jid];placed.push([q.x+X-12,q.y-12,q.x+X+12,q.y+12])}const potBox=[L.potC-L.potL/2-4,L.narrow?-11:-16,L.potC+L.potL/2+4,L.D+40];placed.push(potBox);for(let k=0;k<tp.length;k+=2)padBox.push([tp[k][0]-T.tw[k]/2,tp[k][1]-2,tp[k][0]+T.tw[k]/2,tp[k][1]+2]);
   const ov=(r,q)=>Math.max(0,Math.min(r[2],q[2])-Math.max(r[0],q[0]))*Math.max(0,Math.min(r[3],q[3])-Math.max(r[1],q[1]));
   for(const b of T.br)for(let k=0;k<b.pts.length;k+=3){const q=sh(b.pts[k]);padBox.push([q[0]-b.w[k]/2,q[1]-b.w[k]/2,q[0]+b.w[k]/2,q[1]+b.w[k]/2])}
   const hits=(r)=>padBox.reduce((a,q)=>a+ov(r,q),0)+placed.reduce((a,q)=>a+ov(r,q),0)*3;
   /* hairlines already drawn, and how many points of a new one land on something drawn */
   const segs=[],inBox=(p,q)=>p[0]>q[0]&&p[0]<q[2]&&p[1]>q[1]&&p[1]<q[3];
   /* (what the hairline starts in, its own knot and the wood under it, it cannot help crossing) */
-  const segHit=(a,b,o)=>{let c=0;const sk=q=>o&&o[0]>q[0]-3&&o[0]<q[2]+3&&o[1]>q[1]-3&&o[1]<q[3]+3;const P=placed.filter(q=>!sk(q)),Q=padBox.filter(q=>!sk(q));
+  const segHit=(a,b,o)=>{let c=0;const sk=q=>q!==potBox&&o&&o[0]>q[0]-3&&o[0]<q[2]+3&&o[1]>q[1]-3&&o[1]<q[3]+3;const P=placed.filter(q=>!sk(q)),Q=padBox.filter(q=>!sk(q));
    for(let i=1;i<=9;i++){const t=i/10,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(P.some(q=>inBox(p,q))||Q.some(q=>inBox(p,q)))c++}return c};
   const rectSegs=r=>{let c=0;for(const [a,b] of segs)for(let i=0;i<=10;i++){const t=i/10;if(inBox([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],r))c++}return c};
   /* Max: a part's own checks, and the existing flows that reach it, grow as one unpruned shoot out of that part's knot, the
@@ -666,20 +691,35 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
      and holds its checks as small leaves set alternately along it; a burl's files share one. A part on no knot (a root in
      the soil) sends up a sucker beside it. Its route back to the soil is the wood it grows from. */
   if(!sap&&!ti){const out=r=>Math.max(0,vx+4-r[0])+Math.max(0,r[2]-(vx+W-4))+Math.max(0,vy+2-r[1]);
-   const grow1=(a,n,uids,kid,route,wd)=>{let best=null;
-    for(const side of [1,-1])for(const k of [.9,.5,1.5])for(const len of [34,28]){const v0=[n[0]*side,n[1]*side-k],m=Math.hypot(v0[0],v0[1])||1,v=[v0[0]/m,v0[1]/m];if(v[1]>-.15)continue;
-     const b0=[a[0]+n[0]*side*(wd/2-1),a[1]+n[1]*side*(wd/2-1)],tip=[b0[0]+v[0]*len,b0[1]+v[1]*len],c=[b0[0]+v[0]*len*.5,b0[1]+v[1]*len*.5-len*.12],pts=gbBez([b0,c,c,tip],10);
-     const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]),r=[Math.min(...xs)-8,Math.min(...ys)-8,Math.max(...xs)+8,Math.max(...ys)+6];
-     const sc=hits(r)+out(r)*400+(k===.9?0:30)+(len===34?0:20);if(!best||sc<best.sc)best={sc,pts,b0,tip,c,r}}
-    if(!best)return;placed.push(best.r);const {b0,c,tip}=best,sdir=tip[0]>=b0[0]?1:-1;
-    const slot=i=>{const t=[.42,.66,.88][i],q=gbCubic([b0,c,c,tip],t),q2=gbCubic([b0,c,c,tip],Math.min(1,t+.05));return [q[0],q[1],Math.atan2(q2[1]-q[1],q2[0]-q[0])*180/Math.PI+(i%2?52:-52)*sdir]};
-    (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:b0,tip,slots:[0,1,2].map(slot),route:[...best.pts.slice().reverse(),...route]})};
+   /* A shoot leaves the bark on the open side, along the wood turned 40 to 55 degrees outward, arches and turns up toward
+      the light; it tapers, holds its checks as leaves set alternately and shrinking toward the tip, and ends in a bud.
+      Shoots keep 18 units apart along the wood, and off pads, names and each other. */
+   const bases=[];
+   const grow1=(pl,k0,wd,uids,kid,routeOf,lo,pref)=>{let best=null;const n1=pl.length-1,step=gbLen(pl)[n1]/n1;
+    for(const off of [0,9,-9,18,-18,27,-27]){const kk=Math.max(lo,Math.min(n1-2,k0+Math.round(off/step)));const a=pl[kk],n=gbNorm(pl,kk),wk=wd[kk];
+     const g0=pl[Math.min(n1,kk+1)],g1=pl[Math.max(0,kk-1)],gm=Math.hypot(g0[0]-g1[0],g0[1]-g1[1])||1,tg=[(g0[0]-g1[0])/gm,(g0[1]-g1[1])/gm];
+     for(const side of [1,-1])for(const th of [45,55,38])for(const len of [32,26]){const r0=th*Math.PI/180,ns=[n[0]*side,n[1]*side];
+      const v0=[tg[0]*Math.cos(r0)+ns[0]*Math.sin(r0),tg[1]*Math.cos(r0)+ns[1]*Math.sin(r0)];if(v0[1]>.2)continue;
+      const b0=[a[0]+ns[0]*(wk/2-1.2),a[1]+ns[1]*(wk/2-1.2)],tip=[b0[0]+v0[0]*len*.72,b0[1]+v0[1]*len*.72-len*.42];
+      const c1=[b0[0]+v0[0]*len*.48,b0[1]+v0[1]*len*.48],c2=[tip[0]-v0[0]*len*.06,tip[1]+len*.3],pts=gbBez([b0,c1,c2,tip],10);
+      const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]),r=[Math.min(...xs)-9,Math.min(...ys)-9,Math.max(...xs)+9,Math.max(...ys)+5];
+      const near=bases.reduce((m,q)=>Math.min(m,Math.hypot(q[0]-b0[0],q[1]-b0[1])),1e9);
+      const sc=hits(r)+out(r)*400+(near<18?400+(18-near)*40:0)+Math.abs(off)*2+(th===45?0:12)+(len===32?0:16)+(pref&&ns[0]*pref<0?60:0);
+      if(!best||sc<best.sc)best={sc,pts,b0,tip,c1,c2,r,kk}}}
+    if(!best)return;placed.push(best.r);bases.push(best.b0);const {b0,c1,c2,tip}=best,cv=[b0,c1,c2,tip];
+    const slot=i=>{const t=[.46,.68,.86][i],q=gbCubic(cv,t),q2=gbCubic(cv,Math.min(1,t+.04)),dir=Math.atan2(q2[1]-q[1],q2[0]-q[0])*180/Math.PI;return [q[0],q[1],dir+(i%2?50:-50),[1,.82,.66][i]]};
+    (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:b0,tip,slots:[0,1,2].map(slot),route:[...best.pts.slice().reverse(),...routeOf(best.kk)]})};
    const tdown=k=>tp.slice(0,k+1).reverse();
+   /* never from the soil or the flare: no shoot leaves the trunk below a fifth of its height */
+   const lowK=Math.round(.2*(tp.length-1));
    for(const kn of T.knots){const uids=kn.ids.filter(id=>(M.buds[id]||[]).length);if(!uids.length)continue;const b=kn.bid?T.br.find(x=>x.id===kn.bid):null;
-    const route=b?[...b.pts.slice(0,kn.k+1).reverse().map(sh),...tdown(b.k)]:tdown(kn.k);grow1(sh(kn.p),kn.n,uids,kn.id,route,kn.w)}
-   for(const r of L.roots){if(!r.id||r.tree!==ti||!(M.buds[r.id]||[]).length)continue;const ii=Math.floor(r.pts.length*.6),a=r.pts[ii];grow1(a,[0,-1],[r.id],r.id,[a,...r.pts.slice(0,ii).reverse()],r.w[ii])}
+    if(b){const bp=b.pts.map(sh);grow1(bp,kn.k,b.w,uids,kn.id,kk=>[...bp.slice(0,kk+1).reverse(),...tdown(b.k)],2)}
+    else grow1(tp,Math.max(lowK,kn.k),T.tw,uids,kn.id,tdown,lowK)}
+   /* a root's own checks grow on the trunk above the flare, on the root's side */
+   for(const r of L.roots){if(!r.id||r.tree!==ti||!(M.buds[r.id]||[]).length)continue;
+    grow1(tp,Math.round(.24*(tp.length-1)),T.tw,[r.id],r.id,kk=>[...tdown(kk),...r.pts.slice(0,Math.floor(r.pts.length*.6))],lowK,r.d)}
    /* a changed part on no journey has no knot: its shoot comes from the leader, under the crown */
-   const loose=Object.keys(M.buds).filter(id=>!(B.shootGeo||[]).some(g=>g.uids.includes(id)));if(loose.length){const k=gbNear(T.ty,.88);grow1(tp[k],gbNorm(tp,k),loose,'lead:'+ti,tdown(k),T.tw[k])}}
+   const loose=Object.keys(M.buds).filter(id=>!(B.shootGeo||[]).some(g=>g.uids.includes(id)));if(loose.length)grow1(tp,Math.round(.86*(tp.length-1)),T.tw,loose,'lead:'+ti,tdown,lowK)}
   T.knots.forEach((kn,ki)=>{const p0=sh(kn.p),n=kn.n;const many=kn.ids.length>1;const off=(ki%2?-1:1)*kn.w*.18;const p=[p0[0]+n[0]*off,p0[1]+n[1]*off];
    /* a knot is a swelling in the bark, longer along the wood than across it: its shaded flank, its lit crown, and the grain
       parting round it in two long shallow arcs; a burl is the same, larger */
@@ -691,21 +731,21 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    const cr=[[-1,0],[-.45,.55],[0,-.45],[.45,.5],[1,0]].map(([u,v])=>[p[0]+tg[0]*u*(ra+4)+n[0]*v*2.2,p[1]+tg[1]*u*(ra+4)+n[1]*v*2.2]);
    const u=M.U[kn.id];const names=kn.ids.map(id=>(M.U[id]||{}).label||id);
    const g=sv('g',{class:'kn'+(many?' burl':''),'data-k':'u:'+kn.id,tabindex:-1,role:'button','aria-label':many?names.length+' parts of the change, grown together: '+names.join(', '):(u?u.label:kn.id)+', a part of the change'},
-    sv('path',{d:lens(1)+' '+lens(-1),class:'kg','clip-path':'url(#'+clipId+')'}),E(c0,ra,rb,'k0'),E(c1,ra*.84,rb*.78,'k1'),E(p,ra+2.4,rb+2.4,'ring'),sv('path',{d:gbLine(cr),class:'crack'}),
+    sv('path',{d:lens(1)+' '+lens(-1),class:'kg','clip-path':'url(#'+clipId+')'}),E(p,ra+4.5,rb+4.5,'halo'),E(c0,ra,rb,'k0'),E(c1,ra*.84,rb*.78,'k1'),E(p,ra+2.4,rb+2.4,'ring'),sv('path',{d:gbLine(cr),class:'crack'}),
     sv('circle',{cx:gbF(p[0]),cy:gbF(p[1]),r:Math.max(9,ra+3),class:'hitc'}));
    g.__ids=kn.ids;(kn.bid?JG[kn.bid]:gKn).append(g);for(const id of kn.ids){B.knot[id]=g;B.pos[id]=p0}B.nav.push('u:'+kn.id);B.navEl['u:'+kn.id]=g;g.__n=n;g.__w=kn.w;g.__on=kn.on;
    const t=kn.on==='t'?kn.t:T.br.find(x=>'b'+x.i===kn.on).h;anim('kn:'+kn.id,g,at(t)+200,300,'fade');
-   if(u){const txt=gwCut(u.label,many?18:24)+(many?' +'+(kn.ids.length-1):''),tw2=gbW(txt,6.2);let best=null;
+   if(u){const txt=gwCut(u.label,many?16:24)+(many?' +'+(kn.ids.length-1)+(kn.ids.length>2?' files':' file'):''),tw2=gbW(txt,6.2*(L.narrow?GB_NK:1));let best=null;
     /* A name goes on open ground beside its knot: never on another name, a pad, the wood, a shoot or the soil, and the hairline
        back to its knot, from the bark's edge, crosses no other name or line. The nearest such place wins. */
     const lead=r=>{const e=[Math.max(r[0]+2,Math.min(r[2]-2,p[0])),Math.max(r[1]+1,Math.min(r[3]-1,p[1]))],dd=Math.hypot(e[0]-p[0],e[1]-p[1])||1,u0=[(e[0]-p[0])/dd,(e[1]-p[1])/dd],s0=Math.min(dd-3,Math.max(6,kn.w/2+1));return {a:[p[0]+u0[0]*s0,p[1]+u0[1]*s0],e:[e[0]-u0[0]*2,e[1]-u0[1]*2],dd}};
     const cands=kn.bid?[n[1]>0?1:-1,n[1]>0?-1:1]:[1,-1];const DX=L.narrow?[0,-20,20,-40,40,-60,60,-80,80,-100,100,-120,120]:[0,-20,20,-40,40,-60,60];
     for(const dy of [0,-11,11,-22,22,-33,33,-44,44,-55,55,-66,66])for(const dx of DX)for(const sd of cands){const q=[p0[0]+n[0]*sd*(kn.w/2+8)+dx,p0[1]+n[1]*sd*(kn.w/2+8)+3.5+dy];const anc=kn.bid?'middle':(n[0]*sd>0?'start':'end');
      const x0=anc==='start'?q[0]:anc==='end'?q[0]-tw2:q[0]-tw2/2;const r=[x0-2,q[1]-10,x0+tw2+2,q[1]+3];const out=Math.max(0,vx+4-r[0])+Math.max(0,r[2]-(vx+W-4))+Math.max(0,vy+2-r[1]);const ld=lead(r),cross=(ld.dd>12?segHit(ld.a,ld.e,p):0)+rectSegs(r);
-     const sc=hits(r)*4+out*400+cross*150+Math.hypot(dx,dy)*.9+(sd===cands[0]?0:8);(window.__kd=window.__kd||[]).push([kn.id,dx,dy,sd,Math.round(hits(r)),Math.round(out),cross,Math.round(sc)]);if(!best||sc<best.sc)best={q,anc,r,sc,out,dx,dy,cross}}
+     const sunk=Math.max(0,r[3]+8);const sc=hits(r)*4+out*400+cross*150+sunk*600+Math.hypot(dx,dy)*.9+(sd===cands[0]?0:8);if(!best||sc<best.sc)best={q,anc,r,sc,out,dx,dy,cross}}
     /* a name that cannot find clear ground near its knot stays down until the knot itself is pointed at; the card names
        the whole path */
-    const fit=hits(best.r)<=0&&!best.out&&!best.cross&&(!L.narrow||Math.hypot(best.dx,best.dy)<=130);placed.push(best.r);const kl=sv('text',{x:gbF(best.q[0]),y:gbF(best.q[1]),'text-anchor':best.anc,class:'klbl'},txt);kl.__fit=fit;kl.__r=best.r;gKl.append(kl);B.klbl[kn.id]=kl;
+    const fit=hits(best.r)<=0&&!best.out&&!best.cross&&best.r[3]<=-8&&(!L.narrow||Math.hypot(best.dx,best.dy)<=130);placed.push(best.r);const kl=sv('text',{x:gbF(best.q[0]),y:gbF(best.q[1]),'text-anchor':best.anc,class:'klbl'},txt);kl.__fit=fit;kl.__r=best.r;gKl.append(kl);B.klbl[kn.id]=kl;
     /* a label pushed off its knot keeps a hairline back to it */
     const ld=lead(best.r);if(ld.dd>12){gKl.append(sv('path',{class:'kld',d:'M'+gbP(ld.a)+' L'+gbP(ld.e)}));segs.push([ld.a,ld.e])}}});
   /* veins: the route each pad's sap takes, shown live while its journey runs and traced on hover */
@@ -716,13 +756,13 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    /* one silhouette from all its clumps; the ghost behind it shows the shape a previewed mode would grow */
    const circ=[...g.body.map(c=>({id:null,c})),...[...g.leafC].map(([id,c])=>({id,c}))];const xa=Math.min(...circ.map(q=>q.c[0]-q.c[2]))-1,xb=Math.max(...circ.map(q=>q.c[0]+q.c[2]))+1;
    const shape=keep=>gbPadPts(g,circ.filter(q=>!q.id||keep(q.id)).map(q=>q.c),xa,xb);const q0=shape(()=>true),bt=Math.max(2.5,g.PH*.08);
-   const els={ghost:sv('path',{class:'pghost',d:gbPadD(o,q0)}),fill:sv('path',{class:'pfill',d:gbPadD(o,q0),fill:'url(#'+padG+')'}),band:sv('path',{class:'pband',d:gbPadBand(o,q0,bt)})};
+   const els={ghost:sv('path',{class:'pghost',d:gbPadD(o,q0)}),fill:sv('path',{class:'pfill',d:gbPadD(o,q0),fill:'url(#'+padG+')'}),tex:sv('path',{class:'ptex',d:gbPadD(o,q0),fill:'url(#'+padG+'s)'}),band:sv('path',{class:'pband',d:gbPadBand(o,q0,bt)}),rim:sv('path',{class:'prim',d:gbPadRim(o,q0)})};
    const mk=sv('path',{d:gbPadD(o,q0),fill:'#666'});rMask.append(mk);
-   const pg=sv('g',{class:'pad'+(pd.crown?' crown':'')+(back?' back':''),'data-k':'j:'+jid,'data-pad':pd.id,tabindex:-1,role:'button'},els.ghost,els.fill,els.band,sv('ellipse',{cx:gbF(o[0]),cy:gbF(o[1]-5),rx:6,ry:4.6,class:'bud0'}));
+   const pg=sv('g',{class:'pad'+(pd.crown?' crown':'')+(back?' back':''),'data-k':'j:'+jid,'data-pad':pd.id,tabindex:-1,role:'button'},els.ghost,els.fill,els.tex,els.band,els.rim,sv('ellipse',{cx:gbF(o[0]),cy:gbF(o[1]-5),rx:6,ry:4.6,class:'bud0'}));
    jg.append(pg);const lg=sv('g',{});jg.append(lg);
    const delay=pd.b?at(pd.b.h)+380+1.5*pd.b.len:base+tdur;
    /* the wood a leaf's sap runs through on its way down: its branch (or, for the crown, the leader) and the trunk */
-   const rt={tp,br:pd.b?pd.b.pts.map(sh):null,exit:pd.b?pd.b.exit:0,k:pd.b?pd.b.k:tp.length-5};
+   const rt={tp,br:pd.b?pd.b.pts.map(sh):null,bw:pd.b?pd.b.w[pd.b.exit]:0,exit:pd.b?pd.b.exit:0,k:pd.b?pd.b.k:tp.length-5};
    B.pad[pd.id]={el:pg,jg,o,geo:g,jid,pol:pd.pol,crown:pd.crown,b:pd.b,lg,leaves:pd.leaves,delay,tree:ti,shape,els,mk,bt,sk:'*',rt,q0};(B.padsOf[jid]=B.padsOf[jid]||[]).push(pd.id);
    if(!quiet){const t0=gbT('pad:'+pd.id,delay);if(now-t0<450){pg.style.transformBox='fill-box';pg.style.transformOrigin='center bottom';B.anim.push([pg,t0-now,450,'pop'])}}
    if(!sap&&!pd.pol){B.nav.push('j:'+jid);B.navEl['j:'+jid]=pg}});
@@ -734,7 +774,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    gLbl.append(gl);B.lbl[pid]={el:gl,eb,t2,t3,tl,w:l.w,pol:l.pol,jid:l.jid};anim('lbl:'+pid,gl,B.pad[pid].delay+250,350,'fade')}
   /* on a phone the names go in the list under the tree; the tree carries their numbers, just outside each pad */
   for(const jid in (T.badge||{})){const q=T.badge[jid];const bx=q.x+X,ax=q.ax+X;
-   const gl=sv('g',{class:'badge','data-k':'j:'+jid},sv('path',{class:'leader',d:'M'+gbF(ax)+' '+gbF(q.ay)+' L'+gbF(bx+(bx>ax?-10:bx<ax?10:0))+' '+gbF(q.y+(bx===ax?10:0))}),sv('circle',{cx:gbF(bx),cy:gbF(q.y),r:10}),sv('text',{x:gbF(bx),y:gbF(q.y)},''));
+   const gl=sv('g',{class:'badge','data-k':'j:'+jid},sv('path',{class:'leader',d:'M'+gbF(ax)+' '+gbF(q.ay)+' L'+gbF(bx+(bx>ax?-10:bx<ax?10:0))+' '+gbF(q.y+(bx===ax?10:0))}),sv('circle',{cx:gbF(bx),cy:gbF(q.y),r:L.narrow?10*GB_NK:10}),sv('text',{x:gbF(bx),y:gbF(q.y)},''));
    gLbl.append(gl);B.lbl[jid]={el:gl,num:gl.lastChild,badge:true,jid}}
  });
  if(L.trees.length&&M.jin.length>3&&!sap){const T=L.trees[0],p=T.tp[gbNear(T.ty,.4)];gJin.append(sv('text',{x:gbF(p[0]-T.S*28),y:gbF(p[1]),'text-anchor':T.S>0?'end':'start',class:'note'},'+'+(M.jin.length-3)+' changed, on no journey'))}
@@ -749,6 +789,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  svg.addEventListener('click',e=>{let k=keyOf(e);if(!k)k=gbNearLeaf(e);if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
  svg.addEventListener('keydown',gbKeys);
  B.tip=h('div',{class:'gb-tip',hidden:true,role:'status'});B.width=width;
+ /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots) and the foliage it climbs into */
+ {const rc=sv('clipPath',{id:'gb-rc'+N});for(const c of clip.children)rc.append(c.cloneNode());
+  for(const el of svg.querySelectorAll('path.tw'))rc.append(sv('path',{d:el.getAttribute('d')}));
+  for(const id in B.pad){const P=B.pad[id];P.rcp=sv('path',{d:P.mk.getAttribute('d')});rc.append(P.rcp)}defs.append(rc);gSap.setAttribute('clip-path','url(#gb-rc'+N+')');B.rclip=rc}
  gw.B=B;gw.svg=svg;
  
  if(svg.animate)for(const [el,delay,ms,kind] of B.anim){if(kind==='fade')el.animate([{opacity:0},{opacity:1}],{duration:ms,delay,fill:'backwards'});else if(kind==='pop')el.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1)',opacity:1}],{duration:ms,delay,easing:'cubic-bezier(.2,.8,.3,1.1)',fill:'backwards'})}
@@ -759,7 +803,7 @@ function gbNearLeaf(e){const B=gw.B;if(!B||e.pointerType==='mouse')return null;l
  for(const id in B.leaf){const el=B.leaf[id];if(el.classList.contains('gone'))continue;const r=el.getBoundingClientRect();const d=Math.hypot(r.left+r.width/2-e.clientX,r.top+r.height/2-e.clientY);if(d<bd){bd=d;best='s:'+id}}return best}
 
 /* The same leaf with a bite out of its upper edge: how a failed scenario looks, in any theme and on any ground. */
-function gbLeafBite(L,W,edge){const a=-L/2,b=L/2;const up=[[a,0],[a+.22*L,-.62*W],[b-.32*L,-.62*W],[b,0]];const c=[L*.1,-W*.5],r=L*.19;
+function gbLeafBite(L,W,edge){const a=-L/2,b=L/2;const up=[[a,0],[a+.22*L,-.62*W],[b-.32*L,-.62*W],[b,0]];const c=[L*.15,-W*.52],r=W*.34;
  const pts=gbBez(up,24).map(q=>{const d=Math.hypot(q[0]-c[0],q[1]-c[1]);return d<r?[c[0]+(q[0]-c[0])/(d||1)*r,c[1]+(q[1]-c[1])/(d||1)*r]:q});
  /* the bitten edge alone, for the browned rim a failed leaf has round its wound */
  if(edge){const e=pts.filter(q=>Math.abs(Math.hypot(q[0]-c[0],q[1]-c[1])-r)<.01);return e.length>1?'M'+e.map(gbP).join(' L'):''}
@@ -795,7 +839,7 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
  if(vis&&!inm.length){const lo=list.reduce((a,x)=>gbRank[x.mode]<gbRank[a]?x.mode:a,'max');return [['pruned in '+gbModeName(vis)+' · '+gbModeName(lo)+' grows '+(list.length===1?'it':'them'),'n']]}
  const T=[];if(c('fail'))T.push([c('fail')+' failed','f']);if(c('pass'))T.push([c('pass')+' passed','p']);if(c('run'))T.push([c('run')+' running','r']);
  const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),nf=open.filter(x=>!x.flow).length,tp=open.length-nf;
- if(!ran.length&&!s.modeBy)T.push([list.length+' drafted · '+list.filter(x=>x.mode==='min').length+' in Minimum','n']);else{if(tp)T.push([tp+' to prove','n']);if(nf)T.push([nf+' no flow yet','n'])}
+ if(!ran.length&&!s.modeBy){const km=vis||'min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(tp)T.push([tp+' to prove','n']);if(nf)T.push([nf+' no flow yet','n'])}
  if(pr)T.push(['+'+pr+' pruned','n']);return T}
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
@@ -819,12 +863,13 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
     /* pruning: a leaf the chosen mode drops falls once, one after another, then only its cut stem is left */
-    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet){el.__cutAt=Date.now();el.__lag=Math.min(i*80,560);const st=el.__inner.style;st.animationDelay=el.__lag+'ms';
+    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet){el.__cutAt=Date.now();el.__lag=Math.min(i*40,400);const st=el.__inner.style;st.animationDelay=(el.__lag+90)+'ms';
+      {const a0=(sl[2])*Math.PI/180,bx=P.o[0]+sl[0]-Math.cos(a0)*g.L/2,by=P.o[1]+sl[1]-Math.sin(a0)*g.L/2;const sn=sv('path',{class:'snip',d:'M'+gbF(bx-3.2)+' '+gbF(by-3.2)+' L'+gbF(bx+3.2)+' '+gbF(by+3.2)+' M'+gbF(bx-3.2)+' '+gbF(by+3.2)+' L'+gbF(bx+3.2)+' '+gbF(by-3.2),style:'animation-delay:'+el.__lag+'ms;transform-box:fill-box;transform-origin:center'});P.lg.append(sn);setTimeout(()=>sn.remove(),el.__lag+400)}
       /* it drops and drifts in screen space, so the leaf's own angle is taken out of the fall */
-      const a=(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))*Math.PI/180,sc=sl[3]||1,h=gbHash('fall:'+x.id),fx=(h-.5)*40,fy=90;
-      st.setProperty('--fx',gbF((fx*Math.cos(a)+fy*Math.sin(a))/sc)+'px');st.setProperty('--fy',gbF((-fx*Math.sin(a)+fy*Math.cos(a))/sc)+'px');st.setProperty('--fr',gbF((h<.5?-1:1)*(60+80*gbHash('spin:'+x.id)))+'deg');
-      setTimeout(()=>{if(el.__in===false){el.classList.replace('cut','gone');gbPaint()}},940+el.__lag)}
-     cls+=el.__cutAt&&Date.now()-el.__cutAt<920+(el.__lag||0)?' cut':' gone'}else{el.__cutAt=0;el.__inner.style.animationDelay=''}
+      const a=(sl[2]+(gbHash(x.id)-.5)*(sl[4]?8:14))*Math.PI/180,sc=sl[3]||1,h=gbHash('fall:'+x.id),fx=(h-.5)*24,fy=80+60*gbHash('drop:'+x.id);
+      st.setProperty('--fx',gbF((fx*Math.cos(a)+fy*Math.sin(a))/sc)+'px');st.setProperty('--fy',gbF((-fx*Math.sin(a)+fy*Math.cos(a))/sc)+'px');st.setProperty('--fr',gbF((h<.5?-1:1)*(15+20*gbHash('spin:'+x.id)))+'deg');
+      setTimeout(()=>{if(el.__in===false){el.classList.replace('cut','gone');gbPaint()}},720+el.__lag)}
+     cls+=el.__cutAt&&Date.now()-el.__cutAt<700+(el.__lag||0)?' cut':' gone'}else{el.__cutAt=0;el.__inner.style.animationDelay=''}
     if(pv&&!add){const keep=gbRank[x.mode]<=gbRank[pv];cls+=keep?' pv-in':' pv-out';if(!keep)cutN++}
     el.setAttribute('class',cls);el.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t);
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
@@ -833,14 +878,14 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    /* the pad's own outline follows its leaves: a pruned leaf's clump goes with it, and a previewed mode's extra growth shows
       as a faint outline behind */
    const kk=[...kept].join(','),gk=[...grown].join(',');if(P.sk!==kk+'|'+gk){P.sk=kk+'|'+gk;const q=P.shape(id=>kept.has(id)),d=gbPadD(P.o,q);
-    P.els.fill.setAttribute('d',d);P.mk.setAttribute('d',d);P.els.band.setAttribute('d',gbPadBand(P.o,q,P.bt));P.els.ghost.setAttribute('d',gk===kk?d:gbPadD(P.o,P.shape(id=>grown.has(id))))}
+    P.els.fill.setAttribute('d',d);P.els.tex.setAttribute('d',d);if(P.rcp)P.rcp.setAttribute('d',d);P.els.rim.setAttribute('d',gbPadRim(P.o,q));P.mk.setAttribute('d',d);P.els.band.setAttribute('d',gbPadBand(P.o,q,P.bt));P.els.ghost.setAttribute('d',gk===kk?d:gbPadD(P.o,P.shape(id=>grown.has(id))))}
    /* a pruned leaf leaves a scar where it grew: a short stub of the twig that carried it, standing out of the foliage that
       is left, cut flat with its pale face showing (the legend's mark). A hanging one leaves its stalk cut short. One scar per
       pruned scenario, so the "+N pruned" under the name can be counted on the tree. */
    {const q=P.shape(id=>kept.has(id));B.scar=B.scar||{};for(const x of list){const sl=g.slot.get(x.id),el=B.leaf[x.id];if(!sl||!el)continue;
     const on=el.classList.contains('gone');let sc=B.scar[x.id];if(!on){if(sc)sc.classList.remove('on');continue}if(sl[4])continue;
-    if(!sc||sc.__k!==kk){const th=(sl[2]+(gbHash(x.id)-.5)*14)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],bx=sl[0]-u[0]*(g.L*(sl[3]||1)/2+4.5),top=gbAtX(q.top,bx);
-     const a=[P.o[0]+bx-u[0]*2,P.o[1]+top+2.5-u[1]*2],e=[a[0]+u[0]*9,a[1]+u[1]*9],n=[-u[1],u[0]],w0=1.7,w1=1.3,ang=th*180/Math.PI;
+    if(!sc||sc.__k!==kk){const bx0=sl[0]-Math.cos(sl[2]*Math.PI/180)*(g.L*(sl[3]||1)/2+4.5),bx=Math.max(-g.PW*.4,Math.min(g.PW*.4,bx0*.8)),bot=gbAtX(q.bot,bx),sd=bx>=0?1:-1,th=(90-sd*(38+12*gbHash('sc:'+x.id)))*Math.PI/180,u=[Math.cos(th),Math.sin(th)];
+     const a=[P.o[0]+bx-u[0]*3,P.o[1]+bot-1.5-u[1]*3],e=[a[0]+u[0]*8,a[1]+u[1]*8],n=[-u[1],u[0]],w0=2,w1=1.5,ang=th*180/Math.PI;
      const d='M'+gbP([a[0]+n[0]*w0,a[1]+n[1]*w0])+' L'+gbP([e[0]+n[0]*w1,e[1]+n[1]*w1])+' L'+gbP([e[0]-n[0]*w1,e[1]-n[1]*w1])+' L'+gbP([a[0]-n[0]*w0,a[1]-n[1]*w0])+'Z';
      const nx=sv('g',{class:'scar','data-k':'s:'+x.id,'data-pad':pid,tabindex:-1,role:'button'},sv('path',{d,class:'sw'}),sv('ellipse',{cx:gbF(e[0]),cy:gbF(e[1]),rx:1.5,ry:1.9,transform:'rotate('+gbF(ang)+' '+gbP(e)+')',class:'cutf'}),sv('circle',{cx:gbF(e[0]),cy:gbF(e[1]),r:9,class:'hitc'}));
      if(sc)sc.replaceWith(nx);else P.lg.append(nx);sc=nx;sc.__k=kk;B.scar[x.id]=sc}
@@ -867,8 +912,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   const bd=B.lbl[j.id];if(bd&&bd.badge){bd.num.textContent=String(n);bd.el.setAttribute('class','badge'+(all.some(x=>inMode(x)&&s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(mainCut?' pruned':'')+(gw.pinned==='j:'+j.id?' sel':''))}}
  /* Max: each part's shoot, placed with the tree (gbBuild). Pointing at a smaller mode keeps the shoots where they are,
     faded, as everything else it would cut. */
- const showBuds=pv?(pv==='max'||!vis||vis==='max'):vis?vis==='max':true;B.budsShown=showBuds;
- if(!B.shoots){B.shoots={};for(const rec of B.shootGeo||[]){const el=sv('g',{class:'budg'});B.gBud.append(el);el.append(sv('path',{d:gbRib(rec.pts,rec.pts.map((_,i)=>2.3-1.6*i/10)),class:'tw'}));
+ const showBuds=pv?(pv==='max'||!vis||vis==='max'):vis?vis==='max':true;B.budsShown=showBuds;/* leaving a preview is not a pruning: its ghosts just go */const pvWas=B.pvWas;B.pvWas=pv;
+ if(!B.shoots){B.shoots={};for(const rec of B.shootGeo||[]){const el=sv('g',{class:'budg'});B.gBud.append(el);{const sd=gbRib(rec.pts,rec.pts.map((_,i)=>2.1-1.5*i/10));el.append(sv('path',{d:sd,class:'tw shoot'}));if(B.rclip)B.rclip.append(sv('path',{d:gbRib(rec.pts,rec.pts.map(()=>3.2))}))}
+   {const q=rec.pts[rec.pts.length-1],q0=rec.pts[rec.pts.length-2],ang=Math.atan2(q[1]-q0[1],q[0]-q0[0])*180/Math.PI;el.append(sv('path',{d:gbLeafD(5,2.4),class:'tipbud',transform:'translate('+gbP(q)+') rotate('+gbF(ang)+')'}))}
    rec.g=el;for(const uid of rec.uids){B.shoots[uid]=rec;B.budG[uid]=rec}
    /* a shoot appears once the knot it grows from is there */
    const now=performance.now(),tb=gbT('kn:'+rec.kid,0)+300;if(!quiet&&el.animate&&now<tb+300)el.animate([{opacity:0},{opacity:1}],{duration:300,delay:Math.max(0,tb-now),fill:'backwards'})}}
@@ -878,7 +924,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  for(const g of new Set(Object.values(B.shoots))){const list=gbOrd(g.list);
   list.forEach((x,i)=>{let el=B.bud[x.id];if(i>=g.slots.length){if(el)el.classList.add('gone');return}
    if(!el){const q=g.slots[i];el=sv('g',{class:'gb-lf bud','data-k':'s:'+x.id,tabindex:-1,role:'button'},sv('g',{class:'gb-lfi'},sv('circle',{r:7,cx:6,class:'hitc'}),sv('path',{d:gbLeafD(12,6),transform:'translate(6 0)',class:'blade'})));
-    el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)';el.__u=g.uids[0];el.__base=g.base;g.g.append(el);B.bud[x.id]=el}
+    el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+q[3]+')':'');el.__u=g.uids[0];el.__base=g.base;g.g.append(el);B.bud[x.id]=el}
    /* while a dropped shoot fades, its leaves stay on it */
    const fad=!showBuds&&!!(g.fade||(g.on===undefined?gw.prevBuds:g.on));const im=(showBuds||fad)&&(inMode(x)||pv==='max'||fad);const cut=!!pv&&pv!=='max'&&inMode(x);
    el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)?' pv-add':'')+(im&&cut?' pv-out':''));
@@ -886,8 +932,13 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   /* shoots a chosen mode drops wither and fade, rather than vanish */
   const any=list.some(inMode),on=showBuds&&(any||pv==='max'),was=g.on===undefined?gw.prevBuds:g.on;g.on=on;
   if(on){g.g.style.display='';if(g.fade){g.fade.cancel();g.fade=null}}
-  else if(was&&!quiet&&g.g.animate&&!g.fade){g.g.style.display='';g.fade=g.g.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(5px)'}],{duration:520,delay:200,easing:'ease-in',fill:'forwards'});g.fade.onfinish=()=>{g.fade=null;if(!g.on)g.g.style.display='none'}}
-  else if(!g.fade)g.g.style.display='none';g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',!!pv&&pv!=='max'&&any)}
+  else if(was&&!quiet&&!pvWas&&g.g.animate&&!g.fade){g.g.style.display='';g.g.style.transformBox='view-box';g.g.style.transformOrigin=gbF(g.base[0])+'px '+gbF(g.base[1])+'px';
+   /* a dropped shoot is cut at the bark: a snip, then it tips and falls */
+   const sn=sv('path',{class:'snip',d:'M'+gbF(g.base[0]-3)+' '+gbF(g.base[1]-3)+' L'+gbF(g.base[0]+3)+' '+gbF(g.base[1]+3)+' M'+gbF(g.base[0]-3)+' '+gbF(g.base[1]+3)+' L'+gbF(g.base[0]+3)+' '+gbF(g.base[1]-3),style:'transform-box:fill-box;transform-origin:center'});B.gBud.append(sn);setTimeout(()=>sn.remove(),420);
+   const tip=(g.tip[0]>=g.base[0]?1:-1)*(16+14*gbHash('shf:'+g.kid));g.fade=g.g.animate([{opacity:1,transform:'none'},{opacity:1,transform:'rotate('+gbF(tip*.4)+'deg)',offset:.2},{opacity:0,transform:'translate(0,110px) rotate('+gbF(tip)+'deg)'}],{duration:620,delay:120,easing:'cubic-bezier(.5,0,.85,.4)',fill:'forwards'});g.fade.onfinish=()=>{g.fade=null;if(!g.on)g.g.style.display='none'}}
+  else if(!g.fade)g.g.style.display='none';
+  if(!g.scar){const a=Math.atan2(g.pts[1][1]-g.pts[0][1],g.pts[1][0]-g.pts[0][0])*180/Math.PI;g.scar=sv('ellipse',{class:'shscar',cx:gbF(g.base[0]),cy:gbF(g.base[1]),rx:1.6,ry:1.1,transform:'rotate('+gbF(a+90)+' '+gbP(g.base)+')'});B.gBud.insertBefore(g.scar,B.gBud.firstChild)}
+  g.scar.style.display=on?'none':'';g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',!!pv&&pv!=='max'&&any)}
  /* a knot's name never sits on a shoot that is showing */
  const budBox=showBuds?Object.values(B.budG).filter(g=>g.g.style.display!=='none').map(g=>{const xs=g.slots.map(q=>q[0]),ys=g.slots.map(q=>q[1]);return [Math.min(...xs)-11,Math.min(...ys)-11,Math.max(...xs)+11,Math.max(...ys)+11]}):[];
  for(const id in B.klbl){const r=B.klbl[id].__r;B.klbl[id].__clash=!!r&&budBox.some(q=>Math.min(r[2],q[2])>Math.max(r[0],q[0])&&Math.min(r[3],q[3])>Math.max(r[1],q[1]))}
@@ -922,14 +973,19 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  for(const el of new Set(Object.values(B.knot)))el.classList.toggle('on',el.__ids.some(id=>L.units.has(id)));
  const rootPart=L.part&&B.root[L.part]?gw.M.U[L.part]:null;
  const hk=gw.hov&&gw.hov.startsWith('u:')?gw.hov.slice(2):null;
- for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];kl.classList.toggle('on',on&&(ids.includes(hk)||(rootPart?ids.includes(rootPart.parent):ids.some(q=>L.units.has(q))&&kl.__fit!==false&&!kl.__clash)))}
+ /* the name of the knot pointed at always shows; a lit name it would overprint stays down */
+ let hr=null;for(const id in B.klbl){const ids=B.knot[id]?B.knot[id].__ids:[id];if(on&&ids.includes(hk))hr=B.klbl[id].__r}const ov=r=>!!hr&&!!r&&r!==hr&&Math.min(r[2],hr[2])>Math.max(r[0],hr[0])-4&&Math.min(r[3],hr[3])>Math.max(r[1],hr[1])-2;
+ for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];kl.classList.toggle('on',on&&(ids.includes(hk)||(rootPart?ids.includes(rootPart.parent):ids.some(q=>L.units.has(q))&&kl.__fit!==false&&!kl.__clash&&!ov(kl.__r))))}
  for(const id in B.root){B.root[id].classList.toggle('hl',L.units.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route: one line from the leaf's stalk, down through its pad to the branch under it, along the branch's own centre
     line to the trunk, down the trunk's centre line to the flare, and out along every root the journey depends on. A failed
     scenario's route is red from the leaf to the part where it broke; past that point it never ran, so it is grey. */
  let d='',dx='',dw='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
  const spine=(R,at)=>{let mid;if(R.br){let bi=R.br.length-1,bd=1e9;for(let i=R.exit;i<R.br.length;i++){const dd=Math.abs(R.br[i][0]-at[0]);if(dd<bd){bd=dd;bi=i}}const bp=R.br[bi];mid=[...gbSmooth([at,[at[0]+(bp[0]-at[0])*.2,(at[1]+bp[1])/2],bp],2),...R.br.slice(0,bi).reverse()]}
-  else{const tt=R.tp[R.k];mid=gbSmooth([at,[at[0]+(tt[0]-at[0])*.3,(at[1]+tt[1])/2],tt],2)}return [...mid,...R.tp.slice(0,R.k).reverse()]};
+  else{const tt=R.tp[R.k];mid=gbSmooth([at,[at[0]+(tt[0]-at[0])*.3,(at[1]+tt[1])/2],tt],2)}
+  /* where a branch's route turns down the trunk it bends round a fillet as wide as the branch, not a corner */
+  const all=[...mid,...R.tp.slice(0,R.k).reverse()];if(!R.br)return all;const c=mid.length-1,r=Math.max(8,(R.bw||8)*1.1),a0=gbBack(all,c,r),a1=gbFwd(all,c,r);
+  return [...all.slice(0,a0),...gbBez([all[a0],all[c],all[c],all[a1]],10),...all.slice(a1+1)]};
  const rootsOf=(j,only)=>j.units.filter(id=>B.root[id]&&(!only||id===only)).map(id=>B.L.roots.find(q=>q.id===id)).filter(Boolean);
  if(x){const el=B.leaf[x.id]||B.bud[x.id];const j=gw.M.J.find(q=>gw.M.leaves[q.id].includes(x));const m=el&&/translate\(([-\d.]+)px,\s*([-\d.]+)px\)(?:\s*rotate\(([-\d.]+)deg\))?/.exec(el.style.transform);
   /* from where the leaf's stalk meets the pad, not from the middle of its blade */
@@ -937,7 +993,9 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
   /* A failed scenario's route is drawn like any other; only the hop where it broke is red: a short stretch of the wood at
      that knot (or the start of that root), whose knot is cracked and named. When the run does not say where, only the leaf is red. */
   if(j&&at&&P&&P.rt){const pts=spine(P.rt,at);const r=gw.state.run[x.id];const w=r&&r.st==='fail'?gbWound(gw.M,j,x):null;const wr=w&&B.root[w]?w:null;
-   const end=pts[pts.length-1],rts=rootsOf(j).map(rr=>gbSmooth([end,...rr.pts],1));d=line(pts)+rts.map(q=>' '+line(q)).join('');
+   const rr0=rootsOf(j);const at0=pts.length-1;let main=pts,rts=[];
+   if(rr0.length){const i0=gbBack(pts,at0,10);main=pts.slice(0,i0+1);rts=rr0.map(rr=>{const k1=gbFwd(rr.pts,0,10);return [...gbBez([pts[i0],pts[at0],pts[at0],rr.pts[k1]],8),...rr.pts.slice(k1+1)]})}
+   d=line(main)+rts.map(q=>' '+line(q)).join('');
    if(w&&!wr&&B.pos[w]){const p=B.pos[w];let ci=0,bd=1e9;pts.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});const acc=gbLen(pts);
     const seg=pts.filter((q,i)=>Math.abs(acc[i]-acc[ci])<=16);if(seg.length>1)dw=line(seg)}
    else if(wr){const q=rts[rootsOf(j).findIndex(rr=>rr.id===wr)];if(q){const acc=gbLen(q);dw=line(q.filter((_,i)=>acc[i]<=Math.max(24,acc[acc.length-1]*.45)))}}}
@@ -957,12 +1015,13 @@ function gbPinTip(){const B=gw.B;if(!B)return;const k=B.L.narrow&&!gw.hov?gw.pin
 function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid=el&&el.getAttribute&&el.getAttribute('data-pad');const P=pid&&B.pad[pid];
  const hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom=''};
  if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))){hide();return}
- const s=gw.state,M=gw.M;const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return [...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map(u=>u.label).join(' › ')};
+ const s=gw.state,M=gw.M;/* a path breaks only between its hops */
+ const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return [...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map((u,i)=>h('span',{class:'hop'},(i?' › ':'')+u.label)).flatMap((n,i)=>i?[' ',n]:[n])};
  tip.replaceChildren();
  if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
   gwPut(tip,h('span',{class:'k'},(j?{happy:'happy path',guard:'what it refuses',failure:'how it fails'}[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')+(x.criteria.length?' · '+x.criteria.join(' '):'')),h('b',{},x.title),
    /* a failure says where it broke, in the same words as the list, then where on the route */
-   r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140)):h('div',{class:'st '+w.c},w.t),r0&&r0.st==='fail'?h('div',{class:'st fail'},r0.hop?'On the route: '+(r0.after?'after ':'at ')+r0.hop:'The run does not say which hop broke'):null,
+   r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140)):h('div',{class:'st '+w.c},w.t),
    h('div',{class:'path'},j?pathOf(j):((M.U[x.unit]||{}).label||'')+(x.flow&&x.scenarioKind==='regression'?' · '+x.flow:'')))}
  else if(k.startsWith('j:')){const j=M.J.find(q=>q.id===P.jid);const n=(gw.order||[]).indexOf(P.jid)+1;const vis=s.modeBy?s.mode:null;
   const later=P.leaves.filter(x=>vis&&gbRank[x.mode]>gbRank[vis]);
@@ -994,15 +1053,15 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  if(rid)hard.push(box(B.root[rid].getBoundingClientRect()));
  for(const kl of Object.values(B.klbl))if(kl.classList.contains('on')||kl.classList.contains('wound')){const q=kl.getBoundingClientRect();if(q.width)hard.push(box(q))}
  for(const l of Object.values(B.lbl)){const q=l.el.getBoundingClientRect();if(q.width)(l.el.classList.contains('hl')?hard:soft).push(box(q))}
- const pot=B.svg.querySelector('.pots');if(pot){const q=pot.getBoundingClientRect();if(q.width)soft.push(box(q))}
+ /* the leaves it lights are what it explains, so it never sits on them; nor on the pot, whose face carries names */
+ for(const lf of B.svg.querySelectorAll('.gb-lf.hl,.gb-lf.sel')){const q=lf.getBoundingClientRect();if(q.width)hard.push([q.left-c.left-6,q.top-c.top-6,q.right-c.left+6,q.bottom-c.top+6])}
+ const firm=[];const pot=B.svg.querySelector('.pots');if(pot){const q=pot.getBoundingClientRect();if(q.width)firm.push(box(q))}
  /* and it would rather sit on empty ground than on foliage */
  for(const P of Object.values(B.pad)){const q=P.el.getBoundingClientRect();if(q.width)soft.push(box(q))}
  /* the route, as points along it */
  const rp=[];for(const pe of [B.sap,B.sapX,B.sapW]){const dd=pe.getAttribute('d')||'';const nums=dd.match(/-?[\d.]+/g)||[];for(let i=0;i+1<nums.length;i+=6)rp.push(toPx([+nums[i],+nums[i+1]]))}
- /* the card may hang below the drawing, over the key: it is a passing card, so that costs a little, and a card far from its
-    thing costs more */
- const hang=230;soft.push([0,sr.bottom-c.top,c.width,sr.bottom-c.top+hang,.05]);
- const g=14,W2=c.width,H2=Math.max(sr.bottom-c.top+Math.max(0,hang),th+8);
+ /* it stays inside the drawing: never over the key below it or past the panel's edge */
+ const g=14,W2=Math.min(c.width,sr.right-c.left),H2=Math.max(sr.bottom-c.top,th+8);
  const near=[[x1+g,cy-th/2],[x0-tw-g,cy-th/2],[x1+g,y0-th+10],[x1+g,y1-10],[x0-tw-g,y0-th+10],[x0-tw-g,y1-10],[cx-tw/2,y0-th-g],[cx-tw/2,y1+g]];
  /* beside everything that must stay clear (for a root, its whole run, name and tail) */
  const U=hard.reduce((a,b)=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]);
@@ -1017,17 +1076,23 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* the hairline starts inside the thing itself (a root's whole run, say), so only what it does not start in can be crossed */
  const hardL=hard.filter(b=>!inB([cx,cy],b)),softL=soft.filter(b=>!inB([cx,cy],b));
  for(const q of [...near,...far]){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4));let sc=0;
-  for(const b of hard){const a=ov(x,y,b);if(a>0)sc+=1e5+a*10}for(const b of soft)sc+=ov(x,y,b)*(b[4]||2);
+  for(const b of hard){const a=ov(x,y,b);if(a>0)sc+=1e5+a*10}for(const b of firm){const a=ov(x,y,b);if(a>0)sc+=4e4+a*5}for(const b of soft)sc+=ov(x,y,b)*(b[4]||2);
   for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3)sc+=2e4;
   const dist=Math.hypot(Math.max(x-x1,x0-(x+tw),0),Math.max(y-y1,y0-(y+th),0));sc+=25*dist+(dist>170?60*(dist-170):0)+Math.abs(x+tw/2-cx)*.2;
   /* the hairline it would draw must not cross foliage, names or the lit route */
   if(dist>48&&dist<=170){const ex=Math.max(x,Math.min(cx,x+tw)),ey=Math.max(y,Math.min(cy,y+th));for(let i=1;i<12;i++){const t=i/12,p=[cx+(ex-cx)*t,cy+(ey-cy)*t];if(inB(p,me))continue;
-   if(hardL.some(b=>inB(p,b)))sc+=3000;else if(softL.some(b=>!b[4]&&inB(p,b)))sc+=600;if(rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5))sc+=600}}
+   if(hardL.some(b=>inB(p,b))||firm.some(b=>!inB([cx,cy],b)&&inB(p,b)))sc+=3000;else if(softL.some(b=>!b[4]&&inB(p,b)))sc+=600;if(rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5))sc+=600}}
   if(!best||sc<best.sc-1)best={x,y,sc}}
- tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
- /* a little way from what it explains, a hairline joins them; a card docked in a far corner draws none, so no line crosses the tree */
+ /* when the drawing has no clear ground near the thing, the card docks at the head of the side panel, level with it, and
+    draws no line across the tree */
+ const ins=wrap.parentNode&&wrap.parentNode.nextElementSibling,ir=ins&&ins.offsetWidth?ins.getBoundingClientRect():null;
+ const bd=Math.hypot(Math.max(best.x-x1,x0-(best.x+tw),0),Math.max(best.y-y1,y0-(best.y+th),0));
+ const dock=!!ir&&ir.left>=c.right-8&&(best.sc>=4e4||bd>200);
+ if(dock){best={x:ir.left-c.left,y:Math.max(4,Math.min(cy-th/2,H2-th-4)),sc:0}}
+ tip.classList.toggle('dock',dock);tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
+ /* a little way from what it explains, a hairline joins them; a docked card draws none, so no line crosses the tree */
  const ex=Math.max(best.x,Math.min(cx,best.x+tw)),ey=Math.max(best.y,Math.min(cy,best.y+th));
- if(Math.hypot(ex-cx,ey-cy)>48&&Math.hypot(ex-cx,ey-cy)<=170&&B.lead){const toSv=(px,py)=>[vb.x+(px-(sr.left-c.left))/f,vb.y+(py-(sr.top-c.top))/f];const a=toSv(cx,cy),b=toSv(ex,ey),u=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
+ if(!dock&&Math.hypot(ex-cx,ey-cy)>48&&Math.hypot(ex-cx,ey-cy)<=170&&B.lead){const toSv=(px,py)=>[vb.x+(px-(sr.left-c.left))/f,vb.y+(py-(sr.top-c.top))/f];const a=toSv(cx,cy),b=toSv(ex,ey),u=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
   B.lead.setAttribute('d','M'+gbP([a[0]+(b[0]-a[0])/u*9,a[1]+(b[1]-a[1])/u*9])+' L'+gbP(b))}else if(B.lead)B.lead.setAttribute('d','')}
 function gbRove(el){const B=gw.B;for(const k in B.navEl)B.navEl[k].setAttribute('tabindex','-1');for(const id in B.leaf)B.leaf[id].setAttribute('tabindex','-1');for(const id in B.bud)B.bud[id].setAttribute('tabindex','-1');el.setAttribute('tabindex','0')}
 /* the keys follow the picture: up and down move between pads, knots and roots by height; left and right move along a
