@@ -729,4 +729,119 @@ describe('Grow page', () => {
       await finger.close();
     } finally { await browser.close(); }
   }, 60000);
+
+  /** The ground under the tree, read from the drawn page: the pot's widest edge, each service root's names, the unused store's
+   *  stub and tag, the seal's lines, and the nebari and soil from the layout. */
+  const ground = () => {
+    const w = (0, eval)('({ gw })'); const L = w.gw.B.L;
+    const svg = document.querySelector('[data-testid="grow"] svg.gb[role=group]')!;
+    const box = (el: Element) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2, w: r.width }; };
+    const lip = box(svg.querySelector('.lip')!), foot = box(svg.querySelector('.pots .pot-ft')!);
+    const ext = Array.from(svg.querySelectorAll('.rt.dep.ext')).map((g) => ({ wood: box(g.querySelector('.w')!), names: Array.from(g.querySelectorAll('.rlbl:not(.nt)')).map((t) => ({ text: t.textContent, ...box(t) })),
+      stops: Array.from(g.querySelectorAll('.rlbl.nt')).map((t) => ({ text: t.textContent, ...box(t) })), end: g.querySelector('.tailend') ? box(g.querySelector('.tailend')!) : null }));
+    const lg = svg.querySelector('.rt.loose');
+    const loose = lg ? { tags: Array.from(lg.querySelectorAll('.rlbl')).map((t) => ({ text: t.textContent, lines: t.querySelectorAll('tspan[dy], tspan[y]').length, ...box(t) })), rect: box(lg.querySelector('.tag')!),
+      dash: getComputedStyle(lg.querySelector('.tag')!).strokeDasharray, stake: box(lg.querySelector('.stake')!), cut: box(lg.querySelector('.rcut')!) } : null;
+    const seal = Array.from(svg.querySelectorAll('.seal .sm')).map((t) => ({ text: t.textContent ?? '', len: (t as SVGTextElement).getComputedTextLength() }));
+    const room = Number(svg.querySelector('.seal')?.getAttribute('data-room'));
+    // the soil line, and where a store root that no journey uses lies against it
+    const half = (T: { tp: number[][]; tw: number[] }) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -8) k++; return T.tw[k]! / 2; };
+    const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]) }));
+    const lr = L.roots.find((r: { loose: boolean }) => r.loose);
+    const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
+    return { lip, foot, ext, loose, seal, room, nebari, sunk, trees: L.trees.length };
+  };
+
+  it('roots the tree in its pot: buttress roots that taper into the soil, a service named outside the rim on its side at every width, an unused store sunk with a one-line dashed tag, and the whole repo name on the seal', async () => {
+    const { dir, state } = await grownWithFailure();
+    const service = state.units.find((u) => u.root && u.layer === 'ext')!;
+    expect(service).toBeTruthy();
+    if (!state.stops.some((x) => x.unit === service.id)) applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'trace.stopped', unit: service.id, at: service.loc, why: 'the call leaves the repo' } as GrowEvent);
+    // A table the change adds that no journey reads or writes.
+    applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'unit.found', unit: 'seats', label: 'seats table', unitKind: 'table', loc: 'db/seats.sql:1', root: true, layer: 'data', parent: null } as GrowEvent);
+    const repoName = dir.split(/[\\/]/).pop()!;
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 1024, 768, 390]) {
+        const page = await growPage(browser, server.url, state, width, width < 500);
+        await page.waitForTimeout(2500);
+        const g = await page.evaluate(ground);
+        const at = width + 'px';
+        // 3 to 5 buttress roots per tree, each thick where it leaves the trunk and gone within about one and a half base widths.
+        for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q: { tree: number }) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(3); expect(n, at).toBeLessThanOrEqual(5); }
+        for (const q of g.nebari) {
+          expect(q.start / q.G, at).toBeGreaterThan(.25);
+          expect(q.tip, at).toBeLessThan(1.5);
+          expect((q.reach - q.G / 2) / q.G, at).toBeLessThanOrEqual(1.6);
+        }
+        // The service is named where its root crosses the rim, outside the pot on that side; "trace stops" is a label of its own
+        // by the end of the tail.
+        expect(g.ext, at).toHaveLength(1);
+        const [root] = g.ext;
+        const side = root!.wood.l < g.lip.l - .5 ? -1 : root!.wood.r > g.lip.r + .5 ? 1 : 0;
+        expect(side, at).not.toBe(0);
+        expect(root!.names.map((x: { text: string | null }) => x.text), at).toEqual([service.label]);
+        const name = root!.names[0]!;
+        if (side < 0) expect(name.r, at).toBeLessThanOrEqual(g.lip.l); else expect(name.l, at).toBeGreaterThanOrEqual(g.lip.r);
+        expect(name.cy, at).toBeGreaterThan(g.lip.t - 4);
+        expect(name.cy, at).toBeLessThan(g.foot.t);
+        expect(root!.stops.map((x: { text: string | null }) => x.text), at).toEqual(['trace stops']);
+        const stop = root!.stops[0]!, end = root!.end!;
+        expect(Math.min(Math.abs(stop.l - end.r), Math.abs(stop.r - end.l)), at).toBeLessThan(8);
+        expect(Math.abs(stop.cy - end.cy), at).toBeLessThan(8);
+        // The unused store: a stub sunk to half its depth in the soil, its tag one line inside a dashed border, staked beside
+        // the cut face.
+        expect(g.loose, at).toBeTruthy();
+        const { tags, rect, dash, stake, cut } = g.loose!;
+        expect(tags, at).toHaveLength(1);
+        expect(tags[0]!.text, at).toMatch(/^seats(?: table|…)? · unused$/);
+        if (width >= 768) expect(tags[0]!.text, at).toBe('seats table · unused');
+        expect(tags[0]!.lines, at).toBe(0);
+        expect(tags[0]!.l, at).toBeGreaterThanOrEqual(rect.l);
+        expect(tags[0]!.r, at).toBeLessThanOrEqual(rect.r);
+        expect(dash, at).not.toBe('none');
+        expect(Math.min(Math.abs(stake.cx - cut.l), Math.abs(stake.cx - cut.r)), at).toBeLessThanOrEqual(cut.w + 4);
+        for (const dy of g.sunk) expect(Math.abs(dy), at).toBeLessThan(1.5);
+        // The seal keeps the whole repo name, on one line or broken at a hyphen, every line inside the face.
+        expect(g.seal.map((x: { text: string }) => x.text).join(''), at).toBe(repoName);
+        for (const line of g.seal) expect(line.len, at + ': ' + line.text).toBeLessThanOrEqual(g.room + .5);
+        await page.close();
+      }
+      // Pointed at, the service's route turns off the trunk along its root and ends there: nothing lit runs on below the soil.
+      const page = await growPage(browser, server.url, state, 1440);
+      await page.waitForTimeout(2500);
+      const below = await page.evaluate((id) => {
+        const w = (0, eval)('({ gw, gbLight })'); w.gw.hov = 'u:' + id; w.gbLight();
+        const L = w.gw.B.L, sap = w.gw.B.sap as SVGPathElement, n = sap.getTotalLength(), pa = L.potC - L.potL / 2, pb = L.potC + L.potL / 2;
+        let worst = -Infinity;
+        for (let s = 0; s <= n; s += .5) { const p = sap.getPointAtLength(s); if (p.x > pa + 2 && p.x < pb - 2) worst = Math.max(worst, p.y - L.sy(p.x)); }
+        return { n, worst };
+      }, service.id);
+      expect(below.n).toBeGreaterThan(0);
+      expect(below.worst).toBeLessThanOrEqual(.5);
+      // The Outline names it as its tag does.
+      await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.tree = 'outline'; w.growPaint(); });
+      const row = page.locator('[data-testid="grow-outline"] .gb-olr', { hasText: 'seats table' });
+      expect(await row.locator('.t').evaluate((t) => t.firstChild!.textContent + (t.querySelector('.un')?.textContent ?? ''))).toBe('seats table · unused');
+      expect(await row.locator('.fd').textContent()).toBe('Feeds no journey');
+      // On a dark page the seal's letters stand at least three to one against the clay.
+      await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.tree = 'grove'; w.growPaint(); });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      const fills = await page.evaluate(() => {
+        const svg = document.querySelector('[data-testid="grow"] svg.gb[role=group]')!;
+        const probe = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); probe.style.fill = 'var(--pot)'; svg.append(probe);
+        const out = { pot: getComputedStyle(probe).fill, seal: getComputedStyle(svg.querySelector('.seal .sm')!).fill }; probe.remove(); return out;
+      });
+      const lum = (css: string) => {
+        const m = css.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/), n = css.match(/rgba?\((\d+), (\d+), (\d+)/);
+        const c = m ? m.slice(1, 4).map(Number) : n!.slice(1, 4).map((x) => Number(x) / 255);
+        const lin = c.map((x) => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+        return .2126 * lin[0]! + .7152 * lin[1]! + .0722 * lin[2]!;
+      };
+      const [hi, lo] = [lum(fills.seal), lum(fills.pot)].sort((a, b) => b - a);
+      expect((hi! + .05) / (lo! + .05), JSON.stringify(fills)).toBeGreaterThanOrEqual(3);
+      await page.close();
+    } finally { await browser.close(); }
+  }, 120000);
 });
