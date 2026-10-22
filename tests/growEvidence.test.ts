@@ -449,6 +449,19 @@ describe('From a grown scenario to its run', () => {
     await page.getByTestId('grow-view-grove').click();
     await page.close();
   });
+
+  it('"Open the runs" on a grow not proven yet opens in the drawer the scenario its next action names, never the newest run of another scenario', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    // s10 could not run; s4 passed in the newest run this grow made
+    const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent
+      : e.kind === 'scenario.passed' && e.scenario === 's4' ? { ...e, run: '2026-12-31T00-00-00Z_pass_newest' } as GrowEvent : e));
+    await pinned(page, crashed, 's4');
+    await expect(page.getByTestId('grow-verdict-next').textContent()).resolves.toBe('See why it could not run ›');
+    await page.getByTestId('grow-open-runs').click();
+    expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: 's10' });
+    await page.close();
+  });
 });
 
 describe('A grow whose config is in a subfolder', () => {

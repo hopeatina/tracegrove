@@ -761,13 +761,16 @@ async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r
  try{state=await api('/api/overview')}catch(e){}
  openTab('Run');return true}
 /* "Open the runs" opens what happened in the first failure's run, in the drawer, at its failing step; the drawer says so when
-   that run is not saved here any more, and still offers to rerun it. With no failure, it opens the newest run this grow made in
-   the Run tab. It is never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say),
+   that run is not saved here any more, and still offers to rerun it. With no failure, on a grow not proven yet, it opens in the
+   drawer the scenario the verdict's next action names (why it could not run, say), never another scenario's run. Otherwise it
+   opens the newest run this grow made in the Run tab. It is never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say),
    it says so and tries the next newest, and at last opens the Run tab as it is. A grow whose config is in a subfolder stays here
    instead: this folder's Run tab would only offer to plant a config it already has. */
 async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
  const fail=s.scenarios.find(x=>gwIn(x)&&s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x)&&gwDrCan(x));
  if(fail){gwDrOpen(fail.id);if(gw.dr)gw.dr.from='t:grow-open-runs';return}
+ const V=gw.view&&gw.view.verdict,next=V&&V.verdict==='not proven yet'?gwNextRan():null;
+ if(next){gwDrOpen(next.id);if(gw.dr)gw.dr.from='t:grow-open-runs';return}
  const tries=s.scenarios.filter(x=>gwRan(x)).sort((a,b)=>String(s.run[b.id].run).localeCompare(String(s.run[a.id].run)));
  for(let i=0;i<tries.length;i++)if(await gwOpenRun(tries[i].id,undefined,i>0))return;
  if(!state.hasConfig&&s.flows&&s.flows.config){if(!tries.length)toast('This grow saved no run to open.');return}
@@ -972,7 +975,7 @@ function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)r
 /* What to do about a grow that is not proven yet, from why its scenarios in the mode are not tested yet: a run that never reached
    its checks says why in the drawer; a flow that did not run is proved by growing again with proving on, in the same mode (as
    the start card's "Prove with real flows" does); a scenario no flow proves gets its flow written. */
-/* The scenario Not proven yet's next action opens in the drawer: the first in the mode with no result whose run
+/* The scenario Not proven yet's next action and "Open the runs" open in the drawer: the first in the mode with no result whose run
    can be read there (one that never reached its checks, say) */
 function gwNextRan(){const s=gw.state;return s.scenarios.find(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail'))&&gwRan(x)&&gwDrCan(x))||null}
 function gwNext(){const s=gw.state;const open=s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail')));
