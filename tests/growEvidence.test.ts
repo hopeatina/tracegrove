@@ -371,7 +371,8 @@ describe('grow --json and the exit code', () => {
     expect(out).toBe('');
     const min = state.scenarios.filter((x) => x.mode === 'min');
     expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: min.length }, failures: [] });
-    expect(summary!.unproven).toEqual(min.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: `Run with --prove to run ${x.flow}` })));
+    // Each reason is an instruction grow takes: there is no --prove flag, only --no-prove to leave out.
+    expect(summary!.unproven).toEqual(min.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: `Run grow without --no-prove to run ${x.flow}` })));
     let said = '';
     const allowed = await growCommand({ ...flags(dir), 'no-prove': true, 'allow-unproven': true }, (t) => { said += t; });
     expect(allowed.code).toBe(0);
@@ -392,6 +393,28 @@ describe('grow --json and the exit code', () => {
     expect(out.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: nothing in this change was traced to a scenario/);
     const { summary } = await growCommand({ ...flags(dir), branch: 'docs-only', json: true }, () => {});
     expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: 0 }, failures: [], unproven: [] });
+  }, 60_000);
+
+  it('tells the page’s reader to turn proving on with the page’s own control, and reads old logs’ --prove as the flag grow takes', async () => {
+    const dir = notesCount(false);
+    const { state } = await grow({ dir, branch: 'notes-count', base: 'main', mode: 'min', prove: false, gh: false, agent: { off: true }, save: false, proveOn: 'Grow again with “Prove with real flows” on' });
+    const min = state.scenarios.filter((x) => x.mode === 'min');
+    expect(min.map((x) => state.run[x.id]!.why)).toEqual(min.map((x) => `Grow again with “Prove with real flows” on to run ${x.flow}`));
+    // The page's server says it that way.
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' });
+    try {
+      const r = await fetch(`${server.url}api/grow`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-tracegrove-token': 'tk-0123456789abcdef' }, body: JSON.stringify({ branch: 'notes-count', base: 'main', prove: false, agent: false, mode: 'min' }) });
+      const text = await r.text();
+      const notRun = text.split('\n').filter((l) => l.startsWith('data: ') && l.includes('"scenario.not_run"')).map((l) => (JSON.parse(l.slice(6)) as { why: string }).why);
+      expect(notRun.length).toBeGreaterThan(0);
+      for (const why of notRun) expect(why).toMatch(/^(Grow again with “Prove with real flows” on to run \S+|No flow proves this yet)$/);
+    } finally { await server.close(); }
+    // A log saved before this read "Run with --prove", a flag grow never took.
+    const old = freshGrow();
+    for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'tracegrove-max.jsonl'), 'utf8').split('\n')) if (line.trim()) applyGrow(old, JSON.parse(line) as GrowEvent);
+    const reasons = growVerdict(old).unproven.map((x) => x.reason);
+    expect(reasons).toContain('Run grow without --no-prove to run browser.grow');
+    expect(reasons.filter((x) => x.includes('--prove ') || x.startsWith('Run with'))).toEqual([]);
   }, 60_000);
 
   it('still exits 1 for a failed check with --allow-unproven, and takes the flag from the command line', () => {

@@ -302,7 +302,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         sse('session', { id: operation.id });
         let snapshot: GrowState | null = null; let last = 0; let timer: ReturnType<typeof setTimeout> | null = null;
         const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growViewAt(snapshot, dir, growFacts) }); };
-        const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, agent: { off: !body.agent }, signal: operation.controller.signal,
+        const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, proveOn: 'Grow again with “Prove with real flows” on', agent: { off: !body.agent }, signal: operation.controller.signal,
           ...(body.mode ? {} : { chooseMode: () => new Promise<Mode | null>((done) => { growPick = { id: operation.id, done }; operation.controller.signal.addEventListener('abort', () => done(null), { once: true }); }) }) },
         (event, state) => { sse('event', event); snapshot = state; if (Date.now() - last >= 100) flush(); else timer ??= setTimeout(flush, 100); });
         running = job;

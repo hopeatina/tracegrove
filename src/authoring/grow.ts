@@ -39,7 +39,11 @@ export type GrowOptions = {
   chooseMode?: (counts: Record<Mode, number>) => Promise<Mode | null>;
   /** write the event log under .tracegrove/discovery/ (default true) */
   save?: boolean;
+  /** how to turn proving on where this grow was started, for the reason a scenario was not run (default: the command line's) */
+  proveOn?: string;
 };
+/** What the command line says to prove a scenario that was not run. */
+export const PROVE_ON_CLI = 'Run grow without --no-prove';
 export type GrowResult = { state: GrowState; events: GrowEvent[]; log: string | null };
 
 type Ctx = {
@@ -175,7 +179,7 @@ async function traceAndProve(home: string, work: string | null, options: GrowOpt
   const t = Date.now();
   if (options.prove) await prove(ctx, config, agent.settings);
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[mode]);
-  if (!options.prove) for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: s.flow ? `Run with --prove to run ${s.flow}` : 'No flow proves this yet' });
+  if (!options.prove) for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: s.flow ? `${options.proveOn ?? PROVE_ON_CLI} to run ${s.flow}` : 'No flow proves this yet' });
   const res = (st: string) => inRun.filter((s) => state.run[s.id]?.st === st).length;
   emit({ kind: 'discovery.finished', ran: res('pass') + res('fail'), passed: res('pass'), failed: res('fail'), notRun: res('not_run') });
 }

@@ -109,6 +109,9 @@ export function freshGrow(): GrowState {
     flows: null, run: {}, real: {}, done: null, blocked: null, last: 0 };
 }
 
+/** Logs saved before grow said how to prove a scenario it did not run told the reader to pass --prove, a flag grow has never
+ *  taken: they read as the instruction that works. */
+const runnable = (why: string) => why.replace(/^Run with --prove to run /, 'Run grow without --no-prove to run ');
 /** The flow a scenario was started with, kept when its result lands. */
 const ranFlow = (s: GrowState, id: string) => (s.run[id]?.flow ? { flow: s.run[id]!.flow } : {});
 const strip = <T extends { kind: string; v?: string; seq?: number }>(e: T) => { const { kind: _k, v: _v, seq: _s, ...rest } = e; return rest; };
@@ -158,7 +161,7 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'scenario.running': s.run[e.scenario] = { st: 'run', ...(e.flow ? { flow: e.flow } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
     case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run, ...ranFlow(s, e.scenario) }; break;
     case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}), ...ranFlow(s, e.scenario) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why, ...ranFlow(s, e.scenario) }; break;
+    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: runnable(e.why), ...ranFlow(s, e.scenario) }; break;
     case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
     case 'variant.not_applicable': s.real[e.scenario] = { st: 'not_run', note: e.note, na: true }; break;
