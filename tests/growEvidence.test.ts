@@ -361,6 +361,32 @@ describe('From a grown scenario to its run', () => {
     await expect(write.getByTestId('grow-verdict-next').isDisabled()).resolves.toBe(false);
     await write.close();
   });
+
+  it('counts in the band why each scenario is not tested yet as the verdict and grow --json say it: could not run from its reason, and a flow an agent wrote as a flow', async () => {
+    const show = (page: Page, st: GrowState) => page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: st, v: growView(st) });
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const big = () => page.getByTestId('grow-result').locator('.big').textContent();
+    const reasons = (st: GrowState) => Object.fromEntries(growJsonSummary(st, mkdtempSync(join(tmpdir(), 'tracegrove-norun-'))).unproven.map((u) => [u.scenario, u.reason]));
+    // s10's run checked what it should, but its evidence did not verify: it is not proven, and never "could not run"
+    const unverified = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'passed',
+      why: 'Not proven: the run evidence did not verify' } as GrowEvent : e));
+    expect(reasons(unverified).s10).toBe('Not proven: the run evidence did not verify');
+    await show(page, unverified);
+    await expect(big()).resolves.toBe('3 of 7 scenarios proved, 3 with no flow yet, 1 to prove');
+    // s1 has no flow of its own; an agent wrote one and ran it, and the app did not start: it could not run, as grow --json says
+    const s1 = plotline().scenarios.find((x) => x.id === 's1')!;
+    expect(s1.flow).toBeFalsy();
+    const written = plotline((e) => (e.kind === 'scenario.not_run' && e.scenario === 's1' ? [
+      { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.running', scenario: 's1', flow: 'discovered.seats-panel' } as GrowEvent,
+      { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: 's1', run: '2026-10-22T01-41-00Z_error_s1', outcome: 'infrastructure_failed',
+        why: 'Could not run: the app did not start (application exited before becoming ready)' } as GrowEvent] : e));
+    expect(written.run.s1).toMatchObject({ st: 'not_run', flow: 'discovered.seats-panel' });
+    expect(reasons(written).s1).toMatch(/^Could not run: the app did not start/);
+    await show(page, written);
+    await expect(big()).resolves.toBe('3 of 7 scenarios proved, 1 failed, 2 with no flow yet, 1 could not run');
+    await page.close();
+  });
 });
 
 describe('A grow whose config is in a subfolder', () => {

@@ -714,9 +714,11 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
 /* A verdict's counts each stay whole on a line ("1 failed", never "1" ending one line and "failed" starting the next); the
    words are the same, so its text reads as before. */
 const gwClauses=t=>String(t).split(', ').flatMap((c,i)=>i?[', ',h('span',{class:'nw'},c)]:[c]);
-function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length;
- /* a scenario whose run never reached its checks is not still to prove: it could not run, as the verdict and grow --json say */
- const cr=nr.filter(x=>x.flow&&s.run[x.id].run).length,rest=nr.length-nf-cr;
+function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');
+ /* a scenario whose run never reached its checks is not still to prove: it could not run, as its reason says it in the verdict
+    and grow --json, whoever wrote its flow; one with no flow, neither its own nor one an agent wrote and ran for it, has none yet */
+ const could=x=>/^Could not run/.test(String(s.run[x.id].why||''));
+ const cr=nr.filter(could).length,nf=nr.filter(x=>!could(x)&&!(s.run[x.id].flow||x.flow)).length,rest=nr.length-nf-cr;
  return (nf?', '+nf+' with no flow yet':'')+(cr?', '+cr+' could not run':'')+(rest?', '+rest+' to prove':'')}
 /* The spec's line in the verdict counts each criterion once, in the spec panel's words. A count of none is left out, except
    "0 need you": it is the one that says nothing waits on the reader. */
