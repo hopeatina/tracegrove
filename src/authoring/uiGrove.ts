@@ -774,13 +774,15 @@ function gwDrLoop(e,el){const f=[...el.querySelectorAll('button,[href],input,sel
  if(!f.length)return;const a=document.activeElement,first=f[0],last=f[f.length-1];
  if(e.shiftKey&&(a===first||!el.contains(a)||f.indexOf(a)<0&&a===el.querySelector('#gw-dr-title'))){e.preventDefault();last.focus()}
  else if(!e.shiftKey&&(a===last||!el.contains(a))){e.preventDefault();first.focus()}}
+/* another dialog open over the page (the command palette, the keyboard list) keeps its own focus and its own Escape */
+const gwOverlay=t=>!!document.querySelector('.pal-back')||!!(t&&t.closest&&t.closest('[aria-modal="true"]:not(.gw-dr)'));
 document.addEventListener('focusin',e=>{if(!gw.dr||tab!=='Discover'||!gw.slots||!gwDrSheet())return;const box=gw.slots.ins,el=box.querySelector('.gw-dr');
- if(!el||!box.isConnected||box.contains(e.target))return;const t=el.querySelector('#gw-dr-title');if(t)t.focus({preventScroll:true})});
+ if(!el||!box.isConnected||box.contains(e.target)||gwOverlay(e.target))return;const t=el.querySelector('#gw-dr-title');if(t)t.focus({preventScroll:true})});
 /* Close returns to the panel, and focus to the link that opened the drawer */
 function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus=d.from||'d:'+d.sid;growPaint()}
-/* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used
-   is left alone */
-document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
+/* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used,
+   or one pressed while another dialog is open over the page, is left alone */
+document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||gwOverlay(e.target)||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
 /* The drawer's head and the step it opened on (with no run, its buttons) both come into view: the page scrolls as little as it
    can, and the panel beside the tree, or the sheet under its head, scrolls inside itself */
 function gwDrReveal(){const S=gw.slots,box=S&&S.ins,el=box&&box.querySelector('.gw-dr');if(!el||!el.isConnected)return;const m=8;
@@ -820,7 +822,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  const j=M.J.find(q=>(M.leaves[q.id]||[]).includes(x)),n=j?(gw.order||[]).indexOf(j.id)+1:0;const st=r&&r.st==='fail'?'fail':r&&r.st==='pass'?'pass':'none';
  /* under 1060 px it is a sheet over the page: a dialog that keeps Tab inside it */
  const sheet=gwDrSheet();
- const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',role:sheet?'dialog':null,'aria-modal':sheet?'true':null,on:{keydown:e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gwDrClose()}else if(e.key==='Tab'&&gwDrSheet())gwDrLoop(e,el)}}});
+ const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',role:sheet?'dialog':null,'aria-modal':sheet?'true':null,on:{keydown:e=>{if(e.key==='Escape'){if(gwOverlay(e.target))return;e.preventDefault();e.stopPropagation();gwDrClose()}else if(e.key==='Tab'&&gwDrSheet())gwDrLoop(e,el)}}});
  const place=j?(n?'Journey '+n+', ':'')+gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check';
  gwPut(el,h('div',{class:'gw-drh'},h('span',{class:'mk '+st,'aria-hidden':'true'},{fail:'✗',pass:'✓',none:'○'}[st]),
   h('div',{style:'min-width:0'},h('h2',{id:'gw-dr-title',tabindex:'-1','data-testid':'grow-happened-title'},...gwRich(T.title)),

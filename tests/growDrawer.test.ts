@@ -349,6 +349,36 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('leaves the command palette and the keyboard list their own focus and Escape, as a sheet at 1000 px and beside the tree at 1440', async () => {
+    for (const width of [1000, 1440]) {
+      const page = await browser.newPage({ viewport: { width, height: 800 } });
+      page.on('pageerror', (e) => { errors.push(String(e)); });
+      await page.goto(`${server.url}#grow/${failed}/steps`);
+      await opened(page);
+      await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+      // the palette opens over the drawer and keeps the caret: what is typed goes into it
+      await page.keyboard.press('Control+k');
+      await page.locator('.pal-back input').waitFor();
+      await page.keyboard.type('Run');
+      const where = () => page.evaluate(() => ({ palette: !!document.querySelector('.pal-back'), drawer: !!document.querySelector('[data-testid="grow-happened"]'),
+        focus: document.activeElement?.closest('.pal-back') ? 'palette' : document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName }));
+      expect(await where(), `${width}`).toEqual({ palette: true, drawer: true, focus: 'palette' });
+      expect(await page.locator('.pal-back input').inputValue()).toBe('Run');
+      // one Escape closes the palette only; the next closes the drawer
+      await page.keyboard.press('Escape');
+      expect(await where(), `${width}`).toMatchObject({ palette: false, drawer: true });
+      // the keyboard list, opened from the drawer's heading, is closed by Escape before the drawer is
+      await page.getByTestId('grow-happened-title').focus();
+      await page.keyboard.press('?');
+      await page.locator('.pal-back').waitFor();
+      await page.keyboard.press('Escape');
+      expect(await where(), `${width}`).toMatchObject({ palette: false, drawer: true });
+      await page.keyboard.press('Escape');
+      expect(await where(), `${width}`).toMatchObject({ palette: false, drawer: false });
+      await page.close();
+    }
+  });
+
   it('is a full-screen sheet on a phone, every target at least 44 px', async () => {
     // the ways into it, on the card under the tree and on the rows, in the Grove and the Outline
     const before = await open(`#grow/${failed}`, 390);
