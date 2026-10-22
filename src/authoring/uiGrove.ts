@@ -357,6 +357,9 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-drh .w{font-weight:600;color:var(--ink2)}.gw-drh .w.fail{color:var(--verm-ink)}.gw-drh .w.pass{color:var(--moss)}
 .gw-drx{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink3);font:18px/1 var(--sans);cursor:pointer;padding:0}
 .gw-drx:hover{color:var(--ink);border-color:var(--ink3)}
+.gw-drpg{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;line-height:18px;color:var(--ink3)}
+.gw-drpg button{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink);font:18px/1 var(--sans);cursor:pointer;padding:0}
+.gw-drpg button:disabled{color:var(--muted);cursor:default;opacity:.5}
 .gw-drc{margin-top:12px}
 .gw-drc .gw-chip.ok{background:var(--moss-bg);color:var(--moss)}.gw-drc .gw-chip.bad{background:var(--verm-bg);color:var(--verm-ink)}
 .gw-drc .gw-chip.standin{background:var(--gold-bg);color:var(--gold)}.gw-drc .gw-chip.none{background:none;border:1px dashed var(--line2);color:var(--ink3)}
@@ -390,7 +393,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  html:has(.gw-insw.dr:not([hidden])){overflow:hidden}
  .gw-insw.dr .gw-dr{border:0;border-radius:0;padding:0 16px 28px;max-width:760px;margin:0 auto}
  .gw-insw.dr .gw-drh{position:sticky;top:0;z-index:1;background:var(--paper);padding:12px 0 10px;border-bottom:1px solid var(--line)}
- .gw-dr .btn,.gw-drs button,.gw-drt button{min-height:44px}.gw-drx{width:44px;height:44px}.gw-drt button{padding:0 12px}.gw-drs button{padding:12px 10px}}
+ .gw-dr .btn,.gw-drs button,.gw-drt button{min-height:44px}.gw-drx,.gw-drpg button{width:44px;height:44px}.gw-drt button{padding:0 12px}.gw-drs button{padding:12px 10px}}
 `;
 
 export const GROVE_JS = String.raw`
@@ -796,6 +799,11 @@ function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=nu
 /* The way in, wherever a scenario is shown beside "See what happened ›" (which opens the Run tab) */
 function gwDrEntry(x){if(!gwDrCan(x))return null;const ran=gwRan(x);
  return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':(ran?'What happened, step by step: ':'Why it is not tested yet: ')+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},ran?'Step by step ›':'Why not tested yet ›')}
+/* With several failures, the drawer of one pages to the next in the order the verdict counts them: "Failure 1 of 3" */
+function gwDrPager(x){const s=gw.state,f=s.scenarios.filter(q=>gwIn(q)&&s.run[q.id]&&s.run[q.id].st==='fail'&&gwRan(q)),i=f.indexOf(x);if(i<0||f.length<2)return null;
+ const go=k=>()=>{if(f[k])gwDrOpen(f[k].id)};
+ return h('div',{class:'gw-drpg','data-testid':'grow-happened-pager'},h('button',{type:'button','aria-label':'Previous failure','data-testid':'grow-happened-prev',disabled:i<=0,on:{click:go(i-1)}},'‹'),
+  h('span',{},'Failure '+(i+1)+' of '+f.length),h('button',{type:'button','aria-label':'Next failure','data-testid':'grow-happened-next',disabled:i>=f.length-1,on:{click:go(i+1)}},'›'))}
 /* a response body as it was recorded; JSON is laid out to read, the same text */
 const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
 const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
@@ -811,7 +819,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  gwPut(el,h('div',{class:'gw-drh'},h('span',{class:'mk '+st,'aria-hidden':'true'},{fail:'✗',pass:'✓',none:'○'}[st]),
   h('div',{style:'min-width:0'},h('h2',{id:'gw-dr-title',tabindex:'-1','data-testid':'grow-happened-title'},...gwRich(T.title)),
    h('div',{class:'meta'},h('span',{class:'w '+st},gwDrW[st]),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),h('span',{},place),
-    h('span',{},x.criteria.length?'promise'+(x.criteria.length>1?'s ':' ')+x.criteria.join(', '):'no promise'))),
+    h('span',{},x.criteria.length?'promise'+(x.criteria.length>1?'s ':' ')+x.criteria.join(', '):'no promise')),gwDrPager(x)),
   h('button',{class:'gw-drx',type:'button','aria-label':'Close what happened','data-testid':'grow-happened-close',on:{click:gwDrClose}},'×')));
  if(!gwRan(x)){gwPut(el,gwDrNone(x,r,j,M));return el}
  if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}

@@ -7,7 +7,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { checksOf } from '../src/authoring/checkCompare.ts';
 import { grow } from '../src/authoring/grow.ts';
 import { happenedIn } from '../src/authoring/happened.ts';
-import { couldNotRun, type GrowState } from '../src/authoring/growState.ts';
+import { couldNotRun, growVerdict, type GrowState } from '../src/authoring/growState.ts';
 import { runTests } from '../src/authoring/run.ts';
 import type { PredicateT } from '../src/protocol/index.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
@@ -380,4 +380,58 @@ describe('What happened in a run that never reached its checks', () => {
     expect(unrecorded.length).toBeGreaterThan(0);
     expect(unrecorded.map((x) => x.tone)).toEqual(unrecorded.map(() => 'none'));
   }, 120_000);
+});
+
+/* The seats branch with a second break: a seat count out of range is refused with another error than the flow expects, so
+   seats.bad-seats fails beside seats.remove-seat. */
+describe('What happened, with several failures', () => {
+  let dir = '', state: GrowState, server: UiServer, browser: Browser;
+  const errors: string[] = [];
+  beforeAll(async () => {
+    dir = plotlineSeats();
+    const app = join(dir, 'app', 'billing.mjs'), text = readFileSync(app, 'utf8');
+    expect(text).toContain("error: 'bad_seats'");
+    writeFileSync(app, text.replaceAll("error: 'bad_seats'", "error: 'seats_out_of_range'"));
+    git(dir, 'commit', '-qam', 'Name the seats error after its range');
+    ({ state } = await grow({ dir, branch: 'seats', base: 'main', mode: 'min', prove: true, gh: false, agent: { off: true } }));
+    server = await startUi({ dir, branch: 'seats', port: 0, token: TOKEN });
+    browser = await chromium.launch({ headless: true });
+  }, 180_000);
+  afterAll(async () => { await browser?.close(); await server?.close(); rmSync(dir, { recursive: true, force: true }); expect(errors).toEqual([]); });
+
+  it('pages from one failure to the next in the order the verdict counts them, its buttons 44 px on a sheet', async () => {
+    const fails = state.scenarios.filter((x) => state.run[x.id]?.st === 'fail').map((x) => x.id);
+    expect(fails.map((id) => state.run[id]!.flow).sort()).toEqual(['seats.bad-seats', 'seats.remove-seat']);
+    expect(growVerdict(state).first?.scenario).toBe(fails[0]);
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(`${server.url}#grow/${fails[0]}/steps`);
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    const pager = () => page.evaluate(() => ({ text: document.querySelector('[data-testid="grow-happened-pager"] span')?.textContent,
+      prev: (document.querySelector('[data-testid="grow-happened-prev"]') as HTMLButtonElement | null)?.disabled, next: (document.querySelector('[data-testid="grow-happened-next"]') as HTMLButtonElement | null)?.disabled, hash: location.hash }));
+    expect(await pager()).toMatchObject({ text: 'Failure 1 of 2', prev: true, next: false });
+    await page.getByTestId('grow-happened-next').click();
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), fails[1]);
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    expect(await pager()).toMatchObject({ text: 'Failure 2 of 2', prev: false, next: true });
+    await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe(state.scenarios.find((x) => x.id === fails[1])!.title.replaceAll('`', ''));
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    await page.getByTestId('grow-happened-prev').click();
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), fails[0]);
+    expect(await pager()).toMatchObject({ text: 'Failure 1 of 2' });
+    // a scenario that passed has no pager
+    const passed = state.scenarios.find((x) => state.run[x.id]?.st === 'pass')!.id;
+    await page.evaluate((id) => { location.hash = `#grow/${id}/steps`; }, passed);
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), passed);
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    await expect(page.getByTestId('grow-happened-pager').count()).resolves.toBe(0);
+    await page.close();
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    phone.on('pageerror', (e) => { errors.push(String(e)); });
+    await phone.goto(`${server.url}#grow/${fails[1]}/steps`);
+    await phone.getByTestId('grow-happened-oneline').waitFor();
+    const sizes = await phone.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-happened-pager"] button')).map((b) => { const r = b.getBoundingClientRect(); return [r.width, r.height]; }));
+    expect(sizes).toEqual([[44, 44], [44, 44]]);
+    await phone.close();
+  });
 });
