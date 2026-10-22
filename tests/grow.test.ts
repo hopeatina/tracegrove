@@ -1330,8 +1330,21 @@ describe('Grow page', () => {
         if (!wood.some((e: any) => e !== tw && e.isPointInFill(usr(e, s0)))) bad(pid, 'twig starts off the wood', id);
         const a = pts[pts.length - 2]!, ta = Math.atan2(end[1]! - a[1]!, end[0]! - a[0]!) * 180 / Math.PI, da = Math.abs((((ta - sl[2]!) % 360) + 540) % 360 - 180);
         if (da > 15) bad(pid, 'leaf turned off its twig', [id, da]);
-        // a failure hangs on a short stem; a leaf on a cushion has its foot tucked in and its middle clear, so its state reads
-        if (hang) { const st = Math.hypot(end[0]! - pts[0]![0]!, end[1]! - pts[0]![1]!); if (st > 0.5 * g.Hc + 0.01) bad(pid, 'stem longer than half the crest', [id, st, g.Hc]); }
+        // a failure hangs beneath its cushion from a twig that shows, run out at least four pixels under the cushion's
+        // underside, on a straight stem of ten pixels; where it has no room there it sits on the cushion's lower rim on a short
+        // stem. A leaf on a cushion has its foot tucked in and its middle clear, so its state reads
+        if (hang) {
+          const seated = [[0, 0], [0.45 * L, 0], [-0.45 * L, 0]].some(([x, y]) => fill.isPointInFill(usr(fill, scr(lf, x!, y!))));
+          if (seated) { const st = Math.hypot(end[0]! - pts[0]![0]!, end[1]! - pts[0]![1]!); if (st > 0.5 * g.Hc + 0.01) bad(pid, 'stem longer than half the crest', [id, st, g.Hc]); }
+          else {
+            const A = pts.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - pts[i - 1]![0]!, q[1]! - pts[i - 1]![1]!) : 0), a), []), d = A[A.length - 1]! - 10;
+            let i = 1; while (i < A.length - 1 && A[i]! < d) i++;
+            const f = Math.max(0, Math.min(1, (d - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))), base = [pts[i - 1]![0]! + (pts[i]![0]! - pts[i - 1]![0]!) * f, pts[i - 1]![1]! + (pts[i]![1]! - pts[i - 1]![1]!) * f];
+            const bb = fill.getBBox(), low = usr(tw, scr(fill, bb.x + bb.width / 2, bb.y + bb.height)), hw = (tw.__w[i] ?? 1) / 2;
+            if (Math.hypot(end[0]! - base[0]!, end[1]! - base[1]!) < 9.5) bad(pid, 'hanging stem not straight', id);
+            if (base[1]! - hw - low.y < 4 - 0.01) bad(pid, 'hanging twig closer than four pixels under its cushion', [id, base[1]! - hw - low.y]);
+          }
+        }
         else {
           const tf = B.tuft?.[id];
           if (!on(tf)) bad(pid, 'no tuft', id);
@@ -1743,7 +1756,7 @@ describe('Grow page', () => {
   /** The tree's form as drawn: which journey the crown holds, how its wood is sized and set, and how its leaves sit. */
   const form = () => {
     const w = (0, eval)('({ gw, gbHf, gbModel, gbOrderOf })'), B = w.gw.B, S = w.gw.state, hf: number = w.gbHf(B);
-    const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, over: [] as number[], halos: 0, stem: 0 };
+    const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, below: 0, over: [] as number[], halos: 0, stem: 0 };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const on = (el: any) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
     // a colour as the page paints it, whatever space it was mixed in, and a token of the tree's own
@@ -1819,12 +1832,22 @@ describe('Grow page', () => {
         out.hung++;
         const pts = B.ltw[id][0].__pts as number[][], E = pts[pts.length - 1]!, S0 = pts[Math.max(0, pts.length - 7)]!, dx = E[0]! - S0[0]!, dy = E[1]! - S0[1]!, st = Math.hypot(dx, dy);
         const k = g.cOf.get(id), c = g.cs[k], mid = [P.o[0] + sl[0]!, P.o[1] + sl[1]!], th = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-        out.stem = Math.max(out.stem, st * hf);
-        if (st > 0.42 * L + 0.01) bad('a long stem', [id, st, L]);
         if (th < 30 - 0.01 || th > 45 + 0.01) bad('a stem not at thirty to forty-five degrees, out and down', [id, th]);
         if (Math.sign(dx) !== (P.b ? P.b.dir : Math.sign(mid[0]! - (P.o[0] + c.x)))) bad('a stem leaning in', id);
         const fill = P.cu[k].el.querySelector('.pfill'), u = [Math.cos(sl[2]! * Math.PI / 180), Math.sin(sl[2]! * Math.PI / 180)];
         let inside = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (fill.isPointInFill(new DOMPoint(mid[0]! + u[0]! * f * L, mid[1]! + u[1]! * f * L))) inside++; }
+        // it hangs beneath its cushion, clear of it, on a stem of ten pixels off the twig run out to it; or, with no room
+        // there, it sits on the rim on a short stem
+        if (!inside) {
+          out.below++;
+          const A = pts.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - pts[i - 1]![0]!, q[1]! - pts[i - 1]![1]!) : 0), a), []), d = A[A.length - 1]! - 10;
+          let j = 1; while (j < A.length - 1 && A[j]! < d) j++;
+          const f = Math.max(0, Math.min(1, (d - A[j - 1]!) / ((A[j]! - A[j - 1]!) || 1))), b = [pts[j - 1]![0]! + (pts[j]![0]! - pts[j - 1]![0]!) * f, pts[j - 1]![1]! + (pts[j]![1]! - pts[j - 1]![1]!) * f], sb = Math.hypot(E[0]! - b[0]!, E[1]! - b[1]!);
+          if (sb < 9 || sb > 10.6) bad('a hanging stem not ten pixels', [id, sb]);
+          continue;
+        }
+        out.stem = Math.max(out.stem, st * hf);
+        if (st > 0.42 * L + 0.01) bad('a long stem', [id, st, L]);
         out.over.push(inside / 21);
       }
     }
@@ -1853,7 +1876,8 @@ describe('Grow page', () => {
             await expect.poll(() => ins.textContent()).toContain(f.failing ? 'The first failing journey' : 'The headline journey');
             expect(await ins.locator('h3').first().textContent()).toBe(f.title.replace(/`/g, ''));
           } else if (width < 500) expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(11);
-          // each failure's blade lies over its cushion's rim by about three tenths
+          // each failure hangs beneath its cushion, or with no room there its blade lies over the rim by about three tenths
+          expect(f.below + f.over.length, at).toBe(f.hung);
           for (const o of f.over) { expect(o, at + ' over the rim').toBeGreaterThan(0.12); expect(o, at + ' over the rim').toBeLessThan(0.5); }
           if (name !== 'plotline') expect(f.hung, at).toBeGreaterThan(0);
           if (name === 'bushy') expect(f.halos, at).toBeGreaterThan(0);
@@ -2200,6 +2224,52 @@ describe('Grow page', () => {
         // under every cushion at least two twigs show, four to eight pixels below its lowest edge, clear of every cushion
         expect(r.cushions.length, name).toBeGreaterThan(2);
         for (const c of r.cushions) expect(c.n, name + ' twigs under ' + c.pid + ' cushion ' + c.k).toBeGreaterThanOrEqual(2);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
+  /** Every leaf that hangs as drawn: how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten
+   *  pixels of that twig, leaves wood that shows. */
+  const hung = () => {
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, bad: [] as string[] };
+    const shown = (e: Element) => e.getBoundingClientRect().width > 0 && !e.closest('.off, .gone, .cut') && getComputedStyle(e).display !== 'none' && getComputedStyle(e).opacity !== '0';
+    const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => shown(f) && shown(f.closest('.cush') ?? f));
+    const wood = (Array.from(svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]).filter(shown);
+    const pt = svg.createSVGPoint(), inEl = (e: SVGGeometryElement, x: number, y: number) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); };
+    const under = (x: number, y: number) => fills.some((f) => inEl(f, x, y));
+    for (const pid in B.pad) {
+      const P = B.pad[pid]; if (!shown(P.jg)) continue;
+      for (const [id, sl] of P.geo.slot as Map<string, number[]>) {
+        const tw = ((B.ltw ?? {})[id] ?? [])[0], leaf = B.leaf[id];
+        if (!sl[4] || !tw || !leaf || !shown(tw) || leaf.classList.contains('cut') || leaf.classList.contains('gone')) continue;
+        out.n++;
+        const p: number[][] = tw.__pts, s: number[][] = [], A: number[] = [0];
+        for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, l = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!), n = Math.max(1, Math.ceil(l * 2)); A.push(A[i - 1]! + l); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); }
+        // no more than two fifths of the twig it hangs from lies under a cushion
+        const hid = s.filter((q) => under(q[0]!, q[1]!)).length / s.length;
+        if (hid > 0.4) out.bad.push(pid + ' ' + id + ': ' + Math.round(hid * 100) + '% of its twig under a cushion');
+        // its stem leaves wood that shows: the stem's base clear of every cushion, with wood within two pixels of it
+        const L = A[A.length - 1]! - 10; let i = 1; while (i < A.length - 1 && A[i]! < L) i++;
+        const f = Math.max(0, Math.min(1, (L - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))), b = [p[i - 1]![0]! + (p[i]![0]! - p[i - 1]![0]!) * f, p[i - 1]![1]! + (p[i]![1]! - p[i - 1]![1]!) * f];
+        if (under(b[0]!, b[1]!)) out.bad.push(pid + ' ' + id + ': its stem leaves wood under a cushion ' + JSON.stringify(b.map(Math.round)));
+        else if (![0, 1, 2].some((r) => Array.from({ length: r ? 12 : 1 }, (_, k) => [b[0]! + r * Math.cos(k * Math.PI / 6), b[1]! + r * Math.sin(k * Math.PI / 6)]).some((q) => wood.some((e) => inEl(e, q[0]!, q[1]!)))))
+          out.bad.push(pid + ' ' + id + ': its stem leaves no wood ' + JSON.stringify(b.map(Math.round)));
+      }
+    }
+    return out;
+  };
+
+  it('hangs each failure from a twig that shows: run out under its cushion to it, its stem leaving that twig\'s underside', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, folded(file), width);
+        await page.waitForTimeout(2500);
+        const h = await page.evaluate(hung);
+        expect(h.n, name + ' ' + width).toBeGreaterThan(0);
+        expect(h.bad, name + ' ' + width).toEqual([]);
         await page.close();
       }
     } finally { await browser.close(); }
