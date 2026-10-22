@@ -9,7 +9,11 @@ export const StepReport = z.object({ id: Text, name: Text, method: Text, path: T
   durationMs: z.number().nonnegative().nullable(), reason: Text.nullable(), observedText: Text.nullable().optional(),
   declared: z.boolean().optional(), expectStatus: z.number().int().nullable().optional(), expectation: Text.optional(),
   /** 'fail' when a check on this step's evidence failed, even though the step itself completed. */
-  checks: z.enum(['pass', 'fail']).optional() }).strict();
+  checks: z.enum(['pass', 'fail']).optional(),
+  /** The check that failed on this step, with what it expected and what it got, from the run's recorded assertion. */
+  compared: z.object({ check: Text, expected: z.unknown(), got: z.unknown() }).strict().optional(),
+  /** What the app answered an HTTP step: the recorded response body, cut at 4 KB. */
+  answer: Text.optional() }).strict();
 export type StepReport = z.infer<typeof StepReport>;
 export const CaseReport = z.object({ caseId: Text, file: Text, title: Text, outcome: Text, durationMs: z.number().nonnegative(), steps: z.array(StepReport).max(10000),
   failure: z.object({ step: Text, message: Text, observed: Text.nullable(), fix: Text.nullable().optional(), code: Text.optional() }).strict().nullable(), videos: z.array(RunVideo).max(10000).optional(),

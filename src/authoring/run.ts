@@ -15,6 +15,7 @@ import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CaseSpec, type ExecutionReceipt } from '../protocol/index.ts';
 import { getPath } from '../core/reducer.ts';
+import { comparedOf } from './checkCompare.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -111,9 +112,17 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const conversation = ConversationObservation.safeParse(s.output);
     const standIn = StandInObservation.safeParse(s.output);
     const own = receipt.assertions.filter((a) => a.assertionId.replace(/\.expect$/, '') === s.stepId);
+    // The check that failed here, as the run recorded it against its declared predicate: what it expected, and what it got.
+    const failed = own.find((a) => a.result === 'fail' && a.reasonCode);
+    const declared = failed && assertions.find((a) => a.id === failed.assertionId);
+    const compared = failed && declared ? comparedOf(declared.predicate, failed, { method: info?.method ?? '', path: info?.path ?? '' }) : null;
+    // What the app answered an HTTP step, as recorded.
+    const http = output && !standIn.success && !conversation.success && !mcp.success && !browser.success && !job.success && typeof output.status === 'number' ? output as { body?: unknown; bodyText?: string | null } : null;
+    const body = http ? http.body ?? http.bodyText ?? null : null;
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
       declared: !!info, expectStatus: info?.expectStatus ?? null, ...(info?.expectation ? { expectation: info.expectation } : {}),
       ...(own.length && s.result === 'completed' ? { checks: own.every((a) => a.result === 'pass') ? 'pass' as const : 'fail' as const } : {}),
+      ...(compared ? { compared } : {}), ...(body !== null && body !== '' ? { answer: excerpt(body, 4096) } : {}),
       ...(standIn.success ? { observedText: standInLine(standIn.data) } : conversation.success ? { observedText: conversationLine(conversation.data) } : mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
   let failure: CaseReport['failure'] = null;

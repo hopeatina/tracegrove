@@ -7,6 +7,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { grow } from '../src/authoring/grow.ts';
 import { growJsonSummary } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState } from '../src/authoring/growState.ts';
+import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
 
@@ -94,6 +95,25 @@ describe('From a grown scenario to its run', () => {
     await link.click();
     expect(await landed(page)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
     await expect(page.locator('aside[aria-label="Step detail"]').textContent()).resolves.toContain('notes.count › step 3 of 4');
+    await page.close();
+  });
+
+  it('shows on the Run tab what the failed check expected and got, and what the app answered, and does not count that step as held', async () => {
+    const run = readSavedRun(join(dir, '.tracegrove', 'runs', failRun));
+    const steps = run.cases.find((c) => c.caseId === 'notes.count')!.steps;
+    expect(steps.map((x) => [x.checks, x.compared ?? null])).toEqual([['pass', null], ['pass', null], ['fail', { check: 'body.count', expected: 0, got: 1 }], ['pass', null]]);
+    expect(steps.map((x) => x.answer)).toEqual([expect.stringContaining('"title":"Counted"'), '{"count":1}', '{"count":1}', '{"count":1}']);
+    const page = await open(`#grow/${failed}/happened/step-3`);
+    await landed(page);
+    const detail = page.locator('aside[aria-label="Step detail"]');
+    await expect(detail.getByTestId('step-expected').textContent()).resolves.toBe('body.count: 0');
+    await expect(detail.getByTestId('step-observed').textContent()).resolves.toBe('body.count: 1');
+    await expect(detail.getByTestId('step-answer').textContent()).resolves.toBe('{"count":1}');
+    await expect(page.locator('.kpi', { hasText: 'steps held' }).textContent()).resolves.toBe('3 / 4steps held');
+    // A step whose check held keeps its own expectation, and says what the app answered.
+    await page.locator('button.step').nth(1).click();
+    await expect(detail.getByTestId('step-expected').textContent()).resolves.toBe('Status 200');
+    await expect(detail.getByTestId('step-answer').textContent()).resolves.toBe('{"count":1}');
     await page.close();
   });
 

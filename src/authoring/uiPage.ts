@@ -75,6 +75,7 @@ textarea{padding:12px;resize:vertical;min-height:88px;width:100%}
 .fix:hover,.fix[aria-pressed=true]{border-color:var(--twig)}
 .obs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:12px 0}.obs>div{min-width:0;overflow-wrap:anywhere;padding:10px 12px;border-radius:8px;background:var(--stone)}.obs .bad{background:var(--verm-bg)}.obs .good{background:var(--moss-bg)}
 .obs-long{grid-template-columns:minmax(0,1fr)}.obs .mono{white-space:pre-wrap}
+.answer{margin:0 0 12px}.answer .label{margin:0 0 4px}.answer pre{max-height:240px;overflow:auto}
 pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .think{display:inline-flex;gap:5px;align-items:center}.think i{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:pulse 1.2s ease-in-out infinite}
 .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
@@ -166,7 +167,7 @@ ${BENCHMARK_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
- const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null}));
+ const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null,checks:c?s.checks||null:null,compared:c?s.compared||null:null,answer:c?s.answer||null:null}));
   return{id:f.caseId,title:c?c.title:f.title,file:f.file,editable:state.flows.some(flow=>flow.caseId===f.caseId),fixtures:c||unavailable?[]:f.fixtures,state:unavailable?'unavailable':c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,requests:c?c.requests||[]:[],steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
@@ -219,7 +220,7 @@ function runTab(){
   h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
  if(state.compileError&&!state.flows.length&&!ui.run)return[h('div',{class:'kpis',style:'margin:0 0 16px'},inputChip()),blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
- const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass').length;
+ const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass'&&s.checks!=='fail').length;
  if(ui.sel===null){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
  const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
  const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},state.runs.map(r=>h('option',{value:r.name,selected:r.name===ui.runName},r.bundleVerified===false?ago(r.startedAt)+' · evidence unavailable':ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
@@ -270,15 +271,20 @@ function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id
  const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id),
   on:{loadedmetadata:()=>{const at=ui.videoTimes[key],end=Number.isFinite(player.duration)?player.duration:0;if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,end||at);else if(end>0.2){posed=true;player.currentTime=end-0.1}status.textContent='Recording loaded from verified evidence.'},play:()=>{if(posed){posed=false;player.currentTime=0}},timeupdate:()=>{if(!posed)ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
  return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
+/* a recorded value as the page writes it: text quoted, everything else as JSON */
+const shown=v=>typeof v==='string'?JSON.stringify(v):v===undefined?'nothing':JSON.stringify(v);
 function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':s.state==='unavailable'?'Recorded steps are unavailable until this run’s evidence can be verified.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
+ /* a step whose check failed shows what that check expected and what it got, from the run's recorded assertion */
+ const cmp=x.checks==='fail'&&x.compared?x.compared:null;
  return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},sameName(x)?x.reportedName:x.name),
   x.reportedName&&!sameName(x)?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
     h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
 
-  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono','data-testid':'step-expected'},cmp?cmp.check+': '+shown(cmp.expected):x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono','data-testid':'step-observed'},cmp?cmp.check+': '+shown(cmp.got)+(x.observedText!=null?'\n'+x.observedText:''):x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  x.answer!=null?h('div',{class:'answer'},h('div',{class:'label'},'the app answered'),h('pre',{'data-testid':'step-answer'},x.answer)):null,
   s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
   recording(s),
   !current?h('p',{class:'small muted'},'This recorded scenario has no current flow to run or prune.'):null,

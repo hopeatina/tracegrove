@@ -7,7 +7,6 @@ import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
-import { CaseSpec, refKey, type PredicateT } from '../protocol/index.ts';
 import { growVerdict, inMode, plainTitle, type GrowState, type RunState } from './growState.ts';
 import { savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
@@ -29,45 +28,6 @@ export function brokeLine(r: RunState | undefined): string {
   const route = r?.hop ? ` On the route: ${r.after ? 'after' : 'at'} ${r.hop}.` : '';
   if (!why) return `Failed, with no reason recorded.${route}`;
   return (i <= 0 ? `Broke: ${dot(why)}` : `Broke at check “${why.slice(0, i)}”: ${dot(why.slice(i + 2))}`) + route;
-}
-
-type Leaf = { p: Exclude<PredicateT, { kind: 'all' }>; actual: unknown };
-/** Pair each leaf of a predicate with its recorded actual: an `all` records one actual per predicate, in order. */
-function leaves(p: PredicateT, actual: unknown): Leaf[] {
-  if (p.kind !== 'all') return [{ p, actual }];
-  const list = Array.isArray(actual) ? actual : [];
-  return p.predicates.flatMap((q, i) => leaves(q, i < list.length ? list[i] : null));
-}
-/** The leaf whose failure the reducer recorded as `reason` (src/core/reducer.ts says each one this way). */
-function failedLeaf(all: Leaf[], reason: string): Leaf | undefined {
-  return all.find(({ p, actual }) => {
-    switch (p.kind) {
-      case 'status_equals': return reason === `status ${actual ?? 'none'} != ${p.value}`;
-      case 'json_path_equals': return reason === `${p.path} differs` || reason === `${p.path} absent`;
-      case 'json_path_present': return reason === `${p.path} absent`;
-      case 'json_path_absent': return reason === `${p.path} present`;
-      case 'json_path_count': return reason === `count ${actual} != ${p.count}`;
-      case 'json_path_includes': return reason === `${p.path} absent` || reason.startsWith(`${p.path} lacks `);
-      case 'json_path_excludes': return reason.startsWith(`${p.path} contains `);
-      case 'json_path_at_most': return reason.startsWith(`${p.path} `) && (reason.includes(' > ') || reason.endsWith(' is not a number'));
-      case 'step_result': return reason === `step ${actual ?? 'unobserved'} != ${p.value}`;
-    }
-  });
-}
-/** What a leaf compared, named as the Run tab names it, and what it wanted. */
-function compared(l: Leaf, reason: string, step: { method: string; path: string }): { check: string; expected: unknown; got: unknown } {
-  const { p, actual } = l;
-  switch (p.kind) {
-    case 'status_equals': return { check: 'status', expected: p.value, got: actual };
-    case 'json_path_equals': return { check: step.method === 'STANDIN' && p.path === 'body.count' ? `${step.path} call count` : p.path, expected: p.value, got: reason.endsWith(' absent') ? 'absent' : actual };
-    case 'json_path_present': return { check: p.path, expected: 'present', got: 'absent' };
-    case 'json_path_absent': return { check: p.path, expected: 'absent', got: actual };
-    case 'json_path_count': return { check: `${p.path} count`, expected: p.count, got: actual };
-    case 'json_path_includes': return { check: p.path, expected: p.values, got: actual };
-    case 'json_path_excludes': return { check: p.path, expected: { without: p.values }, got: actual };
-    case 'json_path_at_most': return { check: p.path, expected: { atMost: p.value }, got: actual };
-    case 'step_result': return { check: 'step result', expected: p.value, got: actual };
-  }
 }
 
 /** One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. */
@@ -95,12 +55,8 @@ function failureOf(s: GrowState, dir: string, id: string): GrowFailure {
     if (i < 0 || !bad(steps[i])) i = steps.findIndex(bad);
     if (i < 0) return out;
     const at = steps[i]!; out.step = i + 1;
-    const spec = CaseSpec.parse(bundle.documents[refKey(receipt.caseRef)]);
-    const record = receipt.assertions.find((a) => a.assertionId.replace(/\.expect$/, '') === at.id && a.result === 'fail' && a.reasonCode);
-    const declared = [...spec.preconditions, ...spec.assertions].find((a) => a.id === record?.assertionId);
-    if (!record || !declared) return out;
-    const leaf = failedLeaf(leaves(declared.predicate, record.actual), record.reasonCode!);
-    if (leaf) Object.assign(out, compared(leaf, record.reasonCode!, at));
+    // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same.
+    if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got });
   } catch { /* evidence that does not verify gives no expected or got */ }
   return out;
 }
