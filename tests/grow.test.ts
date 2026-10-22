@@ -572,4 +572,127 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 60000);
+
+  /** The tree's foliage measured as drawn: every leaf, its twig and its cushion, from the SVG's own geometry. */
+  const foliage = () => {
+    const w = (0, eval)('({ gw, GB_PET })');
+    const B = w.gw.B, PET: number = w.GB_PET;
+    const scr = (el: any, x: number, y: number) => new DOMPoint(x, y).matrixTransform(el.getScreenCTM());
+    const usr = (el: any, q: DOMPoint) => q.matrixTransform(el.getScreenCTM().inverse());
+    const on = (el: any) => !!el && el.getScreenCTM() !== null && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    const lum = (c: string) => { const n = (c.match(/[\d.]+/g) ?? []).map(Number); const [r, g, b] = c.startsWith('color(') ? n.slice(0, 3) : n.slice(0, 3).map((v) => v / 255); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+    const segD = (a: number[], b: number[], c: number[], d: number[]) => {
+      const pd = (p: number[], s: number[], e: number[]) => { const vx = e[0]! - s[0]!, vy = e[1]! - s[1]!, t = Math.max(0, Math.min(1, ((p[0]! - s[0]!) * vx + (p[1]! - s[1]!) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0]! - s[0]! - vx * t, p[1]! - s[1]! - vy * t); };
+      return Math.min(pd(a, c, d), pd(b, c, d), pd(c, a, b), pd(d, a, b));
+    };
+    const wood = Array.from(document.querySelectorAll('.gw-svg.gb path.w, .gw-svg.gb path.tw:not(.lt)')).filter((e: any) => e.getScreenCTM());
+    const out = { leaves: 0, hung: 0, bad: [] as string[], cush: [] as { tree: string; crown: boolean; role: string; n: number; a: number; h: number }[] };
+    const bad = (pid: string, what: string, v?: unknown) => out.bad.push(pid + ': ' + what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    for (const pid in B.pad) {
+      const P = B.pad[pid], g = P.geo, L: number = g.L, W: number = g.W, kept: [string, number[]][] = [];
+      g.cs.forEach((c: any, k: number) => {
+        if (c.role === 'shoulder' && !c.ids.length) bad(pid, 'a shoulder with no guard', k);
+        if (c.ids.length && L > 0.55 * c.a) bad(pid, 'leaf longer than a quarter of its cushion', [L, c.a]);
+        out.cush.push({ tree: P.el.closest('svg')?.id ?? '', crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
+      });
+      for (const [id, sl] of g.slot as Map<string, number[]>) {
+        const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
+        out.leaves++; kept.push([id, sl]);
+        const lf = el.__inner, hang = !!sl[4], cu = P.cu[g.cOf.get(id)].el, fill = cu.querySelector('.pfill');
+        if (hang) out.hung++;
+        // the whole blade inside its own cushion, unless it hangs beneath
+        if (!hang) for (const [x, y] of [[0, 0], [0.45 * L, 0], [-0.45 * L, 0], [0, 0.4 * W], [0, -0.4 * W], [0.25 * L, 0.3 * W], [0.25 * L, -0.3 * W], [-0.25 * L, 0.3 * W], [-0.25 * L, -0.3 * W]]) {
+          if (!fill.isPointInFill(usr(fill, scr(lf, x!, y!)))) { bad(pid, 'blade outside its cushion', id); break; }
+        }
+        // the petiole ends on its twig, the twig starts inside a limb, and the leaf turns along it
+        const tw = B.ltw?.[id]?.[0];
+        if (!on(tw)) { bad(pid, 'no twig', id); continue; }
+        const pts: number[][] = tw.__pts, end = pts[pts.length - 1]!, ft = usr(tw, scr(lf, -L / 2 - PET, 0));
+        if (Math.hypot(ft.x - end[0]!, ft.y - end[1]!) > 1) bad(pid, 'petiole off its twig', [id, Math.hypot(ft.x - end[0]!, ft.y - end[1]!)]);
+        const s0 = scr(tw, pts[0]![0]!, pts[0]![1]!);
+        if (!wood.some((e: any) => e !== tw && e.isPointInFill(usr(e, s0)))) bad(pid, 'twig starts off the wood', id);
+        const a = pts[pts.length - 2]!, ta = Math.atan2(end[1]! - a[1]!, end[0]! - a[0]!) * 180 / Math.PI, da = Math.abs((((ta - sl[2]!) % 360) + 540) % 360 - 180);
+        if (da > 15) bad(pid, 'leaf turned off its twig', [id, da]);
+        // a failure hangs on a short stem; a leaf on a cushion has its foot tucked in and its middle clear, so its state reads
+        if (hang) { const st = Math.hypot(end[0]! - pts[0]![0]!, end[1]! - pts[0]![1]!); if (st > 0.5 * g.Hc + 0.01) bad(pid, 'stem longer than half the crest', [id, st, g.Hc]); }
+        else {
+          const tf = B.tuft?.[id];
+          if (!on(tf)) bad(pid, 'no tuft', id);
+          else { if (!tf.isPointInFill(usr(tf, scr(lf, -L / 2 + 1, 0)))) bad(pid, 'foot not tucked in', id); if (tf.isPointInFill(usr(tf, scr(lf, 0.05 * L, 0)))) bad(pid, 'tuft over the blade', id); }
+        }
+      }
+      // no two leaves touch
+      const mid = (sl: number[]) => { const t = sl[2]! * Math.PI / 180, u = [Math.cos(t) * L / 2, Math.sin(t) * L / 2]; return [[sl[0]! - u[0]!, sl[1]! - u[1]!], [sl[0]! + u[0]!, sl[1]! + u[1]!]]; };
+      for (let i = 0; i < kept.length; i++) for (let j = i + 1; j < kept.length; j++) {
+        const A = mid(kept[i]![1]), C = mid(kept[j]![1]), d = segD(A[0]!, A[1]!, C[0]!, C[1]!);
+        if (d < W) bad(pid, 'leaves overlap', [kept[i]![0], kept[j]![0], d]);
+      }
+      // opaque cushions; a crest stands clear of its shoulders with its wood between, and the shoulders are a step darker
+      const els = P.cu.map((c: any) => c.el), cr = g.cs.findIndex((c: any) => c.role === 'crest'), shs = g.cs.map((c: any, k: number) => (c.role === 'shoulder' && on(els[k]) ? k : -1)).filter((k: number) => k >= 0);
+      for (const k of [...shs, cr]) if (k >= 0 && on(els[k])) {
+        if (+getComputedStyle(els[k].querySelector('.pfill')).fillOpacity < 0.92 || +getComputedStyle(els[k]).opacity < 1) bad(pid, 'cushion not opaque', k);
+        for (const c of els[k].querySelectorAll('circle')) if (+getComputedStyle(c).fillOpacity < 0.92) { bad(pid, 'clump not opaque', k); break; }
+      }
+      if (cr >= 0 && on(els[cr]) && shs.length) {
+        const cb = els[cr].querySelector('.pfill').getBBox(), top = Math.min(...shs.map((k: number) => els[k].querySelector('.pfill').getBBox().y));
+        if (top - (cb.y + cb.height) < 10) bad(pid, 'tiers closer than 10', top - (cb.y + cb.height));
+        const lc = lum(getComputedStyle(els[cr].querySelector('.pfill')).fill);
+        for (const k of shs) if (lum(getComputedStyle(els[k].querySelector('.pfill')).fill) >= lc - 0.02) bad(pid, 'shoulder not darker than its crest', k);
+      }
+    }
+    // and no leaf is hidden under another journey's pad
+    for (const pid in B.pad) for (const [id, sl] of B.pad[pid].geo.slot as Map<string, number[]>) {
+      const el = B.leaf[id], L: number = B.pad[pid].geo.L; if (!on(el) || el.classList.contains('gone')) continue;
+      for (const qid in B.pad) if (qid !== pid) for (const c of B.pad[qid].cu) {
+        const f = c.el.querySelector('.pfill'); if (!on(c.el)) continue;
+        if ([[0, 0], [0.4 * L, 0], [-0.4 * L, 0]].some(([x, y]) => f.isPointInFill(usr(f, scr(el.__inner, x!, y!))))) bad(pid, 'leaf under the pad of ' + qid, [id, sl[4]]);
+      }
+    }
+    return out;
+  };
+
+  /** Five journeys in Max, the first grown bushy (three happy paths, four guards, two failures) and the second failed at a step. */
+  async function grownBushy() {
+    const dir = fiveRoutes();
+    const { state } = await grow({ dir, branch: 'five', base: 'main', mode: 'max', prove: false, gh: false, agent: { off: true }, save: false });
+    const [j1, j2] = state.journeys;
+    const mine = state.scenarios.filter((x) => x.journey === j1!.id);
+    const grow1 = (pol: 'happy' | 'guard' | 'failure', n: number) => {
+      const have = mine.filter((x) => x.polarity === pol), src = have[0] ?? mine[0]!;
+      for (let i = have.length; i < n; i++) state.scenarios.push({ ...src, id: src.id + '-' + pol + i, title: src.title + ' ' + (i + 1), polarity: pol });
+    };
+    grow1('happy', 3); grow1('guard', 4); grow1('failure', 2);
+    const failed = state.scenarios.find((x) => x.journey === j2!.id)!;
+    applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'scenario.failed', scenario: failed.id, took: 12, run: null, why: 'only one row is written: expected 1, got 2' } as GrowEvent);
+    return { dir, state };
+  }
+
+  it('grows every leaf on a twig from the wood, inside its own opaque cushion, the tiers apart and each cushion sized by its leaves', async () => {
+    const { dir, state } = await grownBushy();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 }, colorScheme: scheme, reducedMotion: 'reduce' });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
+        await page.getByTestId('grow-view-grove').click();
+        await expect.poll(() => page.evaluate(() => Object.keys((0, eval)('gw').B?.pad ?? {}).length)).toBeGreaterThan(0);
+        const f = await page.evaluate(foliage);
+        expect(f.leaves, width + 'px').toBeGreaterThan(2);
+        expect(f.bad, width + 'px').toEqual([]);
+        // a cushion's area grows with how many leaves it holds, one tree's k for all; the crown's crest at most 15% larger across
+        for (const tree of new Set(f.cush.map((c) => c.tree))) {
+          const cs = f.cush.filter((c) => c.tree === tree), per = (c: { a: number; h: number; n: number }) => (c.a * c.h) / (c.n + 0.5);
+          const plain = cs.filter((c) => !(c.crown && c.role === 'crest')), base = Math.min(...plain.map(per));
+          for (const c of plain) expect(per(c) / base, width + 'px ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
+          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) expect(Math.sqrt(per(c) / base)).toBeLessThanOrEqual(1.151);
+          for (const a of plain) for (const b of plain) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
+        }
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
 });

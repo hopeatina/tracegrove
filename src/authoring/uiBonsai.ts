@@ -294,7 +294,7 @@ function gbSegD(a,b,c,d){const P=(p,q,r)=>{const dx=r[0]-q[0],dy=r[1]-q[1],l=dx*
  const s=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);if(s(a,b,c)*s(a,b,d)<0&&s(c,d,a)*s(c,d,b)<0)return 0;return Math.min(P(a,c,d),P(b,c,d),P(c,a,b),P(d,a,b))}
 function gbPadGeo(list,H,dir,seed,crown,K,pol){const z=Math.max(.6,Math.pow(H/560,.75));
  /* every leaf on a tree is the same size, so no leaf reads as bigger news than another */
- const L=Math.max(12,Math.min(16.5,15.5*z,H*.03)),W=L*.52,gap=14,d=dir||1;
+ const L=Math.max(12,Math.min(16.5,15.5*z,H*.03)),W=L*.52,gap=16,d=dir||1;
  const g={happy:[],guard:[],failure:[]};for(const x of gbOrd(list))g[gbPol(x)].push(x);
  const one=!!pol||(!g.happy.length&&(crown||!g.guard.length));
  const mk=(role,sd,lv)=>({role,sd,lv,ids:lv.map(x=>x.id),hang:[],a:0,h:0,b:0,x:0,seat:0,limf:null,pos:[],body:[]});
@@ -308,20 +308,20 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol){const z=Math.max(.6,Math.pow(H/56
  for(const c of cs){c.hs=c.role==='shoulder'?c.sd:d;c.limf=c.role==='shoulder'?(crown?.14:.1):shs.length||crown?null:.1}
  /* a cushion's shape, from its middle (v=0) to its ends (v=±1): a dome over a shallow underside, a shoulder flatter than a crest */
  const ar=c=>c.role==='shoulder'?.62:one&&!crown?.72:.8,tY=(c,v)=>-c.h*(.13+.87*Math.pow(Math.max(0,1-v*v),c.role==='shoulder'?.5:.62)),bY=(c,v)=>-c.h*.13*v*v;
- const size=(c,k)=>{c.a=k*(crown&&c.role==='crest'?1.15:1)*Math.sqrt((c.lv.length+1)/ar(c));c.h=c.a*ar(c)};
+ const size=(c,k)=>{c.a=k*(crown&&c.role==='crest'?1.15:1)*Math.sqrt((c.lv.length+.5)/ar(c));c.h=c.a*ar(c)};
  /* a leaf leans out along its twig: on a crest they fan from the wood under it, a little out from the trunk; on a shoulder
     lower, out over its own side; on a crown they fan from the leader */
  const ang=(c,px,id)=>{const v=Math.max(-1,Math.min(1,px/c.a)),j=(gbHash('lf:'+id)-.5)*12;let t;
-  if(c.role==='shoulder'){const w=(v*c.sd+1)/2;t=-90+c.sd*(c.sd===d||crown?56+12*w:50+12*w)}else if(crown)t=-90+40*v;else t=-90+36*v+12*d;return (t+j)*Math.PI/180};
+  if(c.role==='shoulder'){const w=(v*c.sd+1)/2;t=-90+c.sd*(c.sd===d||crown?56+12*w:50+12*w)}else if(crown)t=-90+50*v;else t=-90+46*v+12*d;return (t+j)*Math.PI/180};
  /* inside: the whole blade within the cushion, and its foot above the wood the cushion lies on, so its twig can rise to it */
  const SP=[[.5,0],[-.5,0],[0,.5],[0,-.5],[.25,.45],[.25,-.45],[-.25,.45],[-.25,-.45]];
  const inside=(c,p,th,m)=>{const u=[Math.cos(th),Math.sin(th)];if(c.limf!==null&&p[1]-u[1]*(L/2+GB_PET)>-(c.limf*c.h+1))return false;
   for(const [s,t] of SP){const x=p[0]+u[0]*s*L-u[1]*t*W,y=p[1]+u[1]*s*L+u[0]*t*W,v=x/c.a;if(Math.abs(v)>=.97||y<tY(c,v)+m||y>bY(c,v)-m)return false}return true};
- /* leaves are set out in rows and then relaxed: each pair pushed apart until they stand a leaf and a tenth apart, blade
+ /* leaves are set out in rows (one row arched with its dome) and then relaxed: each pair pushed apart until they stand a leaf and a tenth apart, blade
     clear of blade, each drawn back inside its cushion */
  const place=c=>{const n=c.lv.length;c.pos=[];if(!n)return true;const r=gbRng(gbHash('lv:'+seed+':'+c.role+c.sd));
   const per=Math.max(1,Math.floor((1.7*c.a-L)/(1.15*L))+1),rows=Math.ceil(n/per),P=[];
-  for(let i=0;i<n;i++){const row=Math.floor(i/per),k=i%per,m=Math.min(per,n-row*per),sp=Math.min(1.2*L,1.6*c.a/m);P.push([(k-(m-1)/2)*sp+(row%2?sp*.3:0)+(r()-.5)*2,-c.h*(rows===1?.56:.7-.4*row/(rows-1))+(r()-.5)*2])}
+  for(let i=0;i<n;i++){const row=Math.floor(i/per),k=i%per,m=Math.min(per,n-row*per),sp=Math.min(1.2*L,1.6*c.a/m);const q=m>1?(k-(m-1)/2)/((m-1)/2):0;P.push([(k-(m-1)/2)*sp+(row%2?sp*.3:0)+(r()-.5)*2,-c.h*(rows===1?(m>2?.48+.18*(1-q*q):.56):.7-.4*row/(rows-1))+(r()-.5)*2])}
   const D=1.1*L,core=[0,-c.h*(c.limf===null?.5:.58)],th=i=>ang(c,P[i][0],c.lv[i].id),seg=i=>{const t=th(i),u=[Math.cos(t)*L/2,Math.sin(t)*L/2];return [[P[i][0]-u[0],P[i][1]-u[1]],[P[i][0]+u[0],P[i][1]+u[1]]]};
   const ok=(i,j)=>{const a=seg(i),b=seg(j);return Math.hypot(P[j][0]-P[i][0],P[j][1]-P[i][1])>=D-.4&&gbSegD(a[0],a[1],b[0],b[1])>=W+1.6};
   for(let it=0;it<90;it++){let moved=false;
@@ -331,7 +331,7 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol){const z=Math.max(.6,Math.pow(H/56
   c.pos=P.map((p,i)=>[p[0],p[1],th(i)]);for(let i=0;i<n;i++){if(!inside(c,P[i],th(i),1.5))return false;for(let j=i+1;j<n;j++)if(!ok(i,j))return false}return true};
  /* the smallest size, by the tree's one rule, at which every cushion holds its leaves (the caller passes the largest any pad
     on the tree needs, so they all share it); never so small that a leaf stands more than about a third of its crest's height */
- let k=Math.max(K||0,L*1.35);const fit=k=>{for(const c of cs)size(c,k);return cs.every(place)};for(let i=0;i<48&&!fit(k);i++)k*=1.05;
+ let k=Math.max(K||0,L*1.22);const fit=k=>{for(const c of cs)size(c,k);return cs.every(place)};for(let i=0;i<48&&!fit(k);i++)k*=1.05;
  /* the clumps a cushion is heaped from: a row along its crest whose tops scallop its edge, and a lower row in front */
  for(const c of cs){const r=gbRng(gbHash('cl:'+seed+':'+c.role+c.sd)),kt=Math.max(3,Math.min(6,Math.round(2*c.a/(.8*c.h)))),R=c.h*(c.role==='shoulder'?.5:.42);c.body=[];
   for(let i=0;i<kt;i++){const v=(i/(kt-1)*2-1)*.74+(r()-.5)*.1,rr=R*(.84+.3*r());c.body.push([v*c.a,tY(c,v)+rr-1.6-1.4*r(),rr,0])}
@@ -346,7 +346,7 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol){const z=Math.max(.6,Math.pow(H/56
  const G={L,W,PW,PH:0,z,cs,crown:!!crown,one,gap,need:k,Hc,d,slot:new Map(),tuft:new Map(),cOf:new Map(),drop:4,tY,bY};cs.forEach((c,i)=>{for(const id of [...c.ids,...c.hang.map(x=>x.id)])G.cOf.set(id,i)});
  /* each leaf in place, and the tuft of foliage in front of its foot, which tucks its stalk in */
  G.lay=()=>{for(const c of cs){c.bot=c.b;c.pos.forEach((p,i)=>{const id=c.lv[i].id,u=[Math.cos(p[2]),Math.sin(p[2])];
-   G.slot.set(id,[c.x+p[0],c.b+p[1],p[2]*180/Math.PI,1,0]);G.tuft.set(id,[c.x+p[0]-u[0]*(L/2+.5),c.b+p[1]-u[1]*(L/2+.5)+1,.3*L+1.2,.17*L+1])})}
+   G.slot.set(id,[c.x+p[0],c.b+p[1],p[2]*180/Math.PI,1,0]);G.tuft.set(id,[c.x+p[0]-u[0]*(L/2-.5),c.b+p[1]-u[1]*(L/2-.5)+.5,.3*L+1.2,.17*L+1])})}
   /* how far below its lowest underside the pad reaches: its failures' stems and leaves (set exactly once they hang) */
   G.PH=Math.max(...cs.map(c=>c.h-c.b));G.drop=cs.some(c=>c.hang.length)?3+.5*Hc+GB_PET+L+2:4};
  /* A cushion's outline: the dome, with the tops of the clumps along its crest standing a little proud of it in round
@@ -558,7 +558,7 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   if(list){list=gbOrd(list);lines=wrap(list[0].title,30,3)}
   else lines=wrap(title,30,3);
   return {lines,hgt:lines.length*16+32+(n>=3?14:0),w:Math.max(...lines.map(l=>gbW(gbPlain(l),7.1)),150)+18}};
- let L=null;
+ let L=null;const Hmin=sap?0:Math.min(H0,400);
  for(let pass=0;pass<6;pass++){
   const trees=trees0.map((t,i)=>gbTree(M,t.js,i?H0*Math.max(.5,Math.min(.75,Math.sqrt((t.leaves||1)/Math.max(1,main.leaves||1)))):H0,i%2?-S:S,brn+':'+i,sap));
   /* label boxes, local to each tree */
@@ -705,7 +705,9 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const stopX=rl.some(l=>l.r.stop&&l.r.ext);
   const yb=Math.max(0,...rl.filter(l=>l.below||l.note).map(l=>l.y+5));
   L={trees,xs,potL,potC,D,fh,kpx,fy,roots,rl,fs,sy,wallX,seal,x0,x1,y0:y0-8,y1:Math.max(yb,D+fh+(lone?10:12)+(stopX?10:0)),narrow,S,H0,lone};
-  const need=L.x1-L.x0+24;if(need<=width||pass===5)break;H0*=Math.max(.55,Math.min(.96,Math.pow((width-24)/need,1.4)));}
+  /* too wide: a lower tree has smaller pads and labels, down to the height where its leaves reach their smallest; below
+     that only the trunk would shrink and the pads pile into each other, so past it the drawing scales down whole instead */
+  const need=L.x1-L.x0+24;if(need<=width||pass===5||H0<=Hmin)break;H0=Math.max(Hmin,H0*Math.max(.55,Math.min(.96,Math.pow((width-24)/need,1.4))));}
  return L}
 
 /* Wood grows out along its own spine: the finished, textured wood is uncovered from its base to its tip by a broad stroke
@@ -730,7 +732,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  /* foliage is lit from above: the crest lighter, the body its own green, the underside in shade */
  const padG='gb-pad'+N;defs.append(sv('pattern',{id:padG+'s',patternUnits:'userSpaceOnUse',width:31,height:23},...[[10.0,3.5,-58,'s',1.6],[11.3,1.3,59,'s',1.2],[13.0,5.5,38,'s',1.7],[29.4,14.5,-55,'s',1.5],[30.3,1.1,-36,'s',1.2],[3.7,7.1,-24,'s',1.7],[5.8,2.2,-54,'s',1.7],[15.4,12.2,10,'s',2.0],[11.2,5.7,-24,'l',1.3],[17.8,12.1,17,'l',1.4],[30.4,2.7,37,'s',1.4],[28.9,9.7,-51,'l',1.7],[27.1,7.2,19,'s',1.7],[14.1,19.3,-1,'s',1.8],[1.9,16.1,44,'s',1.5],[20.7,0.5,48,'s',1.7],[15.3,5.0,3,'s',1.3],[12.1,20.0,-50,'s',1.5],[8.6,3.1,40,'l',1.4],[12.9,8.3,27,'l',1.3],[5.5,5.3,-11,'s',1.9],[5.7,6.5,-33,'s',1.5],[17.6,21.9,61,'l',1.8],[22.9,10.5,30,'s',1.5],[14.9,9.2,-22,'s',1.3],[5.0,7.8,-57,'s',1.7]].map(([x,y,a,c,rx])=>sv('ellipse',{cx:x,cy:y,rx,ry:rx*.5,transform:'rotate('+a+' '+x+' '+y+')',class:'st'+c}))));
  /* each clump of foliage lit on its top and in its own shade beneath, the crest's a step lighter than its shoulders' */
- for(const [k,v] of [['cr','fol'],['sh','fsh']])defs.append(sv('linearGradient',{id:padG+k,x1:.3,y1:0,x2:.45,y2:1},sv('stop',{offset:.08,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.5,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:.92,style:'stop-color:var(--'+v+'-lo)'})));
+ for(const [k,v] of [['cr','fol'],['sh','fsh']])defs.append(sv('linearGradient',{id:padG+k,x1:.3,y1:0,x2:.45,y2:1},sv('stop',{offset:.08,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.5,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:.92,style:'stop-color:var(--'+v+'-lo)'})),
+  /* a tuft: lit along its top, where it crosses the leaf, and gone into the cushion below */
+  sv('linearGradient',{id:padG+'t'+k,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:.1,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.55,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:1,style:'stop-color:var(--'+v+');stop-opacity:0'})));
  /* the traced route is drawn over everything, but where it runs inside a pad it shows faintly, as sap under foliage */
  const rmId='gb-rm'+N,rMask=sv('mask',{id:rmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));defs.append(rMask);
  const B={key,L,svg,grow:[],anim:[],pad:{},padsOf:{},brEl:{},leaf:{},clump:{},bud:{},budG:{},knot:{},klbl:{},root:{},lbl:{},vein:{},pos:{},nav:[],navEl:{},cur:{},jinEl:{}};
@@ -752,6 +756,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  const shade=(pts,w,from,parent)=>{const s1=gbSide(pts);parent.append(sv('path',{d:gbBand(pts,w,s1*.2,s1*.98,from),class:'lt'}),sv('path',{d:gbBand(pts,w,-s1*.38,-s1*1.06,from),class:'sh'}))};
  const grain=(pts,w,seed,parent)=>{const r=gbRng(seed);for(const f of [-.6,-.2,.22,.58]){const ph=r()*6.28,a=Math.floor(pts.length*(.02+.08*r())),e=Math.floor(pts.length*(.7+.25*r()));
    const q=pts.slice(a,e).map((p,i)=>{const n=gbNorm(pts,i+a),o=w[i+a]*.5*(f+.07*Math.sin(i*.25+ph));return[p[0]+n[0]*o,p[1]+n[1]*o]}).filter((_,i)=>i%2===0);if(q.length>2)parent.append(sv('path',{d:gbLine(gbSmooth(q,1)),class:'grain'}))}};
+ /* a branchlet that carries a cushion is bark like its limb: lit on one side, shaded on the other, growing with it */
+ const barkOn=(tw,parent)=>{if(sap)return;clip.append(sv('path',{d:tw.getAttribute('d')}));const bl=sv('g',{'clip-path':'url(#'+clipId+')',filter:'url(#'+softId+')'});parent.append(bl);shade(tw.__pts,tw.__w,0,bl);tw.__also=[bl]};
  const ribFlat=(pts,w)=>{const A=[],Z=[];pts.forEach((q,i)=>{const n=gbNorm(pts,i),h=w[i]/2;A.push([q[0]+n[0]*h,q[1]+n[1]*h]);Z.push([q[0]-n[0]*h,q[1]-n[1]*h])});return 'M'+A.map(gbP).join(' L')+' L'+Z.reverse().map(gbP).join(' L')+'Z'};
  /* the pot: an unglazed rectangle, about as deep as the trunk is thick, with a two-unit lip and splayed feet, or a small round
     bowl for a lone literati; inside it a mound of soil with low mounds of moss, which the roots lie in and the trunk rises out of */
@@ -890,7 +896,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    for(const f of [fil(A,Bp,Cc),fil(A2,B2,C2)]){const fp=sv('path',{d:f,class:'w'+old});(b.back?wg:gWood).append(fp);clip.append(sv('path',{d:f}));anim('fil:'+id+f.length,fp,delay+ms*.25,240,'fade');
     /* the crotch sits in the shade of the branch above it, so the trunk's lit side does not run on into it as a pale wedge */
     if(!b.back){const fs=sv('path',{d:f,class:'filsh'});gGrain.append(fs);anim('filsh:'+id+f.length,fs,delay+ms*.25,240,'fade')}}
-   b.twigs.forEach((t,tk)=>{const tpp=t.pts.map(sh);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+old});tw.__pts=tpp;tw.__w=t.w;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];/* a twig starts once the growing branch has reached its base (the branch grows on an ease-out) */
+   b.twigs.forEach((t,tk)=>{const tpp=t.pts.map(sh);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+old});tw.__pts=tpp;tw.__w=t.w;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(!b.back)barkOn(tw,jg);/* a twig starts once the growing branch has reached its base (the branch grows on an ease-out) */
     const ts=gbT('wood:'+id,delay)-now+ms*(1-Math.pow(1-Math.min(1,t.at+.04),1/2.2))+(t.c?320*t.bi/(t.c.pts.length-1):0);anim('tw:'+id+':'+(t.id||tk),tw,ts,320,'grow');
     /* the cushion this twig carries shows only once the twig has grown to it */
     const ce=(B.cEnd=B.cEnd||{})[b.id]=B.cEnd[b.id]||{};if(t.k!==undefined)ce[t.k]=Math.max(ce[t.k]||0,ts+320)});
@@ -909,7 +915,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    B.brEl[b.id]={g:wg,jg,stub,cutmk,cuttag}}
   /* the leader forks into the crown */
   /* a branchlet starts once the leader has grown to it, out from under its bark, and a leaf's twig once its own wood has */
-  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];
+  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else barkOn(tw,gBud);
    const t0=t.c?at(T.ty[t.c.bi])+320*t.bi/(t.c.pts.length-1):at(T.ty[t.bi]),ak='ctw:'+ti+':'+(t.id||tk)+gk;anim(ak,tw,t0,320,'grow');const ce=(B.cEnd=B.cEnd||{})[T.apex.id]=B.cEnd[T.apex.id]||{};if(t.k!==undefined)ce[t.k]=Math.max(ce[t.k]||0,gbT(ak,t0)-now+320)});
   /* knots: a raised boss on the bark, its file named beside it when its journey is lit */
   const padBox=T.padList.map(pd=>{const o=sh(T.origin[pd.id]),g=pd.geo;return [o[0]-g.PW/2,o[1]-g.PH-6,o[0]+g.PW/2,o[1]+g.drop+2]});const placed=L.rl.map(l=>{if(l.box)return l.box;const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;return [x0-2,l.y-L.fs,x0+w0+2,l.y+3]});
@@ -919,7 +925,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   for(const jid in T.badge||{}){const q=T.badge[jid];placed.push([q.x+X-12,q.y-12,q.x+X+12,q.y+12])}const potBox=[L.potC-L.potL/2-4,L.narrow?-11:-16,L.potC+L.potL/2+4,L.D+40];placed.push(potBox);for(let k=0;k<tp.length-1;k+=2){const k2=Math.min(tp.length-1,k+2),hw=Math.max(T.tw[k],T.tw[k2])/2;padBox.push([Math.min(tp[k][0],tp[k2][0])-hw,Math.min(tp[k][1],tp[k2][1])-1,Math.max(tp[k][0],tp[k2][0])+hw,Math.max(tp[k][1],tp[k2][1])+1])}
   const ov=(r,q)=>Math.max(0,Math.min(r[2],q[2])-Math.max(r[0],q[0]))*Math.max(0,Math.min(r[3],q[3])-Math.max(r[1],q[1]));
   for(const b of T.br)for(let k=0;k<b.pts.length-1;k+=2){const q=sh(b.pts[k]),q2=sh(b.pts[Math.min(b.pts.length-1,k+2)]),hw=b.w[k]/2;padBox.push([Math.min(q[0],q2[0])-hw,Math.min(q[1],q2[1])-hw,Math.max(q[0],q2[0])+hw,Math.max(q[1],q2[1])+hw])}
-  const hits=(r)=>padBox.reduce((a,q)=>a+ov(r,q),0)+placed.reduce((a,q)=>a+ov(r,q),0)*3;
+  /* a cushion is opaque: a shoot or a name behind or over one hides it or its leaves, so it weighs as much as a name */
+  const nPad=T.padList.length,hits=(r)=>padBox.reduce((a,q,i)=>a+ov(r,q)*(i<nPad?3:1),0)+placed.reduce((a,q)=>a+ov(r,q),0)*3;
   /* hairlines already drawn, and how many points of a new one land on something drawn */
   const segs=[],inBox=(p,q)=>p[0]>q[0]&&p[0]<q[2]&&p[1]>q[1]&&p[1]<q[3];
   /* (what the hairline starts in, its own knot and the wood under it, it cannot help crossing) */
@@ -949,8 +956,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
       const sc=hits(r)+out(r)*400+(near<gapMin?400+(gapMin-near)*40:0)+(crook?220:0)+Math.abs(off)*2+(th===45?0:12)+(len===32?0:16)+(pref&&ns[0]*pref<0?60:0);
       if(!best||sc<best.sc)best={sc,pts,b0,tip,c1,c2,r,kk,near,o:out(r)}}}
     /* every file grows its own shoot from its own knot; only one with no open air at all, or one whose knot is right beside
-       another's, joins the nearest shoot, so the wood does not grow a hedge */
-    const gs=B.shootGeo||[];if(gs.length&&(!best||best.o>0||best.near<(L.narrow?14:10))){const a=pl[k0];const nb=gs.reduce((m,g)=>Math.hypot(g.base[0]-a[0],g.base[1]-a[1])<Math.hypot(m.base[0]-a[0],m.base[1]-a[1])?g:m,gs[0]);nb.uids.push(...uids);return}
+       another's, or one that could only grow into a cushion, joins the nearest shoot, so the wood does not grow a hedge */
+    const inPad=r=>padBox.slice(0,nPad).reduce((a,q)=>a+ov(r,q),0)>.2*(r[2]-r[0])*(r[3]-r[1]);
+    const gs=B.shootGeo||[];if(gs.length&&(!best||best.o>0||best.near<(L.narrow?14:10)||inPad(best.r))){const a=pl[k0];const nb=gs.reduce((m,g)=>Math.hypot(g.base[0]-a[0],g.base[1]-a[1])<Math.hypot(m.base[0]-a[0],m.base[1]-a[1])?g:m,gs[0]);nb.uids.push(...uids);return}
     if(!best)return;placed.push(best.r);bases.push(best.b0);const {b0,c1,c2,tip}=best,cv=[b0,c1,c2,tip];
     const slot=i=>{const t=[.46,.68,.86][i],q=gbCubic(cv,t),q2=gbCubic(cv,Math.min(1,t+.04)),dir=Math.atan2(q2[1]-q[1],q2[0]-q[0])*180/Math.PI;return [q[0],q[1],dir+(i%2?50:-50),[1,.82,.66][i]]};
     (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:b0,tip,slots:[0,1,2].map(slot),route:[...best.pts.slice().reverse(),...routeOf(best.kk)]})};
@@ -1009,7 +1017,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
    const mk=sv('path',{d:gbPadD(o,q0),fill:'#666'});rMask.append(mk);
    const pg=sv('g',{class:'pad'+(pd.crown?' crown':'')+(back?' back':''),'data-k':'j:'+jid,'data-pad':pd.id,tabindex:-1,role:'button'},els.ghost,...cu.map(q=>q.el),pw,sv('ellipse',{cx:gbF(o[0]),cy:gbF(o[1]-5),rx:6,ry:4.6,class:'bud0'}));
    jg.append(pg);const lg=sv('g',{});jg.append(lg);const tg=sv('g',{class:'ptufts','clip-path':'url(#'+pk+')'});jg.append(tg);const tf=B.tuft=B.tuft||{};
-   for(const [id,q] of g.tuft){tf[id]=sv('ellipse',{cx:gbF(o[0]+q[0]),cy:gbF(o[1]+q[1]),rx:gbF(q[2]),ry:gbF(q[3]),fill:'url(#'+padG+(g.cs[g.cOf.get(id)].role==='crest'?'cr':'sh')+')',class:'ptuft t'+(g.cs[g.cOf.get(id)].role==='crest'?'cr':'sh')});tg.append(tf[id])}
+   /* the foliage in front of a leaf's foot: two small clumps, so the blade tucks into the cushion instead of sitting on it */
+   for(const [id,q] of g.tuft){const k=g.cs[g.cOf.get(id)].role==='crest'?'cr':'sh',x=o[0]+q[0],y=o[1]+q[1],r=q[3]*1.1,dx=q[2]*.3,iy=y-Math.sqrt(Math.max(1,r*r-dx*dx))+(gbHash('tf:'+id)-.5);
+    tf[id]=sv('path',{class:'ptuft t'+k,fill:'url(#'+padG+'t'+k+')',d:'M'+gbF(x-dx-r)+' '+gbF(y)+' A'+gbF(r)+' '+gbF(r)+' 0 0 1 '+gbF(x)+' '+gbF(iy)+' A'+gbF(r)+' '+gbF(r)+' 0 0 1 '+gbF(x+dx+r)+' '+gbF(y)+' A'+gbF(dx+r)+' '+gbF(r*.8)+' 0 0 1 '+gbF(x-dx-r)+' '+gbF(y)+'Z'});tg.append(tf[id])}
    /* each cushion shows once its own twig has grown to it (the outer one once the branch has, the crest once the leader
       has); the pad starts with its first cushion */
    const ce=(B.cEnd||{})[pd.id]||{},cT=q0.cs.map((c,k)=>ce[k]!==undefined?ce[k]:pd.b?(ce.br!==undefined?ce.br:at(pd.b.h)+380+1.5*pd.b.len):tS+tdur);
