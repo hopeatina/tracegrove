@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompileResult } from './compile.ts';
@@ -378,7 +378,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         // The base branch the grow set the change against, to say whether a run of it is recorded; a name, never an option.
         const base = url.searchParams.get('base');
         if (base !== null && !/^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,200}$/.test(base)) return send(400, { error: 'bad base branch name' });
-        try { found = happenedIn(root, name, caseId, { base }); } catch { return send(404, { error: 'run not found' }); }
+        const cfg = url.searchParams.get('config');
+        try { found = happenedIn(root, name, caseId, { base, config: cfg ? join(root, basename(cfg)) : configPath() }); } catch { return send(404, { error: 'run not found' }); }
         return found ? send(200, found) : send(404, { error: 'the run has no record of that flow' });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {

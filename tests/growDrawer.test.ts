@@ -599,3 +599,44 @@ describe('What happened, with several failures', () => {
     await page.close();
   }, 120_000);
 });
+
+/* The seats branch and its base, main: a flow that both have, run once on each. A run counts as made on main only when its app's
+   source is main's, by the source digest its launch attested set against the files main's commit holds. */
+describe('Whether a flow held on the base branch', () => {
+  const mine: string[] = [];
+  afterAll(() => { for (const d of mine.splice(0)) rmSync(d, { recursive: true, force: true }); });
+  it('counts the saved runs made on the base branch’s source and says how they went, and no other run as one of them', async () => {
+    const dir = plotlineSeats(); mine.push(dir);
+    const flow = 'billing.upgrade-charges-once', grep = 'tracegrove/billing/upgrade-charges-once.flow.yaml', configPath = join(dir, 'tracegrove.config.yaml');
+    const seats = await runTests({ configPath, grep });
+    git(dir, 'checkout', '-q', 'main');
+    const main = await runTests({ configPath, grep });
+    // a branch off main that only adds a source file: a run of main lacks it, so it is not a run of this branch either
+    git(dir, 'checkout', '-qb', 'more');
+    writeFileSync(join(dir, 'app', 'unused.mjs'), 'export const unused = 1;\n');
+    git(dir, 'add', 'app/unused.mjs'); git(dir, 'commit', '-qm', 'An unused module');
+    git(dir, 'checkout', '-q', 'seats');
+    const [a, b] = [seats.report.cases[0]!.outcome, main.report.cases[0]!.outcome];
+    expect([a, b].every((o) => o === 'passed' || o === 'assertion_failed')).toBe(true);
+    const d = happenedIn(dir, basename(seats.report.runDir), flow, { base: 'main' })!;
+    expect(d.history.saved).toBe(2);
+    expect(d.base).toEqual({ branch: 'main', runs: 1, passed: b === 'passed' ? 1 : 0, failed: b === 'passed' ? 0 : 1, notReached: 0 });
+    expect(d.historyLine).toBe(`${a === b ? `${a === 'passed' ? 'Passed' : 'Failed'} in all 2 saved runs` : 'Passed 1 of 2 saved runs'}; the 1 made on main ${b === 'passed' ? 'passed' : 'failed'}.`);
+    // the run of seats is the one made on seats
+    expect(happenedIn(dir, basename(seats.report.runDir), flow, { base: 'seats' })!.base).toMatchObject({ runs: 1, passed: a === 'passed' ? 1 : 0 });
+    expect(happenedIn(dir, basename(seats.report.runDir), flow, { base: 'more' })!.base).toMatchObject({ branch: 'more', runs: 0 });
+    // a base git cannot read has no run recorded
+    const none = happenedIn(dir, basename(seats.report.runDir), flow, { base: 'gone' })!;
+    expect(none.base).toEqual({ branch: 'gone', runs: 0, passed: 0, failed: 0, notReached: 0 });
+    expect(none.historyLine).toMatch(/; no run on gone is recorded\.$/);
+    // the drawer's route takes the base the grow names, and only as a branch name
+    const server = await startUi({ dir, branch: 'seats', port: 0, token: TOKEN });
+    try {
+      const get = (q: string) => fetch(`http://127.0.0.1:${server.port}/api/runs/${basename(seats.report.runDir)}/happened?case=${flow}${q}`, { headers: { 'x-tracegrove-token': TOKEN } });
+      const ok = await get('&base=main'); expect(ok.status).toBe(200);
+      expect(await ok.json()).toMatchObject({ base: { branch: 'main', runs: 1 }, historyLine: d.historyLine });
+      expect(await (await get('')).json()).toMatchObject({ base: null });
+      for (const bad of ['--output=x', 'main..seats', 'a b']) expect((await get(`&base=${encodeURIComponent(bad)}`)).status, bad).toBe(400);
+    } finally { await server.close(); }
+  }, 180_000);
+});
