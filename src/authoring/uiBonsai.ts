@@ -66,10 +66,10 @@ export const BONSAI_CSS = String.raw`
 .gb .tipbud path{fill:var(--moss-bg);stroke:var(--moss);stroke-width:1}.gb .shn{font:500 9.5px var(--mono);fill:var(--ink3)}.gb .shtag rect{fill:color-mix(in srgb,var(--moss) 8%,var(--paper));stroke:var(--shoot);stroke-width:1}.gb .shtag .shtie{fill:none;stroke:var(--shoot);stroke-width:1}.gb .shtag .shn{fill:var(--moss)}
 /* an existing flow Max re-checks: a graft bud ringed into the bark at its knot, in the state its run is in */
 .gb .gb-gr{cursor:pointer;transition:opacity .3s}.gb .gb-gr.gone{display:none}.gb .gb-gr:focus{outline:none}
-.gb .gb-gr .gring{fill:color-mix(in srgb,var(--paper) 78%,var(--moss));stroke:var(--graft);stroke-width:1}.gb .gb-gr .ghalo{fill:none;stroke:var(--wood-shade);stroke-width:2.2;opacity:.35}.gb .gb-gr.none .gring{stroke-dasharray:2 1.3}.gb .gb-gr.pass .gring{fill:color-mix(in srgb,var(--moss) 30%,var(--paper));stroke:var(--moss)}.gb .gb-gr.pass.warn .gring{stroke:var(--gold)}
+.gb .gb-gr .gring{fill:color-mix(in srgb,var(--moss) 26%,var(--wood-lit));stroke:var(--graft);stroke-width:1.1}.gb .gb-gr .ghalo{fill:none;stroke:var(--wood-shade);stroke-width:2.2;opacity:.35}.gb .gb-gr.none .gring{stroke-dasharray:2 1.3}.gb .gb-gr.pass .gring{fill:color-mix(in srgb,var(--moss) 30%,var(--paper));stroke:var(--moss)}.gb .gb-gr.pass.warn .gring{stroke:var(--gold)}
 .gb .gb-gr.fail .gring{fill:color-mix(in srgb,var(--verm) 24%,var(--paper));stroke:var(--verm)}.gb .gb-gr.run .gring{fill:color-mix(in srgb,var(--gold) 30%,var(--paper));stroke:var(--gold)}
 .gb .gb-gr.pre .gring,.gb .gb-gr.pv-out .gring{stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none}.gb .gb-gr.pv-add .gring{fill:var(--moss);fill-opacity:.28;stroke:var(--moss);stroke-opacity:.6;stroke-dasharray:none}.gb .gb-gr.pv-add .ghalo{opacity:.12}.gb.dim .gb-gr.pv-add{opacity:1}
-.gb .gb-gr.hl .gring{stroke-width:1.7;filter:drop-shadow(0 0 1.5px var(--gold))}.gb .gb-gr:focus-visible .gring{stroke:var(--ink);stroke-width:1.8}.gb.dim .gb-gr:not(.hl){opacity:.35}
+.gb .gb-gr.hl .gring{stroke-width:1.7;filter:drop-shadow(0 0 1.5px var(--gold))}.gb .gb-gr:focus-visible .gring{stroke:var(--ink);stroke-width:1.8}.gb.dim .gb-gr:not(.hl):not(.pv-add){opacity:.35}
 .gb .budg.pre .shn,.gb .budg.pv-out .shn{opacity:.5}
 /* its legend swatch (gbGraftSw) */
 .gw-sw .gr{fill:var(--paper);stroke:var(--moss);stroke-width:1.2}
@@ -765,7 +765,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  const defs=sv('defs',{});const clipId='gb-wood'+N,softId='gb-soft'+N;const clip=sv('clipPath',{id:clipId});
  defs.append(clip,sv('filter',{id:softId,x:'-10%',y:'-10%',width:'120%',height:'120%'},sv('feGaussianBlur',{stdDeviation:'2.2'})));svg.append(defs);
  /* a lit knot's glow: amber from inside the boss, fading out into the bark round it (red for one that broke) */
- for(const [k,c] of [['kg','--gold'],['kw','--verm']])defs.append(sv('radialGradient',{id:'gb-'+k+N},sv('stop',{offset:0,style:'stop-color:var('+c+');stop-opacity:.85'}),sv('stop',{offset:.5,style:'stop-color:var('+c+');stop-opacity:.45'}),sv('stop',{offset:1,style:'stop-color:var('+c+');stop-opacity:0'})));
+ for(const [k,c] of [['kg','--gold'],['kw','--verm']])defs.append(sv('radialGradient',{id:'gb-'+k+N},sv('stop',{offset:0,style:'stop-color:var('+c+');stop-opacity:.72'}),sv('stop',{offset:.45,style:'stop-color:var('+c+');stop-opacity:.36'}),sv('stop',{offset:1,style:'stop-color:var('+c+');stop-opacity:0'})));
  svg.style.setProperty('--kg','url(#gb-kg'+N+')');svg.style.setProperty('--kgw','url(#gb-kw'+N+')');
  /* foliage is lit from above: the crest lighter, the body its own green, the underside in shade */
  const padG='gb-pad'+N;defs.append(sv('pattern',{id:padG+'s',patternUnits:'userSpaceOnUse',width:31,height:23},...[[10.0,3.5,-58,'s',1.6],[11.3,1.3,59,'s',1.2],[13.0,5.5,38,'s',1.7],[29.4,14.5,-55,'s',1.5],[30.3,1.1,-36,'s',1.2],[3.7,7.1,-24,'s',1.7],[5.8,2.2,-54,'s',1.7],[15.4,12.2,10,'s',2.0],[11.2,5.7,-24,'l',1.3],[17.8,12.1,17,'l',1.4],[30.4,2.7,37,'s',1.4],[28.9,9.7,-51,'l',1.7],[27.1,7.2,19,'s',1.7],[14.1,19.3,-1,'s',1.8],[1.9,16.1,44,'s',1.5],[20.7,0.5,48,'s',1.7],[15.3,5.0,3,'s',1.3],[12.1,20.0,-50,'s',1.5],[8.6,3.1,40,'l',1.4],[12.9,8.3,27,'l',1.3],[5.5,5.3,-11,'s',1.9],[5.7,6.5,-33,'s',1.5],[17.6,21.9,61,'l',1.8],[22.9,10.5,30,'s',1.5],[14.9,9.2,-22,'s',1.3],[5.0,7.8,-57,'s',1.7]].map(([x,y,a,c,rx])=>sv('ellipse',{cx:x,cy:y,rx,ry:rx*.5,transform:'rotate('+a+' '+x+' '+y+')',class:'st'+c}))));
@@ -1071,11 +1071,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
     const P=b?b.pts.map(sh):rt?rt.pts:tp,W=b?b.w:rt?rt.w:T.tw,acc=gbLen(P),k0=kn?kn.k:Math.round((rt?.3:.8)*(P.length-1)),R=2.1,off=kn?kn.off*.6:0,gap=kn?kn.ra+R+1.7:0;
     const at=s0=>{const d=acc[k0]+s0;if(d<4||d>acc[acc.length-1]-4)return null;let j=1;while(j<P.length-1&&acc[j]<d)j++;const f=Math.min(1,(d-acc[j-1])/((acc[j]-acc[j-1])||1)),nn=gbNorm(P,j),wj=W[j-1]+(W[j]-W[j-1])*f;if(wj<2*R+2.4)return null;
      const o=Math.max(-(wj/2-R-1.2),Math.min(wj/2-R-1.2,off));return [P[j-1][0]+(P[j][0]-P[j-1][0])*f+nn[0]*o,P[j-1][1]+(P[j][1]-P[j-1][1])*f+nn[1]*o]};
-    /* evenly strung, each as clear of the boss as of the next; closer when the wood between its neighbours is short. A side that
-       meets another knot is full: a bud never stands past a neighbour, nearer it than its own */
+    /* evenly strung, each as clear of the boss as of the next; where the wood between its neighbours is short, the first
+       tucked against the boss's own rim, then closer together. A side that meets another knot is full: a bud never stands
+       past a neighbour, nearer it than its own */
     const kel=kn&&B.knot[kn.ids[0]],route=kel?kel.__route:P.slice(0,k0+1).reverse(),want=Math.min(5,xs.length);let done=[];
-    for(const g of [1.7,.9,.3]){const got=[],full={};
-     for(let st=0;got.length<want&&st<16;st++){const sd=st%2?-1:1;if(full[sd])continue;const c=at(sd*(gap-1.7+g+Math.floor(st/2)*(2*R+g)));
+    for(const [gb,g] of [[1.7,1.7],[.9,.9],[-1,.9],[-1,.3]]){const got=[],full={};
+     for(let st=0;got.length<want&&st<16;st++){const sd=st%2?-1:1;if(full[sd])continue;const c=at(sd*(gap-1.7+gb+Math.floor(st/2)*(2*R+g)));
       if(!c||oth.some(([q,r,o])=>o!==kn&&Math.hypot(q[0]-c[0],q[1]-c[1])<r+R+.6)){full[sd]=1;continue}if(got.some(q=>Math.hypot(q[0]-c[0],q[1]-c[1])<2*R+.2))continue;got.push(c)}
      if(got.length>done.length)done=got;if(done.length>=want)break}
     done.forEach((c,i)=>B.graftR.push({c,r:R,xid:xs[i].id,kid:kn?kn.id:rt?rt.id:'lead',tree:ti,par:kn&&kn.bid?JG[kn.bid]:gKn,route:[c,...route]}))}}
@@ -1210,7 +1211,9 @@ const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id=
 
 function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;const width=gbWidth();
  const pc=list=>['happy','guard','failure'].map(p=>list.filter(x=>gbPol(x)===p).length).join('.');
- const key=(sap?'sap:'+s.units.map(u=>u.id).join(','):M.trees.map(t=>t.js.map(j=>j.id+'='+j.units.join('+')+'#'+pc(M.leaves[j.id])).join(';')).join('|'))+'|jin='+M.jin.map(u=>u.id).join(',')+'|'+M.strays.map(u=>u.id).join(',')+'|'+(s.stops.map(x=>x.unit).join(','))+'|w='+width;
+ /* Max's shoots and graft buds are laid out with the wood, so the parts with checks of their own and the flows each re-checks key it too */
+ const bk=Object.keys(M.buds).sort().map(u=>{const l=M.buds[u],r=l.filter(x=>x.scenarioKind==='regression').length;return u+(l.length>r?'o':'')+Math.min(5,r)}).join(',');
+ const key=(sap?'sap:'+s.units.map(u=>u.id).join(','):M.trees.map(t=>t.js.map(j=>j.id+'='+j.units.join('+')+'#'+pc(M.leaves[j.id])).join(';')).join('|'))+'|jin='+M.jin.map(u=>u.id).join(',')+'|'+M.strays.map(u=>u.id).join(',')+'|'+(s.stops.map(x=>x.unit).join(','))+'|b='+bk+'|w='+width;
  /* a rebuild (the layout changed, say when the window is resized) keeps what was showing, so
     the leaves and shoots a mode drops still fall and fade rather than vanish */
  if(!gw.B||gw.B.key!==key){const O=gw.B;gw.prevIn={};gw.prevShown={};gw.prevBuds=O?O.budsShown:undefined;

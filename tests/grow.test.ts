@@ -797,9 +797,14 @@ describe('Grow page', () => {
         await page.goto(server.url);
         await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
         await page.getByTestId('grow').waitFor();
-        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
+        const paint = (st: typeof state) => page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: st, v: growView(st) });
+        // drafting brings the existing flows in one by one: a tree first drawn with one of them grows a bud for each that follows
+        const early = { ...state, scenarios: state.scenarios.filter((x) => !/^rg[123]$/.test(x.id)) };
+        await paint(early);
         await page.getByTestId('grow-view-grove').click();
         await expect.poll(() => page.evaluate(() => Object.keys((0, eval)('gw').B?.pad ?? {}).length)).toBeGreaterThan(0);
+        expect(await page.evaluate(() => ((0, eval)('gw').B.graftR ?? []).length), width + 'px').toBe(1);
+        await paint(state);
         const g = await page.evaluate(growth);
         expect(g.bad, width + 'px').toEqual([]);
         expect(g.limbs, width + 'px').toBeGreaterThan(2);
