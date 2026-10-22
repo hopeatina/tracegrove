@@ -914,8 +914,8 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
    :gwDrPath(q)+(q.request&&q.request.body?' '+q.request.body+(q.request.declared?' (body as declared)':''):'')+(q.request?' · as '+q.request.as:'')),
   h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.httpMs!=null?'app time not recorded':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
  /* the answer in one line, and what to do about it (rerun, compare, heal, the Run tab) right under it, so they are on screen
-    with the step that broke; a run that never reached its checks says why before the steps it never ran. The link to this
-    step closes the drawer, after its evidence. */
+    with the step that broke; a run that never reached its checks says why before the steps it never ran. Copy link (the link to
+    this step) comes last, after the evidence. */
  const one=[h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),gwDrActs(x,D,true)];
  const unreached=steps.length>0&&steps.every(q=>q.result==='not_run');
  gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,
