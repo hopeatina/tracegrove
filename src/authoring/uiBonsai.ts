@@ -1374,7 +1374,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
 function gbNearLeaf(e){const B=gw.B;if(!B||e.pointerType==='mouse')return null;let best=null,bd=22;const at=gw.tapAt&&e.timeStamp-gw.tapAt[2]<1500?gw.tapAt:[e.clientX,e.clientY];
  for(const [id,el] of [...Object.entries(B.leaf),...Object.entries(B.bud)]){if(el.classList.contains('gone')||el.classList.contains('cut')||!el.isConnected)continue;const t=el.querySelector('.hitp')||el.querySelector('.hitc');if(!t)continue;const r=t.getBoundingClientRect();if(!r.width)continue;const d=Math.hypot(r.left+r.width/2-at[0],r.top+r.height/2-at[1]);if(d<bd){bd=d;best='s:'+id}}return best}
 /* where a finger works the page, a leaf's target is a circle 44 px across round its middle, under the leaf it belongs to */
-function gbThumb(B,inner,cx,sc,cy){if(!inner||!(B.L.narrow||gwTouch()))return;inner.prepend(sv('circle',{cx:cx||null,cy:cy||null,r:gbF(22/gbHf(B)/(sc||1)),class:'hitp'}))}
+function gbThumb(B,inner,cx,sc,cy,cl){if(!inner||!(B.L.narrow||gwTouch()))return;inner.prepend(sv('circle',{cx:cx||null,cy:cy||null,r:gbF(22/gbHf(B)/(sc||1)),class:'hitp'+(cl?' '+cl:'')}))}
 
 /* The same leaf with a bite out of its upper edge: how a failed scenario looks, in any theme and on any ground. */
 function gbLeafBite(L,W,edge){const a=-L/2,b=L/2;const up=[[a,0],[a+.22*L,-.62*W],[b-.32*L,-.62*W],[b,0]];const c=[L*.12,-W*.6],r=W*.5;
@@ -1604,7 +1604,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     el=sv('g',{class:'gb-gr'+(r.dup?' dup':''),'data-k':'s:'+x.id,tabindex:-1,role:'button'},sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:gbF(Math.max(5.2,7/gbHf(B))),class:'hitc'}),
      sv('g',{class:'gsw'},sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(r.r+.9),ry:3.4,transform:'rotate('+ang+' '+gbP(c)+')',class:'ghalo'}),sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(r.r),ry:2.5,transform:'rotate('+ang+' '+gbP(c)+')',class:'gring'}),
       sv('path',{d:gbLine(cr)+'Z',class:'gcres'}),sv('path',{d:gbLeafD(3.4,1.5),class:'gtip',transform:'translate('+gbP(tip)+') rotate('+ta+')'}),
-      r.many&&!r.dup?sv('text',{x:gbF(at(0,9.5)[0]),y:gbF(at(0,9.5)[1]+3),'text-anchor':'middle',class:'gnum'},'\u00d7'+r.many):null));gbThumb(B,el,gbF(c[0]),1,gbF(c[1]));
+      r.many&&!r.dup?sv('text',{x:gbF(at(0,9.5)[0]),y:gbF(at(0,9.5)[1]+3),'text-anchor':'middle',class:'gnum'},'\u00d7'+r.many):null));
+    /* (on a phone its 44 px target is a hit circle too: a graft bud is a swelling, never a drawn ring) */
+    gbThumb(B,el,gbF(c[0]),1,gbF(c[1]),'hitc');
     el.__u=r.kid;el.__route=r.route;r.par.append(el);B.bud[x.id]=el;(B.grafts[r.kid]=B.grafts[r.kid]||[]).push(el);
     /* set into the bark once the wood it sits on has grown there and its knot is there */
     el.__x=x;const now=gbNow(),tb=r.tb||0;if(!quiet&&el.animate&&now<tb+300)gbPlay(el,[{opacity:0},{opacity:1}],{duration:300,fill:'backwards'},tb)}
