@@ -6,6 +6,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
+import { expGot } from './checkCompare.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
 import { growVerdict, growView, inMode, plainTitle, type GrowState, type RunState, type VerdictFacts } from './growState.ts';
 import { savedRunDirectory } from './runLocation.ts';
@@ -21,7 +22,7 @@ export type GrowJsonSummary = {
   failures: GrowFailure[]; unproven: Array<{ scenario: string; title: string; reason: string }>;
 };
 
-/** A failure in the run's own words, as the page says it: the check that broke and its message, then the route. */
+/** A failure in the grow's own words, when its run recorded no check to read: where it broke and its message, then the route. */
 export function brokeLine(r: RunState | undefined): string {
   const why = String(r?.why ?? '').trim(); const i = why.indexOf(': ');
   const dot = (t: string) => (/[.!?]$/.test(t) ? t : `${t}.`);
@@ -56,8 +57,10 @@ function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFail
     if (i < 0 || !bad(steps[i])) i = steps.findIndex(bad);
     if (i < 0) return found;
     const at = steps[i]!; out.step = i + 1; found.stepName = at.name;
-    // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same.
-    if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got });
+    // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same; and the sentence the page
+    // says, from those recorded fields. Without a recorded check, the reason the grow recorded stays.
+    if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got,
+      says: `${expGot(at.compared)}. Step ${i + 1} (${at.name}) broke it.` });
   } catch { /* evidence that does not verify gives no expected or got */ }
   return found;
 }

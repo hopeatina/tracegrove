@@ -311,7 +311,8 @@ describe('grow --json and the exit code', () => {
     expect(summary!.failures).toHaveLength(1);
     expect(Object.keys(f)).toEqual(['scenario', 'title', 'promise', 'flow', 'run', 'step', 'check', 'expected', 'got', 'says', 'evidence']);
     expect(f).toMatchObject({ scenario: x.id, title: plainTitle(x.title), promise: 'C1, C2', flow: 'notes.count', run: state.run[x.id]!.run, step: 3, check: 'body.count', expected: 0, got: 1 });
-    expect(f.says).toBe('Broke at check “another user counts none”: body.count is 1, expected 0. On the route: at GET /notes/count.');
+    // The sentence is built from those recorded fields, in the page's words.
+    expect(f.says).toBe('Expected body.count 0, got 1. Step 3 (another user counts none) broke it.');
     expect(f.evidence.map((p) => p.split('/').pop())).toEqual(['summary.json', 'receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl']);
     for (const p of f.evidence) { expect(p.startsWith(`.tracegrove/runs/${f.run}/`)).toBe(true); expect(existsSync(join(dir, p))).toBe(true); }
     // What it got is the run's own recorded value: the failing check recorded [status, body.count].
