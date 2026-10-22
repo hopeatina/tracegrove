@@ -152,6 +152,8 @@ describe('What happened, step by step', () => {
     });
     expect(box.ins).toBeGreaterThanOrEqual(600); expect(box.ins).toBeLessThanOrEqual(660);
     expect(box).toMatchObject({ svg: true, pinned: `s:${failed}`, lit: true });
+    // the tree keeps no card of its own for it beside the drawer, which says it once
+    expect(await page.evaluate(() => { const B = (0, eval)('gw').B; return { narrow: B.L.narrow, card: !B.tip.hidden }; })).toEqual({ narrow: true, card: false });
     await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
     const step = (n: number) => page.getByTestId(`grow-happened-step-${n}`).textContent();
     await expect(step(4)).resolves.toContain('Expected 2 charges, got 3');
