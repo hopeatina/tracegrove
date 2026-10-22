@@ -473,13 +473,16 @@ function gwSw(k){
  if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
  if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
  /* an existing flow's graft bud: a swelling of the bark with a bud tip at its crown, as the tree draws it (gbPaint); a shoot's
-    count of the checks its leaves do not show: a small bud tied to its tip, the number in its round body; and where a
-    shoot or a leaf that had grown was cut, the callus it heals with on the bark */
+    count of the checks its leaves do not show: a small bud tied to its tip, the number in its round body; where a leaf or a
+    branch that had grown was cut, the callus it heals with on the bark; and where a shoot that had grown was cut, its callus
+    as the tree lays it, on the bark beside the boss of the knot it grew from, along the grain */
  if(k==='graft')return gwSvg(20,10,sv('path',{d:'M0 4.1 C7 4.3 13 4.5 20 4.7 L20 7.3 C13 7.5 7 7.7 0 7.9 Z',class:'wd'}),sv('ellipse',{cx:10,cy:6,rx:4.6,ry:2.3,class:'wl'}),
   sv('g',{transform:'translate(10 2.1) rotate(-90)'},sv('path',{d:gwLeafD(3.4,1.7,false),class:'lf bud'})));
  if(k==='ntag')return gwSvg(22,12,sv('path',{d:'M1 6 L5 6',class:'ntg'}),sv('path',{d:'M18.8 6 C16.1 7.84 13.64 11.4 10.4 11.4 A5.4 5.4 0 0 1 10.4 .6 C13.64 .6 16.1 4.16 18.8 6 Z',class:'ntg'}),sv('text',{x:10.4,y:6.3,class:'ntn'},'+N'));
  if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg'},sv('path',{d:'M0 3.4 L16 2.9 L16 9.1 L0 9.6 Z',class:'wd'}),sv('ellipse',{cx:8,cy:6.3,rx:3.6,ry:2.3,class:'cal'}),sv('path',{d:'M5.3 6.9 A2.9 1.8 0 0 1 10.7 6.9',class:'cres'})));
- if(k==='scar')return gwSw('cut');
+ if(k==='scar')return gwSvg(22,12,sv('path',{d:'M0 3.4 C7.3 3.2 14.7 3 22 2.9 L22 9.1 C14.7 9.2 7.3 9.4 0 9.6 Z',class:'wd'}),
+  sv('ellipse',{cx:16.5,cy:5.3,rx:2.8,ry:1.8,class:'cal'}),sv('path',{d:'M14.26 5.3 A2.24 1.44 0 0 1 18.74 5.3',class:'cres'}),
+  sv('ellipse',{cx:8.5,cy:6.8,rx:4.3,ry:3.1,class:'k0'}),sv('ellipse',{cx:8,cy:6.2,rx:3.9,ry:2.8,class:'k1'}),sv('ellipse',{cx:7.3,cy:5.4,rx:2.2,ry:1.3,class:'k2'}));
  /* a store's root as the pot shows it: sunk in the soil with the soil's lip over its lower edge, its name on a small tag
     on a solid stake pushed into the soil beside its tip */
  if(k==='root')return gwSvg(22,14,sv('path',{d:'M.5 6.5 C4.6 6.6 8.8 7.1 13.8 8.3 C14.2 8.5 14 8.9 13.6 9 C8.6 9 4.6 9.2 .5 9.6 Z',class:'wd'}),sv('path',{d:'M16.6 11 L16.6 4.6',class:'stk sd'}),

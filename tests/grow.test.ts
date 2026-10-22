@@ -1472,6 +1472,15 @@ describe('Grow page', () => {
       expect(cut.shown).toBe(true);
       expect(cut.keyed).toBe(true);
       expect(cut.keyed).toBe(cut.shown);
+      // drawn as the tree lays it: a callus on the bark beside a knot's boss, never the same picture as the row's other mark
+      const sw = await page.evaluate(() => {
+        const li = Array.from(document.querySelectorAll('.gw-legend [aria-label="Pruned"] .gw-li'));
+        const look = (e: Element | undefined) => { const s = e?.querySelector('.gw-sw'); return s ? { cal: !!s.querySelector('.cal'), cres: !!s.querySelector('.cres'), boss: !!s.querySelector('.k1'), cf: !!s.querySelector('.cf'), html: s.innerHTML } : null; };
+        return { scar: look(li.find((e) => e.textContent === 'where a shoot was cut')), others: li.filter((e) => e.textContent !== 'where a shoot was cut').map(look) };
+      });
+      expect(sw.scar && { cal: sw.scar.cal, cres: sw.scar.cres, boss: sw.scar.boss, cf: sw.scar.cf }).toEqual({ cal: true, cres: true, boss: true, cf: false });
+      expect(sw.others.length).toBeGreaterThan(0);
+      for (const o of sw.others) { expect(o?.boss).toBe(false); expect(o?.html).not.toBe(sw.scar!.html); }
       await page.close();
     } finally { await browser.close(); }
   }, 90000);
