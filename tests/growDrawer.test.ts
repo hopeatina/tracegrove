@@ -326,11 +326,23 @@ describe('What happened, step by step', () => {
   });
 
   it('is a full-screen sheet on a phone, every target at least 44 px', async () => {
+    // the ways into it, on the card under the tree and on the rows, in the Grove and the Outline
+    const before = await open(`#grow/${failed}`, 390);
+    const ways = () => before.evaluate(() => Array.from(document.querySelectorAll('[data-dr],[data-hap]')).filter((b) => (b as HTMLElement).offsetParent && b.getBoundingClientRect().width > 0)
+      .map((b) => { const q = b.getBoundingClientRect(); return { t: b.textContent, w: q.width, h: q.height }; }));
+    const grove = await ways();
+    expect(grove.length).toBeGreaterThan(0);
+    expect(grove.filter((q) => q.w < 44 || q.h < 44)).toEqual([]);
+    await before.getByTestId('grow-view-outline').tap();
+    const outline = await ways();
+    expect(outline.length).toBeGreaterThan(0);
+    expect(outline.filter((q) => q.w < 44 || q.h < 44)).toEqual([]);
+    await before.close();
     const page = await open(`#grow/${failed}/steps`, 390);
     await opened(page);
     const m = await page.evaluate(() => {
       const r = document.querySelector('.gw-insw')!.getBoundingClientRect();
-      const small = Array.from(document.querySelectorAll('[data-testid="grow-happened"] button')).filter((b) => (b as HTMLElement).offsetParent)
+      const small = Array.from(document.querySelectorAll('[data-testid="grow-happened"] button, [data-dr], [data-hap]')).filter((b) => (b as HTMLElement).offsetParent)
         .map((b) => { const q = b.getBoundingClientRect(); return { t: b.textContent, w: q.width, h: q.height }; }).filter((q) => q.w < 44 || q.h < 44);
       return { sheet: [r.left, r.top, r.width, r.height], small, view: [innerWidth, innerHeight] };
     });
