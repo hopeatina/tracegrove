@@ -417,6 +417,15 @@ describe('What happened, step by step', () => {
     }
   });
 
+  it('gives every button in the result band at least 44 px on a phone', async () => {
+    const page = await open(`#grow/${failed}`, 390);
+    const sizes = await page.getByTestId('grow-result').evaluate((band) => Array.from(band.querySelectorAll('button')).filter((b) => (b as HTMLElement).offsetParent)
+      .map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent, h: r.height }; }));
+    expect(sizes.map((q) => q.t)).toContain('Open the runs');
+    expect(sizes.filter((q) => q.h < 44)).toEqual([]);
+    await page.close();
+  });
+
   it('is a full-screen sheet on a phone, every target at least 44 px', async () => {
     // the ways into it, on the card under the tree and on the rows, in the Grove and the Outline
     const before = await open(`#grow/${failed}`, 390);
