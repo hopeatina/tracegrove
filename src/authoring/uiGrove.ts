@@ -353,6 +353,8 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-hap+.gw-dre{margin-left:14px}.gw-dre+.gw-wr{margin-left:12px}
 .gw-cacts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .gw-more{margin-top:4px;font-size:13.5px;line-height:19px;color:var(--ink)}.gw-flag .gw-more{display:block}
+/* why a scenario is not tested yet, under its state on its card and its row */
+.gw-nrw{margin:6px 0 0;font-size:13.5px;line-height:19px;color:var(--ink2);overflow-wrap:anywhere}
 /* on a phone, the ways into what happened are 44 px tall like every other target */
 @media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}.gw-result .btn,.btn.gw-wr,.gw-cacts .btn,.gw-call .btn,.gw-callrow .btn,.gw-meta .btn{min-height:44px}}
 .gw-dr{border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;background:var(--paper);min-width:0;margin-bottom:4px}
@@ -672,7 +674,7 @@ function gwPartCard(id,inline,live){const s=gw.state,v=gw.view;const M=gw.M||gbM
    ownOut.length?h('p',{class:'small muted gw-one','data-testid':'grow-own-line'},gwFacts(gwOwnFacts(ownOut))):null):null]}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
  if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms));
- if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return h('span',{class:'gw-badge'+(x.flow?'':' nf'),title:r.why||''},x.flow?'to prove':'no flow yet')}
+ if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return gwOpenBadge(x)}
 /* The spec as a strip of criteria: one chip each, its mark the status; the chosen one opens below and lights its parts in the
    tree. Above the strip, every criterion is counted once, as chips with the same marks. */
 function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
@@ -690,7 +692,7 @@ function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card
   notes.length?h('details',{class:'gw-notes',open:notes.some(n=>n.classList.contains('red'))?true:null},h('summary',{},notes.length+' note'+(notes.length===1?'':'s')+': '+[s.drift.length?s.drift.length+' in the code, not in the spec':null,s.stops.length?'tracing stopped '+s.stops.length+'×':null].filter(Boolean).join(' · ')),notes):null);
  return card}
 function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
- const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms)):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):h('span',{class:'gw-badge'+(x.flow?'':' nf')},x.flow?'to prove':'no flow yet');
+ const mock=!r?h('span',{class:'gw-badge'},'waiting'):r.st==='run'?h('span',{class:'gw-badge run'},'running'):r.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms)):r.st==='fail'?h('span',{class:'gw-badge fail'},'failed'):gwOpenBadge(x);
  const real=x.mockOnly?h('span',{class:'gw-badge'},'mock only'):!v?h('span',{class:'gw-badge'},r&&r.st==='pass'?'next':'after mock'):v.st==='pass'?h('span',{class:'gw-badge pass'},'passed '+gwDur(v.ms)):h('span',{class:'gw-badge warn'},v.na?'mock only':'skipped');
  const note=x.mockOnly||(v&&v.note)||(x.realKey?'Runs against the provider sandbox when '+x.realKey+' is set':'No sandbox known for this provider yet');
  return h('div',{class:'gw-lanes'},h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'mock · stand-in'),mock,h('span',{class:'note'},'Every PR. Can fail, slow down or hang up on purpose.')),h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'real · sandbox'),real,h('span',{class:'note'},note)))}
@@ -715,11 +717,22 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
    words are the same, so its text reads as before. */
 const gwClauses=t=>String(t).split(', ').flatMap((c,i)=>i?[', ',h('span',{class:'nw'},c)]:[c]);
 function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');
- /* a scenario whose run never reached its checks is not still to prove: it could not run, as its reason says it in the verdict
-    and grow --json, whoever wrote its flow; one with no flow, neither its own nor one an agent wrote and ran for it, has none yet */
- const could=x=>/^Could not run/.test(String(s.run[x.id].why||''));
- const cr=nr.filter(could).length,nf=nr.filter(x=>!could(x)&&!(s.run[x.id].flow||x.flow)).length,rest=nr.length-nf-cr;
+ const n=w=>nr.filter(x=>gwOpenWord(x)===w).length,nf=n('no flow yet'),cr=n('could not run'),rest=n('to prove');
  return (nf?', '+nf+' with no flow yet':'')+(cr?', '+cr+' could not run':'')+(rest?', '+rest+' to prove':'')}
+/* The flow that proves a scenario: its own, or one an agent wrote and ran for it */
+const gwFlowOf=x=>{const r=x&&gw.state&&gw.state.run[x.id];return r&&r.flow||x&&x.flow||null};
+/* One word for a scenario with no result, the same in the band, its row, its card, its leaf and the verdict's next action, from
+   the reason the verdict and grow --json give it: a scenario whose run never reached its checks could not run, whoever wrote
+   its flow; one with no flow, neither its own nor one an agent wrote and ran for it, has no flow yet; the rest are to prove */
+const gwOpenWord=x=>{const r=gw.state.run[x.id];return r&&r.st==='not_run'&&/^Could not run/.test(String(r.why||''))?'could not run':gwFlowOf(x)?'to prove':'no flow yet'};
+/* Why a scenario is not tested yet, as the verdict and grow --json say it, as one sentence: under its state on its card and its
+   row, as the prototype puts it */
+function gwWhyNot(x){const r=gw.state.run[x.id];if(!r||r.st!=='not_run'||!r.why)return null;
+ return h('p',{class:'gw-nrw','data-testid':'grow-card-why'},String(r.why).replace(/([^.!?])$/,'$1.'))}
+/* The badge of a scenario with no result, in its one word; the reason is its title, and the card's line under it */
+/* An outlined leaf has a flow and no result: in the key it is to prove, and says could not run too when one of them could not */
+const gwInKey=()=>gw.state.scenarios.some(x=>gwIn(x)&&gwOpenWord(x)==='could not run')?'to prove, or could not run':'to prove';
+const gwOpenBadge=x=>{const w=gwOpenWord(x),r=gw.state.run[x.id];return h('span',{class:'gw-badge'+(w==='no flow yet'?' nf':''),title:r&&r.why||''},w)};
 /* The spec's line in the verdict counts each criterion once, in the spec panel's words. A count of none is left out, except
    "0 need you": it is the one that says nothing waits on the reader. */
 function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
@@ -822,8 +835,9 @@ function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=nu
    happened ›" (gwHappened) instead. */
 function gwDrEntry(x){if(!gwDrCan(x)||gwRan(x))return null;
  return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':'Why it is not tested yet: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'Why not tested yet ›')}
-/* A scenario no flow proves offers to write that flow on its card, beside the way into why it is not tested yet */
-function gwWriteEntry(x){const s=gw.state;return x&&!x.flow&&s&&s.done&&gwIn(x)?h('button',{class:'btn sm gw-wr',type:'button','data-testid':'grow-card-write','aria-label':'Write this flow: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow'):null}
+/* A scenario no flow proves (neither its own nor one an agent wrote and ran for it) offers to write that flow on its card, beside
+   the way into why it is not tested yet */
+function gwWriteEntry(x){const s=gw.state;return x&&s&&!gwFlowOf(x)&&s.done&&gwIn(x)?h('button',{class:'btn sm gw-wr',type:'button','data-testid':'grow-card-write','aria-label':'Write this flow: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow'):null}
 /* Where a failure's extra stand-in call came from, as grow --json says it, under the answer on its card: "The extra 900 charge came
    during step 3 (owner removes it again); step 4 counted them." Only when its run says so. */
 function gwMore(x){const t=x&&gw.view&&gw.view.more&&gw.view.more[x.id];const r=x&&gw.state.run[x.id];return t&&r&&r.st==='fail'?h('div',{class:'gw-more','data-testid':'grow-card-more'},t):null}
@@ -922,14 +936,14 @@ function gwDrActs(x,D,under){const s=gw.state,d=gw.dr,r=s.run[x.id];const fail=!
    under?null:gwDrCopyBtn()),
   why.length?h('p',{class:'gw-drw','data-testid':'grow-happened-why'},why.join(' ')):null]}
 /* A scenario with no run: why, what it would prove and where it starts, and the way to write its flow */
-function gwDrNone(x,r,j,M){const why=String(r&&r.why||(x.flow?'This grow did not run its flow':'No flow proves this yet')).replace(/([^.!?])$/,'$1.');const u=M.U[x.unit]||{};
+function gwDrNone(x,r,j,M){const why=String(r&&r.why||(gwFlowOf(x)?'This grow did not run its flow':'No flow proves this yet')).replace(/([^.!?])$/,'$1.');const u=M.U[x.unit]||{};
  const at=j?gbStarts(j,M):null;if(at&&typeof at[0]==='string')at[0]=at[0].charAt(0).toUpperCase()+at[0].slice(1);
  return [h('div',{class:'gw-drn','data-testid':'grow-happened-none'},h('b',{},why),h('span',{},'Nothing has run, so there are no steps, checks or calls to show.')),
   x.proves?h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'It would prove'),h('p',{},...gwRich(x.proves))):null,
   h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'Where it starts'),at?h('p',{},...at):null,u.label&&!(j&&j.entry===x.unit)?h('p',{},'Part: ',...gwCodeText(gwPlain(u.label))):null,
    x.layers&&x.layers.length?h('p',{class:'gw-drw'},'Layers it crosses: '+x.layers.map(l=>GW.layers[l]||l).join(', ')):null),
   x.realKey?h('div',{class:'gw-drsec','data-testid':'grow-happened-realkey'},h('span',{class:'gw-eyebrow'},'To run it for real'),h('p',{},'A real run needs '+x.realKey+'.')):null,
-  h('div',{class:'gw-dra'},x.flow?null:h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-write',on:{click:()=>gwDrWrite(x)}},'Write this flow'),
+  h('div',{class:'gw-dra'},gwFlowOf(x)?null:h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-write',on:{click:()=>gwDrWrite(x)}},'Write this flow'),
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link'))]}
 /* The address follows the selection: the run a scenario opened while the Run tab still shows it, else the drawer, else what is
    selected here. */
@@ -958,10 +972,13 @@ function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)r
 /* What to do about a grow that is not proven yet, from why its scenarios in the mode are not tested yet: a run that never reached
    its checks says why in the drawer; a flow that did not run is proved by growing again with proving on, in the same mode (as
    the start card's "Prove with real flows" does); a scenario no flow proves gets its flow written. */
+/* The scenario Not proven yet's next action opens in the drawer: the first in the mode with no result whose run
+   can be read there (one that never reached its checks, say) */
+function gwNextRan(){const s=gw.state;return s.scenarios.find(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail'))&&gwRan(x)&&gwDrCan(x))||null}
 function gwNext(){const s=gw.state;const open=s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail')));
- const ran=open.find(x=>gwRan(x)&&gwDrCan(x)),flow=open.find(x=>x.flow),none=open.find(x=>!x.flow&&s.done);
+ const ran=gwNextRan(),flow=open.find(x=>gwFlowOf(x)),none=open.find(x=>!gwFlowOf(x)&&s.done);
  const b=(label,aria,go,off)=>h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-next','aria-label':aria,disabled:!!off,on:{click:go}},label);
- if(ran){const could=/^Could not run/.test(String(s.run[ran.id].why||''));const T=gwPlain(gwVia(ran.title).title);
+ if(ran){const could=gwOpenWord(ran)==='could not run';const T=gwPlain(gwVia(ran.title).title);
   return b(could?'See why it could not run ›':'See why it is not proven ›',(could?'See why it could not run: ':'See why it is not proven: ')+T,()=>{gwDrOpen(ran.id);if(gw.dr)gw.dr.from='t:grow-verdict-next'})}
  if(flow)return b('Prove it','Prove it: grow again with “Prove with real flows” on, in '+gwML(s.mode),()=>{gw.prove=true;if(!gw.base&&s.change&&s.change.base)gw.base=s.change.base;growStart(s.modeBy?s.mode:null)},gw.busy);
  if(none)return b('Write this flow','Write this flow: '+gwPlain(gwVia(none.title).title),()=>gwDrWrite(none));
@@ -1078,7 +1095,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  else if(one){const j=M.J[0],crown=gwPadLeaves(j.id,null)||M.leaves[j.id]||[],own=p=>!!(gw.B&&gw.B.padsOf&&gwPadLeaves(j.id,p)),on=p=>crown.some(x=>gbPol(x)===p);
   where=row('Where a leaf sits',[bm('crown','happy path, on the crown'),own('guard')?bm('branch','what it refuses, on a branch of its own'):on('guard')?pm('shoulder','what it refuses'):null,
    own('failure')?bm('branch','how it fails, on a branch of its own'):on('failure')?pm('hang','how it fails'):null],'where')}
- const leaves=row('Leaf',[it('pass','passed'),it('fail','failed'),it('run','running'),it('in','to prove'),it('none','no flow yet')]);
+ const leaves=row('Leaf',[it('pass','passed'),it('fail','failed'),it('run','running'),it('in',gwInKey()),it('none','no flow yet')]);
  const route=row('Route',[it('route','a scenario’s route'),it('rbad',[h('span',{class:'bad'},'red'),': where it broke']),it('rrest','grey: never reached')]);
  /* the files on the route, and what Max grows from a file's knot: a shoot of its part checks and the existing flows through it,
     named as the Outline names them */

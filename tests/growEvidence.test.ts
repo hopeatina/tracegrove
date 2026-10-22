@@ -387,6 +387,68 @@ describe('From a grown scenario to its run', () => {
     await expect(big()).resolves.toBe('3 of 7 scenarios proved, 1 failed, 2 with no flow yet, 1 could not run');
     await page.close();
   });
+
+  /* A scenario with no result, selected, as its row under Journeys, its card beside the tree, its leaf and the key say it */
+  const said = (page: Page, sid: string) => page.evaluate((id) => {
+    const t = (e: Element | null | undefined) => (e ? e.textContent!.replace(/\s+/g, ' ').trim() : null);
+    const card = document.querySelector('[data-testid="grow-inspector"]'), leaf = document.querySelector(`[data-testid="grow"] svg [data-k="s:${id}"]`);
+    return {
+      band: t(document.querySelector('[data-testid="grow-result"] .big')),
+      row: t(document.querySelector(`.gb-ols[data-sid="${id}"] .gw-badge`)),
+      card: t(card?.querySelector('.sec .row .gw-badge')),
+      why: t(card?.querySelector('[data-testid="grow-card-why"]')),
+      write: !!card?.querySelector('[data-testid="grow-card-write"]'),
+      proof: Array.from(card?.querySelectorAll('.gw-chip.built, .gw-chip.missing') ?? []).map((e) => t(e)),
+      leaf: leaf?.getAttribute('aria-label')?.replace(/^Scenario: [^,]*, /, '') ?? null,
+      mark: leaf ? ['idle', 'none'].find((c) => leaf.classList.contains(c)) ?? null : null,
+      key: Array.from(document.querySelectorAll('.gw-legend .gw-li, .gb-olkey .gw-li')).map((e) => t(e)).filter((w) => /^to prove/.test(w ?? '')),
+    };
+  }, sid);
+  const pinned = (page: Page, st: GrowState, sid: string) => page.evaluate(({ s, v, id }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.pinned = 's:' + id; w.gw.dr = null; w.growPaint(); }, { s: st, v: growView(st), id: sid });
+  const reasonsOf = (st: GrowState) => Object.fromEntries(growJsonSummary(st, mkdtempSync(join(tmpdir(), 'tracegrove-words-'))).unproven.map((u) => [u.scenario, u.reason]));
+  const APP = 'Could not run: the app did not start (application exited before becoming ready)';
+
+  it('names a scenario whose app did not start “could not run” in its row, its card, its leaf and the key, as the band does, with the reason grow --json gives under its card', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    // s10 has its own flow, and its run never reached its checks: tg's 15 scenarios read this way
+    const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent : e));
+    expect(reasonsOf(crashed).s10).toBe(APP);
+    await pinned(page, crashed, 's10');
+    expect(await said(page, 's10')).toEqual({ band: '3 of 7 scenarios proved, 3 with no flow yet, 1 could not run', row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
+      proof: ['seats.remove-seat'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['to prove, or could not run'] });
+    // one with no flow at all has none yet, everywhere, and offers to write it
+    await pinned(page, crashed, 's5');
+    expect(await said(page, 's5')).toMatchObject({ row: 'no flow yet', card: 'no flow yet', why: 'No flow proves this yet.', write: true, proof: ['no flow yet'], leaf: 'no flow yet', mark: 'none' });
+    // a run whose evidence did not verify is still to prove, with why; nothing could not run, so the key says only to prove
+    const unverified = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'passed', why: 'Not proven: the run evidence did not verify' } as GrowEvent : e));
+    await pinned(page, unverified, 's10');
+    expect(await said(page, 's10')).toMatchObject({ band: '3 of 7 scenarios proved, 3 with no flow yet, 1 to prove', row: 'to prove', card: 'to prove', why: 'Not proven: the run evidence did not verify.', write: false,
+      leaf: 'to prove: Not proven: the run evidence did not verify', mark: 'idle', key: ['to prove'] });
+    await page.close();
+  });
+
+  it('names a scenario whose flow an agent wrote and ran “could not run” when its app did not start, never “no flow yet”, and offers to rerun it, not to write it', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const written = plotline((e) => (e.kind === 'scenario.not_run' && e.scenario === 's1' ? [
+      { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.running', scenario: 's1', flow: 'discovered.seats-panel' } as GrowEvent,
+      { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: 's1', run: '2026-10-22T01-41-00Z_error_s1', outcome: 'infrastructure_failed', why: APP } as GrowEvent] : e));
+    expect(written.scenarios.find((x) => x.id === 's1')!.flow).toBeFalsy();
+    expect(reasonsOf(written).s1).toBe(APP);
+    await pinned(page, written, 's1');
+    expect(await said(page, 's1')).toEqual({ band: '3 of 7 scenarios proved, 1 failed, 2 with no flow yet, 1 could not run', row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
+      proof: ['discovered.seats-panel'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['to prove, or could not run'] });
+    const acts = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-inspector"] [data-testid="grow-card-actions"] button')).map((b) => b.textContent));
+    expect(acts).toEqual(['Rerun', 'Copy link']);
+    // its row in the Outline says the same, with the same reason when it is opened
+    await page.getByTestId('grow-view-outline').click();
+    await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 's:s1'; w.gw.pinList = 's:s1'; w.growPaint(); });
+    await expect(page.locator('.gb-ols[data-sid="s1"] .gw-badge').first().textContent()).resolves.toBe('could not run');
+    await expect(page.locator('.gb-olin [data-testid="grow-card-why"]').first().textContent()).resolves.toBe(`${APP}.`);
+    await page.getByTestId('grow-view-grove').click();
+    await page.close();
+  });
 });
 
 describe('A grow whose config is in a subfolder', () => {
