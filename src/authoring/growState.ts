@@ -247,12 +247,6 @@ const VERDICT_WORD: Record<VerdictKind, string> = { 'not ready': 'Not ready', 'n
 const VERDICT_MARK: Record<VerdictKind, string> = { 'not ready': '✗', 'not proven yet': '◌', ready: '✓', stopped: '✕', cancelled: '✕' };
 const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven yet': 3, ready: 0, stopped: 2, cancelled: 4 };
 
-/**
- * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
- * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result or
- * the mode holds no scenario at all, "Ready" when at least one passed and every one did. Exit codes: 1 fix, 3 prove more (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was
- * cancelled (4) keeps its own code.
- */
 /** What the first failure's run recorded: the step that broke, and the check there with what it expected and got. Null
  *  fields were not recorded (the run is gone, or its evidence does not say). */
 export type VerdictFacts = { step: number | null; stepName: string | null; check: string | null; expected: unknown; got: unknown };
@@ -271,6 +265,13 @@ function howItBroke(r: RunState | undefined, broke: VerdictFacts | null | undefi
   return failReason(r?.why).said || null;
 }
 
+/**
+ * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
+ * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result or
+ * the mode holds no scenario at all, "Ready" when at least one passed and every one did. Exit codes: 1 fix, 3 prove more
+ * (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was cancelled (4) keeps its own code. `broke` is what the
+ * first failure's run recorded, so the verdict can say how it failed.
+ */
 export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke?: VerdictFacts | null } = {}) {
   const inRun = s.scenarios.filter((x) => inMode(s, x));
   const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
