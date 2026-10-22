@@ -17,7 +17,7 @@ One verdict, computed once from the grow's counts (`growVerdict`), is what the D
 - **Not proven yet** when nothing failed but a scenario in the chosen mode has no result, or when the mode holds no scenario at all (a change to only its docs, say): then it says nothing in this change was traced to a scenario.
 - **Ready** when at least one scenario in the mode passed and every one did.
 
-The exit code follows it: `1` not ready (fix), `3` not proven yet (prove more), `0` ready. `--allow-unproven` turns `3` into `0`. A grow that stopped exits `2`, and one that was cancelled exits `4`.
+The exit code follows it: `1` not ready (fix), `3` not proven yet (prove more), `0` ready. `--allow-unproven` turns `3` into `0`. A grow that stopped exits `2`, and one that was cancelled exits `4`. Every other command keeps `3` for an infrastructure failure, and a grow that crashes exits `3` as well: with `--json`, a finished grow prints its `summary` (`exitMeaning: "prove more"`), while a crash prints a `tracegrove.cli-error/v1` report instead, so read the output, not only the code.
 
 `summary.failures` gives each failure's scenario, title, promise, flow, run, whether that run is saved in this folder (`saved`; a grow that proved in a worktree of its own saved it there), step and check, what the check expected and what it got (from the run's recorded assertion), the sentence the page says, and the paths of its evidence (`summary.json`, and the cell's `receipt.json`, `assertions.json`, `boundaries.json` and `events.jsonl`). What the run did not record is `null`, and a run that is not saved here has no evidence listed. `summary.unproven` lists each scenario not tested yet with its reason.
 

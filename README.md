@@ -407,7 +407,7 @@ check that another user is denied. Run them and fix setup until they pass. Never
 challenge_check if you think one is wrong. Finish with the readiness summary.
 ```
 
-Every command also takes `--json`, with stable exit codes: `0` passed, `1` a check failed, `2` blocked (fix setup, don't retry), `3` infrastructure failed, `4` cancelled. [Agent guide](docs/agent-guide.md).
+Every command also takes `--json`, with stable exit codes: `0` passed, `1` a check failed, `2` blocked (fix setup, don't retry), `3` infrastructure failed, `4` cancelled. One exception: `grow` also exits `3` when its verdict is *not proven yet* (prove more; `--allow-unproven` exits `0` instead), and a grow that crashes exits `3` too. Only the output tells them apart: with `--json`, a finished grow prints its `summary`, whose `exitMeaning` is `prove more`, while a crash prints a `tracegrove.cli-error/v1` report instead. See [Grow](docs/grow.md#the-verdict). [Agent guide](docs/agent-guide.md).
 
 ## Documentation
 
