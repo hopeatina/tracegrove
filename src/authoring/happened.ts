@@ -30,6 +30,11 @@ export type Happened = {
   foot: string[];
   /** the saved runs beside this one that ran the flow: how many, how many passed and failed a check, the newest that passed */
   history: { saved: number; passed: number; failed: number; lastPass: string | null };
+  /** those saved runs that ended with no result from their checks: never reached them (blocked, or the app did not start),
+   *  cancelled, or inconclusive */
+  unfinished: { notReached: number; cancelled: number; inconclusive: number };
+  /** whether the flow held before, in one sentence from the counts above; null when no saved run ran it */
+  historyLine: string | null;
 };
 
 const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -156,10 +161,11 @@ function footOf(c: CaseReport, steps: StepReport[]): string[] {
 /** The saved runs beside this one that ran the flow, newest first, as their verified evidence says; read once each once it
  *  verifies. A run that does not verify yet (one still being written, say) is read again next time, never kept as unreadable. */
 const outcomes = new Map<string, Array<{ caseId: string; outcome: string }>>();
-function historyOf(root: string, caseId: string, current: string): Happened['history'] {
+function historyOf(root: string, caseId: string, current: string): Pick<Happened, 'history' | 'unfinished'> {
   let names: string[] = [];
   try { names = readdirSync(join(root, '.tracegrove', 'runs')).filter((n) => n !== 'latest' && SavedRunName.safeParse(n).success).sort().reverse(); } catch { names = []; }
   let saved = 0, passed = 0, failed = 0, lastPass: string | null = null;
+  const unfinished = { notReached: 0, cancelled: 0, inconclusive: 0 };
   for (const name of names) {
     let dir: string;
     try { dir = savedRunDirectory(root, name); } catch { continue; }
@@ -176,25 +182,41 @@ function historyOf(root: string, caseId: string, current: string): Happened['his
     saved++;
     if (mine.outcome === 'passed') { passed++; if (!lastPass && name !== current) lastPass = name; }
     else if (mine.outcome === 'assertion_failed') failed++;
+    else if (mine.outcome === 'blocked' || mine.outcome === 'infrastructure_failed') unfinished.notReached++;
+    else if (mine.outcome === 'cancelled') unfinished.cancelled++;
+    else if (mine.outcome === 'inconclusive') unfinished.inconclusive++;
   }
-  return { saved, passed, failed, lastPass };
+  return { history: { saved, passed, failed, lastPass }, unfinished };
+}
+
+/** Whether the flow held before, in the saved runs: how they went, the runs that never reached their checks named as such
+ *  (never read as failures), and that no run of the base branch is recorded to set it against. */
+export function historyLine(h: Happened['history'], u: Happened['unfinished'], base: string | null): string | null {
+  if (!h.saved) return null;
+  const all = h.saved === 1 ? 'its 1 saved run' : `all ${h.saved} saved runs`;
+  const were = (n: number) => (n === 1 ? 'was' : 'were');
+  const head = h.failed === h.saved ? `Failed in ${all}` : h.passed === h.saved ? `Passed in ${all}` : u.notReached === h.saved ? `Never reached its checks in ${all}`
+    : [`Passed ${h.passed} of ${h.saved} saved runs`, u.notReached ? `${u.notReached} never reached ${u.notReached === 1 ? 'its' : 'their'} checks` : '',
+      u.cancelled ? `${u.cancelled} ${were(u.cancelled)} cancelled` : '', u.inconclusive ? `${u.inconclusive} ${were(u.inconclusive)} inconclusive` : ''].filter(Boolean).join('; ');
+  return `${head}${base ? `; no run on ${base} is recorded` : ''}.`;
 }
 
 /** The drawer's reading of `caseId` in the run `name` saved under `root` (the folder whose .tracegrove holds it). */
-export function happenedIn(root: string, name: string, caseId: string): Happened | null {
+export function happenedIn(root: string, name: string, caseId: string, opts: { base?: string | null } = {}): Happened | null {
   const dir = savedRunDirectory(root, name);
   const r = readSavedRun(dir);
   // Only the flow asked for: a run that holds one other flow is not read as this one.
   const c = r.cases.find((q) => q.caseId === caseId);
   const verified = r.evidenceStatus === 'verified';
-  const history = historyOf(root, caseId, name);
+  const { history, unfinished } = historyOf(root, caseId, name);
+  const said = { history, unfinished, historyLine: historyLine(history, unfinished, opts.base || null) };
   if (!c) return verified ? null : { run: name, verified, source: null, startedAt: r.startedAt, caseId, title: caseId, outcome: r.outcome, ms: 0, steps: [], at: 0, contradicts: null,
-    oneLine: 'This run’s evidence could not be verified, so its steps are not shown.', chips: [{ t: `run ${name}`, tone: '' }, { t: 'not verified', tone: 'bad' }], foot: [], history };
+    oneLine: 'This run’s evidence could not be verified, so its steps are not shown.', chips: [{ t: `run ${name}`, tone: '' }, { t: 'not verified', tone: 'bad' }], foot: [], ...said };
   const names = declaredNames(dir, c.caseId);
   const steps = c.steps.filter((x) => x.declared !== false).map((x) => ({ ...x, name: names.get(x.id) ?? x.name }));
   const name1 = (x: StepReport) => x.name;
   const { line, contradicts } = oneLineOf(c, steps, name1, () => sealedCause(dir, c.caseId));
   const at = Math.max(0, steps.findIndex(bad));
   return { run: name, verified, source: verified ? r.sourceDigest.slice(0, 6) : null, startedAt: r.startedAt, caseId: c.caseId, title: c.title, outcome: c.outcome, ms: c.durationMs,
-    steps, at, contradicts, oneLine: line, chips: chipsOf(r, c, name), foot: footOf(c, steps), history };
+    steps, at, contradicts, oneLine: line, chips: chipsOf(r, c, name), foot: footOf(c, steps), ...said };
 }

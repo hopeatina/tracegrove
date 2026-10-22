@@ -6,7 +6,7 @@ import { basename, join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { checksOf } from '../src/authoring/checkCompare.ts';
 import { grow } from '../src/authoring/grow.ts';
-import { happenedIn } from '../src/authoring/happened.ts';
+import { happenedIn, historyLine } from '../src/authoring/happened.ts';
 import { couldNotRun, growVerdict, type GrowState } from '../src/authoring/growState.ts';
 import { runTests } from '../src/authoring/run.ts';
 import type { PredicateT } from '../src/protocol/index.ts';
@@ -434,7 +434,28 @@ describe('What happened in a run that never reached its checks', () => {
     const unrecorded = d.chips.filter((x) => / not recorded$/.test(x.t));
     expect(unrecorded.length).toBeGreaterThan(0);
     expect(unrecorded.map((x) => x.tone)).toEqual(unrecorded.map(() => 'none'));
+    // in the flow's history a run that never reached its checks is said so, never counted as a failure
+    expect(d.history).toMatchObject({ saved: 1, passed: 0, failed: 0 });
+    expect(d.unfinished).toEqual({ notReached: 1, cancelled: 0, inconclusive: 0 });
+    expect(d.historyLine).toBe('Never reached its checks in its 1 saved run.');
+    // once the app starts again and the flow passes, the line says both
+    writeFileSync(app, readFileSync(app, 'utf8').replace("console.error('billing is down');\nprocess.exit(3);\n", ''));
+    const again = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'card-declined' });
+    expect(again.report.cases.map((x) => x.outcome)).toEqual(['passed']);
+    const e = happenedIn(dir, basename(again.report.runDir), c.caseId)!;
+    expect([e.history.saved, e.history.passed, e.history.failed, e.unfinished.notReached]).toEqual([2, 1, 0, 1]);
+    expect(e.historyLine).toBe('Passed 1 of 2 saved runs; 1 never reached its checks.');
   }, 120_000);
+
+  it('says the saved runs as they went: failures, runs that never reached their checks, cancelled and inconclusive ones', () => {
+    const none = { notReached: 0, cancelled: 0, inconclusive: 0 };
+    expect(historyLine({ saved: 0, passed: 0, failed: 0, lastPass: null }, none, 'main')).toBeNull();
+    expect(historyLine({ saved: 6, passed: 0, failed: 0, lastPass: null }, { ...none, notReached: 6 }, 'main')).toBe('Never reached its checks in all 6 saved runs; no run on main is recorded.');
+    expect(historyLine({ saved: 6, passed: 0, failed: 2, lastPass: null }, { ...none, notReached: 4 }, 'main')).toBe('Passed 0 of 6 saved runs; 4 never reached their checks; no run on main is recorded.');
+    expect(historyLine({ saved: 6, passed: 1, failed: 1, lastPass: 'r' }, { notReached: 1, cancelled: 2, inconclusive: 1 }, null)).toBe('Passed 1 of 6 saved runs; 1 never reached its checks; 2 were cancelled; 1 was inconclusive.');
+    expect(historyLine({ saved: 3, passed: 2, failed: 1, lastPass: 'r' }, none, null)).toBe('Passed 2 of 3 saved runs.');
+    expect(historyLine({ saved: 1, passed: 0, failed: 1, lastPass: null }, none, 'main')).toBe('Failed in its 1 saved run; no run on main is recorded.');
+  });
 });
 
 /* The seats branch with a second break: a seat count out of range is refused with another error than the flow expects, so

@@ -375,7 +375,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const root = runRoot(url);
         if (!root) return send(400, { error: 'config must name a file inside this folder' });
         let found: ReturnType<typeof happenedIn>;
-        try { found = happenedIn(root, name, caseId); } catch { return send(404, { error: 'run not found' }); }
+        // The base branch the grow set the change against, to say whether a run of it is recorded; a name, never an option.
+        const base = url.searchParams.get('base');
+        if (base !== null && !/^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,200}$/.test(base)) return send(400, { error: 'bad base branch name' });
+        try { found = happenedIn(root, name, caseId, { base }); } catch { return send(404, { error: 'run not found' }); }
         return found ? send(200, found) : send(404, { error: 'the run has no record of that flow' });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {

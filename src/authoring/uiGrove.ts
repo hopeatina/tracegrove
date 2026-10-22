@@ -761,7 +761,7 @@ async function gwDrLoad(d){const s=gw.state,r=s.run[d.sid],x=gwScen(d.sid);const
  let out=null,err=null;
  /* the run is read for the flow the grow recorded it ran, never for whichever flow the run holds */
  if(!flow)err='This grow did not record which flow made the run '+r.run+', so it is not read as this scenario.';
- else try{const res=await fetch('/api/runs/'+encodeURIComponent(r.run)+'/happened?case='+encodeURIComponent(flow)+(cfg?'&config='+encodeURIComponent(cfg):''),{headers:{'x-tracegrove-token':TOKEN}});
+ else try{const res=await fetch('/api/runs/'+encodeURIComponent(r.run)+'/happened?case='+encodeURIComponent(flow)+(cfg?'&config='+encodeURIComponent(cfg):'')+(s.change&&s.change.base?'&base='+encodeURIComponent(s.change.base):''),{headers:{'x-tracegrove-token':TOKEN}});
   const j=await res.json().catch(()=>null);
   if(res.ok&&j&&Array.isArray(j.steps))out=j;else err=j&&j.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':j&&j.error==='the run has no record of that flow'?'The run '+r.run+' has no record of '+flow+'.':'The run '+r.run+' could not be read'+(j&&j.error?': '+j.error:'')+'.'}
  catch(e){err='The run '+r.run+' could not be read.'}
@@ -815,9 +815,6 @@ const gwDrPath=q=>q.method+' '+(q.request&&q.request.path?q.request.path:q.path+
 /* a response body as it was recorded; JSON is laid out to read, the same text */
 const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
 const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
-/* whether the flow held before, from the runs saved beside this one, and that no run of the base branch is recorded to compare */
-function gwDrHist(hs){if(!hs||!hs.saved)return null;const s=gw.state,base=s.change&&s.change.base;const all=hs.saved===1?'its 1 saved run':'all '+hs.saved+' saved runs';
- return (hs.failed===hs.saved?'Failed in '+all:hs.passed===hs.saved?'Passed in '+all:'Passed '+hs.passed+' of '+hs.saved+' saved runs')+(base?'; no run on '+base+' is recorded.':'.')}
 function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.sid);if(!x)return null;const r=s.run[x.id];const T=gwVia(x.title);
  const j=M.J.find(q=>(M.leaves[q.id]||[]).includes(x)),n=j?(gw.order||[]).indexOf(j.id)+1:0;const st=r&&r.st==='fail'?'fail':r&&r.st==='pass'?'pass':'none';
  /* under 1060 px it is a sheet over the page: a dialog that keeps Tab inside it */
@@ -832,8 +829,9 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  if(!gwRan(x)){gwPut(el,gwDrNone(x,r,j,M));return el}
  if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}
  if(!d.data){gwPut(el,h('p',{class:'gw-drerr',role:'alert'},d.err||'The run could not be read.'),gwDrActs(x,null));return el}
- const D=d.data,steps=D.steps,all=gwDrCalls(steps),cur=d.step,hs=D.history;
- const hist=gwDrHist(hs);
+ const D=d.data,steps=D.steps,all=gwDrCalls(steps),cur=d.step;
+ /* whether the flow held before, in the runs saved beside this one, as the server says it from them */
+ const hist=D.historyLine||null;
  /* each step, and under it what it recorded: the answer the run contradicts, the stand-in calls made while it ran (placed by
     their own timestamps), and for a watch step what it expected and got, and how long it waited */
  const ol=h('ol',{class:'gw-drs','aria-label':'Steps'},steps.map((q,i)=>{const k=q.checks==='fail'&&q.result==='completed'?'fail':kind(q.result);const con=!!D.contradicts&&D.contradicts.at===i;const sx=[];
