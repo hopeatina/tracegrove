@@ -549,10 +549,25 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const maxV=js.length===1?2:js.length===2?1:0;let left=A.length,nv=0;const nP=p=>A.filter(x=>gbPol(x)===p).length;
  for(const p of js.length===2?['failure','guard'].sort((a,b)=>nP(b)-nP(a)):['failure','guard']){if(nv>=maxV)break;const n=A.filter(x=>gbPol(x)===p).length;if(n&&n<left){left-=n;nv++;items.push({id:apex.id+'~'+p,j:apex,pol:p,w:Math.max(.6,M.weight(apex)*n/A.length)})}}
  const m=items.length,lit=!m;const vp=new Set(items.filter(it=>it.pol).map(it=>it.pol));
- const h1=m>=7?.27:m===1?.36:.31;const hs=[];for(let i=0,h=h1;i<m;i++){hs.push(h);h+=(.86-h)*.4}
- const side=items.map((_,i)=>i%2?-S:S),back=items.map((_,i)=>m>=3&&i%3===2);
  const carry={};for(const j of js)for(const id of j.units)if(!U[id].root)carry[id]=(carry[id]||0)+1;
  const ownOf=j=>j.units.filter(id=>!U[id].root&&carry[id]===1);
+ const depth=id=>{let s=0,n=0;for(const j of js){const i=j.units.indexOf(id);if(i>=0){s+=i/Math.max(1,j.units.length-1);n++}}return n?s/n:0};
+ const ownA=apex.units.filter(id=>!U[id].root&&carry[id]===1).sort((a,b)=>depth(b)-depth(a));
+ /* The branch of the headline journey's refusals or failures grows from the knot where most of its scenarios break (the
+    hop the run says broke) or, where none broke, end (the last hop of their route): its height and collar are that knot's,
+    and it leaves on the outside of the trunk's bend there. Its knot stands where the headline journey's own parts would set
+    it on the upper trunk, deepest lowest, above the other journeys' branches; as the tree's first branch it stands a third
+    up, its knot with it. One branch to a knot; one whose knot is shared, or a root, takes a height as any other branch. The
+    other branches fill the remaining heights, heaviest lowest. */
+ const endOf=x=>{const w=gbWound(M,apex,x),ix=apex.units.indexOf(x.unit),real=apex.units.filter(id=>!U[id].root);return w||(x.scenarioKind!=='happy'&&ix>=0?x.unit:real[real.length-1])};
+ const anc=items.map(it=>{if(!it.pol)return null;const n=new Map();for(const x of A)if(gbPol(x)===it.pol){const e=endOf(x);n.set(e,(n.get(e)||0)+1)}let a=null,an=0;for(const [id,c] of n)if(c>an){a=id;an=c}return a&&ownA.includes(a)?a:null});
+ anc.forEach((a,i)=>{if(a&&anc.indexOf(a)<i)anc[i]=null});
+ const h1=m>=7?.27:m===1?.36:.31;const lad=[];for(let i=0,h=h1;i<m;i++){lad.push(h);h+=(.86-h)*.4}
+ const hs=items.map(()=>0);{let q=0;items.forEach((it,i)=>{if(!anc[i])hs[i]=lad[q++]});const npH=hs.filter((h,i)=>!anc[i]),n=ownA.length,lo0=npH.length?Math.max(...lad)+.06:.35;
+  let floor=npH.length?Math.max(...npH)+.12:null;
+  for(const i of items.map((_,i)=>i).filter(i=>anc[i]).sort((a,b)=>ownA.indexOf(anc[a])-ownA.indexOf(anc[b]))){const ix=ownA.indexOf(anc[i]),t=n===1?(lo0+.85)/2:lo0+(.85-lo0)*ix/(n-1);
+   hs[i]=floor===null?h1:Math.min(.72,Math.max(floor,t));floor=hs[i]+.2}}
+ const ord=items.map((_,i)=>i).sort((a,b)=>hs[a]-hs[b]),side=items.map(()=>S);ord.forEach((i,r)=>{side[i]=r%2?-S:S});const back=items.map((_,i)=>m>=3&&ord.indexOf(i)%3===2);
  /* the bare wood a branch shows before its pad: room for each of its own parts' knots, about a knot's length apart */
  const bare=it=>it.pol?Math.max(.025*H,14):Math.max(.025*H,10+19*Math.min(4,ownOf(it.j).length));
  /* Pads first, each as wide as the leaves it holds. Then the trunk is as tall as the pads need: the leader runs into the
@@ -583,7 +598,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
     upper trunk is not a bare pole (tried first, and kept only if nothing then overlaps) */
  if(!lit){for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(pd.geo.PH*(strict?1:.5)+pd.geo.L*(strict?.75:0)+gap+inC+lift)/(1-hs[pd.i]));
-  for(let i=0;i<m;i++)for(let j=i+1;j<m;j++)if(side[i]===side[j]&&!back[i]&&!back[j])need=Math.max(need,(padList[i+1].geo.PH+padList[j+1].geo.drop+gap)/(hs[j]-hs[i]));
+  for(let i=0;i<m;i++)for(let j=i+1;j<m;j++)if(side[i]===side[j]&&!back[i]&&!back[j]){const a=hs[i]<=hs[j]?i:j,c=a===i?j:i;need=Math.max(need,(padList[a+1].geo.PH+padList[c+1].geo.drop+gap)/((hs[c]-hs[a])||.01))}
   /* and no branch reaches further from the trunk than about two thirds of the tree's height (to the top of its crown): a
      long journey makes a taller tree, not a longer whip */
   for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(bare(items[pd.i])+pd.geo.PW)/.62-.6*cpd.geo.PH)}
@@ -599,7 +614,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const tl=cpd.geo.cs.some(c=>c.hap)?Math.max(0,-crc.bot):0;
  const Ht=Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);const D=sap?Ht*.05:Dd;
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
- else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;items.forEach((it,i)=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
+ else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;ord.forEach(i=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
   /* with one or two branches the apex leans a little away from the first, so the tree's mass stays over its roots: the
      crown's middle within about a tenth of the trunk's height of the nebari */
   /* and above it the leader keeps moving, in bends that shrink toward the top, so the upper trunk is never a straight pole */
@@ -677,7 +692,6 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     on the bare wood of its branch, deepest nearest the trunk (a lone one toward the outer end of it, clear of the crotch,
     where a shoot of its own can grow; and, where the bare wood reaches that far, past the limb's first sixth, so a long limb
     under a wide pad can still put one out); the headline journey's own parts on the upper trunk. */
- const depth=id=>{let s=0,n=0;for(const j of js){const i=j.units.indexOf(id);if(i>=0){s+=i/Math.max(1,j.units.length-1);n++}}return n?s/n:0};
  /* knots keep their distance along the wood, about two of their own lengths; where more files share a stretch than fit, the
     last knot there swells into a burl that holds the rest, and its card names every one */
  /* (on the trunk a knot keeps about a girth and a quarter from the next, so two bosses never touch) */
@@ -687,21 +701,28 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const group=(list,n)=>list.length<=n?list.map(id=>[id]):[...list.slice(0,n-1).map(id=>[id]),list.slice(n-1)];
  const core=lit?[]:Object.keys(carry).filter(id=>carry[id]>1).sort((a,b)=>carry[b]-carry[a]||depth(b)-depth(a));
  const c0=.09,c1=Math.max(.16,h1-.05);group(core,fitN(c0,c1)).forEach((ids,i,a)=>onTrunk(ids,a.length===1?.16:c0+(c1-c0)*i/(a.length-1)));
- const ownA=apex.units.filter(id=>!U[id].root&&carry[id]===1).sort((a,b)=>depth(b)-depth(a));
- const fr=hs.filter((h,i)=>!back[i]);const shB=cc.filter(Boolean).map(q=>q.bi),hi=Math.min(lit?.74:.95,1-(inC+8+cdrop)/Ht,...shB.map(bi=>(-tp[bi][1]-.85*tw[bi]-14)/Ht)),lo=Math.min(hi-.12,lit?.1:(fr.length?Math.max(...fr)+.06:.35));
+ const fr=hs.filter((h,i)=>!back[i]&&!anc[i]);const shB=cc.filter(Boolean).map(q=>q.bi),hi=Math.min(lit?.74:.95,1-(inC+8+cdrop)/Ht,...shB.map(bi=>(-tp[bi][1]-.85*tw[bi]-14)/Ht)),lo=Math.min(hi-.12,lit?.1:(fr.length?Math.max(...fr)+.06:.35));
  /* (and none in the crotch of a branchlet the leader puts out for a crown's shoulder: clear of its fillet and a boss below it) */
- group(ownA,Math.min(5,fitN(lo,hi))).forEach((ids,i,a)=>onTrunk(ids,a.length===1?(lo+hi)/2:lo+(hi-lo)*i/(a.length-1)));
+ /* (a refusals' branch holds its knot at its collar; the parts deeper than it sit below, clear of its fillet, the rest above) */
+ {const pk=br.filter(b=>anc[b.i]).sort((a,b)=>a.h-b.h);let pI=-1,pH=null,pD=0,used=0;
+  for(const b of [...pk,null]){const ix=b?ownA.indexOf(anc[b.i]):ownA.length,ids=ownA.slice(pI+1,ix),dl=b?(KT(b.k)+1.5*b.b)/Ht:0;
+   if(ids.length){let a=pH===null?lo+(b?.04:0):pH+pD,z=b?b.h-dl:hi;if(pk.length&&pH===null&&z-a<.04*ids.length)a=Math.max(.1,z-.05*ids.length);if(z<a)z=a=(a+z)/2;
+    group(ids,Math.max(1,Math.min(5-used,fitN(a,z)))).forEach((g,i,arr)=>{used++;onTrunk(g,arr.length===1?(a+z)/2:a+(z-a)*i/(arr.length-(b?0:1)))})}
+   if(b){const k=b.k;used++;knots.push({id:anc[b.i],ids:[anc[b.i]],on:'t',k,p:tp[k],n:gbNorm(tp,k),w:tw[k],t:ty[k],pin:b.dir,pinB:b.id});pI=ix;pH=b.h;pD=dl}}}
  /* never closer than that along the trunk, and none pushed into the crown: one that would be joins the burl below it */
  const kTop=gbNear(ty,hi);const tk=knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);
- for(let i=1;i<tk.length;i++){let k=tk[i].k;while(k<tp.length-6&&tacc[k]-tacc[tk[i-1].k]<KT(tk[i-1].k))k++;if(k!==tk[i].k){tk[i].k=k;tk[i].p=tp[k];tk[i].n=gbNorm(tp,k);tk[i].w=tw[k]}}
- for(let i=tk.length-1;i>0;i--)if(tk[i].k>kTop+2){tk[i-1].ids.push(...tk[i].ids);knots.splice(knots.indexOf(tk[i]),1)}
+ /* (a refusals' knot holds its place at its branch's collar: the one below it gives way downward instead) */
+ const kmv=(q,k)=>{q.k=k;q.p=tp[k];q.n=gbNorm(tp,k);q.w=tw[k]};
+ for(let i=1;i<tk.length;i++){if(tk[i].pin){let k=tk[i-1].k;if(!tk[i-1].pin)while(k>1&&tacc[tk[i].k]-tacc[k]<KT(k))k--;if(k!==tk[i-1].k)kmv(tk[i-1],k);continue}
+  let k=tk[i].k;while(k<tp.length-6&&tacc[k]-tacc[tk[i-1].k]<KT(tk[i-1].k))k++;if(k!==tk[i].k)kmv(tk[i],k)}
+ for(let i=tk.length-1;i>0;i--)if(tk[i].k>kTop+2&&!tk[i].pin){tk[i-1].ids.push(...tk[i].ids);knots.splice(knots.indexOf(tk[i]),1)}
  /* and a trunk past five knots is a ladder of names: two helper files side by side on it grow together into a burl, the
     nearest pair first, until it holds five or no two helpers stand side by side (a knot that still finds no place for its
     name is a pip, gbKnotNames); the burl leads with the one that held more, and sits between them, weighted by how many
     files each held */
  {const help=q=>gbKTier(M,q.ids)===3,row=()=>knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);let tr=row();
   while(tr.length>5){let best=null;for(let i=1;i<tr.length;i++){const a=tr[i-1],b=tr[i];if(help(a)&&help(b)&&(!best||b.k-a.k<best.b.k-best.a.k))best={a,b}}
-   if(!best)break;const {a,b}=best,lead=a.ids.length>=b.ids.length?a:b,o=lead===a?b:a,k=Math.round((a.k*a.ids.length+b.k*b.ids.length)/(a.ids.length+b.ids.length));
+   if(!best)break;const {a,b}=best,lead=a.pin?a:b.pin?b:a.ids.length>=b.ids.length?a:b,o=lead===a?b:a,k=lead.pin?lead.k:Math.round((a.k*a.ids.length+b.k*b.ids.length)/(a.ids.length+b.ids.length));
    lead.ids.push(...o.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(o),1);tr=row()}}
  for(const b of br){if(b.pol)continue;const own=ownOf(b.j).sort((x,y)=>depth(y)-depth(x));const a0=Math.max(b.Tk/2+8,Math.min(.16*b.len,b.inner-8)),a1=Math.max(a0+4,b.inner-4);const fit=Math.min(4,Math.max(1,Math.floor((a1-a0)/KG)+1));
   group(own,fit).forEach((ids,i,a)=>{const d=a.length===1?a0+(a1-a0)*.7:a0+(a1-a0)*i/(a.length-1);const k=gbNear(b.acc,d);knots.push({id:ids[0],ids,on:'b'+b.i,bid:b.id,k,p:b.pts[k],n:gbNorm(b.pts,k),w:b.w[k]})})}
@@ -713,11 +734,14 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const nScn=id=>js.reduce((n,j)=>n+(j.units.includes(id)?(M.leaves[j.id]||[]).length:0),0)+(M.buds[id]||[]).length,maxS=Math.max(1,...knots.map(q=>q.ids.reduce((s,id)=>s+nScn(id),0)));
  const wood=q=>{if(q.on==='t')return {pts:tp,w:tw,acc:tacc,up:-S};const b=br.find(x=>x.id===q.bid);return {pts:b.pts,w:b.w,acc:b.acc,up:gbNorm(b.pts,q.k)[1]<0?1:-1}};
  const boss=(q,alt)=>{const P=wood(q),n1=P.pts.length-1,k=q.k,a=P.pts[Math.max(0,k-6)],c=P.pts[Math.min(n1,k+6)],b=P.pts[k],n=gbNorm(P.pts,k),bend=[b[0]-(a[0]+c[0])/2,b[1]-(a[1]+c[1])/2],cv=bend[0]*n[0]+bend[1]*n[1];
-  q.side=Math.abs(cv)>1.2?Math.sign(cv):alt;q.p=b;q.n=n;q.w=P.w[k];q.tg=[n[1],-n[0]];q.off=q.side*(.3+.1*gbHash('kn:'+key+':'+q.id))*q.w;q.bp=[b[0]+n[0]*q.off,b[1]+n[1]*q.off];
-  q.sz=Math.max(.7,Math.min(1.2,.72+.48*Math.sqrt(q.ids.reduce((s,id)=>s+nScn(id),0)/maxS)))*(q.ids.length>1?1.12:1)*(.93+.14*gbHash('ks:'+key+':'+q.id));q.ra=Math.min(7.5,q.w*.14+3.8,Math.max(2.6,q.w*.6))*q.sz;q.rb=q.ra/1.35};
+  q.side=q.pin?q.pin*(Math.sign(n[0])||1):Math.abs(cv)>1.2?Math.sign(cv):alt;q.p=b;q.n=n;q.w=P.w[k];q.tg=[n[1],-n[0]];q.off=q.side*(.3+.1*gbHash('kn:'+key+':'+q.id))*q.w;q.bp=[b[0]+n[0]*q.off,b[1]+n[1]*q.off];
+  q.sz=Math.max(.7,Math.min(1.2,.72+.48*Math.sqrt(q.ids.reduce((s,id)=>s+nScn(id),0)/maxS)))*(q.ids.length>1?1.12:1)*(.93+.14*gbHash('ks:'+key+':'+q.id));q.ra=Math.min(7.5,q.w*.14+3.8,Math.max(2.6,q.w*.6))*q.sz;q.rb=q.ra/1.35;
+  /* (a refusals' knot is its branch's collar: the boss sits just under where the branch leaves, its centre within its own
+     radius and a few px of the branch's first point, so its name can leave it under the limb) */
+  if(q.pin&&q.kc===undefined){q.kc=k;const dd=Math.sqrt(Math.max(0,Math.pow(q.ra+5,2)-q.off*q.off));let k2=k;while(k2>1&&tacc[k]-tacc[k2-1]<=dd)k2--;if(k2!==k){q.k=k2;boss(q,alt)}}};
  for(const on of [...new Set(knots.map(q=>q.on))]){let alt=null;const row=knots.filter(q=>q.on===on).sort((a,b)=>a.k-b.k);
   for(const q of row){if(alt===null)alt=q.on==='t'?wood(q).up:-wood(q).up;boss(q,alt);alt=-q.side}
-  for(let i=1;i<row.length;i++){const a=row[i-1],b=row[i];if(Math.hypot(a.bp[0]-b.bp[0],a.bp[1]-b.bp[1])<1.2*Math.max(a.w,b.w)){a.ids.push(...b.ids);knots.splice(knots.indexOf(b),1);row.splice(i,1);i--;boss(a,a.side)}}}
+  for(let i=1;i<row.length;i++){const a=row[i-1],b=row[i];if(Math.hypot(a.bp[0]-b.bp[0],a.bp[1]-b.bp[1])<1.2*Math.max(a.w,b.w)){const [x,y]=b.pin&&!a.pin?[b,a]:[a,b];x.ids.push(...y.ids);knots.splice(knots.indexOf(y),1);row.splice(row.indexOf(y),1);i--;boss(x,x.side)}}}
  /* the outline swells over the boss on its own side, about as far as the boss stands proud of the wood */
  const bx=tp.map(()=>0);for(const b of br)b.bx=b.pts.map(()=>0);
  for(const q of knots){const P=wood(q),arr=q.on==='t'?bx:br.find(x=>x.id===q.bid).bx,amp=Math.max(1.2+q.rb*.3,Math.abs(q.off)+q.rb*.92-q.w/2+1),sg=q.ra*1.15;
@@ -1298,7 +1322,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
    if(u){const txt=gbKnotTxt(M,kn.ids,kn.id);
     /* A name goes on open ground beside its knot; every name on the tree is placed in one pass once everything it must
        keep clear of is known (gbKnotNames, after the pads, names and numbers are drawn) */
-    (B.klq=B.klq||[]).push({id:kn.id,tree:ti,p,p0,n,tg,ra,rb,txt,w:kn.w,bid:kn.bid})}});
+    (B.klq=B.klq||[]).push({id:kn.id,tree:ti,p,p0,n,tg,ra,rb,txt,w:kn.w,bid:kn.bid,pb:kn.pinB})}});
   /* Max: an existing flow the change reaches re-checks a part and grows nothing of its own: a graft bud, a small swelling of
      the bark by that part's knot, along the grain, half out of the wood on the boss's side, lit along its rim, with a tiny
      bud tip at its crown. One for each flow, either side of the boss, clear of every other knot; more than two share one
@@ -1306,7 +1330,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
   if(!sap&&!ti){B.graftR=[];const by=new Map(),oth=T.knots.map(q=>[sh(q.bp),q.ra,q]);
    for(const uid in M.buds)for(const x of M.buds[uid])if(x.scenarioKind==='regression'){const id=x.unit||uid,kn=T.knots.find(q=>q.ids.includes(id)),rt=!kn&&L.roots.find(r=>r.id===id&&r.tree===ti),kk=kn?'k:'+kn.id:rt?'r:'+id:'';if(!by.has(kk))by.set(kk,[]);by.get(kk).push(x)}
    for(const [kk,xs] of by){const kn=kk[0]==='k'?T.knots.find(q=>'k:'+q.id===kk):null,rt=kk[0]==='r'?L.roots.find(r=>'r:'+r.id===kk):null,b=kn&&kn.bid?T.br.find(x=>x.id===kn.bid):null;
-    const P=b?b.pts.map(sh):rt?rt.pts:tp,W=b?b.w:rt?rt.w:T.tw,acc=gbLen(P),k0=kn?kn.k:Math.round((rt?.3:.8)*(P.length-1)),R=4,sd0=kn?Math.sign(kn.off)||1:0,gap=kn?kn.ra+R+1.7:0;
+    const P=b?b.pts.map(sh):rt?rt.pts:tp,W=b?b.w:rt?rt.w:T.tw,acc=gbLen(P),k0=kn?kn.k:Math.round((rt?.3:.8)*(P.length-1)),R=4,sd0=kn?Math.sign(kn.off)||1:0,gap=kn?kn.ra+R+1.7+(kn.pin?5:0):0;/* (a collar knot's a little further off, clear of its branch's foot) */
     const at=s0=>{const d=acc[k0]+s0;if(d<4||d>acc[acc.length-1]-4)return null;let j=1;while(j<P.length-1&&acc[j]<d)j++;const f=Math.min(1,(d-acc[j-1])/((acc[j]-acc[j-1])||1)),nn=gbNorm(P,j),wj=W[j-1]+(W[j]-W[j-1])*f;if(wj<4)return null;
      const sd=sd0||(nn[1]<0?1:-1),o=sd*(wj/2-1.2),c=[P[j-1][0]+(P[j][0]-P[j-1][0])*f+nn[0]*o,P[j-1][1]+(P[j][1]-P[j-1][1])*f+nn[1]*o];c.n=[nn[0]*sd,nn[1]*sd];c.t=[nn[1],-nn[0]];return c};
     /* evenly strung, each as clear of the boss as of the next; where the wood between its neighbours is short, the first
@@ -1813,6 +1837,12 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  if(rr0.length){const J=rr0.map(rr=>({rr,...gbFork(pts,rr)}));
   const i0=Math.min(...J.map(o=>o.iJ));main=pts.slice(0,i0+1);
   rts=J.map(o=>({id:o.rr.id,pts:[...pts.slice(i0,o.iJ),...o.out]}))}
+ /* Where the leaf's own wood meets the leader at a hop the route runs through (a branch grown from the hop where its
+    scenarios break or end), its glow stops just short of the leader's, so each is a band in its own wood and neither spills
+    across the other */
+ if(lf&&lf.length>1&&main.length>1){const D=Math.min(9,.33*gbGirth(B,lf[lf.length-1]))+1.5,sd=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};
+  const near=p=>{let m=1e9;for(let i=0;i<main.length-1;i++)m=Math.min(m,sd(p,main[i],main[i+1]));return m},i=lf.findIndex(p=>near(p)<D);
+  if(i>0){let a=lf[i-1],b=lf[i];for(let s=0;s<12;s++){const c=[(a[0]+b[0])/2,(a[1]+b[1])/2];if(near(c)<D)b=c;else a=c}lf=[...lf.slice(0,i),a]}}
  const L0=lf&&lf.length>1?line(lf)+' ':'',all=()=>L0+line(main)+rts.map(q=>' '+line(q.pts)).join('');
  /* which hops are the scenario's own (gbReach): a happy path runs the whole journey; any other scenario runs from the
     journey's start to the hop it checks, and the rest of the journey is not its route */
@@ -1974,7 +2004,9 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const inOwn=(e,lb)=>{const o=Math.hypot(e.p[0]-e.p0[0],e.p[1]-e.p0[1]),amp=Math.max(1.2+.3*e.rb,o+.92*e.rb-e.w/2+1),sg=e.ra*1.15;
   return p=>caps.some(c=>c.lb===lb&&dPS(p,c.a,c.b)<c.r-3+amp*Math.exp(-Math.pow(((p[0]-e.p0[0])*e.tg[0]+(p[1]-e.p0[1])*e.tg[1])/sg,2)))};
  const leadHard=(e,R,A,u,bud)=>{const lb=limb(e),len=Math.hypot(A[0]-R[0],A[1]-R[1]),R5=[R[0]+u[0]*Math.min(5*k,len/2),R[1]+u[1]*Math.min(5*k,len/2)];
-  for(const c of caps){if(c.tag==='shoot'||c.lb===lb||(c.tag==='knot'&&c.own===e.id))continue;if(gbSegD(c.own===e.id?R5:R,A,c.a,c.b)<c.r-(c.tag==='wood'?1:0))return false}
+  /* (a refusals' collar knot leaves from under its branch's foot, which grows out of the same boss: it may start against that
+     foot, as against its own shoot, but never runs onto the branch) */
+  for(const c of caps){if(c.tag==='shoot'||c.lb===lb||(c.tag==='knot'&&c.own===e.id))continue;const foot=e.pb&&c.lb==='b:'+e.pb&&Math.hypot(c.a[0]-e.p0[0],c.a[1]-e.p0[1])<e.w*.9+e.ra;if(gbSegD(c.own===e.id||foot?R5:R,A,c.a,c.b)<c.r-(c.tag==='wood'?1:0))return false}
   /* it is off its own limb by the boss's radius from where it leaves it, and never goes back onto it */
   const inn0=inOwn(e,lb);let off=false,on=0;for(let d=0;d<=len+.01;d+=1){const p=[R[0]+u[0]*d,R[1]+u[1]*d],inn=inn0(p);if(!inn)off=true;else if(off||d>e.ra)return false;else on=d}if(!off)return false;
   for(let d=0;d<=len+.01;d+=2){const p=[R[0]+u[0]*d,R[1]+u[1]*d];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2.5))return false}
@@ -1984,8 +2016,9 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   /* the leader leaves the boss on its outward side, from the knot's centre out along the normal by the boss's radius, and
      runs out away from the wood, never across it; a stub along the normal ties its foot to the boss's edge */
   const R=[e.p[0]+v[0]*e.ra,e.p[1]+v[1]*e.ra],S=[e.p[0]+v[0]*(e.rb-.4),e.p[1]+v[1]*(e.rb-.4)];
-  /* (a leader near upright may carry its name beside its end or centred over it) */
-  for(const len of lens)for(const u of D16){if(u[0]*v[0]+u[1]*v[1]<.2)continue;const A=[R[0]+u[0]*len,R[1]+u[1]*len],ux=Math.abs(u[0]),sides=ux>.38?(ux<.4?[1,0]:[1]):[0];let lh=null;
+  /* (a leader near upright may carry its name beside its end or centred over it; a refusals' collar knot's may also leave it
+     down and out, under the branch that grows from its boss) */
+  for(const len of lens)for(const u of D16){if(u[0]*v[0]+u[1]*v[1]<(e.pb?-.3:.2))continue;const A=[R[0]+u[0]*len,R[1]+u[1]*len],ux=Math.abs(u[0]),sides=ux>.38?(ux<.4?[1,0]:[1]):[0];let lh=null;
    for(const sd of sides){let anc,x0,yb;
     if(sd){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
     const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud)||!clearO(r))continue;if(lh===null)lh=intoO(R,A,e.id)?0:leadHard(e,R,A,u,bud);if(!lh)break;
@@ -2185,12 +2218,15 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const lead=CB=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]];
   if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4)opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
   if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  let bestL=null;for(const pts of opts){let pen=pts.length>2?12:0,ok=true;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
-    for(const q of nox)if(!inB(pa,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
-    for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-pa[0],p[1]-pa[1])>=G;
+  /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
+     in a stacked key it runs clear of the lines above and below) */
+  if(kb&&(pa[1]<CB[1]||pa[1]>CB[3])){const ym=(AB[1]+AB[3])/2;for(const [x0,sg] of [[AB[2],1],[AB[0],-1]])for(const x2 of [CB[0]+10,CB[2]-10,x0+sg*(G+4)])if((x2-x0)*sg>G&&x2>=CB[0]+4&&x2<=CB[2]-4)opts.push([[x0,ym],[x2,ym],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
+  let bestL=null;for(const pts of opts){let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
+    for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
      if(off&&txt.some(q=>dB(p,q)<G)){pen+=150;ok=false}
      if(off&&rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5)){pen+=400;ok=false}
-     if(firm.some(q=>!inB(pa,q)&&inB(p,q))){pen+=300;ok=false}else if(cus.some(q=>!inB(pa,q)&&inB(p,q))){pen+=60;ok=false}else if(soft.some(q=>!inB(pa,q)&&inB(p,q)))pen+=60}}
+     if(firm.some(q=>!inB(p0,q)&&inB(p,q))){pen+=300;ok=false}else if(cus.some(q=>!inB(p0,q)&&inB(p,q))){pen+=60;ok=false}else if(soft.some(q=>!inB(p0,q)&&inB(p,q)))pen+=60}}
    if(!bestL||pen<bestL.pen)bestL={pts,pen,ok}}return bestL};
  /* (a root's card stays within 84 px of where its root crosses the rim, or of where a root in the pot starts) */
  const rd=rr&&rr.pts&&rr.pts.length?toPx(xo||rr.pts[0]):rim,rimB=rd?[rd[0],rd[1],rd[0],rd[1]]:null;

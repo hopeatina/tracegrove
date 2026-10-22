@@ -1824,6 +1824,53 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
+  /** Where each branch of the headline journey's refusals or failures leaves the trunk: the knot most of its scenarios
+   *  broke at (the run's hop) or, where none broke, the last hop of their route. */
+  const refusals = () => {
+    const w = (0, eval)('({ gw, gbModel, gbWound })'), B = w.gw.B, M = w.gw.M || w.gbModel(), S = w.gw.state;
+    const out: Array<{ id: string; tree: number; end: string; d: number; ra: number; side: boolean; failed: number }> = [];
+    B.L.trees.forEach((T: any, ti: number) => {
+      for (const b of T.br.filter((x: any) => x.pol)) {
+        const j = b.j, P = B.pad[b.id], n = new Map<string, number>();
+        for (const x of P.leaves) {
+          const wd = w.gbWound(M, j, x), ix = j.units.indexOf(x.unit), real = j.units.filter((id: string) => !M.U[id]?.root);
+          const end = wd ?? (x.scenarioKind !== 'happy' && ix >= 0 ? x.unit : real[real.length - 1]);
+          n.set(end, (n.get(end) ?? 0) + 1);
+        }
+        const end = [...n].sort((a, c) => c[1] - a[1])[0]![0], q = T.knots.find((k: any) => k.on === 't' && k.ids.includes(end));
+        if (!q) { out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Infinity, ra: 0, side: false, failed: 0 }); continue; }
+        const p0 = b.pts[0], conv = Math.sign(q.n[0] * q.side);
+        out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Math.hypot(p0[0] - q.bp[0], p0[1] - q.bp[1]), ra: q.ra, side: conv === Math.sign(b.dir), failed: P.leaves.filter((x: any) => S.run[x.id]?.st === 'fail').length });
+      }
+    });
+    return out;
+  };
+
+  it('grows the branch of what the headline journey refuses from the knot where its scenarios break, or end', async () => {
+    const { dir, state } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      let unbroken = 0;
+      for (const [name, s] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['failed', state]] as const) {
+        const page = await treePage(browser, server.url, s, { width: 1440, reduce: true });
+        await page.waitForTimeout(400);
+        const got = await page.evaluate(refusals);
+        expect(got.length, name).toBeGreaterThan(0);
+        // its collar is that knot: the branch's first point within the knot's boss and six pixels, on the side the boss stands
+        for (const r of got) {
+          expect(r.d, name + ' ' + r.id + ' at ' + r.end).toBeLessThanOrEqual(r.ra + 6);
+          expect(r.side, name + ' ' + r.id + ' on its knot\'s convex side').toBe(true);
+          if (!r.failed) unbroken++;
+        }
+        if (name === 'plotline') expect(got.find((r) => r.id === 'j1~guard')?.end, name).toBe('POST /seats');
+        await page.close();
+      }
+      // and a branch none of whose scenarios failed sits at the last hop they run
+      expect(unbroken).toBeGreaterThan(0);
+    } finally { await browser.close(); }
+  }, 90000);
+
   it('fills a leaf still to prove on a dark page with a pale leaf, never the page showing through', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
