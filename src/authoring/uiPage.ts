@@ -76,6 +76,12 @@ textarea{padding:12px;resize:vertical;min-height:88px;width:100%}
 .obs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:12px 0}.obs>div{min-width:0;overflow-wrap:anywhere;padding:10px 12px;border-radius:8px;background:var(--stone)}.obs .bad{background:var(--verm-bg)}.obs .good{background:var(--moss-bg)}
 .obs-long{grid-template-columns:minmax(0,1fr)}.obs .mono{white-space:pre-wrap}
 .answer{margin:0 0 12px}.answer .label{margin:0 0 4px}.answer pre{max-height:240px;overflow:auto}
+.checked{margin:0 0 12px}.checked .label{margin:0 0 4px}.cks{display:grid;gap:3px}
+.ck{display:grid;grid-template-columns:16px minmax(0,1fr);grid-template-areas:'m v' '. k';gap:0 8px;font-size:13px;line-height:19px;padding:2px 0}.ck .m{grid-area:m}.ck .v{grid-area:v}.ck .k{grid-area:k}
+.gw-drp .ck{grid-template-columns:16px minmax(0,1fr) minmax(0,1.25fr);grid-template-areas:'m k v';gap:2px 8px}.ck .m{font:600 13px/19px var(--mono);text-align:center}
+.ck.pass .m{color:var(--moss)}.ck.fail .m,.ck.fail .v{color:var(--verm-ink)}.ck.none .m{color:var(--ink3)}.ck .k{font:12px/19px var(--mono);color:var(--ink3);overflow-wrap:anywhere}.ck .v{overflow-wrap:anywhere}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.call{display:grid;gap:0;font-size:13px;line-height:19px;padding:3px 0}.call .mono{overflow-wrap:anywhere}.call .small{overflow-wrap:anywhere}
 pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .think{display:inline-flex;gap:5px;align-items:center}.think i{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:pulse 1.2s ease-in-out infinite}
 .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
@@ -170,7 +176,7 @@ ${BENCHMARK_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
- const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null,checks:c?s.checks||null:null,compared:c?s.compared||null:null,answer:c?s.answer||null:null}));
+ const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null,checks:c?s.checks||null:null,compared:c?s.compared||null:null,answer:c?s.answer||null:null,checked:c?s.checked||null:null,calls:c?s.calls||null:null}));
   return{id:f.caseId,title:c?c.title:f.title,file:f.file,editable:state.flows.some(flow=>flow.caseId===f.caseId),fixtures:c||unavailable?[]:f.fixtures,state:unavailable?'unavailable':c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,requests:c?c.requests||[]:[],steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
@@ -276,6 +282,15 @@ function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id
  const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id)+(runAtQuery(ui.runName)?'&'+runAtQuery(ui.runName):''),
   on:{loadedmetadata:()=>{const at=ui.videoTimes[key],end=Number.isFinite(player.duration)?player.duration:0;if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,end||at);else if(end>0.2){posed=true;player.currentTime=end-0.1}status.textContent='Recording loaded from verified evidence.'},play:()=>{if(posed){posed=false;player.currentTime=0}},timeupdate:()=>{if(!posed)ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
  return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
+/* Every comparison a step's checks made, each with its mark, worded as the verdict words a failure ("Expected 2 charges, got 3"):
+   the Run tab's step and the grow page's drawer show the same rows. A comparison whose record cannot say whether it held is
+   said to be not recorded, never held. */
+function stepChecked(list){return h('div',{class:'cks'},(list||[]).map(c=>{const k=c.held===true?'pass':c.held===false?'fail':'none';
+ return h('div',{class:'ck '+k},h('span',{class:'m'},{pass:'✓',fail:'✗',none:'?'}[k],h('span',{class:'sr'},{pass:' held',fail:' failed',none:' not recorded'}[k])),h('span',{class:'k'},c.check),h('span',{class:'v'},c.held===null?'Not recorded whether it held: '+c.says.charAt(0).toLowerCase()+c.says.slice(1):c.says))}))}
+/* One call a stand-in recorded: what it was asked, and when, under which idempotency key, as the stand-in recorded it */
+const callLine=c=>c.standIn+' '+c.method+' '+c.path+(c.amount!=null?' · '+c.amount+(c.currency?' '+c.currency:''):'')+(c.description?' · '+c.description:'')+' → '+c.status;
+const callMeta=c=>'at '+String(c.at).slice(11,23)+' UTC · '+(c.key?'idempotency key '+c.key+(c.repeat?' (a repeat)':''):'no idempotency key')+(c.faulted?' · the stand-in faulted it':'');
+function stepCalls(list){return (list||[]).map(c=>h('div',{class:'call'},h('span',{class:'mono'},callLine(c)),h('span',{class:'small muted'},callMeta(c))))}
 /* a recorded value as the page writes it: text quoted, everything else as JSON */
 const shown=v=>typeof v==='string'?JSON.stringify(v):v===undefined?'nothing':JSON.stringify(v);
 function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
@@ -290,6 +305,8 @@ function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=
 
   h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono','data-testid':'step-expected'},cmp?cmp.check+': '+shown(cmp.expected):x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono','data-testid':'step-observed'},cmp?cmp.check+': '+shown(cmp.got)+(x.observedText!=null?'\n'+x.observedText:''):x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
   x.answer!=null?h('div',{class:'answer'},h('div',{class:'label'},'the app answered'),h('pre',{'data-testid':'step-answer'},x.answer)):null,
+  x.checked&&x.checked.length?h('div',{class:'checked','data-testid':'step-checked'},h('div',{class:'label'},'we checked'),stepChecked(x.checked)):null,
+  x.calls&&x.calls.length?h('div',{class:'checked','data-testid':'step-calls'},h('div',{class:'label'},'the stand-in recorded'),stepCalls(x.calls)):null,
   s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
   recording(s),
   !current?h('p',{class:'small muted'},'This recorded scenario has no current flow to run or prune.'):null,
