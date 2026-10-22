@@ -457,4 +457,33 @@ describe('What happened, with several failures', () => {
     expect(sizes).toEqual([[44, 44], [44, 44]]);
     await phone.close();
   });
+
+  it('lists each stand-in call once when two watch steps read the same route', async () => {
+    writeFileSync(join(dir, 'tracegrove', 'seats', 'twice.flow.yaml'), ['title: Each charge is counted as it lands', 'risk: critical', 'tags: [billing, seats]', 'steps:',
+      '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 200',
+      '  - name: the upgrade was charged', '    standin: payments', '    received: POST /v1/charges', '    expect: { calls: 1 }',
+      '  - name: owner adds a seat', '    POST: /seats', '    json: { seats: 2, daysLeft: 30 }', '    expect: 200',
+      '  - name: the seat was charged too', '    standin: payments', '    received: POST /v1/charges', '    expect: { calls: 2 }', ''].join('\n'));
+    const { report } = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'tracegrove/seats/twice.flow.yaml' });
+    expect(report.cases.map((c) => [c.caseId, c.outcome])).toEqual([['seats.twice', 'passed']]);
+    const run = basename(report.runDir);
+    // the second watch step holds the first one's call as well as its own
+    const d = happenedIn(dir, run, 'seats.twice')!;
+    expect(d.steps.map((x) => (x.calls ?? []).map((c) => c.amount))).toEqual([[], [4900], [], [4900, 900]]);
+    expect(d.foot.join(' ')).not.toMatch(/outside every step/);
+    // the drawer lists each call once, on the step it came in, and counts it once
+    const passed = state.scenarios.find((x) => state.run[x.id]?.st === 'pass')!.id;
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await page.getByTestId('grow-result').waitFor();
+    await page.evaluate(([id, name]) => { const g = (0, eval)('gw'); g.state.run[id!].run = name; g.state.run[id!].flow = 'seats.twice'; location.hash = `#grow/${id}/steps`; }, [passed, run]);
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    await expect(page.getByTestId('grow-happened-tab-called').textContent()).resolves.toBe('Called out 2');
+    const rows = await page.locator('[data-testid="grow-happened"] .gw-drs li').allTextContents();
+    expect(rows.map((t) => (t.match(/payments ← \d+/g) ?? []))).toEqual([['payments ← 4900'], [], ['payments ← 900'], []]);
+    await page.getByTestId('grow-happened-tab-called').click();
+    expect(((await page.getByTestId('grow-happened-panel').textContent()) ?? '').match(/payments POST \/v1\/charges · \d+ usd/g)).toEqual(['payments POST /v1/charges · 4900 usd', 'payments POST /v1/charges · 900 usd']);
+    await page.close();
+  }, 120_000);
 });

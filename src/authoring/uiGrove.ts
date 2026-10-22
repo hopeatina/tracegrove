@@ -804,6 +804,9 @@ function gwDrPager(x){const s=gw.state,f=s.scenarios.filter(q=>gwIn(q)&&s.run[q.
  const go=k=>()=>{if(f[k])gwDrOpen(f[k].id)};
  return h('div',{class:'gw-drpg','data-testid':'grow-happened-pager'},h('button',{type:'button','aria-label':'Previous failure','data-testid':'grow-happened-prev',disabled:i<=0,on:{click:go(i-1)}},'‹'),
   h('span',{},'Failure '+(i+1)+' of '+f.length),h('button',{type:'button','aria-label':'Next failure','data-testid':'grow-happened-next',disabled:i>=f.length-1,on:{click:go(i+1)}},'›'))}
+/* every stand-in call the run recorded, each once: a watch step reads all the calls its stand-in has had so far, so two watch
+   steps on one route both hold the earlier calls */
+const gwDrCalls=steps=>{const seen=new Set();return steps.flatMap(q=>q.calls||[]).filter(c=>{const k=JSON.stringify([c.standIn,c.method,c.path,c.at,c.key]);if(seen.has(k))return false;seen.add(k);return true})};
 /* a response body as it was recorded; JSON is laid out to read, the same text */
 const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
 const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
@@ -824,7 +827,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  if(!gwRan(x)){gwPut(el,gwDrNone(x,r,j,M));return el}
  if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}
  if(!d.data){gwPut(el,h('p',{class:'gw-drerr',role:'alert'},d.err||'The run could not be read.'),gwDrActs(x,null));return el}
- const D=d.data,steps=D.steps,all=steps.flatMap(q=>q.calls||[]),cur=d.step,hs=D.history;
+ const D=d.data,steps=D.steps,all=gwDrCalls(steps),cur=d.step,hs=D.history;
  const hist=gwDrHist(hs);
  /* each step, and under it what it recorded: the answer the run contradicts, the stand-in calls made while it ran (placed by
     their own timestamps), and for a watch step what it expected and got, and how long it waited */

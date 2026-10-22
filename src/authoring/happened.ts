@@ -144,7 +144,8 @@ function footOf(c: CaseReport, steps: StepReport[]): string[] {
   const out: string[] = [];
   const unwatched = (c.services ?? []).filter((s) => s.calls === 'not recorded').map((s) => s.name);
   if (unwatched.length) out.push(`No step watched ${listed(unwatched, 'or')}, so ${unwatched.length === 1 ? 'its' : 'their'} calls are not recorded (only a watch step records a stand-in’s calls).`);
-  const loose = steps.flatMap((x) => x.calls ?? []).filter((q) => !q.during).length;
+  // each call once: a watch step reads every call its stand-in has had so far, so two on one route hold the same call
+  const loose = new Set(steps.flatMap((x) => x.calls ?? []).filter((q) => !q.during).map((q) => JSON.stringify([q.standIn, q.method, q.path, q.at, q.key]))).size;
   if (loose) out.push(`${loose} stand-in call${loose === 1 ? '' : 's'} came outside every step’s recorded time.`);
   const screen = steps.some((x) => x.method === 'UI'), talk = steps.some((x) => x.method === 'VOICE' || x.method === 'CHAT');
   if (!screen && !talk && !(c.videos ?? []).length) out.push('No step drives a screen, so there are no screenshots, video or transcript.');
