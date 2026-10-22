@@ -983,12 +983,13 @@ describe('Grow page', () => {
     try {
       for (const [file, name] of recorded) {
         const state = folded(file);
-        for (const width of [1440, 768]) {
+        for (const width of [1440, 1024, 768]) {
           const page = await growPage(browser, server.url, state, width);
           await page.waitForTimeout(2500);
           const ins = page.getByTestId('grow-inspector'), inspector = await ins.count() ? await ins.textContent() : null;
-          const seen = await page.evaluate(() => {
-            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, S = w.gw.state, out: string[] = [];
+          // every leaf, root and knot in turn, and later the same with a leaf pinned; at 1440 a card also keeps off every cushion
+          const cards = () => page.evaluate((wide: boolean) => {
+            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, out: string[] = [];
             const m = (B.svg as SVGSVGElement).getScreenCTM()!, px = (p: number[]) => [m.a * p[0]! + m.c * p[1]! + m.e, m.b * p[0]! + m.d * p[1]! + m.f];
             // does the segment a-b pass through the box r (Liang-Barsky)?
             const cross = (a: number[], b: number[], r: DOMRect) => {
@@ -1003,21 +1004,43 @@ describe('Grow page', () => {
             for (const id of Object.keys(B.leaf)) if (!B.leaf[id].classList.contains('gone') && B.leaf[id].getBoundingClientRect().width) things.push(['s:' + id, B.leaf[id]]);
             for (const id of Object.keys(B.root)) things.push(['u:' + id, B.root[id]]);
             for (const k of Object.keys(B.klbl)) if (B.knot[k]) things.push(['u:' + B.knot[k].__ids[0], B.knot[k]]);
+            const meet = (c: DOMRect, r: DOMRect) => Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5;
             let cards = 0;
+            // a card covers no name, the faded ones included, no word of a journey's and no root's name, and no hairline crosses one
+            const look = (k: string, c: DOMRect, kl: Element | null, lead: number[][]) => {
+              const names = [...Object.values(B.klbl) as Element[]].filter((t) => t.classList.contains('on') || t.classList.contains('kdim')).concat(Array.from(B.svg.querySelectorAll('.rlbl, .lbl text') as NodeListOf<Element>)).map((t) => [t, t.getBoundingClientRect()] as const).filter(([, r]) => r.width);
+              for (const [t, r] of names) {
+                if (meet(c, r)) out.push(k + ': card covers ' + (t.classList.contains('kdim') ? 'the faded ' : '') + t.textContent);
+                for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
+              }
+              // and past its first 12 px the hairline keeps 12 px off every word but the thing's own name (less a pixel, for
+              // where the line is rounded)
+              const own = k.startsWith('u:') && B.root[k.slice(2)] ? Array.from(B.root[k.slice(2)].querySelectorAll('.rlbl') as NodeListOf<Element>) : [];
+              for (const [t, r] of names) {
+                if (t === kl || own.includes(t)) continue;
+                let near = Infinity;
+                for (let i = 1; i < lead.length; i++) {
+                  const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                  for (let s = 0; s <= n; s += 1) {
+                    const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                    if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) near = Math.min(near, Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom)));
+                  }
+                }
+                if (near < 11) out.push(k + ': hairline ' + near.toFixed(1) + ' px from ' + t.textContent);
+              }
+              if (wide) for (const e of Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<Element>)) { const r = e.getBoundingClientRect(); if (r.width && meet(c, r)) out.push(k + ': card on a cushion of ' + (e.closest('[data-pad]') || e).getAttribute('data-pad')); }
+            };
             for (const [k, el] of things) {
               w.gbHover(k, el);
               const tip = B.tip as HTMLElement;
-              if (tip.hidden) { out.push(k + ': no card'); continue; }
+              // (a pinned thing's card is the inspector beside the tree, where there is one)
+              if (tip.hidden) { if (k !== w.gw.pinned || L.narrow) out.push(k + ': no card'); continue; }
               cards++;
               if (tip.classList.contains('dock') || !tip.parentElement!.contains(B.svg)) out.push(k + ': card not over the tree');
               const c = tip.getBoundingClientRect(), d = B.lead.getAttribute('d') || '';
               const lead = (d.match(/-?[\d.]+/g) || []).map(Number).reduce((a: number[][], v: number, i: number) => { if (i % 2) a[a.length - 1]!.push(v); else a.push([v]); return a; }, []).map(px);
-              const names = [...Object.values(B.klbl) as Element[]].filter((t) => t.classList.contains('on')).concat(Array.from(B.svg.querySelectorAll('.rlbl') as NodeListOf<Element>)).map((t) => [t, t.getBoundingClientRect()] as const).filter(([, r]) => r.width);
               const kk = k.startsWith('u:') && B.knot[k.slice(2)] ? Object.keys(B.klbl).find((q) => B.knot[q] === B.knot[k.slice(2)]) : undefined, kl: Element | null = kk ? B.klbl[kk] : null;
-              for (const [t, r] of names) {
-                if (Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5) out.push(k + ': card covers ' + t.textContent);
-                for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
-              }
+              look(k, c, kl, lead);
               // a knot's card hangs off its name, which stands out, so only one line runs to the knot: the name's own
               if (kl && kl.classList.contains('on') && !kl.classList.contains('pt')) out.push(k + ': its name does not stand out');
               if (kl && kl.classList.contains('on') && lead.length) {
@@ -1033,12 +1056,24 @@ describe('Grow page', () => {
               }
             }
             w.gbHover(null);
+            // on a phone the pinned thing's card stays under the drawing, and covers nothing in it either
+            if (w.gw.pinned && !(B.tip as HTMLElement).hidden) look(w.gw.pinned + ' pinned', B.tip.getBoundingClientRect(), null, []);
             return { cards, out };
-          });
+          }, width >= 1440);
+          const seen = await cards();
           expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
           expect(seen.out, name + ' ' + width).toEqual([]);
           // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
           if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
+          // a leaf pinned as a click pins it, then every card again
+          await page.evaluate(() => {
+            const w = (0, eval)('({ gw, growPaint, gbTipOff })'), B = w.gw.B, id = Object.keys(B.leaf).find((q) => !B.leaf[q].classList.contains('gone') && B.leaf[q].getBoundingClientRect().width);
+            w.gw.pinned = 's:' + id; if (!B.L.narrow) w.gbTipOff(B); w.growPaint();
+          });
+          await page.waitForTimeout(400);
+          const pinned = await cards();
+          expect(pinned.cards, name + ' ' + width + ' pinned').toBeGreaterThan(8);
+          expect(pinned.out, name + ' ' + width + ' pinned').toEqual([]);
           await page.close();
         }
       }
