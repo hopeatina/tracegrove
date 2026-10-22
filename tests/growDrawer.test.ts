@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { checksOf } from '../src/authoring/checkCompare.ts';
 import { grow } from '../src/authoring/grow.ts';
 import { happenedIn } from '../src/authoring/happened.ts';
-import type { GrowState } from '../src/authoring/growState.ts';
+import { couldNotRun, type GrowState } from '../src/authoring/growState.ts';
+import { runTests } from '../src/authoring/run.ts';
 import type { PredicateT } from '../src/protocol/index.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 
@@ -265,4 +266,32 @@ describe('What happened, step by step', () => {
     await expect(drawer(page).count()).resolves.toBe(0);
     await page.close();
   });
+});
+
+/* A run that never reached its checks, as tg's grow of browser.grow did: the app exited before it was ready, so every step is
+   not_run. The drawer says why in the words grow says it, from what the host sealed, and never a reason code. */
+describe('What happened in a run that never reached its checks', () => {
+  const mine: string[] = [];
+  afterAll(() => { for (const d of mine.splice(0)) rmSync(d, { recursive: true, force: true }); });
+  it('says why it could not run as the host sealed it, and calls a service it did not record "not recorded", never a stand-in', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracegrove-drawer-norun-')); mine.push(dir);
+    cpSync(join(import.meta.dirname, '..', 'src', 'samples', 'saas-billing'), dir, { recursive: true });
+    const app = join(dir, 'app', 'billing.mjs');
+    writeFileSync(app, `console.error('billing is down');\nprocess.exit(3);\n${readFileSync(app, 'utf8')}`);
+    git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Plotline billing that never starts');
+    const { report } = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'card-declined' });
+    const c = report.cases[0]!;
+    expect(c.outcome).toBe('infrastructure_failed');
+    const d = happenedIn(dir, basename(report.runDir), c.caseId)!;
+    expect(d.steps.length).toBeGreaterThan(0);
+    expect(d.steps.every((x) => x.result === 'not_run')).toBe(true);
+    // the same words grow records as why it is not tested yet, from the summary's failure
+    expect(d.oneLine).toBe(`${couldNotRun(`${c.failure!.step}: ${c.failure!.message}`)}.`);
+    expect(d.oneLine).toBe('Could not run: the app did not start (application exited before becoming ready).');
+    expect(d.oneLine).not.toMatch(/step_not_run|halted_by_prior_failure|Broke at/);
+    // a service the run did not record is greyed as not recorded, not coloured as a stand-in
+    const unrecorded = d.chips.filter((x) => / not recorded$/.test(x.t));
+    expect(unrecorded.length).toBeGreaterThan(0);
+    expect(unrecorded.map((x) => x.tone)).toEqual(unrecorded.map(() => 'none'));
+  }, 120_000);
 });

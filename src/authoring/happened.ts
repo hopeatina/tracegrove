@@ -10,6 +10,11 @@ import { countNoun } from './checkCompare.ts';
 import { readSavedRun, type CheckedRunReport } from './runSource.ts';
 import { SavedRunName, type CaseReport, type StepReport } from './runReport.ts';
 import { isRunDirectory, savedRunDirectory } from './runLocation.ts';
+import { couldNotRun } from './growState.ts';
+import { readVerifiedBundle } from '../core/bundle.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
+import { cellBundleName } from '../core/bundlePaths.ts';
+import { digestOfBytes } from '../protocol/index.ts';
 
 export type HappenedChip = { t: string; tone: 'ok' | 'bad' | 'standin' | 'none' | '' };
 export type Happened = {
@@ -68,14 +73,42 @@ function extraCall(steps: StepReport[], failing: StepReport) {
   return { call, at, field, one, nth: c.expected + 1, expected: c.expected, answer: steps[at]!.answer ?? null };
 }
 
+/**
+ * Why a run never reached its checks, as its host sealed it in the case's events: the app did not start, the run was blocked
+ * before its first step, or a fixture could not be set up. These are the events run.ts reads into the summary's failure, which
+ * grow says as why a scenario is not tested yet; they are read here only when they match the digest their receipt sealed.
+ * Null when the events say none of these.
+ */
+function sealedCause(runDir: string, caseId: string): string | null {
+  try {
+    const bundle = readVerifiedBundle(join(runDir, 'bundle'));
+    const receipt = bundle.receipts.find((x) => x.caseRef.id === caseId);
+    if (!receipt) return null;
+    const bytes = readBoundedFile(join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId), 'events.jsonl'), 16 * 1024 * 1024);
+    if (digestOfBytes(bytes).hex !== receipt.eventsDigest.hex) return null;
+    type Said = { error?: string; reasons?: Array<{ code: string; detail: string }>; entityKey?: string; code?: string; message?: string };
+    const events = bytes.toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as { kind: string; redactedPayload?: Said });
+    const said = (kind: string) => { const e = events.find((x) => x.kind === kind); return e ? e.redactedPayload ?? {} : null; };
+    const host = said('host.failed'), blocked = said('host.blocked'), fixture = said('fixture.failed');
+    if (host) return `(app startup): ${host.error ?? 'host failed'}`;
+    if (blocked?.reasons?.length) return `(before steps): ${blocked.reasons.map((r) => `${r.code}: ${r.detail}`).join('\n')}`;
+    if (fixture) return `${`(fixture ${fixture.entityKey ?? ''})`.replace(' )', ')')}: ${fixture.code ?? 'fixture_failed'}: ${fixture.message ?? ''}`;
+    return null;
+  } catch { return null; }
+}
+
 /** One sentence for what broke, from the records: the answer a stand-in's calls contradict, or what the failing check expected
- *  and got, and the step that broke it; or, for a run that held, how many checks held. */
-function oneLineOf(c: CaseReport, steps: StepReport[], name: (x: StepReport) => string): { line: string; contradicts: Happened['contradicts'] } {
+ *  and got, and the step that broke it; for a run that never reached its checks, why, as its host sealed it (never a reason
+ *  code); or, for a run that held, how many checks held. */
+function oneLineOf(c: CaseReport, steps: StepReport[], name: (x: StepReport) => string, cause: () => string | null): { line: string; contradicts: Happened['contradicts'] } {
   const i = steps.findIndex(bad);
   if (c.outcome === 'passed' || (i < 0 && !c.failure)) {
     const checks = steps.filter((x) => (x.checked ?? []).length).length, cmp = steps.reduce((a, x) => a + (x.checked ?? []).length, 0);
     const held = checks === 1 ? 'Its 1 check held' : `All ${checks} checks held`;
     return { line: `${held}${cmp > checks ? ` (${cmp} comparisons)` : ''}, in ${c.durationMs} ms.`, contradicts: null };
+  }
+  if (c.outcome === 'infrastructure_failed' || (steps.length > 0 && steps.every((x) => x.result === 'not_run'))) {
+    return { line: `${couldNotRun(cause() ?? '')}.`.replace(/\.\.$/, '.'), contradicts: null };
   }
   if (i < 0) {
     const where = c.failure!.step.replace(/^\((.+)\)$/, '$1');
@@ -104,7 +137,7 @@ function chipsOf(r: CheckedRunReport, c: CaseReport, run: string): HappenedChip[
   const verified = r.evidenceStatus === 'verified';
   return [{ t: `run ${run}`, tone: '' }, { t: verified ? `verified · source ${r.sourceDigest.slice(0, 6) || 'not recorded'}` : 'not verified', tone: verified ? 'ok' : 'bad' },
     ...(c.services ?? []).map((s) => ({ t: s.mode === 'stand-in' && s.calls === 'not recorded' ? `${s.name} stand-in · calls not recorded` : `${s.name} ${s.mode}`,
-      tone: (s.mode === 'real' ? '' : s.calls === 'not recorded' ? 'none' : 'standin') as HappenedChip['tone'] }))];
+      tone: (s.mode === 'real' ? '' : s.calls === 'not recorded' || s.mode === 'not recorded' ? 'none' : 'standin') as HappenedChip['tone'] }))];
 }
 
 /** What the run did not record, in plain sentences: a stand-in no step watched, a call outside every step, no screen. */
@@ -158,7 +191,7 @@ export function happenedIn(root: string, name: string, caseId: string): Happened
   const names = declaredNames(dir, c.caseId);
   const steps = c.steps.filter((x) => x.declared !== false).map((x) => ({ ...x, name: names.get(x.id) ?? x.name }));
   const name1 = (x: StepReport) => x.name;
-  const { line, contradicts } = oneLineOf(c, steps, name1);
+  const { line, contradicts } = oneLineOf(c, steps, name1, () => sealedCause(dir, c.caseId));
   const at = Math.max(0, steps.findIndex(bad));
   return { run: name, verified, source: verified ? r.sourceDigest.slice(0, 6) : null, startedAt: r.startedAt, caseId: c.caseId, title: c.title, outcome: c.outcome, ms: c.durationMs,
     steps, at, contradicts, oneLine: line, chips: chipsOf(r, c, name), foot: footOf(c, steps), history };
