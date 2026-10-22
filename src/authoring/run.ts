@@ -147,7 +147,10 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const stepId = failedAssertion.assertionId.replace(/\.expect$/, '');
     const step = receipt.steps.find((s) => s.stepId === stepId);
     const standIn = StandInObservation.safeParse(step?.output);
-    const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
+    // The count it wanted: the compiled expectation ("2 calls received"), else the one its recorded check compared.
+    const wanted = steps.find((x) => x.id === stepId)?.compared?.expected;
+    const fromCheck = typeof wanted === 'number' ? `${wanted} call${wanted === 1 ? '' : 's'}` : null;
+    const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? fromCheck ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
     const message = counted ?? (failedAssertion.reasonCode ? explainDiffers(failedAssertion.reasonCode, step?.output, assertions, stepId) : `assertion ${failedAssertion.result}`);
     failure = { step: stepInfo.get(stepId)?.name ?? stepId, message, observed: observedLine(step?.output) };
   } else if (receipt.outcome !== 'passed') {
