@@ -570,6 +570,27 @@ describe('What happened, with several failures', () => {
     await page.close();
   }, 120_000);
 
+  it('counts only the steps a run reached as requests, and says a step it never reached sent nothing', async () => {
+    writeFileSync(join(dir, 'tracegrove', 'seats', 'halted.flow.yaml'), ['title: The plan is read back after an upgrade', 'risk: critical', 'tags: [billing, seats]', 'steps:',
+      '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 418',
+      '  - name: owner reads the plan', '    GET: /subscription', '    expect: 200', ''].join('\n'));
+    const { report } = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'tracegrove/seats/halted.flow.yaml' });
+    expect(report.cases.map((c) => c.steps.map((x) => x.result))).toEqual([['failed', 'not_run']]);
+    const passed = state.scenarios.find((x) => state.run[x.id]?.st === 'pass')!.id;
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await page.getByTestId('grow-result').waitFor();
+    await page.evaluate(([id, name]) => { const g = (0, eval)('gw'); g.state.run[id!].run = name; g.state.run[id!].flow = 'seats.halted'; location.hash = `#grow/${id}/steps`; }, [passed, basename(report.runDir)]);
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="grow-happened"] .gw-drs li').length === 2);
+    await expect(page.getByTestId('grow-happened-tab-requests').textContent()).resolves.toBe('Requests 1');
+    await page.getByTestId('grow-happened-tab-requests').click();
+    const groups = await page.locator('[data-testid="grow-happened-panel"] .gw-drg').allTextContents();
+    expect(groups[0]).toContain('POST /subscription {"plan":"team"} · as owner');
+    expect(groups[1]).toBe('Step 2 · owner reads the plannot sent: the run stopped before this step');
+    await page.close();
+  }, 120_000);
+
   it('lists each stand-in call once when two watch steps read the same route', async () => {
     writeFileSync(join(dir, 'tracegrove', 'seats', 'twice.flow.yaml'), ['title: Each charge is counted as it lands', 'risk: critical', 'tags: [billing, seats]', 'steps:',
       '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 200',

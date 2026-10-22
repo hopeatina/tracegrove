@@ -845,7 +845,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
    sx.length?h('span',{class:'sx'},sx.map(([t,c])=>h('span',{class:c||null},t))):null))}));
  /* the evidence, in tabs that appear only when they have something to show */
  const answered=steps.map((q,i)=>[q,i]).filter(([q])=>q.answer);const nCheck=steps.filter(q=>(q.checked||[]).length).length;
- const tabs=[['checked','We checked',nCheck],['answered','App answered',answered.length],['called','Called out',all.length],['requests','Requests',steps.length]].filter(t=>t[2]>0);
+ const tabs=[['checked','We checked',nCheck],['answered','App answered',answered.length],['called','Called out',all.length],['requests','Requests',steps.filter(q=>q.result!=='not_run').length]].filter(t=>t[2]>0);
  const key=tabs.some(t=>t[0]===d.tab)?d.tab:tabs.length?tabs[0][0]:null;const pick=k=>{d.tab=k;gw.refocus='t:grow-happened-tab-'+k;growPaint()};
  const list=key?h('div',{class:'gw-drt',role:'tablist','aria-label':'Evidence',on:{keydown:e=>{const o=tabs.map(t=>t[0]),i=o.indexOf(key);let m=-1;
    if(e.key==='ArrowRight')m=(i+1)%o.length;else if(e.key==='ArrowLeft')m=(i-1+o.length)%o.length;else if(e.key==='Home')m=0;else if(e.key==='End')m=o.length-1;if(m<0)return;e.preventDefault();pick(o[m])}}},
@@ -855,7 +855,8 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  if(key==='checked')body=steps.map((q,i)=>(q.checked||[]).length?grp(i,stepChecked(q.checked)):null);
  else if(key==='answered')body=answered.map(([q,i])=>grp(i,h('div',{class:'sub'},gwDrPath(q)+(q.status!=null?' → '+q.status:'')),h('pre',{},gwDrPretty(q.answer)))).concat(steps.some(q=>q.method==='STANDIN')?[h('p',{class:'gw-drw'},'Watch steps get no answer from the app; they read what the stand-in recorded.')]:[]);
  else if(key==='called')body=steps.flatMap((q,i)=>all.filter(c=>c.during===q.id).map(c=>grp(i,stepCalls([c])))).concat(all.filter(c=>!steps.some(q=>q.id===c.during)).map(c=>h('div',{class:'gw-drg'},h('div',{class:'hd'},'Outside every step’s recorded time'),stepCalls([c]))));
- else if(key==='requests')body=steps.map((q,i)=>grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms · '+(q.watch.polls!=null?q.watch.polls+' poll'+(q.watch.polls===1?'':'s'):'polls not recorded'):'')
+ /* a step the run never reached sent nothing, and is said so, not listed as a request */
+ else if(key==='requests')body=steps.map((q,i)=>q.result==='not_run'?grp(i,h('div',{class:'sub'},'not sent: the run stopped before this step')):grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms · '+(q.watch.polls!=null?q.watch.polls+' poll'+(q.watch.polls===1?'':'s'):'polls not recorded'):'')
    :gwDrPath(q)+(q.request&&q.request.body?' '+q.request.body+(q.request.declared?' (body as declared)':''):'')+(q.request?' · as '+q.request.as:'')),
   h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.httpMs!=null?'app time not recorded':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
  gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,ol,
