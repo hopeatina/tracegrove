@@ -827,4 +827,257 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 60000);
+
+  /** The tree's own clocks, read off the motion it set going: when each piece of wood, leaf, cushion, name, shoot and graft
+   *  bud first shows, against when the wood that carries it is there. */
+  /** Every animation the page's own code starts, kept by its target: what a piece did is still there to read once it is over. */
+  const logAnimations = () => {
+    const an = new Map<Element, Animation[]>(), animate = Element.prototype.animate;
+    (window as any).__an = an;
+    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) { const a = animate.apply(this, args); an.set(this, [...(an.get(this) ?? []), a]); return a; };
+  };
+  const timing = () => {
+    const B = (0, eval)('gw').B;
+    const out = { wood: 0, leaves: 0, cush: 0, labels: 0, shoots: 0, grafts: 0, bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const log: Map<Element, Animation[]> = (window as any).__an, own = (el: Element | null | undefined) => (el && log.get(el)) || [];
+    const start = (a: Animation) => Number(a.startTime ?? document.timeline.currentTime) + Number(a.effect!.getTiming().delay ?? 0);
+    const keys = (a: Animation) => (a.effect as KeyframeEffect).getKeyframes();
+    const dur = (a: Animation) => Number(a.effect!.getTiming().duration);
+    // a piece of wood is revealed along its length on an ease-out: its front passes the point a fraction f along at
+    // t0 + ms(1 - (1 - f)^(1/2.2)); the wood under a point is there once the first piece that carries it has passed
+    const near = (pts: number[][], p: number[]) => {
+      const acc = [0]; for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1]! + Math.hypot(pts[i]![0]! - pts[i - 1]![0]!, pts[i]![1]! - pts[i - 1]![1]!));
+      let best = [Infinity, 0];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1]!, b = pts[i]!, vx = b[0]! - a[0]!, vy = b[1]! - a[1]!, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * vx + (p[1]! - a[1]!) * vy) / (vx * vx + vy * vy || 1)));
+        const d = Math.hypot(p[0]! - a[0]! - vx * t, p[1]! - a[1]! - vy * t);
+        if (d < best[0]!) best = [d, (acc[i - 1]! + (acc[i]! - acc[i - 1]!) * t) / (acc[acc.length - 1] || 1)];
+      }
+      return best as [number, number];
+    };
+    const woodAt = (p: number[], pad: number, not?: unknown) => {
+      let t = Infinity;
+      for (const g of B.grow) { if (g === not || !g.pts) continue; const [d, f] = near(g.pts, p); if (f > 0.01 && d <= Math.max(...g.w) / 2 + pad) t = Math.min(t, g.t0 + g.ms * (1 - Math.pow(1 - f, 1 / 2.2))); }
+      return t;
+    };
+    // when a cushion has grown to v of its size, from its own keyframes
+    const cuAt = (P: any, k: number, v: number) => {
+      const a = own(P.cu?.[k]?.gr)[0]; if (!a) return -Infinity;
+      const ks = keys(a), sc = ks.map((q) => Number(String(q.transform).match(/scale\(([\d.]+)\)/)?.[1] ?? 1));
+      for (let i = 1; i < ks.length; i++) if (sc[i]! >= v) { const o0 = ks[i - 1]!.computedOffset, o1 = ks[i]!.computedOffset; return start(a) + dur(a) * (o0 + ((o1 - o0) * (v - sc[i - 1]!)) / (sc[i]! - sc[i - 1]! || 1)); }
+      return start(a) + dur(a);
+    };
+    // each piece of wood starts from wood that is already there
+    for (const g of B.grow) {
+      if (!g.pts) continue;
+      const t = woodAt(g.pts[0], 1, g); if (t === Infinity) continue;
+      out.wood++;
+      if (g.t0 < t - 2) bad('wood starts before the wood it grows from reaches it', Math.round(t - g.t0));
+    }
+    // a leaf opens out of its twig once the twig has grown and its cushion is all but whole
+    for (const id in B.leaf) {
+      const el = B.leaf[id], a = own(el.__g)[0], P = B.pad[el.__p]; if (!a || !P) continue;
+      out.leaves++;
+      const s = start(a), tw = (B.ltw ?? {})[id]?.[0], g = tw && B.grow.find((q: any) => q.el === tw);
+      if (dur(a) < 150 || dur(a) > 180) bad('leaf opens over', dur(a));
+      if (!/scale\(0\)/.test(String(keys(a)[0]!.transform))) bad('leaf does not open from its stalk', id);
+      if (g && s < g.t0 + g.ms - 2) bad('leaf before its twig has grown', [id, Math.round(g.t0 + g.ms - s)]);
+      const k = P.geo.cOf.get(id), c = k === undefined ? -Infinity : cuAt(P, k, 0.85);
+      if (s < c - 2) bad('leaf before its cushion is all but whole', [id, Math.round(c - s)]);
+    }
+    // a cushion scales up from the fork its twigs leave the wood at, once the wood is there; never a patch ahead of it
+    for (const pid in B.pad) {
+      const P = B.pad[pid];
+      (P.cu ?? []).forEach((u: any, k: number) => {
+        const a = own(u.gr)[0]; if (!a) return;
+        out.cush++;
+        const k0 = keys(a)[0]!, m = String(k0.transform).match(/translate\(([-\d.]+)px, ?([-\d.]+)px\) scale\(([\d.]+)\)/);
+        if (!m || Number(m[3]) > 0.1 || Number(k0.opacity) !== 0) return bad('cushion does not grow from a point', [pid, k]);
+        const t = woodAt([Number(m[1]), Number(m[2])], 2);
+        if (t === Infinity) bad('cushion grows from off the wood', [pid, k]);
+        else if (start(a) < t - 2) bad('cushion grows before its wood reaches its fork', [pid, k, Math.round(t - start(a))]);
+      });
+    }
+    // a pad's name, or its number, once its first cushion is half grown
+    for (const key in B.lbl) {
+      const a = own(B.lbl[key].el)[0]; if (!a) continue;
+      out.labels++;
+      const pid = B.pad[key] ? key : (B.padsOf[key] ?? []).find((p: string) => !B.pad[p].pol) ?? (B.padsOf[key] ?? [])[0], P = B.pad[pid];
+      const half = P ? Math.min(...(P.cu ?? []).map((_: unknown, k: number) => cuAt(P, k, 0.5))) : -Infinity;
+      if (start(a) < half - 2) bad('name before its pad is half grown', [key, Math.round(half - start(a))]);
+    }
+    // a shoot sprouts from its knot once the growing wood has passed it, and its count after it; a graft bud the same
+    for (const rec of B.shootGeo ?? []) {
+      const a = own(rec.fl)[0]; if (!a) continue;
+      out.shoots++;
+      const t = woodAt(rec.base, 6);
+      if (t === Infinity) bad('shoot off the wood', rec.kid);
+      else if (start(a) < t - 2) bad('shoot before the growing wood passes its knot', [rec.kid, Math.round(t - start(a))]);
+      const c = own(rec.ctag)[0]; if (c && start(c) < start(a)) bad('count before its shoot', rec.kid);
+    }
+    for (const el of Array.from(B.svg.querySelectorAll('.gb-gr')) as Element[]) {
+      const a = own(el)[0], c = el.querySelector('circle.gring'); if (!a || !c) continue;
+      out.grafts++;
+      const t = woodAt([Number(c.getAttribute('cx')), Number(c.getAttribute('cy'))], 6);
+      if (t === Infinity) bad('graft bud off the wood', el.getAttribute('data-k'));
+      else if (start(a) < t - 2) bad('graft bud before the growing wood passes its knot', [el.getAttribute('data-k'), Math.round(t - start(a))]);
+    }
+    return out;
+  };
+
+  /** How a cut tree looks, part by part, for everything a preview greys: its paint and opacity as computed. */
+  const looks = () => {
+    const B = (0, eval)('gw').B, out: Record<string, string> = {};
+    const roots = [...(new Set(Object.values(B.shoots ?? {})) as Set<any>)].filter((g) => g.g.classList.contains('pv-out')).map((g) => ['s:' + g.kid, g.fl] as const)
+      .concat(Object.entries(B.leaf as Record<string, Element>).filter(([, el]) => el.classList.contains('pv-out')).map(([id, el]) => ['l:' + id, el] as const));
+    for (const [k, el] of roots as [string, Element][]) Array.from(el.querySelectorAll('*')).forEach((e, i) => {
+      const c = getComputedStyle(e); if (c.display === 'none' || c.opacity === '0' || e.getAnimations().length) return;
+      out[k + ':' + i + ':' + e.getAttribute('class')] = [c.fill, c.stroke, c.fillOpacity, c.strokeOpacity, c.opacity].join(' ');
+    });
+    return out;
+  };
+
+  /** Everything one paint cut, read off the motion it set going: the turn, the drop and the fade, the cut face, the count. */
+  const cuts = () => {
+    const B = (0, eval)('gw').B, hf = B.svg.getBoundingClientRect().width / B.svg.viewBox.baseVal.width;
+    const out = { shoots: 0, leaves: 0, order: [] as number[][], bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const own = (el: Element | null | undefined) => (el ? el.getAnimations().filter((a: any) => a.transitionProperty === undefined && a.animationName === undefined) : []);
+    const lum = (c: string) => { const n = (c.match(/[\d.]+/g) ?? []).map(Number); return (0.2126 * n[0]! + 0.7152 * n[1]! + 0.0722 * n[2]!) / 255; };
+    const keys = (a: Animation) => (a.effect as KeyframeEffect).getKeyframes();
+    const TR = /translate\(([-\d.]+)px, ?([-\d.]+)px\) translate\(([-\d.]+)px, ?([-\d.]+)px\) rotate\(([-\d.]+)deg\)/;
+    // a fall: half a second, gathering speed, turning 20 to 30 degrees about the cut and fading out as it drops along an arc
+    const fall = (a: Animation | undefined, what: string, cut?: [number[], number]) => {
+      if (!a) { bad(what + ' does not fall'); return -1; }
+      const t = a.effect!.getTiming(), ks = keys(a), z = ks[ks.length - 1]!, m = String(z.transform).match(TR);
+      if (t.duration !== 500) bad(what + ' falls over', t.duration);
+      if (!/^ease-in$|^cubic-bezier\(0\.42, 0, 1, 1\)$/.test(String(t.easing))) bad(what + ' does not gather speed', t.easing);
+      if (!m || Number(z.opacity) !== 0 || Number(ks[0]!.opacity) !== 1) { bad(what + ' does not fade as it falls'); return Number(t.delay); }
+      const [dx, dy, px, py, th] = m.slice(1).map(Number) as [number, number, number, number, number];
+      if (Math.abs(th) < 20 || Math.abs(th) > 30) bad(what + ' turns by', th);
+      if (cut) {
+        if (Math.hypot(px - cut[0][0]!, py - cut[0][1]!) > cut[1]) bad(what + ' does not turn about its cut', [px, py, cut[0]]);
+        if (dy * hf < 39.9 || dy * hf > 80.1) bad(what + ' drops by', dy * hf);
+        if (Math.sign(dx) !== Math.sign(th)) bad(what + ' tips one way and drifts the other');
+        const mid = ks.find((k) => k.computedOffset > 0 && k.computedOffset < 1), mm = mid && String(mid.transform).match(TR);
+        if (!mm || !(Number(mm[1]) / dx > Number(mm[2]) / dy)) bad(what + ' drops straight down, not along an arc');
+      }
+      return Number(t.delay);
+    };
+    for (const g of new Set(Object.values(B.shoots ?? {})) as Set<any>) {
+      if (!g.fade) continue;
+      out.shoots++;
+      const d = fall(own(g.fl)[0], 'shoot ' + g.kid, [g.base, 0.1]);
+      out.order.push([g.base[1], d]);
+      if (!g.g.classList.contains('pv-out')) bad('a falling shoot loses its preview look', g.kid);
+      if (g.fl.querySelector('.gb-lf.pv-add')) bad('a falling shoot\'s leaf turns green', g.kid);
+      // its cut face is on the bark from the snip: a flat pale oval at its collar, lighter than any bark
+      const sc = g.scar, face = sc?.querySelector('ellipse');
+      if (!sc || getComputedStyle(sc).display === 'none' || !face) bad('no cut face where a shoot is cut', g.kid);
+      else {
+        if (Math.hypot(Number(face.getAttribute('cx')) - g.base[0], Number(face.getAttribute('cy')) - g.base[1]) > 0.1) bad('cut face off the collar', g.kid);
+        const fc = getComputedStyle(face), wood = getComputedStyle(B.svg.querySelector('path.w')).fill;
+        if (sc.children.length !== 1 || /url\(/.test(fc.fill) || fc.stroke === 'none') bad('cut face shaded, or with no ring', g.kid);
+        if (lum(fc.fill) < lum(wood) + 0.25) bad('cut face as dark as the bark', [fc.fill, wood]);
+        const sa = own(sc)[0]; if (sa && Number(sa.effect!.getTiming().delay) > d) bad('cut face shows after the snip', g.kid);
+      }
+      // its count does not fall: it fades at the snip, in about 120 ms
+      const tag = g.ctag;
+      if (tag && getComputedStyle(tag).display !== 'none') {
+        const ta = own(tag)[0];
+        if (!ta) bad('count does not fade', g.kid);
+        else { const t = ta.effect!.getTiming(); if (t.duration !== 120 || Number(t.delay) !== d || keys(ta).some((k) => k.transform)) bad('count does not just fade at the snip', [t.duration, t.delay, d]); }
+      }
+    }
+    for (const id in B.leaf) {
+      const el = B.leaf[id]; if (!el.classList.contains('cut')) continue;
+      out.leaves++;
+      if (!el.classList.contains('pv-out')) bad('a falling leaf loses its preview look', id);
+      // its twig turns about the cut face it leaves on the wood
+      const d = fall(el.__fall?.[0], 'leaf ' + id), sc = B.scar?.[id], face = sc?.querySelector('.cutf');
+      if (!sc?.classList.contains('on') || !face) bad('no scar where a leaf is cut', id);
+      else if (el.__fall?.[1]) fall(el.__fall[1], 'twig of ' + id, [[Number(face.getAttribute('cx')), Number(face.getAttribute('cy'))], 0.1]);
+      out.order.push([el.__y, d]);
+    }
+    // from the apex down, one about every 40 ms
+    out.order.sort((a, b) => a[0]! - b[0]! || a[1]! - b[1]!);
+    for (let i = 1; i < out.order.length; i++) if (out.order[i]![1]! < out.order[i - 1]![1]!) bad('cut out of turn from the apex down', [out.order[i - 1], out.order[i]]);
+    const ds = [...new Set(out.order.map((o) => o[1]!))].sort((a, b) => a - b);
+    if (ds.length && ds[0] !== 0) bad('the first cut waits', ds[0]);
+    for (let i = 1; i < ds.length; i++) if (ds[i]! < 600 && Math.abs(ds[i]! - ds[i - 1]! - 40) > 1) bad('cuts not 40 ms apart', ds);
+    return out;
+  };
+
+  it('grows nothing ahead of its wood, and prunes by snipping each cut at its collar and letting it fall in the preview’s grey', async () => {
+    const { dir, state } = await grownBushy();
+    // parts checked on their own and existing flows, so Max has shoots, counts and graft buds to grow and Min to cut
+    const j1 = state.journeys[0]!, unit = j1.units.find((id) => state.scenarios.some((x) => x.unit === id && x.mode === 'max' && !x.journey)) ?? j1.units[0]!;
+    const src = { ...(state.scenarios.find((x) => x.unit === unit) ?? state.scenarios[0]!) };
+    delete src.level; delete src.polarity;
+    for (let i = 0; i < 2; i++) state.scenarios.push({ ...src, id: 'rg' + i, unit, journey: null, scenarioKind: 'regression', mode: 'max', title: 'An existing flow ' + (i + 1) + ' still holds', flow: 'flow.' + i, criteria: [], modeWhy: 'regression' });
+    state.journeys.flatMap((j) => j.units).forEach((id, i) => {
+      for (let k = 0; k <= (i % 3) + 3; k++) state.scenarios.push({ ...src, id: 'pc' + i + '-' + k, unit: id, journey: null, level: 'part', scenarioKind: 'happy', mode: 'max', title: 'Part ' + id + ' alone ' + (k + 1), flow: null, criteria: [], modeWhy: 'part on its own' });
+    });
+    // asked, not yet chosen: the tree grows, then Min is pointed at and picked
+    const asked = { ...state, asked: true, modeBy: null, mode: 'min' as const };
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 }, colorScheme: scheme });
+        await page.addInitScript(logAnimations);
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        // a look compared before and after the cut is the look itself, not a colour part way through a transition
+        await page.addStyleTag({ content: '.gw-svg.gb, .gw-svg.gb * { transition: none !important; }' });
+        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: asked, v: growView(asked) });
+        await page.getByTestId('grow-view-grove').click();
+        await expect.poll(() => page.evaluate(() => Object.keys((0, eval)('gw').B?.pad ?? {}).length)).toBeGreaterThan(0);
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const t = await page.evaluate(timing);
+        expect(t.bad, width + 'px').toEqual([]);
+        for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
+        // once it has grown, pointing at Min greys what it would cut; picking it cuts them, from that grey
+        await page.waitForFunction(() => {
+          const B = (0, eval)('gw').B, log: Map<Element, Animation[]> = (window as any).__an;
+          const ends = [...log.values()].flat().map((a) => Number(a.startTime ?? 0) + Number(a.effect?.getComputedTiming().endTime ?? 0)).concat(B.grow.map((g: any) => g.t0 + g.ms));
+          return performance.now() > Math.max(...ends) + 50;
+        }, null, { timeout: 20000 });
+        const before = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return null; }).then(() => page.evaluate(looks));
+        const c = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return null; }).then(() => page.evaluate(cuts));
+        expect(c.bad, width + 'px').toEqual([]);
+        expect(c.shoots, width + 'px').toBeGreaterThan(1);
+        expect(c.leaves, width + 'px').toBeGreaterThan(1);
+        const after = await page.evaluate(looks);
+        const changed = Object.keys(after).filter((k) => k in before && before[k] !== after[k]).map((k) => [k, before[k], after[k]]);
+        expect(changed, width + 'px').toEqual([]);
+        expect(Object.keys(after).filter((k) => k in before).length, width + 'px').toBeGreaterThan(10);
+        await page.close();
+      }
+      // with reduced motion nothing grows or falls: the tree is there at once, and a cut is just gone, its scars left
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+      await page.addInitScript(logAnimations);
+      await page.goto(server.url);
+      await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+      await page.getByTestId('grow').waitFor();
+      await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: asked, v: growView(asked) });
+      await page.getByTestId('grow-view-grove').click();
+      await expect.poll(() => page.evaluate(() => Object.keys((0, eval)('gw').B?.pad ?? {}).length)).toBeGreaterThan(0);
+      const moving = () => { const B = (0, eval)('gw').B, log: Map<Element, Animation[]> = (window as any).__an; return document.getAnimations().filter((a) => { const e = a.effect as KeyframeEffect | null; return !!e?.target && B.svg.contains(e.target) && a.playState !== 'finished'; }).map((a) => (a.effect as KeyframeEffect).target!.getAttribute('class')).concat([...log.keys()].filter((e) => B.svg.contains(e)).map((e) => 'animated ' + e.getAttribute('class'))); };
+      expect(await page.evaluate(moving)).toEqual([]);
+      await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); });
+      expect(await page.evaluate(moving)).toEqual([]);
+      const rest = await page.evaluate(() => {
+        const B = (0, eval)('gw').B, gs = [...(new Set(Object.values(B.shoots ?? {})) as Set<any>)];
+        return { cut: B.svg.querySelectorAll('.gb-lf.cut').length, scars: B.svg.querySelectorAll('.scar.on').length, shown: gs.filter((g) => g.g.style.display !== 'none').length, faces: gs.filter((g) => g.scar && g.scar.style.display !== 'none').length, shoots: gs.length };
+      });
+      expect(rest.cut).toBe(0);
+      expect(rest.scars).toBeGreaterThan(1);
+      expect(rest.shown).toBe(0);
+      expect(rest.faces).toBe(rest.shoots);
+      await page.close();
+    } finally { await browser.close(); }
+  }, 90000);
 });
