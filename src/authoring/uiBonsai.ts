@@ -153,7 +153,7 @@ export const BONSAI_CSS = String.raw`
 .gb .bead{fill:var(--gold);stroke:var(--paper);stroke-width:1.5}.gb .halo{fill:var(--gold);opacity:.22}
 .gb .note{font:11.5px var(--mono);fill:var(--muted)}
 .gb-tip{position:absolute;z-index:3;width:max-content;max-width:300px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font-size:13px;line-height:18px;color:var(--ink)}
-.gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-wrap:balance}
+.gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gb-tip>.k{display:block;text-wrap:balance}
 .gb-tip .st{font:12px/17px var(--mono);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
 .gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px}.gb-tip .hop{white-space:nowrap}.gb-tip .path .gw-hop.hit .hl{color:var(--ink)}.gb-tip .path .gw-hop.un .hl{color:var(--muted);opacity:.75}
 .gb-tip .st b{display:inline;font-weight:600}.gb-tip .st .k{font:inherit;text-transform:none;letter-spacing:0;color:inherit}.gb-tip.dock{max-width:none;box-shadow:none;border-color:var(--line)}.gb-docked>*{visibility:hidden}
@@ -1384,7 +1384,8 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   if(q)for(const c of q.cs){if(c.on===false||!c.top||!c.top.length)continue;cush.push({x0:o[0]+c.x0,x1:o[0]+c.x1,top:c.top.map(t=>[o[0]+t[0],o[1]+t[1]]),bot:c.bot.map(t=>[o[0]+t[0],o[1]+t[1]])})}
   const g=P.geo;if(g&&g.slot)for(const [,sl] of g.slot){const c=[o[0]+sl[0],o[1]+sl[1]],th=(sl[2]||0)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],Lf=g.L*(sl[3]||1),st=Lf/2+(sl[4]?10.5:4.5);
    cap([c[0]-u[0]*st,c[1]-u[1]*st],[c[0]+u[0]*Lf/2,c[1]+u[1]*Lf/2],7,'leaf');cap(c,c,10,'leaf')}}
- const myK=new Set((T.knots||[]).map(kn=>kn.id)),shoots=[...new Set(B.shootGeo||[])].filter(g=>myK.has(g.kid));
+ /* this tree's shoots: off its knots (a part merged into a burl keeps its own shoot), its leader and its roots */
+ const myK=new Set((T.knots||[]).flatMap(kn=>[kn.id,...(kn.ids||[])])),shoots=[...new Set(B.shootGeo||[])].filter(g=>myK.has(g.kid)||g.kid==='lead:'+ti||(L.roots||[]).some(r=>r.id===g.kid&&r.tree===ti));
  for(const g of shoots){for(let i=0;i<g.pts.length-1;i++)cap(g.pts[i],g.pts[i+1],6,'shoot');for(const q of g.slots||[])cap([q[0],q[1]],[q[0],q[1]],11,'shoot')}
  for(const l of L.rl||[]){if(l.box){labs.push(l.box);continue}const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;labs.push([x0-2,l.y-L.fs,x0+w0+2,l.y+3])}
  for(const pid in T.lbl||{}){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;labs.push([a,l.y-29,a+l.w,l.y-29+l.hgt]);if(l.dir)lines.push([[l.ax+X,l.ay],[lx,l.y-29+l.hgt/2]])}
@@ -1445,12 +1446,20 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
     keep clear of. A name that had to go far, or was left off, is tried again first, and the placing that keeps the names
     nearest their knots wins */
  const far=new Map(),farOf=(e,t)=>{const key=e.id+'|'+t;if(!far.has(key))far.set(key,places(e,t,[50,66,84],D16).filter(c=>clearS(c.r)&&leadS(c.pts,e.id,true)));return far.get(key)};
+ /* and failing all that, the nearest open ground anywhere in the drawing, on a straight hairline that keeps off the knots:
+    a name goes far before it goes on the wood or a leaf */
+ const scanM=new Map(),scan=(e,t)=>{const key=e.id+'|'+t;if(scanM.has(key))return scanM.get(key);const tw=t.length*cw,out=[];
+  for(let yb=V.vy+fs+4;yb<-4;yb+=fs*.7)for(let x0=V.vx+4;x0+tw<V.vx+V.W-4;x0+=6*k){const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];
+   const d=dPR(e.p,r);if(d<14*k||!clearS(r))continue;const A=e.p[0]<r[0]?[r[0]-1,(r[1]+r[3])/2]:e.p[0]>r[2]?[r[2]+1,(r[1]+r[3])/2]:[Math.max(r[0]+4,Math.min(r[2]-4,e.p[0])),e.p[1]<r[1]?r[1]-1:r[3]+1];
+   const u=[A[0]-e.p[0],A[1]-e.p[1]],um=Math.hypot(u[0],u[1])||1,v=[u[0]/um,u[1]/um],R=[e.p[0]+v[0]*(rr(e,v)+1),e.p[1]+v[1]*(rr(e,v)+1)];
+   out.push({anc:'start',x:x0,yb,r,R,A,pts:[A,R],d})}
+  const f=out.sort((a,b)=>a.d-b.d).filter(c=>leadS(c.pts,e.id,true)).slice(0,4000);scanM.set(key,f);return f};
  const run=(want,o)=>{o=o||{};const T=o.txt||new Map(),tx=e=>T.get(e.id)||e.txt;
   const ok=(c,id,soft,m)=>clear(c.r,m,id)&&baseOK(c.r,c.yb)&&leadOK(c.pts,id,soft);
   const lay=order=>{labs.length=0;labs.push(...base[0],...(o.rects||[]));bases.length=0;bases.push(...base[1]);lines.length=0;lines.push(...base[2],...(o.segs||[]));const out=new Map(),hard=[];let cost=0;
    for(const e of order){const t=tx(e),pr=want.get(e.id);let got=null,c0=0;const tryL=(list,soft,c1,step,m)=>{if(got)return;const i=list.findIndex(c=>ok(c,e.id,soft,m));if(i>=0){got=list[i];c0=c1+i*step}};
     tryL(freeOf(e,t),false,0,.15);if(pr<3){tryL(farOf(e,t),false,6,.05);tryL(freeOf(e,t),true,8,.05)}
-    if(pr<2){tryL(farOf(e,t),true,10,.05);if(!got){const gc=gut(e,t);tryL(gc,true,14,.1,.35);if(!got){c0=40;got=gc.find(c=>clear(c.r,.35,e.id)&&baseOK(c.r,c.yb))||gc.find(c=>clearL(c.r,.2,e.id))||gc[0]}}}
+    if(pr<2){tryL(farOf(e,t),true,10,.05);if(!got){const gc=gut(e,t);tryL(gc,true,14,.1,.35);tryL(scan(e,t),true,24,.05,.35);if(!got){c0=40;got=gc.find(c=>clear(c.r,.35,e.id)&&baseOK(c.r,c.yb))||gc.find(c=>clearS(c.r)&&clearL(c.r,.2,e.id))||scan(e,t).find(c=>clearL(c.r,.2,e.id))||gc.find(c=>clearL(c.r,.2,e.id))||gc[0]}}}
     if(!got){cost+=pr<3?8:3;hard.push(e);continue}if(c0>=6)hard.push(e);cost+=c0;out.set(e.id,got);labs.push(got.r);bases.push([got.yb,got.r]);for(let k2=1;k2<got.pts.length;k2++)lines.push([got.pts[k2],got.pts[k2-1],e.id])}
    return {out,cost,hard}};
   const P=Q.map((e,i)=>({e,i})).filter(q=>want.has(q.e.id)).sort((a,b)=>(want.get(a.e.id)-want.get(b.e.id))||(freeOf(a.e,tx(a.e)).length-freeOf(b.e,tx(b.e)).length)||(a.i-b.i)).map(q=>q.e);

@@ -886,12 +886,12 @@ describe('Grow page', () => {
                 if (r.left < svg.left - .5 || r.right > svg.right + .5 || r.top < svg.top - .5 || r.bottom > svg.bottom + .5) out.push(id + ': ' + part.label + ' cut off by the edge');
                 if (!says(t.textContent ?? '', B.knot[k!].__ids.length > 1 && u !== x.unit ? (t.textContent ?? '') : part.label)) out.push(id + ': ' + part.label + ' named "' + t.textContent + '"');
               }
-              // the names on the route never sit on one another
-              const all = Object.values(B.klbl).filter((t) => (t as SVGElement).classList.contains('on')).map((t) => (t as SVGElement).getBoundingClientRect());
-              for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) {
-                const p = all[a]!, q = all[b]!;
-                if (Math.min(p.right, q.right) - Math.max(p.left, q.left) > .5 && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > .5) out.push(id + ': two names overlap');
-              }
+              // the names on the route never sit on one another, nor on a leaf
+              const meet = (p: DOMRect, q: DOMRect, m: number) => Math.min(p.right, q.right) - Math.max(p.left, q.left) > m && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > m;
+              const on = Object.values(B.klbl).filter((t) => (t as SVGElement).classList.contains('on')) as SVGTextElement[], all = on.map((t) => t.getBoundingClientRect());
+              for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) if (meet(all[a]!, all[b]!, .5)) out.push(id + ': two names overlap');
+              const blades = Array.from(B.svg.querySelectorAll('.gb-lf:not(.gone) .blade') as NodeListOf<Element>).map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+              on.forEach((t, a) => { if (blades.some((r) => meet(all[a]!, r, 1.5))) out.push(id + ': ' + t.textContent + ' sits on a leaf'); });
             }
             w.gw.hov = null; w.gbLight();
             return { leaves, out };
