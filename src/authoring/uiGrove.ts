@@ -115,12 +115,12 @@ ${BONSAI_CSS}
 /* ---------- The page around the tree: after the tree's own styles, so these win where they meet ---------- */
 .gw-code{font:.92em/1 var(--mono);background:var(--code);border-radius:4px;padding:1px 4px}
 /* legend marks: small drawings of what the tree draws, in its wood and leaf colours, light and dark */
-.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3))}
-@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
+.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-crs:color-mix(in srgb,#9C8975 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3))}
+@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
 .gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
 .gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
-.gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .rim{fill:var(--sw-rim)}
+.gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cal{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cres{fill:none;stroke:var(--sw-crs);stroke-width:.8;stroke-linecap:round}.gw-sw .rim{fill:var(--sw-rim)}
 .gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
 .gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 22%,var(--paper))}.gw-sw .pot{fill:color-mix(in srgb,var(--ochre) 26%,var(--line2))}
 .gw-sw .rt{fill:none;stroke:var(--sw-wood);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
@@ -458,7 +458,7 @@ const gwSvg=(w,hh,...k)=>sv('svg',{class:'gw-sw',width:gwF(w*1.2),height:gwF(hh*
 function gwSw(k){
  if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
  if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
- if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg',transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
+ if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg'},sv('path',{d:'M0 3.4 L16 2.9 L16 9.1 L0 9.6 Z',class:'wd'}),sv('ellipse',{cx:8,cy:6.3,rx:3.6,ry:2.3,class:'cal'}),sv('path',{d:'M5.3 6.9 A2.9 1.8 0 0 1 10.7 6.9',class:'cres'})));
  /* a store's root as the pot shows it: sunk in the soil with the soil's lip over its lower edge, its name on a small tag
     on a solid stake pushed into the soil beside its tip */
  if(k==='root')return gwSvg(22,14,sv('path',{d:'M.5 6.5 C4.6 6.6 8.8 7.1 13.8 8.3 C14.2 8.5 14 8.9 13.6 9 C8.6 9 4.6 9.2 .5 9.6 Z',class:'wd'}),sv('path',{d:'M16.6 11 L16.6 4.6',class:'stk sd'}),
@@ -717,7 +717,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  /* once a mode is chosen, what it cut: the cut mark, and the modes side by side, each kind of scenario counted in each, as the
     panel compared them before the choice. The column of a mode pointed at lights here too */
  const kind=gwKindOf(),upto=(k,m)=>s.scenarios.filter(x=>(!k||kind(x)===k)&&gbRank[x.mode]<=gbRank[m]).length,has=k=>s.scenarios.some(x=>kind(x)===k);
- const cut=s.modeBy&&out.length?h('div',{class:'gw-lg mode',role:'group','aria-label':'Pruned'},h('span',{class:'lh'},'Pruned'),h('div',{class:'lgi'},it('cut','pruned by '+gwML(s.mode)),
+ const cut=s.modeBy&&out.length?h('div',{class:'gw-lg mode',role:'group','aria-label':'Pruned'},h('span',{class:'lh'},'Pruned'),h('div',{class:'lgi'},B&&B.svg&&B.svg.querySelector('.heal.on')?it('cut','healed where '+gwML(s.mode)+' pruned what had grown'):null,
   h('div',{class:'gw-lgt'},gwCmp('Scenarios',has('own')||has('reg')?[{label:'On the journeys',n:m=>upto('j',m)},has('own')?{label:'Part checks',n:m=>upto('own',m)}:null,has('reg')?{label:'Existing flows',n:m=>upto('reg',m)}:null,{tot:true,label:'In all',n:m=>upto(null,m)}]:[{tot:true,label:'In all',n:m=>upto(null,m)}],'key')))):null;
  const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{gw.howOpen=e.currentTarget.open}}},h('summary',{},'How to read the tree'),
   h('p',{},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.'),

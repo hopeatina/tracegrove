@@ -23,12 +23,12 @@ export const BONSAI_CSS = String.raw`
  --pad:color-mix(in srgb,var(--moss) 44%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 30%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 70%,var(--paper));
  --fol-hi:color-mix(in srgb,var(--moss) 58%,var(--paper));--fol:color-mix(in srgb,var(--moss) 72%,var(--paper));--fol-lo:color-mix(in srgb,var(--moss) 86%,var(--paper));--fsh-hi:color-mix(in srgb,var(--moss) 70%,var(--paper));--fsh:color-mix(in srgb,var(--moss) 83%,var(--paper));--fsh-lo:color-mix(in srgb,var(--moss) 95%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 16%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 34%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 62%,var(--paper));
- --pot:color-mix(in srgb,var(--ochre) 26%,var(--line2));--pot-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#3A2A20);--pot-lit:color-mix(in srgb,var(--pot) 78%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 80%,#3A2A20);--soil-c:color-mix(in srgb,#6B4A32 72%,var(--soil));--soil-lit:color-mix(in srgb,#8A6A4C 60%,var(--soil));--pebble:color-mix(in srgb,var(--line2) 70%,var(--paper));--rt-cut:var(--wood);--rt-ext:var(--wood);--stake:#B09676;--moss-rim:color-mix(in srgb,var(--pad) 55%,var(--pad-lit));--scar:#F1E7CF;--scar-ring:#3E332B}
+ --pot:color-mix(in srgb,var(--ochre) 26%,var(--line2));--pot-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#3A2A20);--pot-lit:color-mix(in srgb,var(--pot) 78%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 80%,#3A2A20);--soil-c:color-mix(in srgb,#6B4A32 72%,var(--soil));--soil-lit:color-mix(in srgb,#8A6A4C 60%,var(--soil));--pebble:color-mix(in srgb,var(--line2) 70%,var(--paper));--rt-cut:var(--wood);--rt-ext:var(--wood);--stake:#B09676;--moss-rim:color-mix(in srgb,var(--pad) 55%,var(--pad-lit))}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--wood:#6E5F50;--wood-lit:#8A7864;--wood-shade:#4A3F35;--wood-old:#5E574E;--knot:#4E4238;--knot-lit:#93826E;--cut:#B9A684;--cutc:color-mix(in srgb,var(--ink3) 82%,var(--paper));--shoot:#A9CF72;--graft:color-mix(in srgb,var(--moss) 70%,#fff);
  --pad:color-mix(in srgb,var(--moss) 50%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 66%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 30%,var(--paper));
  --fol-hi:color-mix(in srgb,var(--moss) 56%,var(--paper));--fol:color-mix(in srgb,var(--moss) 45%,var(--paper));--fol-lo:color-mix(in srgb,var(--moss) 34%,var(--paper));--fsh-hi:color-mix(in srgb,var(--moss) 45%,var(--paper));--fsh:color-mix(in srgb,var(--moss) 35%,var(--paper));--fsh-lo:color-mix(in srgb,var(--moss) 25%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 22%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 40%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 38%,var(--paper));
- --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468;--moss-rim:#7FA36F;--scar:#D9C9A6;--scar-ring:#2B241F}}
+ --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468;--moss-rim:#7FA36F}}
 .gb .w{fill:var(--wood)}.gb .w.old{fill:var(--wood-old)}.gb .lt{fill:var(--wood-lit)}.gb .sh{fill:var(--wood-shade)}
 .gb .grain{fill:none;stroke:var(--wood-shade);stroke-width:.8;stroke-linecap:round;opacity:.32}
 .gb .jin{fill:var(--paper);stroke:var(--wood-old);stroke-width:.9;stroke-linejoin:round}
@@ -48,16 +48,16 @@ export const BONSAI_CSS = String.raw`
 .gb .pcs{fill:none;stroke:color-mix(in srgb,var(--fol-lo) 70%,var(--ink));stroke-width:.9;stroke-linecap:round;opacity:.45}.gb .cush.csh .pcs{stroke:color-mix(in srgb,var(--fsh-lo) 70%,var(--ink))}
 /* a cushion that loses its last kept leaf shrinks away into the wood it grew on */
 .gb .cush{transform-box:fill-box;transform-origin:50% 100%;transition:opacity .45s,transform .45s}.gb .cush.off{opacity:0;transform:scale(.25)}
-.gb .pclu,.gb .ptufts,.gb .pwg{pointer-events:none;transition:opacity .25s}.gb .pwd{fill:var(--wood)}.gb .ptex{opacity:.3}.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .ptuft.gone,.gb .tw.gone,.gb .pwd.gone{display:none}
-.gb.dim .jg:not(.hl) .pclu,.gb.dim .jg:not(.hl) .ptufts,.gb .jg.pv-cut .pclu,.gb .jg.pv-cut .ptufts,.gb .jg.crown.pruned .pclu,.gb .jg.crown.pruned .ptufts,.gb .jg.pruned.pv-back .pclu,.gb .jg.pruned.pv-back .ptufts{opacity:.12}.gb.dim .jg:not(.hl) .pwg,.gb .jg.pv-cut .pwg,.gb .jg.crown.pruned .pwg{opacity:.3}
+.gb .pclu,.gb .ptufts{pointer-events:none;transition:opacity .25s}.gb .ptex{opacity:.3}.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .ptuft.gone,.gb .tw.gone{display:none}
+.gb.dim .jg:not(.hl) .pclu,.gb.dim .jg:not(.hl) .ptufts,.gb .jg.pv-cut .pclu,.gb .jg.pv-cut .ptufts,.gb .jg.crown.pruned .pclu,.gb .jg.crown.pruned .ptufts,.gb .jg.pruned.pv-back .pclu,.gb .jg.pruned.pv-back .ptufts{opacity:.12}
 .gb .pghost{fill:none;stroke:none}.gb .pad.pv-grow .pghost{fill:var(--fol);fill-opacity:.32;stroke:var(--moss);stroke-width:1;stroke-dasharray:3 3}
 .gb .pad:focus-visible .pfill{stroke:var(--ink);stroke-width:1.5}.gb .pad.back .pclu{opacity:.55}
-.gb .pad .bud0{display:none;fill:var(--pad-shade);stroke:var(--moss);stroke-width:.8}.gb .pad.bare .bud0{display:inline}.gb .pad.bare .cush,.gb .pad.bare .pwg{display:none}
+.gb .pad .bud0{display:none;fill:var(--pad-shade);stroke:var(--moss);stroke-width:.8}.gb .pad.bare .bud0{display:inline}.gb .pad.bare .cush{display:none}
 .gb .jg.pruned{display:none}.gb .jg.crown.pruned{display:inline}.gb .jg.crown.pruned .pfill,.gb .jg.pv-cut .pfill{fill:var(--pad-dim)}.gb .jg.pv-cut .brg,.gb .jg.pv-cut .tw{opacity:.55}
 .gb .jg.pruned.pv-back{display:inline}.gb .jg.pruned.pv-back .pfill{fill:var(--pad-dim)}.gb .jg.pruned.pv-back .brg,.gb .jg.pruned.pv-back .tw{opacity:.55}
 /* dimming never thins the wood or makes foliage see-through: what is not lit turns pale, opaque, so nothing shows through a pad */
 .gb.dim .jg:not(.hl) .pfill{fill:var(--pad-dim)}.gb.dim .jg:not(.hl) .gb-lf{opacity:.32}.gb.dim .kn:not(.on):is(:not(.wound),.wmute){opacity:.55}.gb.lfdim .jg.hl .gb-lf:not(.hl):not(.sel){opacity:.45}
-.gb .stub{display:none}.gb .stub.on{display:inline}.gb .stub .sw{fill:var(--wood)}.gb .cutf{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.7}.gb .mlbl{font:600 10.5px var(--mono);fill:var(--muted)}
+.gb .heal{display:none}.gb .heal.on{display:inline}.gb .mlbl{font:600 10.5px var(--mono);fill:var(--muted)}
 .gb .cutmk{display:none;fill:none;stroke:var(--cutc);stroke-width:1.6;stroke-dasharray:3 2.5;stroke-linecap:round}.gb .cuttag{display:none;font:600 10.5px var(--mono);fill:var(--cutc)}.gb .cutmk.on,.gb .cuttag.on{display:inline}
 .gb .tw{fill:var(--wood)}.gb .tw.shoot{fill:var(--shoot)}.gb .bud .bpet{fill:none;stroke:var(--shoot);stroke-width:.9;stroke-linecap:round}.gb .budg .cutk{display:none;fill:none;stroke:var(--cutc);stroke-width:1.3;stroke-linecap:round}
 /* a shoot a mode would cut is grey with the tick across its foot; one it would add is a ghost, stem and all */
@@ -78,7 +78,7 @@ export const BONSAI_CSS = String.raw`
 .gb-lf .rib{fill:none;stroke:var(--paper);stroke-width:.8;opacity:.7}.gb .gb-lf .halo{fill:var(--paper);opacity:.9}.gb-lf.pv-add .halo{opacity:0}.gb-lf.pre .halo,.gb-lf.pv-out .halo{opacity:.55}.gb-lf.fail .halo{fill:color-mix(in srgb,var(--verm) 24%,var(--paper));opacity:1}
 .gb-lf .bb,.gb-lf .nec{display:none}.gb-lf.fail .bb,.gb-lf.fail .nec{display:inline}.gb-lf.fail .bn{display:none}.gb-lf .nec{fill:none;stroke:#6B3A1E;stroke-width:1.3;stroke-linecap:round}
 .gb-lf .pet{fill:none;stroke:color-mix(in srgb,var(--wood) 70%,var(--moss));stroke-width:1.1;stroke-linecap:round}.gb-lf.hang .pet{stroke:var(--wood);stroke-width:1.3}
-.gb .scar{display:none;cursor:pointer}.gb .scar.on{display:inline}.gb .scar .sw{fill:var(--wood);stroke:var(--wood-shade);stroke-width:.5}.gb .scar .cutf{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.5}.gb.dim .jg:not(.hl) .scar,.gb.lfdim .jg.hl .scar{opacity:.4}.gb-lf .nick{display:none;fill:none;stroke:var(--cutc);stroke-width:1.3;stroke-linecap:round}
+.gb .scar{cursor:pointer}.gb.dim .jg:not(.hl) .scar,.gb.lfdim .jg.hl .scar{opacity:.4}.gb-lf .nick{display:none;fill:none;stroke:var(--cutc);stroke-width:1.3;stroke-linecap:round}
 .gb-lf.in .blade{fill:var(--moss-bg);stroke:var(--moss)}
 .gb-lf.pass .blade{fill:var(--moss);stroke:color-mix(in srgb,var(--moss) 70%,#000)}.gb-lf.pass.warn .blade{stroke:var(--gold);stroke-width:1.6}
 .gb-lf.fail .blade{fill:var(--verm);stroke:color-mix(in srgb,var(--verm) 45%,#000);stroke-width:1.1}
@@ -112,9 +112,9 @@ export const BONSAI_CSS = String.raw`
 .gb.dim .gb-lf.bud.pv-add{opacity:1}.gb.dim .jg:not(.hl) .gb-lf.pv-add{opacity:.5}
 /* one cut mark everywhere, asked, previewed or being pruned: a tick in neutral ink, never red (red is failed and broken) */
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
-/* where a shoot was cut: its cut face, flat and flush with the bark, a pale cream oval in a thin dark ring, no light or shade, so it
-   never reads as a knot's raised boss */
-.gb .shscar{pointer-events:none}.gb .shscar .face{fill:var(--scar);stroke:var(--scar-ring);stroke-width:.75}.gb .scar .cutf{fill:var(--scar);stroke:var(--scar-ring);stroke-width:.6}
+/* where a cut that grew has healed: a small roll of callus in the bark's own tones, a step lighter than the bark, with a thin lit
+   crescent on its lip; never a pale disc, and always under the knots, so it never reads as a boss or as one */
+.gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.5}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
 /* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib */
 .gb-lf.fail:not(.pv-out):not(.pv-add) .halo{opacity:0}.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{stroke:#5a1a14;stroke-width:1}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#5a1a14;opacity:1;stroke-width:.9}
 /* to prove: a solid outline over a pale fill, with its midrib; no flow yet: a dashed outline round nothing */
@@ -224,7 +224,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
  .gb-ols .bx{flex-direction:column;align-items:flex-end;gap:4px}}
 /* a phone's narrow column puts a row's chips, and a root's journeys, under its title rather than squeeze the title beside them */
 @media (max-width:420px){.gb-ols,.gb-olr{grid-template-columns:20px minmax(0,1fr)}.gb-ols .bx{grid-column:2;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start}.gb-olr .fd{grid-column:2;justify-self:start;white-space:normal}}
-@media (prefers-reduced-motion:reduce){.gb-lf,.gb-lf .blade,.gb .vein,.gb .pfill,.gb .pband,.gb .pghost,.gb .cush,.gb .pclu,.gb .ptufts,.gb .pwg,.gb .gb-gr,.gb .kn .k1,.gb .kn .ring,.gb .kn .halo,.gb .klbl,.gb .kld,.gb .rring{transition:none}.gb-lf.run .gb-lfi,.gb .vein.live,.gb .sap{animation:none}.gb-lf.cut .gb-lfi{display:none}}
+@media (prefers-reduced-motion:reduce){.gb-lf,.gb-lf .blade,.gb .vein,.gb .pfill,.gb .pband,.gb .pghost,.gb .cush,.gb .pclu,.gb .ptufts,.gb .gb-gr,.gb .kn .k1,.gb .kn .ring,.gb .kn .halo,.gb .klbl,.gb .kld,.gb .rring{transition:none}.gb-lf.run .gb-lfi,.gb .vein.live,.gb .sap{animation:none}.gb-lf.cut .gb-lfi{display:none}}
 `;
 
 export const BONSAI_JS = String.raw`
@@ -333,11 +333,16 @@ const GB_CU=[[0,.08],[.2,.42],[.45,.74],[.7,.92],[1,1]];
 function gbCuAt(v){for(let i=1;i<GB_CU.length;i++){const [a,p]=GB_CU[i-1],[b,q]=GB_CU[i];if(q>=v)return a+(b-a)*(v-p)/((q-p)||1)}return 1}
 /* A pruned piece falls: snipped at p (its collar, where it leaves the wood), it tips th degrees about the cut and drops
    (dx, dy) along a short arc, sideways first, then down, as it fades; GB_FALL ms on an ease-in, gathering speed. */
-const GB_FALL=500,GB_EASEIN='cubic-bezier(.42,0,1,1)';
+const GB_FALL=500,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
 function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'px) translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) rotate('+gbF(r)+'deg) translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';
  return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.4,transform:T(.45*dx,.16*dy,.7*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
-/* Where a pruned leaf's twig is cut: about seven units out from the wood, leaving a stub. */
-function gbStubEnd(p){const a=p[0];let j=1;while(j<p.length-1&&Math.hypot(p[j][0]-a[0],p[j][1]-a[1])<7)j++;return p[j]}
+/* What was only ever shown before a choice, or as a preview, was never grown, so a mode that drops it does not cut it: it
+   shrinks back into p (its collar) as it fades, in GB_BACK ms on the same ease-in, and leaves no mark. */
+/* A healed cut: a small roll of callus at c, in the bark's own tones, rx along the grain t and ry across it, with a thin lit
+   crescent along its lip on the side n it was cut from. Never a pale disc: it reads as bark, and a knot always stands over it. */
+function gbCal(c,t,n,rx,ry,cls,...kids){const ang=Math.atan2(t[1],t[0])*180/Math.PI,cr=[];for(let i=0;i<=8;i++){const th=Math.PI*i/8;cr.push([c[0]+(t[0]*Math.cos(th)*rx+n[0]*Math.sin(th)*ry)*.8,c[1]+(t[1]*Math.cos(th)*rx+n[1]*Math.sin(th)*ry)*.8])}
+ return sv('g',{class:'heal '+cls},sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(rx),ry:gbF(ry),transform:'rotate('+gbF(ang)+' '+gbP(c)+')',class:'cal'}),sv('path',{d:gbLine(cr),class:'cres'}),...kids)}
+function gbBackK(p){const T=k=>'translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) scale('+k+') translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';return [{offset:0,transform:T(1),opacity:1},{offset:1,transform:T(.04),opacity:0}]}
 function gbCu(f){const T=k=>'translate('+gbF(f[0])+'px,'+gbF(f[1])+'px) scale('+k+') translate('+gbF(-f[0])+'px,'+gbF(-f[1])+'px)';return GB_CU.map(([o,k],i)=>({offset:o,transform:T(k),opacity:i?1:0}))}
 
 /* A pad is grown, not stamped: dense cushions of foliage on the wood that carries them. The happy path sits on the crest,
@@ -853,7 +858,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  const gSoil=lay('soil'),gRootX=lay('rootsx'),rxId='gb-rx'+N,rxMask=sv('mask',{id:rxId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));defs.append(rxMask);gRootX.setAttribute('mask','url(#'+rxId+')');
  /* the traced route is drawn over the wood, so it is never lost under a branch; inside a pad it shows faintly (the mask),
     as sap under foliage */
- const gFront=lay('front'),gSap=sv('g',{class:'sapl',mask:'url(#'+rmId+')'});svg.append(gSap);const gKn=lay('knots'),gVein=lay('veins'),gLbl=lay('labels'),gKl=lay('klabels'),gCur=lay('cur');
+ const gFront=lay('front'),gScar=lay('scars'),gSap=sv('g',{class:'sapl',mask:'url(#'+rmId+')'});svg.append(gSap);B.gScar=gScar;const gKn=lay('knots'),gVein=lay('veins'),gLbl=lay('labels'),gKl=lay('klabels'),gCur=lay('cur');
  B.gCur=gCur;B.gBud=gBud;B.gWood=gWood;B.gKn=gKn;B.sapU=sv('path',{class:'sapu',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapX,B.sap,B.sapW);
  B.lead=sv('path',{class:'tiplead',d:''});gCur.append(B.lead);
  /* an animation that has not finished yet: started at its first build, continued by any rebuild; a piece of wood keeps its
@@ -890,11 +895,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   const fil=(a,bb,cc)=>{const m2=[(a[0]+bb[0])/2,(a[1]+bb[1])/2],ctl=[cc[0]+(m2[0]-cc[0])*.45,cc[1]+(m2[1]-cc[1])*.45];return 'M'+gbP(a)+' Q'+gbP(ctl)+' '+gbP(bb)+' L'+gbP(pts[Math.min(n0,eo+3)])+' L'+gbP(c)+'Z'};
   /* the collar: the wood swells round the limb where it leaves, half again its girth across */
   const ca=Math.atan2(pts[eo+2][1]-pts[eo][1],pts[eo+2][0]-pts[eo][0])*180/Math.PI,col=sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')',class:cls});
-  const U=gU||fg;U.append(col);clip.append(sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'}));anim('col:'+id,col,delay+ms*.2,240,'fade');
-  for(const f of [fil(edge(gbFwd(pp,k,1.5*b)),bE(eo+3,fw),bE(eo,fw)),fil(edge(gbBack(pp,k,.8*b)),bE(eo+2,-fw),bE(eo,-fw))]){const fp=sv('path',{d:f,class:cls});U.append(fp);clip.append(sv('path',{d:f}));anim('fil:'+id+f.length,fp,delay+ms*.25,240,'fade');
+  /* (all that it lays on its parent is kept on it, el.__on: a cut flush at the parent takes it away with the limb) */
+  const U=gU||fg,on=[col,sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'})];U.append(col);clip.append(on[1]);anim('col:'+id,col,delay+ms*.2,240,'fade');
+  for(const f of [fil(edge(gbFwd(pp,k,1.5*b)),bE(eo+3,fw),bE(eo,fw)),fil(edge(gbBack(pp,k,.8*b)),bE(eo+2,-fw),bE(eo,-fw))]){const fp=sv('path',{d:f,class:cls}),fc=sv('path',{d:f});U.append(fp);clip.append(fc);on.push(fp,fc);anim('fil:'+id+f.length,fp,delay+ms*.25,240,'fade');
    /* the crotch sits in the shade of the limb above it, so the parent's lit side does not run on into it as a pale wedge */
-   if(gS){const fs=sv('path',{d:f,class:'filsh'});gS.append(fs);anim('filsh:'+id+f.length,fs,delay+ms*.25,240,'fade')}}
-  el.__par=pp;el.__col=col;return {el,wg,fg}};
+   if(gS){const fs=sv('path',{d:f,class:'filsh'});gS.append(fs);on.push(fs);anim('filsh:'+id+f.length,fs,delay+ms*.25,240,'fade')}}
+  el.__par=pp;el.__col=col;el.__on=on;return {el,wg,fg}};
  /* a branchlet that carries a cushion is bark like its limb: lit on one side, shaded on the other, growing with it */
  const barkOn=(tw,parent)=>{if(sap)return;clip.append(sv('path',{d:tw.getAttribute('d')}));const bl=sv('g',{'clip-path':'url(#'+clipId+')',filter:'url(#'+softId+')'}),lw=sv('g',{},bl);parent.append(lw);shade(tw.__pts,tw.__w,0,bl);tw.__also=[lw]};
  const ribFlat=(pts,w)=>{const A=[],Z=[];pts.forEach((q,i)=>{const n=gbNorm(pts,i),h=w[i]/2;A.push([q[0]+n[0]*h,q[1]+n[1]*h]);Z.push([q[0]-n[0]*h,q[1]-n[1]*h])});return 'M'+A.map(gbP).join(' L')+' L'+Z.reverse().map(gbP).join(' L')+'Z'};
@@ -1047,18 +1053,17 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
     /* the riser a raised crest stands on is a limb off the branch, grown the same way */
     if(t.lb)lbS.set(t.pts,limb('tw:'+id+':'+tk,tpp,t.w,{pts,w:b.w,k:t.bi},'w'+old,jg,lm.fg,b.back?null:wg,ts,320,{flat:b.back}).el.__r);
     else{const k='tw:'+id+':'+(t.id||tk);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+old});tw.__pts=tpp;tw.__w=t.w;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(!b.back)barkOn(tw,jg);twRec(b.id,t,anim(k,tw,ts,320,'grow'),tpp)}});
-   /* the stub a pruning leaves: 20 to 30 px of the branch, cut square, its cut face showing, with how many scenarios it held */
-   const pdl=T.pads[b.id].leaves.length;const sA=gbNear(b.acc,b.Tk*.42),sZ=gbNear(b.acc,b.Tk/2+Math.min(30,Math.max(20,b.len*.2)));const sp=pts.slice(sA,sZ+1),sw=b.w.slice(sA,sZ+1).map(v=>v*.92);
-   const ez=sp[sp.length-1],en=gbNorm(sp,sp.length-1),ea=Math.atan2(en[1],en[0])*180/Math.PI,ewz=sw[sw.length-1];const lx=[ez[0]+b.dir*7,ez[1]+4];
-   const stub=sv('g',{class:'stub','data-k':'j:'+b.j.id,'data-pad':b.id},sv('path',{d:ribFlat(sp,sw),class:'sw'}),
-    sv('ellipse',{cx:gbF(ez[0]),cy:gbF(ez[1]),rx:gbF(ewz/2),ry:gbF(Math.max(1.4,ewz*.2)),transform:'rotate('+gbF(ea)+' '+gbP(ez)+')',class:'cutf'}),
-    sv('text',{x:gbF(lx[0]),y:gbF(lx[1]),'text-anchor':b.dir>0?'start':'end',class:'mlbl'},pdl+' pruned'),sv('circle',{cx:gbF(ez[0]),cy:gbF(ez[1]),r:16,class:'hitc'}));
-   gWood.append(stub);
+   /* where a pruning of it heals: cut flush where it left the trunk, no stub or peg, the cut rolled over with callus in the
+      bark's own tones, a thin lit crescent on its outer lip; with how many scenarios the branch held */
+   const pdl=T.pads[b.id].leaves.length;const cA=gbNear(b.acc,b.Tk/2),cq=pts[cA],cw=b.w[cA],cb=pts[Math.min(pts.length-1,cA+2)],cm=Math.hypot(cb[0]-cq[0],cb[1]-cq[1])||1,cn=[(cb[0]-cq[0])/cm,(cb[1]-cq[1])/cm];
+   const t1=tp[Math.min(tp.length-1,b.k+1)],t2=tp[Math.max(0,b.k-1)],tm=Math.hypot(t1[0]-t2[0],t1[1]-t2[1])||1,ctg=[(t1[0]-t2[0])/tm,(t1[1]-t2[1])/tm],cry=Math.max(1.6,cw*.26),cc=[cq[0]-cn[0]*cry*.5,cq[1]-cn[1]*cry*.5];
+   const stub=gbCal(cc,ctg,cn,Math.max(2.4,cw*.52),cry,'stub',sv('text',{x:gbF(cc[0]+b.dir*(cry+6)),y:gbF(cc[1]+4),'text-anchor':b.dir>0?'start':'end',class:'mlbl'},pdl+' pruned'),sv('circle',{cx:gbF(cc[0]),cy:gbF(cc[1]),r:14,class:'hitc'}));
+   stub.setAttribute('data-k','j:'+b.j.id);stub.setAttribute('data-pad',b.id);gScar.append(stub);
    /* the cut a mode will make, shown while that mode is previewed */
    const qi=gbNear(b.acc,b.Tk/2+12),q=pts[qi],qn=gbNorm(pts,qi),qh=b.w[qi]/2+6;const cutmk=sv('path',{class:'cutmk',d:'M'+gbP([q[0]-qn[0]*qh,q[1]-qn[1]*qh])+' L'+gbP([q[0]+qn[0]*qh,q[1]+qn[1]*qh])});
    const cuttag=sv('text',{x:gbF(q[0]),y:gbF(q[1]-qh-5),'text-anchor':'middle',class:'cuttag'},'');gKn.append(cutmk,cuttag);
    jg.append(sv('path',{d:gbLine(pts.slice(b.exit,Math.round(.6*(pts.length-1)))),class:'hitl','stroke-width':16,'data-k':'j:'+b.j.id,'data-pad':b.id}));
-   B.brEl[b.id]={g:wg,jg,stub,cutmk,cuttag}}
+   B.brEl[b.id]={g:wg,jg,stub,cutmk,cuttag,col:cq,on:lm.el.__on}}
   /* the leader forks into the crown */
   /* a branchlet starts once the leader has grown to it, out from under its bark, and a leaf's twig once its own wood has */
   T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||tk)+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
@@ -1108,13 +1113,19 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
     const inPad=r=>padBox.slice(0,nPad).reduce((a,q)=>a+ov(r,q),0)>.2*(r[2]-r[0])*(r[3]-r[1]);
     const gs=B.shootGeo||[],dist=(g,a)=>Math.hypot(g.base[0]-a[0],g.base[1]-a[1]),same=best?gs.filter(g=>g.ns[0]*best.ns[0]+g.ns[1]*best.ns[1]>0&&dist(g,best.b0)<40*kq):[];
     if(gs.length&&(!best||best.o>0||same.length||inPad(best.r))){const a=best?best.b0:pl[k0],pool=same.length?same:gs;pool.reduce((m,g)=>dist(g,a)<dist(m,a)?g:m,pool[0]).uids.push(...uids);return}
-    if(!best)return;placed.push(best.r);(B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:best.b0,ns:best.ns,tip:best.tip,route:[...best.pts.slice().reverse(),...routeOf(best.kk)],tb:now+(tf||tAt)(best.kk)})};
+    if(!best)return;placed.push(best.r);
+    /* where a cut of it heals: beside its knot along the grain, on the side it leans to and the side it grew out of, clear of
+       the boss and on the bark; with no knot, at its collar */
+    const tgAt=k=>{const g0=pl[Math.min(n1,k+1)],g1=pl[Math.max(0,k-1)],gm=Math.hypot(g0[0]-g1[0],g0[1]-g1[1])||1;return [(g0[0]-g1[0])/gm,(g0[1]-g1[1])/gm]};let cal={c:best.b0,t:tgAt(best.kk),n:best.ns};
+    if(bs&&bs.ra){const t0=tgAt(best.kk),v=[best.pts[2][0]-best.pts[0][0],best.pts[2][1]-best.pts[0][1]],sg=Math.sign(v[0]*t0[0]+v[1]*t0[1])||1,k2=Math.max(1,Math.min(n1-1,best.kk+sg*Math.max(1,Math.round((bs.ra+4.6)/step))));
+     const a2=pl[k2],m2=gbNorm(pl,k2),sd=m2[0]*best.ns[0]+m2[1]*best.ns[1]<0?-1:1,o=Math.max(0,wd[k2]/2-2.2);cal={c:[a2[0]+m2[0]*sd*o,a2[1]+m2[1]*sd*o],t:tgAt(k2),n:[m2[0]*sd,m2[1]*sd]}}
+    (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:best.b0,ns:best.ns,tip:best.tip,cal,bid:bs&&bs.bid,boss:bs?{p:bs.p,ra:bs.ra,rb:bs.rb}:null,route:[...best.pts.slice().reverse(),...routeOf(best.kk)],tb:now+(tf||tAt)(best.kk)})};
    const tdown=k=>tp.slice(0,k+1).reverse();
    /* when the growing trunk passes a point of it, so nothing grows out of wood that is not there yet */
    const tAt=k=>at(T.ty[k]);
    /* the knots with most checks first, so a crowded stretch keeps the shoot that holds most */
    const cnt=ids=>ids.reduce((n,id)=>n+own(id).length,0),ks=T.knots.map(kn=>({kn,uids:kn.ids.filter(id=>own(id).length)})).filter(o=>o.uids.length).sort((a,b)=>cnt(b.uids)-cnt(a.uids)||a.kn.t-b.kn.t||a.kn.k-b.kn.k);
-   for(const {kn,uids} of ks){const b=kn.bid?T.br.find(x=>x.id===kn.bid):null,bs={p:sh(kn.bp),side:kn.side,rb:kn.rb};
+   for(const {kn,uids} of ks){const b=kn.bid?T.br.find(x=>x.id===kn.bid):null,bs={p:sh(kn.bp),side:kn.side,rb:kn.rb,ra:kn.ra,bid:kn.bid};
     if(b){const bp=b.pts.map(sh);grow1(bp,kn.k,b.w,uids,kn.id,kk=>[...bp.slice(0,kk+1).reverse(),...tdown(b.k)],2,0,bs,B.brAt[b.id])}
     else grow1(tp,kn.k,T.tw,uids,kn.id,tdown,2,0,bs)}
    /* never from the soil or the flare: a root's sucker leaves the trunk above a fifth of its height, on the root's side where
@@ -1179,19 +1190,13 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   T.padList.forEach((pd,pi)=>{const o=sh(T.origin[pd.id]),g=pd.geo,jid=pd.jid;const back=pd.b&&pd.b.back;const jg=JG[pd.id];
    const shape=g.shape;const q0=shape(()=>true),pk='gb-pk'+N+'-'+ti+'-'+pi;
    const els={ghost:sv('path',{class:'pghost',d:gbPadD(o,q0)}),clip:sv('path',{d:gbPadD(o,q0)})};defs.append(sv('clipPath',{id:pk},els.clip));
-   const wm=sv('mask',{id:pk+'w',maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)});defs.append(wm);
    const cu=g.cs.map((c,k)=>{const d=gbCushD(o,q0.cs[k]),X=o[0]+c.x,Y=o[1]+c.b,ck=pk+'-'+k,cr=c.role==='crest'?'cr':'sh';defs.append(sv('clipPath',{id:ck},sv('path',{d})));
     const clu=sv('g',{'clip-path':'url(#'+ck+')',class:'pclu'});for(const [x,y,r] of c.body)clu.append(sv('circle',{cx:gbF(X+x),cy:gbF(Y+y),r:gbF(r),fill:'url(#'+padG+cr+')'}),sv('path',{class:'pcs',d:'M'+gbP([X+x-r*.92,Y+y+r*.38])+' A'+gbF(r)+' '+gbF(r)+' 0 0 0 '+gbP([X+x+r*.92,Y+y+r*.38])}));clu.append(sv('path',{class:'ptex',d,fill:'url(#'+padG+'s)'}));
-    defs.append(sv('linearGradient',{id:ck+'g',gradientUnits:'userSpaceOnUse',x1:'0',y1:gbF(Y),x2:'0',y2:gbF(Y-c.h*.34)},sv('stop',{offset:0,'stop-color':'#fff'}),sv('stop',{offset:1,'stop-color':'#fff','stop-opacity':0})));
-    const wb=sv('path',{d,fill:'url(#'+ck+'g)'});wm.append(wb);const el=sv('g',{class:'cush c'+cr},sv('path',{class:'pfill',d}),clu);return {el,wb,gr:sv('g',{class:'cgr'},el)}});
-   /* the wood under the foliage, seen only through the cushions' lower edge, in the same bark as outside them (lit on one
-      side, shaded on the other), so a limb runs on into its pad in one colour with no edge where it goes in; a leaf's twig
-      goes with its leaf */
-   const pw=sv('g',{class:'pwg',mask:'url(#'+pk+'w)'}),lt=B.ltw=B.ltw||{},pwc=sv('clipPath',{id:pk+'c'}),pwl=sv('g',{'clip-path':'url(#'+pk+'c)',filter:'url(#'+softId+')'});defs.append(pwc);
-   const wd=(pts,w,id,bx)=>{const d=gbRib(pts,w,0,pts.length-1,undefined,bx),e=sv('path',{class:'pwd',d});pw.append(e);if(id)(lt[id]=lt[id]||[]).push(e);else{pwc.append(sv('path',{d}));if(w[0]>2.4)shade(pts,w,0,pwl)}};
-   if(pd.b){wd(pd.b.pts.map(sh),pd.b.w,null,pd.b.bx);for(const t of pd.b.twigs)wd(t.pts.map(sh),t.w,t.id)}else{wd(tp,T.tw,null,T.bx);for(const t of T.ctw)wd(t.pts.map(sh),t.w,t.id)}pw.append(pwl);
+    const el=sv('g',{class:'cush c'+cr},sv('path',{class:'pfill',d}),clu);return {el,gr:sv('g',{class:'cgr'},el)}});
+   /* a cushion is opaque to its foot: the limb it grew on goes in under it and does not show through (a smear of wood
+      across its base), and a leaf's twig ends under the foliage its leaf lies on */
    const mk=sv('path',{d:gbPadD(o,q0),fill:'#666'});rMask.append(mk);
-   const pg=sv('g',{class:'pad'+(pd.crown?' crown':'')+(back?' back':''),'data-k':'j:'+jid,'data-pad':pd.id,tabindex:-1,role:'button'},els.ghost,...cu.map(q=>q.gr),pw,sv('ellipse',{cx:gbF(o[0]),cy:gbF(o[1]-5),rx:6,ry:4.6,class:'bud0'}));
+   const pg=sv('g',{class:'pad'+(pd.crown?' crown':'')+(back?' back':''),'data-k':'j:'+jid,'data-pad':pd.id,tabindex:-1,role:'button'},els.ghost,...cu.map(q=>q.gr),sv('ellipse',{cx:gbF(o[0]),cy:gbF(o[1]-5),rx:6,ry:4.6,class:'bud0'}));
    jg.append(pg);const lg=sv('g',{});jg.append(lg);const tg=sv('g',{class:'ptufts','clip-path':'url(#'+pk+')'});jg.append(tg);const tf=B.tuft=B.tuft||{};
    /* the foliage in front of a leaf's foot: two small clumps, so the blade tucks into the cushion instead of sitting on it */
    for(const [id,q] of g.tuft){const k=g.cs[g.cOf.get(id)].role==='crest'?'cr':'sh',x=o[0]+q[0],y=o[1]+q[1],r=q[3]*1.1,dx=q[2]*.3,iy=y-Math.sqrt(Math.max(1,r*r-dx*dx))+(gbHash('tf:'+id)-.5);
@@ -1201,17 +1206,20 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
       last has grown it is whole; the wood seen through its foot comes in after. Its end is kept from the first time it is
       drawn, so a leaf drafted later never makes a grown cushion shrink and grow again. */
    const cq=B.cuS[pd.id]||{},cS=q0.cs.map((c,k)=>{const q=cq[k];
-    /* a cushion swells from the fork its twigs leave the wood at, so it starts no sooner than the wood is there */
-    if(!q||q.s===Infinity){const f=[o[0]+c.x,o[1]+c.b],w=gbWoodAt(B,f,2),s0=Math.max(now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tEnd),w<Infinity?w:-Infinity);return {s:s0,e:s0+380,f}}
+    /* a cushion swells from the fork its twigs leave the wood at, so it starts no sooner than the wood is there (with no twig
+       of it drawn yet, from its own foot: the shape's c is its outline, the layout's g.cs[k] has the foot) */
+    if(!q||q.s===Infinity){const f=[o[0]+g.cs[k].x,o[1]+g.cs[k].b],w=gbWoodAt(B,f,2),s0=Math.max(now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tEnd),w<Infinity?w:-Infinity);return {s:s0,e:s0+380,f}}
     const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s;return {s:s1,e:gbT('cue:'+pd.id+':'+k,Math.max(s1+380,q.e)-now),f}});
    /* its name comes once its first cushion is half grown */
    const lblAt=Math.min(...cS.map(c=>c.s+gbCuAt(.5)*(c.e-c.s)));
    /* the wood a leaf's sap runs through on its way down: its own twig, then its branch (or, for the crown, the leader or a
       branchlet off it) and the trunk */
-   const lts={};for(const t of pd.b?pd.b.twigs:T.ctw)if(t.id)lts[t.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null};
+   /* (and how thick the wood it leaves is, where it leaves it: a cut there heals on that wood's bark) */
+   const hwAt=(P,W,q)=>{let bd=Infinity,bw=2;P.forEach((p,i)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;bw=W[i]}});return bw/2};
+   const lts={};for(const t of pd.b?pd.b.twigs:T.ctw)if(t.id)lts[t.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null,hw:t.c?hwAt(t.c.pts,t.c.w,t.pts[0]):pd.b?hwAt(pd.b.pts,pd.b.w,t.pts[0]):hwAt(T.tp,T.tw,t.pts[0])};
    const rt={tp,br:pd.b?pd.b.pts.map(sh):null,bw:pd.b?pd.b.w[pd.b.exit]:0,exit:pd.b?pd.b.exit:0,k:pd.b?pd.b.k:tp.length-1,lt:lts};
    B.pad[pd.id]={el:pg,jg,o,geo:g,jid,pol:pd.pol,crown:pd.crown,b:pd.b,lg,tg,leaves:pd.leaves,cS,lblAt,gk,tree:ti,shape,els,cu,mk,sk:'*',rt,q0};(B.padsOf[jid]=B.padsOf[jid]||[]).push(pd.id);
-   if(!quiet){const pe=Math.max(...cS.map(c=>c.e));cu.forEach((u,k)=>{const c=cS[k];if(now<c.e)B.anim.push([u.gr,c.s-now,c.e-c.s,'cu',c.f])});if(now<pe+200)B.anim.push([pw,pe-now,200,'fade'])}
+   if(!quiet)cu.forEach((u,k)=>{const c=cS[k];if(now<c.e)B.anim.push([u.gr,c.s-now,c.e-c.s,'cu',c.f])})
    if(!sap&&!pd.pol){B.nav.push('j:'+jid);B.navEl['j:'+jid]=pg}});
   for(const pid in T.lbl){const l=T.lbl[pid],pd=T.pads[pid];const back=pd.b&&pd.b.back;const lx=l.x+X,ly=l.y;
    const gl=sv('g',{class:'lbl'+(back?' back':''),'data-k':'j:'+l.jid,'data-pad':pid});const eb=sv('text',{x:gbF(lx),y:gbF(ly-18),'text-anchor':l.anchor,class:'eb'},'');gl.append(eb);
@@ -1316,6 +1324,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  if(!gw.B||gw.B.key!==key){const O=gw.B;gw.prevIn={};gw.prevShown={};gw.prevBuds=O?O.budsShown:undefined;
   if(O){for(const id in O.leaf)gw.prevIn[id]=O.leaf[id].__in;for(const id in O.pad)gw.prevShown[id]=O.pad[id].shown}gbBuild(M,width,key,sap)}
  const B=gw.B;gw.M=M;const vis=s.modeBy?s.mode:s.asked&&gw.picking?gw.picking:null;/* a preview: before a mode is chosen, what each would keep; once one is set, what another would keep or add, as ghosts */const pv=gw.preview&&gw.preview!==(s.modeBy?s.mode:null)?gw.preview:null;let n=0;const quiet=gwQuiet();
+ /* what has grown in a chosen mode, for the whole grow: only that is cut when a mode drops it, and heals over; the rest was
+    only ever shown before a choice, or previewed, and goes back into its collar with no mark */
+ const real=(gw.seen=gw.seen||new Set()).real||(gw.seen.real=new Set());
  const order=sap?[]:gbOrder(M);gw.order=order.map(j=>j.id);
  /* one tab stop into the tree: the first journey in the order the list and the inspector use */
  if(!B.roved){B.roved=true;const f=B.navEl['j:'+gw.order[0]]||B.navEl[B.nav[0]];if(f)gbRove(f)}
@@ -1341,17 +1352,19 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
        if(tf&&tf.animate)gbPlay(tf,[{opacity:0},{opacity:1}],{duration:170,fill:'backwards'},t0)}}}
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2])+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');el.__x=x;el.__y=P.o[1]+sl[1];
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
-    /* pruning: a leaf the chosen mode drops is snipped where its twig leaves the wood, at its turn from the apex down. Twig and
-       leaf go together: they tip 20 to 30 degrees about the cut and drop away along a short arc as they fade, in the grey the
-       preview gave them, and the cut face is left on the wood (the scar below) */
-    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet&&el.__g.animate&&!(gbNow()<(el.__t0||0))){el.__cutAt=Date.now();for(const a of el.__g.getAnimations())a.cancel();const lag=el.__lag=cutLag.get('s:'+x.id)||0,tw=((B.ltw||{})[x.id]||[])[0],tq=P.rt.lt[x.id];
-      const pos=[P.o[0]+sl[0],P.o[1]+sl[1]],a=sl[2]*Math.PI/180,sc=sl[3]||1,ca=Math.cos(a),sa=Math.sin(a),piv=tq?gbStubEnd(tq.pts):[pos[0]-ca*(g.L/2+GB_PET)*sc,pos[1]-sa*(g.L/2+GB_PET)*sc];
+    /* pruning, at its turn from the apex down. A leaf that grew in a chosen mode is snipped where its twig leaves the wood: twig
+       and leaf tip 20 to 30 degrees about the cut and drop away along a short arc as they fade, in the grey the preview gave
+       them, and the cut heals over (the callus below). One that was only ever shown before a choice, or as a preview, was
+       never grown: it shrinks back into its collar as it fades, and leaves no mark */
+    if(im&&vis)real.add(x.id);
+    if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet&&el.__g.animate&&!(gbNow()<(el.__t0||0))){el.__cutAt=Date.now();for(const a of el.__g.getAnimations())a.cancel();const lag=el.__lag=cutLag.get('s:'+x.id)||0,tw=((B.ltw||{})[x.id]||[])[0],tq=P.rt.lt[x.id],fell=el.__fell=real.has(x.id);
+      const pos=[P.o[0]+sl[0],P.o[1]+sl[1]],a=sl[2]*Math.PI/180,sc=sl[3]||1,ca=Math.cos(a),sa=Math.sin(a),piv=tq?tq.pts[0]:[pos[0]-ca*(g.L/2+GB_PET)*sc,pos[1]-sa*(g.L/2+GB_PET)*sc];
       const h=gbHash('fall:'+x.id),dir=ca>.2?1:ca<-.2?-1:h<.5?-1:1,th=dir*(20+10*gbHash('spin:'+x.id)),hf=gbHf(B),dx=dir*(6+10*h)/hf,dy=(40+40*gbHash('drop:'+x.id))/hf;
-      /* the leaf falls in its own frame, so the same motion is put into it: the cut point, the drop and the turn seen from the leaf */
-      const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),o={duration:GB_FALL,delay:lag,easing:GB_EASEIN,fill:'forwards'};
-      el.__fall=[el.__g.animate(gbFallK(lp,ld[0],ld[1],th),o)];if(tw&&tw.animate)el.__fall.push(tw.animate(gbFallK(piv,dx,dy,th),o));
-      setTimeout(()=>{if(el.__in===false){el.classList.replace('cut','gone');gbPaint()}},GB_FALL+lag+40)}
-     cls+=el.__cutAt&&Date.now()-el.__cutAt<GB_FALL+(el.__lag||0)?' cut pv-out':' gone'}else{el.__cutAt=0;if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}
+      /* the leaf moves in its own frame, so the same motion is put into it: the cut point, the drop and the turn seen from the leaf */
+      const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),ms=el.__cutMs=fell?GB_FALL:GB_BACK,o={duration:ms,delay:lag,easing:GB_EASEIN,fill:'forwards'};
+      el.__fall=fell?[el.__g.animate(gbFallK(lp,ld[0],ld[1],th),o)]:[el.__g.animate(gbBackK(lp),o)];if(tw&&tw.animate)el.__fall.push(tw.animate(fell?gbFallK(piv,dx,dy,th):gbBackK(piv),o));
+      setTimeout(()=>{if(el.__in===false){el.classList.replace('cut','gone');gbPaint()}},ms+lag+40)}
+     cls+=el.__cutAt&&Date.now()-el.__cutAt<(el.__cutMs||GB_FALL)+(el.__lag||0)?' cut pv-out':' gone'}else{el.__cutAt=0;if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}
     if(pv&&!add){const keep=gbRank[x.mode]<=gbRank[pv];cls+=keep?' pv-in':' pv-out';if(!keep)cutN++}
     el.setAttribute('class',cls);el.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t);
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
@@ -1361,29 +1374,39 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     if(im){shown++;if(s.run[x.id]&&s.run[x.id].st==='fail')failed=true}});
    /* a pad the mode keeps nothing of is cut back: once its leaves have fallen, the branch drops away and leaves a stub */
    /* a cushion stays while it holds a leaf the mode keeps, and shrinks away when it holds none; a previewed mode's extra
-      growth shows as a faint outline behind */
-   const kk=[...kept].join(','),gk=[...grown].join(',');if(P.sk!==kk+'|'+gk){P.sk=kk+'|'+gk;const q=P.shape(id=>kept.has(id)),d=gbPadD(P.o,q);
-    q.cs.forEach((c,k)=>{const u=P.cu[k];u.el.classList.toggle('off',!c.on);u.wb.style.display=c.on?'':'none'});
+      growth shows as a faint outline behind. The crown is the tree's apex and is never cut away: one the mode keeps nothing
+      of keeps its whole outline, dimmed (.jg.crown.pruned), so the leader and its branchlets end inside it, never bare */
+   const kk=[...kept].join(','),gk=[...grown].join(',');if(P.sk!==kk+'|'+gk){P.sk=kk+'|'+gk;const q=P.shape(P.crown&&!kept.size&&list.length?()=>true:id=>kept.has(id)),d=gbPadD(P.o,q);
+    q.cs.forEach((c,k)=>{const u=P.cu[k];u.el.classList.toggle('off',!c.on)});
     P.els.clip.setAttribute('d',d);if(P.rcp)P.rcp.setAttribute('d',d);P.mk.setAttribute('d',d);P.els.ghost.setAttribute('d',gk===kk?d:gbPadD(P.o,P.shape(id=>grown.has(id))))}
-   /* a pruned leaf leaves a scar where it grew: the stub of its own twig, cut a few units from the wood with its pale face
-      showing (the legend's mark), on the crest, a shoulder or under the pad alike. One scar per pruned scenario, so the
-      "+N pruned" under the name can be counted on the tree. */
-   {B.scar=B.scar||{};for(const x of list){const el=B.leaf[x.id],t=P.rt.lt[x.id];if(!el||!t)continue;
-    /* it is there from the snip, while the twig it was cut from falls */
-    const cut=el.classList.contains('cut'),on=cut||el.classList.contains('gone');let sc=B.scar[x.id];if(!on){if(sc)sc.classList.remove('on');continue}
+   /* a leaf cut after it grew in a chosen mode heals where its twig left the wood: a small callus on that bark, beside the
+      collar (gbCal), where the bark shows; under a cushion the foliage covers it, and on a branch it lies under the branch's knots,
+      which stay raised bosses over it. What was only ever previewed leaves nothing */
+   /* (one for each cushion's cut leaves, and one for those that hung beneath it: where the twigs of a cushion left the wood
+      heals as one cut, at the collar nearest their middle, so a branch is never studded with them) */
+   {B.scar=B.scar||{};const grp=new Map();for(const x of list){const el=B.leaf[x.id],t=P.rt.lt[x.id];if(!el||!t)continue;
+    if(!el.__cal){const p=t.pts,a=p[0],e=p[Math.min(p.length-1,2)],m=Math.hypot(e[0]-a[0],e[1]-a[1])||1,u=[(e[0]-a[0])/m,(e[1]-a[1])/m],o=Math.min(2.4,(t.hw||2)*.6);el.__cal={c:[a[0]+u[0]*o,a[1]+u[1]*o],u}}
+    const c=el.__cal.c,hid=!!(P.mk.isPointInFill&&P.mk.isPointInFill(new DOMPoint(c[0],c[1])));if(!((el.classList.contains('cut')||el.classList.contains('gone'))&&real.has(x.id)&&!hid&&(shown||!P.b)))continue;
+    const k0=g.cOf.get(x.id),k=k0+(g.cs[k0]&&g.cs[k0].hang.some(q=>q.id===x.id)?'h':'');(grp.get(k)||grp.set(k,[]).get(k)).push(x)}
+   const rep=new Map();for(const xs of grp.values()){const C=xs.map(x=>B.leaf[x.id].__cal.c),m=[C.reduce((a,q)=>a+q[0],0)/C.length,C.reduce((a,q)=>a+q[1],0)/C.length];let bi=0;C.forEach((q,i)=>{if(Math.hypot(q[0]-m[0],q[1]-m[1])<Math.hypot(C[bi][0]-m[0],C[bi][1]-m[1]))bi=i});rep.set(xs[bi].id,xs)}
+   for(const x of list){const el=B.leaf[x.id];if(!el||!el.__cal)continue;
+    const cut=el.classList.contains('cut'),{c,u}=el.__cal,on=rep.has(x.id),more=on?rep.get(x.id).length-1:0;let sc=B.scar[x.id];
+    if(!on){if(sc)sc.classList.remove('on');continue}
     const sw=Math.max(cut?el.__lag||0:0,(el.__t0||0)-gbNow()),scIn=q=>{if(!quiet&&q.animate&&(cut||sw>0))q.animate([{opacity:0},{opacity:1}],{duration:60,delay:sw,fill:'backwards'})};
     if(sc&&!sc.classList.contains('on'))scIn(sc);
-    if(!sc){const p=t.pts,a=p[0],e=gbStubEnd(p),m=Math.hypot(e[0]-a[0],e[1]-a[1])||1,u=[(e[0]-a[0])/m,(e[1]-a[1])/m],n=[-u[1],u[0]],w0=1.7,w1=1.3,ang=Math.atan2(u[1],u[0])*180/Math.PI;
-     const d='M'+gbP([a[0]+n[0]*w0,a[1]+n[1]*w0])+' L'+gbP([e[0]+n[0]*w1,e[1]+n[1]*w1])+' L'+gbP([e[0]-n[0]*w1,e[1]-n[1]*w1])+' L'+gbP([a[0]-n[0]*w0,a[1]-n[1]*w0])+'Z';
-     sc=sv('g',{class:'scar','data-k':'s:'+x.id,'data-pad':pid,tabindex:-1,role:'button'},sv('path',{d,class:'sw'}),sv('ellipse',{cx:gbF(e[0]),cy:gbF(e[1]),rx:1.2,ry:1.8,transform:'rotate('+gbF(ang)+' '+gbP(e)+')',class:'cutf'}),sv('circle',{cx:gbF(e[0]),cy:gbF(e[1]),r:9,class:'hitc'}));P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
-    sc.classList.add('on');sc.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t)}}
+    if(!sc){sc=gbCal(c,[-u[1],u[0]],u,2.3,1.5,'scar',sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:9,class:'hitc'}));sc.setAttribute('data-k','s:'+x.id);sc.setAttribute('data-pad',pid);sc.setAttribute('tabindex','-1');sc.setAttribute('role','button');const k1=P.jg.querySelector(':scope>.kn');if(k1)k1.before(sc);else P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
+    sc.classList.add('on');sc.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t+(more?'; and '+more+' more pruned here':''))}}
    const falling=list.some(x=>B.leaf[x.id]&&B.leaf[x.id].classList.contains('cut'));const pruned=!!vis&&list.length>0&&!shown;const bare=!list.length;const cut=pruned&&!falling;const back=cut&&!!pv&&list.some(x=>gbRank[x.mode]<=gbRank[pv]);
    P.el.setAttribute('class','pad'+(P.crown?' crown':'')+(P.b&&P.b.back?' back':'')+(bare?' bare':'')+(gk!==kk?' pv-grow':'')+(failed?' failed':'')+(gw.pinned==='j:'+j.id?' sel':''));
    P.el.setAttribute('aria-label',(P.pol?'Journey '+n+', '+(P.pol==='failure'?'the ways it fails':'what it refuses'):'Journey '+n+', '+j.title)+(pruned?', pruned in '+gbModeName(vis):''));
-   if(P.shown===undefined)P.shown=(gw.prevShown||{})[pid];if(cut&&!P.cutDone){P.cutDone=true;if(!quiet&&P.shown&&P.jg.animate){P.jg.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(20px)',opacity:0}],{duration:450,easing:'ease-in'}).onfinish=()=>{if(P.cutDone)P.jg.classList.add('pruned')}}else P.jg.classList.add('pruned')}
+   /* a journey's branch the chosen mode keeps nothing of: cut flush at the trunk and dropped if it grew in a chosen mode, its
+      callus left (the stub); taken back into its collar, with no mark, if it was only ever shown before a choice. Either way
+      the collar and fillets it laid on the trunk go with it, so nothing of it stands proud of the bark */
+   if(vis&&shown>0)real.add('p:'+pid);const pfell=real.has('p:'+pid),E=B.brEl[pid];
+   if(P.shown===undefined)P.shown=(gw.prevShown||{})[pid];if(cut&&!P.cutDone){P.cutDone=true;if(!quiet&&P.shown&&P.jg.animate&&!P.crown){P.jg.animate(pfell||!E?[{transform:'translateY(0)',opacity:1},{transform:'translateY(20px)',opacity:0}]:gbBackK(E.col),{duration:pfell||!E?450:GB_BACK,easing:'ease-in'}).onfinish=()=>{if(P.cutDone)P.jg.classList.add('pruned')}}else P.jg.classList.add('pruned')}
    if(!cut){P.cutDone=false;P.jg.classList.remove('pruned')}P.shown=!cut;
    const willCut=!!pv&&!P.crown&&list.length>0&&cutN===list.length;P.jg.classList.toggle('pv-cut',willCut);P.jg.classList.toggle('pv-back',back);
-   const E=B.brEl[pid];if(E){const was=E.stub.classList.contains('on');E.stub.classList.toggle('on',cut&&!back);if(cut&&!was&&!quiet&&E.stub.animate)E.stub.animate([{opacity:0},{opacity:1}],{duration:300,delay:350,fill:'backwards'});
+   if(E){const was=E.stub.classList.contains('on');E.stub.classList.toggle('on',cut&&!back&&pfell);for(const e of E.on||[])e.style.display=cut&&!back?'none':'';if(cut&&!was&&!quiet&&E.stub.animate)E.stub.animate([{opacity:0},{opacity:1}],{duration:300,delay:350,fill:'backwards'});
     E.cutmk.classList.toggle('on',willCut);E.cuttag.classList.toggle('on',willCut);if(willCut)E.cuttag.textContent='cut · '+list.length}
    P.pruned=pruned;P.cut=cut;if(!P.pol&&cut)mainCut=true}
   /* each label speaks for its own pad: the journey's name or its riskiest guard or failure, then their state, one colour per word */
@@ -1436,23 +1459,27 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   /* shoots a chosen mode drops wither and fade, rather than vanish */
   const any=list.some(inMode),on=showBuds&&(any||pv==='max'),was=g.on===undefined?gw.prevBuds:g.on;g.on=on;
   const stop=()=>{if(g.fade){g.fade.cancel();g.fade=null}if(g.cfade){g.cfade.cancel();g.cfade=null}};
-  /* where a dropped shoot is cut: its flat cut face on the bark at its collar (the face's long side across the shoot) */
-  if(!g.scar){const a=Math.atan2(g.pts[1][1]-g.pts[0][1],g.pts[1][0]-g.pts[0][0])*180/Math.PI;g.scar=sv('g',{class:'shscar',transform:'rotate('+gbF(a+90)+' '+gbP(g.base)+')'},sv('ellipse',{cx:gbF(g.base[0]),cy:gbF(g.base[1]),rx:3.3,ry:2.1,class:'face'}));(B.gKn||B.gWood).append(g.scar)}
+  /* where a shoot that grew in a chosen mode heals once a mode drops it: a callus beside its knot (gbBuild's cal), under the boss */
+  /* (laid just under its own knot, which may sit on a branch's wood above the scars layer: the knot stays a raised boss over it) */
+  if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,2.6,1.7,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
+  if(vis==='max'&&any)real.add('sh:'+g.kid);const fell=real.has('sh:'+g.kid);
   if(on){g.g.style.display='';stop()}
   /* (one cut before it has sprouted never sprouts; one cut while sprouting falls from where it got to) */
   else if(was&&!quiet&&(!pvWas||chose)&&g.fl&&g.fl.animate&&!g.fade&&!(gbNow()<(g.sp||0)-300)){g.g.style.display='';const lag=cutLag.get(g)||0;for(const a of g.fl.getAnimations())a.cancel();
-   /* a dropped shoot is snipped at its collar, at its turn from the apex down: its cut face shows on the bark at once, and the
-      shoot, still in the grey the preview gave it, tips 20 to 30 degrees about the cut, away from the wood, and drops 40 to
-      80 px along a short arc as it fades, in half a second, gathering speed. Its count does not fall: it just fades. Once
-      gone the fall is let go of, so the shoot can show again (a later preview's ghost, say) */
+   /* a dropped shoot that grew in a chosen mode is snipped at its collar, at its turn from the apex down: its callus shows
+      beside the knot at once, and the shoot, still in the grey the preview gave it, tips 20 to 30 degrees about the cut, away
+      from the wood, and drops 40 to 80 px along a short arc as it fades, in half a second, gathering speed. One only ever
+      shown before a choice, or previewed, shrinks back into its collar as it fades, and leaves no mark. Its count does not
+      fall: it just fades. Once gone the motion is let go of, so the shoot can show again (a later preview's ghost, say) */
    const sd=g.tip[0]>=g.base[0]?1:-1,th=sd*(20+10*gbHash('shf:'+g.kid)),hf=gbHf(B),dy=(40+40*gbHash('shy:'+g.kid))/hf,dx=sd*(6+10*gbHash('shx:'+g.kid))/hf;
-   g.fade=g.fl.animate(gbFallK(g.base,dx,dy,th),{duration:GB_FALL,delay:lag,easing:GB_EASEIN,fill:'forwards'});
+   g.fade=g.fl.animate(fell?gbFallK(g.base,dx,dy,th):gbBackK(g.base),{duration:fell?GB_FALL:GB_BACK,delay:lag,easing:GB_EASEIN,fill:'forwards'});
    if(g.ctag&&g.ctag.animate){const yet=gbNow()<(g.sp||0)+g.n*40+150;for(const a of g.ctag.getAnimations())a.cancel();g.cfade=g.ctag.animate(yet?[{opacity:0},{opacity:0}]:[{opacity:1},{opacity:0}],{duration:yet?GB_FALL+lag:120,delay:yet?0:lag,easing:'ease-in',fill:'forwards'})}
    {const a=g.fade;a.onfinish=()=>{if(g.fade!==a)return;g.fade=null;if(!g.on)g.g.style.display='none';a.cancel();if(g.cfade){g.cfade.cancel();g.cfade=null}g.g.classList.remove('fall')}}}
   else if(!g.fade)g.g.style.display='none';
-  /* the cut face shows at the snip, and never before the growing wood has reached its knot */
-  if(!on&&!g.scarOn&&!quiet&&g.scar.animate){const w=Math.max(g.fade?cutLag.get(g)||0:0,(g.sp||0)-300-gbNow());if(g.fade||w>0)g.scar.animate([{opacity:0},{opacity:1}],{duration:60,delay:w,fill:'backwards'})}g.scarOn=!on;
-  g.scar.style.display=on?'none':'';g.g.classList.toggle('fall',!!g.fade&&!on);g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',(!!pv&&pv!=='max'&&any)||(!!g.fade&&!on));g.g.classList.toggle('pre',!s.modeBy&&!pv&&!list.some(x=>gbRank[x.mode]===0))}
+  /* the callus shows at the snip, and never before the growing wood has reached its knot */
+  /* (and only on wood that stays: a shoot on a branch that is cut away goes with the branch) */
+  const bp=g.bid?B.pad[g.bid]:null,heal=!on&&fell&&!(bp&&bp.pruned);if(heal&&!g.scarOn&&!quiet&&g.scar.animate){const w=Math.max(g.fade?cutLag.get(g)||0:0,(g.sp||0)-300-gbNow());if(g.fade||w>0)g.scar.animate([{opacity:0},{opacity:1}],{duration:60,delay:w,fill:'backwards'})}g.scarOn=heal;
+  g.scar.classList.toggle('on',heal);g.g.classList.toggle('fall',!!g.fade&&!on);g.g.classList.toggle('pv-add',pv==='max'&&!any);g.g.classList.toggle('pv-out',(!!pv&&pv!=='max'&&any)||(!!g.fade&&!on));g.g.classList.toggle('pre',!s.modeBy&&!pv&&!list.some(x=>gbRank[x.mode]===0))}
  /* the existing flows: each a graft bud at the knot it re-checks (gbBuild), ringed in its run's state, there while Max is; a
     mode that drops them lets them fade as its shoots fall */
  {const regs=Object.values(M.buds).flat().filter(x=>x.scenarioKind==='regression');B.grafts=B.grafts||{};
