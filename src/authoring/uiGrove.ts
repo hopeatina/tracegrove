@@ -115,17 +115,19 @@ ${BONSAI_CSS}
 /* ---------- The page around the tree: after the tree's own styles, so these win where they meet ---------- */
 .gw-code{font:.92em/1 var(--mono);background:var(--code);border-radius:4px;padding:1px 4px}
 /* legend marks: small drawings of what the tree draws, in its wood and leaf colours, light and dark */
-.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3))}
-@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
+.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-crs:color-mix(in srgb,#9C8975 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--sw-sap:#E9A23B;--sw-core:#FFF3D6;--sw-red:#D63A28}
+@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--sw-sap:#F2B24C;--sw-core:#FFF6E0;--sw-red:#F05A45}}
 .gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
+/* on a dark page a leaf still to prove is the tree's pale leaf, a lightened cushion green, never the page showing through */
+@media (prefers-color-scheme:dark){.gw-sw .lf.in,.gw-sw .lf.none{fill:color-mix(in oklab,color-mix(in srgb,var(--moss) 56%,var(--paper)) 84%,#fff)}}
 .gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
-.gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .rim{fill:var(--sw-rim)}
+.gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cal{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cres{fill:none;stroke:var(--sw-crs);stroke-width:.8;stroke-linecap:round}.gw-sw .rim{fill:var(--sw-rim)}
 .gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
 .gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 22%,var(--paper))}.gw-sw .pot{fill:color-mix(in srgb,var(--ochre) 26%,var(--line2))}
 .gw-sw .rt{fill:none;stroke:var(--sw-wood);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-sw .tl{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linecap:round}.gw-sw .te{fill:var(--paper);stroke:var(--muted);stroke-width:1.1}
-.gw-sw .rglow{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;opacity:.38}.gw-sw .rte{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.6;stroke-linecap:round;stroke-dasharray:3 3}.gw-sw .rte.bad{stroke:var(--verm);stroke-width:2.4;stroke-dasharray:none}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
+.gw-sw .rglow{fill:none;stroke:var(--sw-sap);stroke-width:3.6;stroke-linecap:round;opacity:.5;filter:blur(.7px)}.gw-sw .rte{fill:none;stroke:var(--sw-sap);stroke-width:2;stroke-linecap:round}.gw-sw .rcore{fill:none;stroke:var(--sw-core);stroke-width:.6;stroke-linecap:round;opacity:.9}.gw-sw .rte.bad{stroke:url(#gw-swred);stroke-width:2.8;stroke-linecap:butt}.gw-sw .rs{stop-color:var(--sw-red)}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
 .gw-sw .k0{fill:var(--sw-shade);opacity:.5}.gw-sw .k1{fill:var(--sw-wood)}.gw-sw .k2{fill:var(--sw-lit);opacity:.85}.gw-sw .kglow{fill:var(--gold);opacity:.6}.gw-sw .kbad{fill:var(--verm);opacity:.5}
 .gw-sw .stk{fill:none;stroke:var(--sw-shade);stroke-width:.8;stroke-dasharray:1 1.4}.gw-sw .tag{fill:var(--paper);stroke:var(--line2);stroke-width:.8}
 .gw-sw .stk.sd{stroke:color-mix(in srgb,var(--sw-shade) 60%,var(--ochre));stroke-width:1.1;stroke-dasharray:none;stroke-linecap:round}.gw-sw .tag.dsh{stroke:var(--muted);stroke-dasharray:1.8 1.1}.gw-sw .un{opacity:.5}.gw-sw .bed{fill:color-mix(in srgb,var(--sw-wood) 30%,var(--paper))}.gw-sw .rg{fill:none;stroke:var(--sw-shade);stroke-width:.4;opacity:.8}
@@ -458,23 +460,24 @@ const gwSvg=(w,hh,...k)=>sv('svg',{class:'gw-sw',width:gwF(w*1.2),height:gwF(hh*
 function gwSw(k){
  if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
  if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
- if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg',transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
+ if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg'},sv('path',{d:'M0 3.4 L16 2.9 L16 9.1 L0 9.6 Z',class:'wd'}),sv('ellipse',{cx:8,cy:6.3,rx:3.6,ry:2.3,class:'cal'}),sv('path',{d:'M5.3 6.9 A2.9 1.8 0 0 1 10.7 6.9',class:'cres'})));
  /* a store's root as the pot shows it: sunk in the soil with the soil's lip over its lower edge, its name on a small tag
     on a solid stake pushed into the soil beside its tip */
  if(k==='root')return gwSvg(22,14,sv('path',{d:'M.5 6.5 C4.6 6.6 8.8 7.1 13.8 8.3 C14.2 8.5 14 8.9 13.6 9 C8.6 9 4.6 9.2 .5 9.6 Z',class:'wd'}),sv('path',{d:'M16.6 11 L16.6 4.6',class:'stk sd'}),
   sv('rect',{x:0,y:8.6,width:22,height:5.4,class:'dirt'}),sv('path',{d:'M.5 8.6 L21.5 8.6',class:'soil'}),sv('rect',{x:12.6,y:1,width:8,height:3.8,rx:1,class:'tag'}));
- /* a store no journey uses as the pot shows it: a short severed root sunk to half its depth in the soil, faded bark tapering
-    from its cut face, and right beside the cut face the stake of its dashed tag */
- if(k==='unused'){const d='M5 6.1 C9.4 6.3 14 7.3 19.8 8.5 L19.8 9.1 C14 10.3 9.4 11.3 5 11.5 Z';return gwSvg(22,14,sv('path',{d,class:'bed'}),sv('path',{d,class:'wd un'}),
-  sv('ellipse',{cx:5,cy:8.8,rx:1.5,ry:2.7,class:'cf'}),sv('path',{d:'M4.7 7.2 A.8 1.6 0 0 1 4.7 10.4',class:'rg'}),
-  sv('rect',{x:0,y:8.8,width:22,height:5.2,class:'dirt'}),sv('path',{d:'M.5 8.8 L21.5 8.8',class:'soil'}),
-  sv('path',{d:'M2.4 10.6 L2.4 4.6',class:'stk sd'}),sv('rect',{x:1.2,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
+ /* a store no journey uses as the pot shows it: faded bark running out from the foot, partly sunk in the soil and tapering
+    to a cut face, its dashed tag's stake pushed into the cut face */
+ if(k==='unused'){const d='M.5 6.4 C6 6.8 11 7.2 17 6.9 L17 10.7 C11 10.6 6 11.2 .5 11.6 Z';return gwSvg(22,14,sv('path',{d,class:'bed'}),sv('path',{d,class:'wd un'}),
+  sv('rect',{x:0,y:9.2,width:22,height:4.8,class:'dirt'}),sv('path',{d:'M.5 9.2 L21.5 9.2',class:'soil'}),
+  sv('ellipse',{cx:17,cy:8.8,rx:1.3,ry:1.9,class:'cf'}),sv('path',{d:'M16.8 7.6 A.6 1.2 0 0 1 16.8 10',class:'rg'}),
+  sv('path',{d:'M17 8.8 L17 4.6',class:'stk sd'}),sv('rect',{x:10.6,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
- /* the route as the tree draws it along the wood, in three marks: the gold dashed route, red on the hop where it broke, and
-    the small grey dots where it never got, drawn as the tree draws them (one stroke of round dots, .rdots with .sap.rest) */
+ /* the route as the tree draws it inside the wood, in three marks: the amber glow with its cream core, the wood turned red
+    just past the hop where it broke (feathered in and out), and the small grey dots where it never got, drawn as the tree
+    draws them (one stroke of round dots, .rdots with .sap.rest) */
  if(k==='route'||k==='rbad'||k==='rrest')return gwSvg(22,10,sv('path',{d:'M0 2.4 C7.3 2.8 14.7 3.3 22 3.7 L22 6.3 C14.7 6.7 7.3 7.2 0 7.6 Z',class:'wd'}),
-  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'})]:k==='rbad'?[sv('path',{d:'M2 5 L7.6 5',class:'rte'}),sv('path',{d:'M9.6 5 L20 5',class:'rte bad'})]:[sv('path',{d:'M3.4 5 L20 5',class:'rdots'})]);
+  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'}),sv('path',{d:'M2 5 L20 5',class:'rcore'})]:k==='rbad'?[sv('defs',{},sv('linearGradient',{id:'gw-swred',gradientUnits:'userSpaceOnUse',x1:7,y1:0,x2:21,y2:0},...[[0,0],[.3,1],[.7,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})))),sv('path',{d:'M2 5 L7.4 5',class:'rglow'}),sv('path',{d:'M2 5 L7.4 5',class:'rte'}),sv('path',{d:'M7 5 L21 5',class:'rte bad'})]:[sv('path',{d:'M3.4 5 L20 5',class:'rdots'})]);
  /* a knot: a boss on the bark, lit gold from inside when its route is lit, cracked red where a hop broke */
  const kn=(...x)=>gwSvg(20,10,sv('path',{d:'M0 3.1 C7 3.3 13 3.5 20 3.7 L20 6.3 C13 6.5 7 6.7 0 6.9 Z',class:'wd'}),...x,sv('ellipse',{cx:10.5,cy:5.6,rx:4.3,ry:3.1,class:'k0'}),sv('ellipse',{cx:10,cy:5,rx:3.9,ry:2.8,class:'k1'}),sv('ellipse',{cx:9.3,cy:4.2,rx:2.2,ry:1.3,class:'k2'}));
  if(k==='knot')return kn();
@@ -518,7 +521,7 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
     own.length?{cls:'muted',label:'Part checks',n:m=>upto(own,m)}:null,reg.length?{cls:'muted',label:'Existing flows',n:m=>upto(reg,m)}:null,{tot:true,label:'Scenarios',n:m=>v.counts[m]}]),
    h('p',{class:'small muted',style:'margin:10px 0 0'},gwTouch()?'Tap a mode to see it on the tree: what it keeps stays, what it cuts fades. Tap it again to choose; nothing runs until you do.':'Point at a mode to see it on the tree: what it keeps stays, what it cuts fades. Nothing runs until you pick.'));return card}
  if(!pin){if(!s.done&&s.focus&&!(s.asked&&!s.modeBy)){pin='u:'+s.focus;live=true;const ag=s.agents.find(a=>!a.done&&a.unit===s.focus);who='Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')}
-  else if(M.J.length){const order=gw.order&&gw.order.length?gw.order:M.J.map(j=>j.id);const failing=order.find(id=>(M.leaves[id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail'));pin='j:'+(failing||order[0]);who=failing?'The first failing journey':'The headline journey'}}
+  else if(M.J.length){const hd=gbHead(M,M.J),failing=(M.leaves[hd.id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail');pin='j:'+hd.id;who=failing?'The first failing journey':'The headline journey'}}
  if(!pin){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},'Follows the tracer as it works. Select a journey, a leaf or a knot to pin it.'));return card}
  /* under the tree (a tablet or a phone) the Journeys card comes straight after and opens a journey or a scenario in place, and
     a phone draws a tapped leaf's card under the tree: there the panel steps aside rather than say the same things again */
@@ -556,10 +559,10 @@ function gwPartCard(id,inline,live){const s=gw.state,v=gw.view;const M=gw.M||gbM
    few?rows.slice(from,from+3):rows,
    live&&rows.length>3?h('button',{class:'gw-dpmore','data-ol':'dp:more','aria-expanded':String(!few),on:{click:()=>{gw.depthAll=!gw.depthAll;gw.refocus='dp:more';growPaint()}}},few?'Show all '+rows.length+' looks':'Show only the latest 3'):null),
   (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},...gwNote(c.reason),h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
-  /* the rows this mode runs, under their kind when the part has both; then what a bigger mode adds, in the one line the tree's
-     card and the Outline print for this part */
-  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},gwOwnHead(own)),['own','reg'].map(k=>{const g=ownIn.filter(x=>gwOwnKind(x)===k);return g.length?[new Set(ownIn.map(gwOwnKind)).size>1?h('div',{class:'gb-sub'},gwOwnHead(g)):null,
-    g.map(x=>gbItem(x,{class:'gb-ols',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},[gwBadge(x)]))]:null}),
+  /* the rows this mode runs, under their kind when the part has both (one flat list, as h flattens its children only once);
+     then what a bigger mode adds, in the one line the tree's card and the Outline print for this part */
+  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},gwOwnHead(own)),['own','reg'].flatMap(k=>{const g=ownIn.filter(x=>gwOwnKind(x)===k);return g.length?[new Set(ownIn.map(gwOwnKind)).size>1?h('div',{class:'gb-sub'},gwOwnHead(g)):null,
+    ...g.map(x=>gbItem(x,{class:'gb-ols',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},[gwBadge(x)]))]:[]}),
    ownOut.length?h('p',{class:'small muted gw-one','data-testid':'grow-own-line'},gwFacts(gwOwnFacts(ownOut))):null):null]}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
  if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms));
@@ -661,9 +664,12 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
 /* The leaves a pad of the tree holds, as the tree drew it (gbBuild): the journey's own pad (pol null) or its guard or failure pad.
    A key row counts what its pad holds, so it says what the pad's label says on a wide screen and nothing is counted twice. */
 function gwPadLeaves(jid,pol){const B=gw.B;if(!B||!B.padsOf||!B.pad)return null;const pid=(B.padsOf[jid]||[]).find(q=>B.pad[q]&&(B.pad[q].pol||null)===pol);return pid?B.pad[pid].leaves:null}
-function gwPolKeys(one){const s=gw.state,M=gw.M;if(!one||!M||!M.J.length)return [];const j=M.J[0];const vis=s.modeBy?s.mode:null,inMode=x=>!s.modeBy||gwIn(x);
- return [['guard','R','What it refuses'],['failure','F','How it fails']].map(([p,b,t])=>{const list=gw.B&&gw.B.padsOf?gwPadLeaves(j.id,p)||[]:(M.leaves[j.id]||[]).filter(x=>gbPol(x)===p),inm=list.filter(inMode);if(!list.length)return null;
-  return h('li',{class:'pol'+(inm.length?'':' cut')},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},t),' · ',...gwRich(gwVia(gbOrd(inm.length?inm:list)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
+function gwPolKeys(one){const s=gw.state,M=gw.M,B=gw.B;if(!M||!M.J.length)return [];
+ /* a tree of two journeys grows the headline journey's guards or failures on a branch of its own too, lettered the same */
+ const j=one?M.J[0]:B&&B.pad&&B.padsOf?M.J.find(q=>(B.padsOf[q.id]||[]).some(pid=>B.pad[pid]&&B.pad[pid].pol)):null;if(!j)return [];const n=gbOrderOf(M).indexOf(j)+1;
+ const vis=s.modeBy?s.mode:null,inMode=x=>!s.modeBy||gwIn(x);
+ return [['guard','R','What it refuses'],['failure','F','How it fails']].map(([p,b,t])=>{const list=B&&B.padsOf?gwPadLeaves(j.id,p)||[]:one?(M.leaves[j.id]||[]).filter(x=>gbPol(x)===p):[],inm=list.filter(inMode);if(!list.length)return null;
+  return h('li',{class:'pol'+(inm.length?'':' cut')},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},(one?'':'Journey '+n+' · ')+(one?t:t.toLowerCase())),' · ',...gwRich(gwVia(gbOrd(inm.length?inm:list)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
 /* Where a leaf sits on a pad, drawn small with the tree's own pad and leaf: the one it names solid, the other two faint. */
 function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:tr,class:'lp-lf'+(pos===k?'':' dim')});
  /* the tree's pad: a crest cushion over two shoulder cushions, each with its shaded underside */
@@ -671,9 +677,9 @@ function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:t
  const band=(x0,x1,base)=>{const m=(x0+x1)/2;return 'M'+gwF(x0+.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base-5)+' '+gwF(x1-.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base+1.4)+' '+gwF(x0+.4)+' '+gwF(base-.2)+'Z'};
  const C=[[4,18.5,14,22.4],[29.5,44,13,22.4],[13,35,7.6,21.6]];
  return sv('svg',{class:'gw-svg gb gw-lpad',width:42,height:30,viewBox:'0 0 48 34','aria-hidden':'true',focusable:'false'},
-  sv('path',{d:'M15.6 23 L14.8 26.2',class:'lp-st'+(pos==='hang'?'':' dim')}),
+  sv('path',{d:'M11.2 19.8 L9.4 21',class:'lp-st'+(pos==='hang'?'':' dim')}),
   ...C.flatMap(([x0,x1,t,b])=>[sv('path',{d:dome(x0,x1,t,b),class:'lp-pad'}),sv('path',{d:band(x0,x1,b),class:'lp-band'})]),
-  lf('crest','translate(24 5.2) rotate(-90)'),lf('shoulder','translate(42.4 11.2) rotate(-34)'),lf('hang','translate(14.3 30.7) rotate(96)'))}
+  lf('crest','translate(24 5.2) rotate(-90)'),lf('shoulder','translate(42.4 11.2) rotate(-34)'),lf('hang','translate(5.6 23.4) rotate(145)'))}
 /* A row of the key: its name, then its items on the key's shared tracks. Nothing when it has no items. */
 function gwKeyRow(head,items,cls){const k=items.flat(Infinity).filter(Boolean);return k.length?h('div',{class:'gw-lg'+(cls?' '+cls:''),role:'group','aria-label':head},h('span',{class:'lh'},head),h('div',{class:'lgi'},k)):null}
 /* Where a one-journey tree grows a leaf: the happy path on the crown, and what it refuses or how it fails on a branch of its
@@ -703,7 +709,9 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
     shoulder, how it fails hangs beneath. A one-journey tree grows its happy path as the crown and what it refuses and how it
     fails as branches of their own; one of those it has no branch for sits on the crown's pad as on any other */
  const pm=(k,t)=>h('span',{class:'gw-li'},gwPadMark(k),h('span',{},t)),bm=(k,t)=>h('span',{class:'gw-li'},gwBranchMark(k),h('span',{},t));
- let where=null;if(M&&M.J.length>1)where=row('Where a leaf sits',[pm('crest','happy path'),pm('shoulder','what it refuses'),pm('hang','how it fails')],'where');
+ let where=null;if(M&&M.J.length>1){/* the headline journey's guards or failures may grow on a branch of their own (a tree of two journeys) */
+  const P=gw.B&&gw.B.pad?Object.values(gw.B.pad):[],br=p=>P.some(q=>q.pol===p),pad=p=>P.length?P.some(q=>!q.pol&&(q.leaves||[]).some(x=>gbPol(x)===p)):true;
+  where=row('Where a leaf sits',[pm('crest','happy path'),pad('guard')?pm('shoulder','what it refuses'):null,br('guard')?bm('branch','what it refuses, on a branch of its own'):null,pad('failure')?pm('hang','how it fails'):null,br('failure')?bm('branch','how it fails, on a branch of its own'):null],'where')}
  else if(one){const j=M.J[0],crown=gwPadLeaves(j.id,null)||M.leaves[j.id]||[],own=p=>!!(gw.B&&gw.B.padsOf&&gwPadLeaves(j.id,p)),on=p=>crown.some(x=>gbPol(x)===p);
   where=row('Where a leaf sits',[bm('crown','happy path, on the crown'),own('guard')?bm('branch','what it refuses, on a branch of its own'):on('guard')?pm('shoulder','what it refuses'):null,
    own('failure')?bm('branch','how it fails, on a branch of its own'):on('failure')?pm('hang','how it fails'):null],'where')}
@@ -717,7 +725,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  /* once a mode is chosen, what it cut: the cut mark, and the modes side by side, each kind of scenario counted in each, as the
     panel compared them before the choice. The column of a mode pointed at lights here too */
  const kind=gwKindOf(),upto=(k,m)=>s.scenarios.filter(x=>(!k||kind(x)===k)&&gbRank[x.mode]<=gbRank[m]).length,has=k=>s.scenarios.some(x=>kind(x)===k);
- const cut=s.modeBy&&out.length?h('div',{class:'gw-lg mode',role:'group','aria-label':'Pruned'},h('span',{class:'lh'},'Pruned'),h('div',{class:'lgi'},it('cut','pruned by '+gwML(s.mode)),
+ const cut=s.modeBy&&out.length?h('div',{class:'gw-lg mode',role:'group','aria-label':'Pruned'},h('span',{class:'lh'},'Pruned'),h('div',{class:'lgi'},B&&B.svg&&B.svg.querySelector('.heal.on')?it('cut','healed where '+gwML(s.mode)+' pruned what had grown'):null,
   h('div',{class:'gw-lgt'},gwCmp('Scenarios',has('own')||has('reg')?[{label:'On the journeys',n:m=>upto('j',m)},has('own')?{label:'Part checks',n:m=>upto('own',m)}:null,has('reg')?{label:'Existing flows',n:m=>upto('reg',m)}:null,{tot:true,label:'In all',n:m=>upto(null,m)}]:[{tot:true,label:'In all',n:m=>upto(null,m)}],'key')))):null;
  const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{gw.howOpen=e.currentTarget.open}}},h('summary',{},'How to read the tree'),
   h('p',{},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.'),
