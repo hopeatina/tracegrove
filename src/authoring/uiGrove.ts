@@ -401,7 +401,8 @@ function gwGrows(list){const by={};for(const x of list)by[x.mode]=(by[x.mode]||0
  const parts=ks.map(say);return parts.join(parts.some(t=>t.includes(':')||t.includes(' and '))?'; ':', ')}
 /* What a scenario is, as the Outline's sections count it: one on a journey, a part checked on its own, or an existing flow the
    change reaches. By id, so a model drawn from an earlier state still answers for this one. */
-function gwKindOf(){const M=gw.M||gbModel();const onJ=new Set(M.J.flatMap(j=>(M.leaves[j.id]||[]).map(x=>x.id)));return x=>onJ.has(x.id)?'j':x.scenarioKind==='regression'?'reg':'own'}
+/* from the state as it is now: the mode cards render before the tree repaints, so the last drawn model can predate the drafts */
+function gwKindOf(){const M=gbModel();const onJ=new Set(M.J.flatMap(j=>(M.leaves[j.id]||[]).map(x=>x.id)));return x=>onJ.has(x.id)?'j':x.scenarioKind==='regression'?'reg':'own'}
 const gwKN={own:['part check','part checks'],reg:['existing flow','existing flows']};
 const gwKW=(k,n)=>k==='j'?n+' on the journeys':n+' '+gwKN[k][n===1?0:1];
 /* "13 part checks and 4 existing flows"; "3 on the journeys, 13 part checks and 4 existing flows" */
