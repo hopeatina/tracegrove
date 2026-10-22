@@ -305,10 +305,12 @@ function gbT(k,delay){const G=gw.seen.gt||(gw.seen.gt={});if(G[k]===undefined)G[
    build places it, so a rebuild never brings it in ahead of the wood under it */
 function gbTA(k,delay){const G=gw.seen.gt||(gw.seen.gt={}),now=gbNow(),t=now+delay;if(G[k]===undefined||(G[k]>now&&t>G[k]))G[k]=t;return G[k]}
 /* A piece of wood's reveal, kept for the whole grow by the piece's own key: when it started, over how long, from what
-   fraction of its length. A rebuild carries it on where it had got to, never from its base again; a piece drawn longer than
-   the one that had already grown out grows on from where that one ended. */
+   fraction of its length. A rebuild carries it on where it had got to, never from its base again; one that had grown out
+   stays grown however the rebuild draws it, since what grew on it (a cushion, a leaf, a name) is kept where it now sits and
+   must never stand past the wood. One whose base the wood has not reached yet in this build (a leaf's twig moved onto a
+   riser drafted under it, which is still growing) is new wood there: it waits for that wood as if new. */
 function gbWood(k,delay,ms,len){const G=gw.seen.gw||(gw.seen.gw={}),now=gbNow();let r=G[k];
- if(!r)r=G[k]={t0:now+delay,ms,f0:0,len};else if(len>r.len+2&&now>=r.t0+r.ms)r=G[k]={t0:now,ms:Math.max(320,ms*(1-r.len/len)),f0:r.len/len,len};return r}
+ if(!r||(delay>0&&r.t0<now+delay-1))r=G[k]={t0:now+delay,ms,f0:0,len};return r}
 /* how much of its length a reveal has uncovered at time t, on its ease-out; and when its front reaches fraction f */
 const gbWF=(r,t)=>{const u=Math.max(0,Math.min(1,(t-r.t0)/r.ms));return r.f0+(1-r.f0)*(1-Math.pow(1-u,2.2))};
 const gbWT=(r,f)=>f<=r.f0?r.t0:r.t0+r.ms*(1-Math.pow(1-Math.min(1,(f-r.f0)/(1-r.f0||1)),1/2.2));
