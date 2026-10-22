@@ -955,6 +955,49 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
+  it('grows a small tree as a bonsai: a stout trunk tapering to a third of its foot, three or four radial roots with no store under it, and its canopy 55 to 65 hundredths of its height', async () => {
+    // One journey through its first file only, with one happy path and one guard: the smallest tree with a branch, and no
+    // dependency roots at all.
+    const s = folded('plotline-seats.jsonl'), j = s.journeys[0]!, mine = s.scenarios.filter((x) => x.journey === j.id);
+    s.journeys = [{ ...j, units: j.units.slice(0, 1) }];
+    s.scenarios = [mine.find((x) => x.polarity === 'happy')!, mine.find((x) => x.polarity === 'guard')!];
+    s.units = s.units.filter((u) => u.id === j.units[0]);
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, s, width, width < 500);
+        await page.waitForTimeout(2500);
+        const r = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), L = w.gw.B.L, T = L.trees[0], svg = w.gw.B.svg as SVGSVGElement;
+          // the drawing's own units (the layout's): the cushions as drawn, and the soil at the trunk's foot
+          const toSvg = (el: SVGGraphicsElement, x: number, y: number) => new DOMPoint(x, y).matrixTransform(svg.getScreenCTM()!.inverse().multiply(el.getScreenCTM()!));
+          const ys = Array.from(svg.querySelectorAll('.jg .pfill')).filter((e) => e.getBoundingClientRect().width > 0).flatMap((e) => { const b = (e as SVGGraphicsElement).getBBox(); return [toSvg(e as SVGGraphicsElement, b.x, b.y).y, toSvg(e as SVGGraphicsElement, b.x + b.width, b.y + b.height).y]; });
+          const X = L.xs[0], soil = L.sy(X), top = Math.min(...ys), low = Math.max(...ys);
+          const up = (y: number) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -y) k++; return T.tw[k]!; };
+          const nebari = L.roots.filter((q: { id: string | null; tree: number }) => !q.id && q.tree === 0).map((q: { pts: number[][] }) => Math.abs(q.pts.at(-1)![0]! - X) / (L.potL / 2));
+          return { trees: L.trees.length, deps: L.roots.filter((q: { id: string | null }) => q.id).length, canopy: (low - top) / (soil - top), apex: T.tw.at(-1), foot: T.tw[0], cal: up(T.D), potL: L.potL, nebari };
+        });
+        const at = width + 'px';
+        expect(r.trees, at).toBe(1);
+        expect(r.deps, at).toBe(0);
+        // the canopy, from the crown's top to the lowest cushion's underside, is 55 to 65 hundredths of the tree's height
+        expect(r.canopy, at + ' canopy').toBeGreaterThanOrEqual(.55);
+        expect(r.canopy, at + ' canopy').toBeLessThanOrEqual(.65);
+        // the trunk tapers to a third of its foot or less, and one caliper up it is at least twelve hundredths of the pot
+        expect(r.apex, at + ' apex').toBeLessThanOrEqual(r.foot / 3);
+        expect(r.apex, at + ' apex').toBeLessThanOrEqual(r.cal / 3);
+        expect(r.cal / r.potL, at + ' trunk').toBeGreaterThanOrEqual(.12);
+        // three or four buttress roots though nothing roots under it, each reaching six tenths of the pot's half-length
+        expect(r.nebari.length, at + ' nebari').toBeGreaterThanOrEqual(3);
+        expect(r.nebari.length, at + ' nebari').toBeLessThanOrEqual(4);
+        for (const n of r.nebari) expect(n, at + ' root reach').toBeGreaterThanOrEqual(.6);
+        footOk(await page.evaluate(ground), 'small tree ' + at);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   /** A grow folded from a recorded discovery log: plotline-billing (two journeys, one scenario failed, Minimum) and tracegrove
    *  itself (two journeys through twelve parts, Max, nothing run yet). */
   const folded = (name: string) => {

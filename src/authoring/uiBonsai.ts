@@ -556,13 +556,15 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* The branch of the headline journey's refusals or failures grows from the knot where most of its scenarios break (the
     hop the run says broke) or, where none broke, end (the last hop of their route): its height and collar are that knot's,
     and it leaves on the outside of the trunk's bend there. Its knot stands where the headline journey's own parts would set
-    it on the upper trunk, deepest lowest, above the other journeys' branches; as the tree's first branch it stands a third
-    up, its knot with it. One branch to a knot; one whose knot is shared, or a root, takes a height as any other branch. The
+    it on the upper trunk, deepest lowest, above the other journeys' branches; as the tree's first branch it stands where a
+    first branch does, its knot with it. One branch to a knot; one whose knot is shared, or a root, takes a height as any other branch. The
     other branches fill the remaining heights, heaviest lowest. */
  const endOf=x=>{const w=gbWound(M,apex,x),ix=apex.units.indexOf(x.unit),real=apex.units.filter(id=>!U[id].root);return w||(x.scenarioKind!=='happy'&&ix>=0?x.unit:real[real.length-1])};
  const anc=items.map(it=>{if(!it.pol)return null;const n=new Map();for(const x of A)if(gbPol(x)===it.pol){const e=endOf(x);n.set(e,(n.get(e)||0)+1)}let a=null,an=0;for(const [id,c] of n)if(c>an){a=id;an=c}return a&&ownA.includes(a)?a:null});
  anc.forEach((a,i)=>{if(a&&anc.indexOf(a)<i)anc[i]=null});
- const h1=m>=7?.27:m===1?.36:.31;const lad=[];for(let i=0,h=h1;i<m;i++){lad.push(h);h+=(.86-h)*.4}
+ /* (a lone branch stands a little under halfway up, so a small tree's canopy, from the crown's top to the cushion's underside, is
+    about three fifths of its height, as a grown tree's is) */
+ const h1=m>=7?.27:m===1?.46:.31;const lad=[];for(let i=0,h=h1;i<m;i++){lad.push(h);h+=(.86-h)*.4}
  const hs=items.map(()=>0);{let q=0;items.forEach((it,i)=>{if(!anc[i])hs[i]=lad[q++]});const npH=hs.filter((h,i)=>!anc[i]),n=ownA.length,lo0=npH.length?Math.max(...lad)+.06:.35;
   let floor=npH.length?Math.max(...npH)+.12:null;
   for(const i of items.map((_,i)=>i).filter(i=>anc[i]).sort((a,b)=>ownA.indexOf(anc[a])-ownA.indexOf(anc[b]))){const ix=ownA.indexOf(anc[i]),t=n===1?(lo0+.85)/2:lo0+(.85-lo0)*ix/(n-1);
@@ -813,12 +815,13 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const deps=[];const taken=new Set();
   trees.forEach((T,i)=>{const ids=[...new Set(T.js.flatMap(j=>(j.units||[]).filter(id=>M.U[id]&&M.U[id].root)))].filter(id=>!taken.has(id));if(!i)for(const u of M.strays)ids.push(u.id);
    ids.slice(0,6).forEach((id,k)=>{taken.add(id);deps.push({id,i,d:k%2?T.S:-T.S,r:Math.floor(k/2),T,ext:M.U[id].layer==='ext',loose:!T.js.some(j=>(j.units||[]).includes(id))})})});
-  /* the nebari: five surface roots (four on a slender literati) radiating from the trunk's foot, each leaving it about a third
+  /* the nebari: five surface roots (four on a slender literati, or a small tree of one branch, which stands on them though no
+     store or service roots under it) radiating from the trunk's foot, each leaving it about a third
      of the foot's girth thick (q.w0) and thinning to a hair, out to six to three quarters of the way to the rim (q.r, of the
      pot's half-length), undulating a little as it goes; the back ones a little higher, the front ones lower and laid over
      them. On a side a named root leaves on, they stay at the shortest, so the named root runs on past them */
   const nbSpec=(T,i)=>{const live=new Set(deps.filter(q=>q.i===i&&!q.loose).map(q=>q.d));
-   const sp=T.lit?[[-1,.72,0,.34,-1],[1,.64,0,.31,-1],[1,.68,1,.36,0],[-1,.61,1,.33,0]]
+   const sp=T.items.length<=1?[[-1,.72,0,.34,-1],[1,.64,0,.31,-1],[1,.68,1,.36,0],[-1,.61,1,.33,0]]
     :[[-1,.74,0,.36,-1.2],[1,.68,0,.32,-1],[-T.S,.62,0,.31,1.6],[1,.65,1,.38,0],[-1,.61,1,.34,0]];
    return sp.map(([d,r,f,w0,ln])=>({d,r:live.has(d)?Math.min(r,.62):r,f,w0,ln}))};
   /* half the foot's width where it meets the soil, from the trunk as drawn */
