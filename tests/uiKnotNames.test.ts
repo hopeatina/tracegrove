@@ -265,7 +265,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('names every knot at rest, beside it or as a numbered pip with its name in the key, so no hop of the headline journey goes unnamed, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
+  it('names every knot at rest, beside it or as a numbered pip (lettered on a phone, where journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of every bud, so no hop of the headline journey goes unnamed, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     let pips = 0;
@@ -277,7 +277,7 @@ describe('the names on the bonsai’s knots', () => {
           // a name, or its pip, fades in only once its knot is there
           expect(timing.filter((x) => x.name !== null).length, name + ' ' + width).toBeGreaterThan(0);
           for (const x of timing) if (x.name !== null) { expect(x.knot, name + ' ' + width + ' ' + x.id).not.toBeNull(); expect(x.name, name + ' ' + width + ' ' + x.id).toBeGreaterThanOrEqual(x.knot!); }
-          const seen = await page.evaluate(() => {
+          const seen = await page.evaluate((width) => {
             const w = (0, eval)('({ gw, gbHover, gbOrder, gbKTier })'), B = w.gw.B, M = w.gw.M, S = w.gw.state, out: string[] = [];
             const label = (u: string) => S.units.find((q: { id: string }) => q.id === u).label as string;
             const says = (text: string, l: string) => text.startsWith(l) || (text.includes('…') && l.startsWith(text.slice(0, text.indexOf('…'))));
@@ -304,8 +304,38 @@ describe('the names on the bonsai’s knots', () => {
                 if (vis(boss) || vis(key)) out.push(label(ids[0]!) + ': a pip as well as a leader');
               }
             }
-            // the numbers count 1, 2, 3 … and no two names, nor a name and a key row, sit on one another
-            if (keyed.slice().sort((a, b) => +a - +b).join(' ') !== keyed.map((_, i) => String(i + 1)).join(' ')) out.push('the pips are numbered ' + keyed.join(' '));
+            // the marks count 1, 2, 3 …, on a phone a, b, c … (its journeys wear numbered badges), and no two names, nor a name and
+            // a key row, sit on one another
+            const phone = !!B.L.narrow, mark = (i: number) => phone ? String.fromCharCode(97 + i) : String(i + 1), ord = (m: string) => /^[a-z]$/.test(m) ? m.charCodeAt(0) - 96 : +m;
+            if (width === 390 && !phone) out.push('a phone is not laid out as one');
+            for (const m of keyed) if (phone && !/^[a-z]$/.test(m)) out.push('a pip on a phone reads ' + m);
+            if (keyed.slice().sort((a, b) => ord(a) - ord(b)).join(' ') !== keyed.map((_, i) => mark(i)).join(' ')) out.push('the pips are marked ' + keyed.join(' '));
+            // the key is one block: every row's pip at one x, one row's height apart, clear of the wood, the cushions and the pot
+            const rows = Object.keys(B.klbl).map((id) => B.klbl[id].parentNode.querySelector('.kpip.key') as SVGGElement).filter((g) => vis(g)).map((g) => ({ c: g.querySelector('circle')!.getBoundingClientRect(), t: (g.parentNode as Element).querySelector('.klbl')!.getBoundingClientRect() })).sort((a, b) => a.c.top - b.c.top);
+            if (rows.length) {
+              const cx = rows.map((r) => (r.c.left + r.c.right) / 2), cy = rows.map((r) => (r.c.top + r.c.bottom) / 2);
+              if (Math.max(...cx) - Math.min(...cx) > 1) out.push('the key rows stand at ' + cx.map(Math.round).join(', '));
+              for (let i = 2; i < cy.length; i++) if (Math.abs((cy[i]! - cy[i - 1]!) - (cy[1]! - cy[0]!)) > 1) out.push('the key rows step ' + cy.map(Math.round).join(', '));
+              const bl = Math.min(...rows.map((r) => Math.min(r.c.left, r.t.left))), bt = Math.min(...rows.map((r) => Math.min(r.c.top, r.t.top))), br = Math.max(...rows.map((r) => Math.max(r.c.right, r.t.right))), bb = Math.max(...rows.map((r) => Math.max(r.c.bottom, r.t.bottom)));
+              const wood = (Array.from(B.svg.querySelectorAll('path')) as Array<SVGGeometryElement & { __pts?: unknown }>).filter((q) => q.__pts && vis(q)), cush = (Array.from(B.svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter(vis);
+              const inside = (el: SVGGeometryElement, x: number, y: number) => { const m = el.getScreenCTM()!.inverse(); return el.isPointInFill(new DOMPoint(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f)); };
+              const hit = new Set<string>();
+              for (let y = bt; y <= bb; y += 2) for (let x = bl; x <= br; x += 2) { if (wood.some((q) => inside(q, x, y))) hit.add('the wood'); if (cush.some((q) => inside(q, x, y))) hit.add('a cushion'); }
+              const pot = B.svg.querySelector('.pots')!.getBoundingClientRect();
+              if (bl < pot.right && br > pot.left && bt < pot.bottom && bb > pot.top) hit.add('the pot');
+              for (const h of hit) out.push('the key lies on ' + h);
+              // and inside the drawing
+              const sr = B.svg.getBoundingClientRect();
+              if (bl < sr.left - .5 || br > sr.right + .5 || bt < sr.top - .5 || bb > sr.bottom + .5) out.push('the key runs out of the drawing');
+            }
+            // a pip stands 8px clear of every count bud and graft bud
+            const buds = (Array.from(B.svg.querySelectorAll('.shtag .sbud, .gb-gr .gsw')) as Element[]).filter(vis).map((e) => e.getBoundingClientRect());
+            for (const id of Object.keys(B.klbl)) {
+              const pc = B.klbl[id].parentNode.querySelector('.kpip:not(.key)') as Element;
+              if (!vis(pc)) continue;
+              const a = pc.querySelector('circle')!.getBoundingClientRect();
+              for (const b of buds) if (Math.hypot(Math.max(b.left - a.right, 0, a.left - b.right), Math.max(b.top - a.bottom, 0, a.top - b.bottom)) < 8 - .5) out.push('pip ' + pc.textContent + ' is within 8px of a bud');
+            }
             const marks = (Array.from(B.svg.querySelectorAll('.klbl.on, .kpip.key')) as Element[]).filter(vis);
             for (let a = 0; a < marks.length; a++) for (let b = a + 1; b < marks.length; b++) if (marks[a]!.parentNode !== marks[b]!.parentNode && meet(marks[a]!.getBoundingClientRect(), marks[b]!.getBoundingClientRect())) out.push('"' + marks[a]!.textContent + '" and "' + marks[b]!.textContent + '" overlap');
             // every hop of the headline journey is named at rest
@@ -336,7 +366,7 @@ describe('the names on the bonsai’s knots', () => {
               w.gbHover(null);
             }
             return { pips: keyed.length, cards, out };
-          });
+          }, width);
           expect(seen.out, name + ' ' + width).toEqual([]);
           if (seen.pips) expect(seen.cards, name + ' ' + width).toBeGreaterThan(0);
           pips += seen.pips;
