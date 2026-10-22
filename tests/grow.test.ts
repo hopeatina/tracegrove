@@ -1469,6 +1469,8 @@ describe('Grow page', () => {
     try {
       for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
         const page = await browser.newPage({ viewport: { width, height: 1000 }, colorScheme: scheme });
+        // TG_THROTTLE=6 slows the page CPU like a busy CI runner, where a slow build once let leaves open ahead of their cushions
+        if (process.env.TG_THROTTLE) { const cdp = await page.context().newCDPSession(page); await cdp.send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.TG_THROTTLE) }); }
         await page.addInitScript(logAnimations);
         await page.goto(server.url);
         await page.getByRole('button', { name: 'Discover', exact: true }).first().click();

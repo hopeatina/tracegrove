@@ -297,6 +297,14 @@ const gbPol=x=>x.polarity||(x.scenarioKind==='happy'?'happy':x.scenarioKind==='s
 const gbOrd=list=>list.map((x,i)=>({x,i})).sort((a,b)=>gbRank[a.x.mode]-gbRank[b.x.mode]||a.i-b.i).map(o=>o.x);
 /* When an animation started, kept for the whole grow, so a rebuild continues it instead of restarting it. */
 function gbT(k,delay){const G=gw.seen.gt||(gw.seen.gt={});if(G[k]===undefined)G[k]=performance.now()+delay;return G[k]}
+/* Growth runs on the page clock: an animation starts at the moment given, on the same clock as the wood's reveal, not
+   when the browser next gets round to starting it, so a slow build or paint never lets a leaf, cushion or name fall out of
+   step with the wood it grows on. */
+function gbPlay(el,kf,o,t0){const a=el.animate(kf,Object.assign({},o,{delay:0}));try{a.startTime=t0}catch(e){a.effect.updateTiming({delay:t0-performance.now()})}return a}
+/* When the growing wood has reached a point: the first piece that carries it, on the same ease-out its reveal runs on. */
+function gbWoodAt(B,p,pad){let t=Infinity;for(const g of B.grow){const P=g.pts;if(!P||P.length<2)continue;const A=gbLen(P),T=A[A.length-1]||1;let bd=Infinity,bf=0;
+ for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],vx=b[0]-a[0],vy=b[1]-a[1],u=Math.max(0,Math.min(1,((p[0]-a[0])*vx+(p[1]-a[1])*vy)/(vx*vx+vy*vy||1))),d=Math.hypot(p[0]-a[0]-vx*u,p[1]-a[1]-vy*u);if(d<bd){bd=d;bf=(A[i-1]+(A[i]-A[i-1])*u)/T}}
+ if(bf>.01&&bd<=Math.max(...g.w)/2+pad)t=Math.min(t,g.t0+g.ms*(1-Math.pow(1-bf,1/2.2)))}return t}
 /* How a cushion grows: from a speck at its fork, quickly opaque and fast at first, easing as it fills out. GB_CU is its scale
    through the growth; gbCuAt(v) the fraction of the growth at which it reaches scale v, which a leaf (v .85) or a name (.5)
    waits for. */
@@ -1158,8 +1166,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
       last has grown it is whole; the wood seen through its foot comes in after. Its end is kept from the first time it is
       drawn, so a leaf drafted later never makes a grown cushion shrink and grow again. */
    const cq=B.cuS[pd.id]||{},cS=q0.cs.map((c,k)=>{const q=cq[k];
-    if(!q||q.s===Infinity){const s0=now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tS+tdur);return {s:s0,e:s0+380,f:[o[0]+c.x,o[1]+c.b]}}
-    const fs=q.f.length?q.f:q.fh;return {s:q.s,e:gbT('cue:'+pd.id+':'+k+gk,Math.max(q.s+380,q.e)-now),f:[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length]}});
+    /* a cushion swells from the fork its twigs leave the wood at, so it starts no sooner than the wood is there */
+    if(!q||q.s===Infinity){const f=[o[0]+c.x,o[1]+c.b],w=gbWoodAt(B,f,2),s0=Math.max(now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tS+tdur),w<Infinity?w:-Infinity);return {s:s0,e:s0+380,f}}
+    const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s;return {s:s1,e:gbT('cue:'+pd.id+':'+k+gk,Math.max(s1+380,q.e)-now),f}});
    /* its name comes once its first cushion is half grown */
    const lblAt=Math.min(...cS.map(c=>c.s+gbCuAt(.5)*(c.e-c.s)));
    /* the wood a leaf's sap runs through on its way down: its own twig, then its branch (or, for the crown, the leader or a
@@ -1211,7 +1220,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
   for(const id in B.pad){const P=B.pad[id];P.rcp=sv('path',{d:P.mk.getAttribute('d')});rc.append(P.rcp)}defs.append(rc);gSap.setAttribute('clip-path','url(#gb-rc'+N+')');B.rclip=rc}
  gw.B=B;gw.svg=svg;
  
- if(svg.animate)for(const [el,delay,ms,kind,f] of B.anim){if(kind==='fade')el.animate([{opacity:0},{opacity:1}],{duration:ms,delay,fill:'backwards'});else if(kind==='cu')el.animate(gbCu(f),{duration:ms,delay,fill:'backwards'})}
+ /* queued against the clock the build began on, and started on it, never late by however long the build took */
+ if(svg.animate)for(const [el,d0,ms,kind,f] of B.anim){if(kind==='fade')gbPlay(el,[{opacity:0},{opacity:1}],{duration:ms,fill:'backwards'},now+d0);else if(kind==='cu')gbPlay(el,gbCu(f),{duration:ms,fill:'backwards'},now+d0)}
  gbGrowRun(B);
  return B}
 /* A tap that lands between leaves picks the nearest leaf within 22 px, so a finger can choose a single leaf on a phone. */
@@ -1292,8 +1302,8 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
      if(!quiet&&el.__g.animate){const ck=g.cOf.get(x.id),c=P.cS&&P.cS[ck],ci=list.slice(0,i).filter(q=>g.cOf.get(q.id)===ck).length;
       const t0=el.__t0=Math.max((B.twEnd||{})[x.id]||0,c?c.s+gbCuAt(.85)*(c.e-c.s):0)+ci*30;
       if(now<t0+170){const ps=-g.L/2-GB_PET,T=k=>'translate('+gbF(ps)+'px,0px) scale('+k+') translate('+gbF(-ps)+'px,0px)',tf=(B.tuft||{})[x.id];
-       el.__g.animate([{transform:T(0)},{transform:T(1)}],{duration:170,delay:t0-now,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'});el.__nick.animate([{opacity:0},{opacity:1}],{duration:120,delay:t0-now+150,fill:'backwards'});
-       if(tf&&tf.animate)tf.animate([{opacity:0},{opacity:1}],{duration:170,delay:t0-now,fill:'backwards'})}}}
+       gbPlay(el.__g,[{transform:T(0)},{transform:T(1)}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t0);gbPlay(el.__nick,[{opacity:0},{opacity:1}],{duration:120,fill:'backwards'},t0+150);
+       if(tf&&tf.animate)gbPlay(tf,[{opacity:0},{opacity:1}],{duration:170,fill:'backwards'},t0)}}}
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2])+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');el.__x=x;el.__y=P.o[1]+sl[1];
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
     /* pruning: a leaf the chosen mode drops is snipped where its twig leaves the wood, at its turn from the apex down. Twig and
@@ -1366,7 +1376,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       its leaves open after it, one by one, then its count */
    const now=performance.now(),kT=(B.kgk||{})[rec.kid]!==undefined?gbT('kn:'+rec.kid+B.kgk[rec.kid],0)+300:0,ts=Math.max((rec.tb||0)+80,kT);rec.sp=ts+300;
    if(!quiet&&fl.animate&&now<ts+300){const b=rec.base,T=k=>'translate('+gbF(b[0])+'px,'+gbF(b[1])+'px) scale('+k+') translate('+gbF(-b[0])+'px,'+gbF(-b[1])+'px)';
-    fl.animate([{transform:T(.05),opacity:0},{offset:.25,transform:T(.42),opacity:1},{transform:T(1),opacity:1}],{duration:300,delay:ts-now,easing:'cubic-bezier(.2,.7,.3,1)',fill:'backwards'})}}}
+    gbPlay(fl,[{transform:T(.05),opacity:0},{offset:.25,transform:T(.42),opacity:1},{transform:T(1),opacity:1}],{duration:300,easing:'cubic-bezier(.2,.7,.3,1)',fill:'backwards'},ts)}}}
  for(const uid in M.buds){const g=B.budG[uid];if(!g)continue;g.list=g.list||[];}
  for(const g of new Set(Object.values(B.shoots)))g.list=[];
  for(const uid in M.buds){const g=B.budG[uid];if(g)g.list.push(...M.buds[uid].filter(x=>x.scenarioKind!=='regression'))}
@@ -1377,13 +1387,13 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       (gbKnotNames); with no clear place it is left off, and the shoot's last leaf says how many more */
    if(!g.cnt){const at=g.cntAt;g.cnt=sv('text',{class:'shn',x:gbF(at?at.x:0),y:gbF(at?at.y:0),'text-anchor':'middle'},'');
     g.ctag=at?sv('g',{class:'shtag'},sv('path',{class:'shtie',d:'M'+gbP(at.tie[0])+' L'+gbP(at.tie[1])}),sv('rect',{x:gbF(at.r[0]),y:gbF(at.r[1]),width:gbF(at.r[2]-at.r[0]),height:gbF(at.r[3]-at.r[1]),rx:gbF((at.r[3]-at.r[1])/2)}),g.cnt):sv('g',{class:'shtag',style:'display:none'},g.cnt);g.g.append(g.ctag);
-    const now=performance.now(),t1=(g.sp||0)+g.n*40+150;if(!quiet&&g.ctag.animate&&now<t1+200)g.ctag.animate([{opacity:0},{opacity:1}],{duration:200,delay:t1-now,fill:'backwards'})}
+    const now=performance.now(),t1=(g.sp||0)+g.n*40+150;if(!quiet&&g.ctag.animate&&now<t1+200)gbPlay(g.ctag,[{opacity:0},{opacity:1}],{duration:200,fill:'backwards'},t1)}
    g.cnt.textContent=list.length>n?'+'+(list.length-n):'';g.ctag.style.display=g.cntAt&&list.length>n?'':'none'}
   list.forEach((x,i)=>{let el=B.bud[x.id];if(i>=g.slots.length){if(el)el.classList.add('gone');return}
    const q=g.slots[i];if(el&&el.__q!==q){el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+gbF(q[3])+')':'');el.__q=q}
    if(!el){const fr=sv('g',{class:'gb-lfg'},sv('g',{class:'gb-lfi'},sv('circle',{r:gbF(Math.max(8,12/gbHf(B)/(q[3]||1))),cx:8.5,class:'hitc'}),sv('path',{d:'M0 0 L3.6 0',class:'bpet'}),sv('path',{d:gbLeafD(11,5.6),transform:'translate(9 0)',class:'blade'})));el=sv('g',{class:'gb-lf bud','data-k':'s:'+x.id,tabindex:-1,role:'button'},fr);
     el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+gbF(q[3])+')':'');el.__q=q;el.__u=g.uids[0];el.__base=g.base;g.fl.append(el);B.bud[x.id]=el;
-    const now=performance.now(),t1=(g.sp||0)+i*40;if(!quiet&&fr.animate&&now<t1+170)fr.animate([{transform:'scale(0)'},{transform:'scale(1)'}],{duration:170,delay:t1-now,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'})}
+    const now=performance.now(),t1=(g.sp||0)+i*40;if(!quiet&&fr.animate&&now<t1+170)gbPlay(fr,[{transform:'scale(0)'},{transform:'scale(1)'}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t1)}
    /* while a dropped shoot fades, its leaves stay on it */
    const fad=!showBuds&&!!(g.fade||(g.on===undefined?gw.prevBuds:g.on));const im=(showBuds||fad)&&(inMode(x)||pv==='max'||fad);const cut=!!pv&&pv!=='max'&&inMode(x);
    el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)&&!fad?' pv-add':'')+(im&&(cut||fad)?' pv-out':''));
@@ -1415,7 +1425,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    if(!el){el=sv('g',{class:'gb-gr','data-k':'s:'+x.id,tabindex:-1,role:'button'},sv('circle',{cx:gbF(r.c[0]),cy:gbF(r.c[1]),r:gbF(Math.max(4.6,7/gbHf(B))),class:'hitc'}),sv('circle',{cx:gbF(r.c[0]),cy:gbF(r.c[1]),r:gbF(r.r),class:'ghalo'}),sv('circle',{cx:gbF(r.c[0]),cy:gbF(r.c[1]),r:gbF(r.r),class:'gring'}));
     el.__u=r.kid;el.__route=r.route;r.par.append(el);B.bud[x.id]=el;(B.grafts[r.kid]=B.grafts[r.kid]||[]).push(el);
     /* set into the bark once the wood it sits on has grown there and its knot is there */
-    el.__x=x;const now=performance.now(),tb=r.tb||0;if(!quiet&&el.animate&&now<tb+300)el.animate([{opacity:0},{opacity:1}],{duration:300,delay:tb-now,fill:'backwards'})}
+    el.__x=x;const now=performance.now(),tb=r.tb||0;if(!quiet&&el.animate&&now<tb+300)gbPlay(el,[{opacity:0},{opacity:1}],{duration:300,fill:'backwards'},tb)}
    const im=showBuds&&(inMode(x)||pv==='max'),cut=!!pv&&pv!=='max'&&inMode(x),was=el.__on;el.__on=im;
    if(im){if(el.__fade){el.__fade.cancel();el.__fade=null}}
    else if(was&&!quiet&&(!pvWas||chose)&&el.animate&&!el.__fade&&!(performance.now()<(r.tb||0))){for(const q of el.getAnimations())q.cancel();const a=el.__fade=el.animate([{opacity:1},{opacity:0}],{duration:360,delay:cutLag.get(el)||0,easing:'ease-in',fill:'forwards'});a.onfinish=()=>{if(el.__fade===a){el.__fade=null;if(!el.__on)el.classList.add('gone')}a.cancel()}}
