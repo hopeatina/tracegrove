@@ -1252,14 +1252,22 @@ describe('Grow page', () => {
       return Math.min(pd(a, c, d), pd(b, c, d), pd(c, a, b), pd(d, a, b));
     };
     const wood = Array.from(document.querySelectorAll('.gw-svg.gb path.w, .gw-svg.gb path.tw:not(.lt)')).filter((e: any) => e.getScreenCTM());
-    const out = { leaves: 0, hung: 0, bad: [] as string[], cush: [] as { tree: string; crown: boolean; role: string; n: number; a: number; h: number }[] };
+    const out = { leaves: 0, hung: 0, bad: [] as string[], cush: [] as { tree: string; pid: string; crown: boolean; role: string; n: number; a: number; h: number }[], pads: [] as { tree: string; pid: string; h: number; PW: number; L: number; n: number; tier: number }[] };
+    // each pad's height on its trunk (the crown's at the top), and the tier that sets its width: 1 at the lowest branch, .7 at
+    // the apex
+    const hOf = (P: any) => (P.crown ? 1 : P.b.h);
+    for (const pid in B.pad) {
+      const P = B.pad[pid], tree = P.el.closest('svg')?.id ?? '', mine = Object.values(B.pad).filter((Q: any) => Q.tree === P.tree) as any[];
+      const lo = Math.min(...mine.map(hOf)), n = P.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0);
+      out.pads.push({ tree: tree + ':' + P.tree, pid, h: hOf(P), PW: P.geo.PW, L: P.geo.L, n, tier: mine.length > 1 ? 1 - 0.3 * (hOf(P) - lo) / ((1 - lo) || 1) : 1 });
+    }
     const bad = (pid: string, what: string, v?: unknown) => out.bad.push(pid + ': ' + what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     for (const pid in B.pad) {
       const P = B.pad[pid], g = P.geo, L: number = g.L, W: number = g.W, kept: [string, number[]][] = [];
       g.cs.forEach((c: any, k: number) => {
         if (c.role === 'shoulder' && !c.ids.length) bad(pid, 'a shoulder with no guard', k);
         if (c.ids.length && L > 0.55 * c.a) bad(pid, 'leaf longer than a quarter of its cushion', [L, c.a]);
-        out.cush.push({ tree: P.el.closest('svg')?.id ?? '', crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
+        out.cush.push({ tree: (P.el.closest('svg')?.id ?? '') + ':' + P.tree, pid, crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
       });
       for (const [id, sl] of g.slot as Map<string, number[]>) {
         const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
@@ -1666,19 +1674,23 @@ describe('Grow page', () => {
         const f = await page.evaluate(foliage);
         expect(f.leaves, width + 'px').toBeGreaterThan(2);
         expect(f.bad, width + 'px').toEqual([]);
-        // a cushion's area grows with how many leaves it holds, one tree's k for all; the crown's crest at most 15% larger across
-        // by its leaves, and always the largest cushion on the tree: at least 1.15 times across any branch's, raised to exactly
-        // that where it holds fewer leaves than one of them
+        // a cushion's area grows with how many leaves it holds, one k for every cushion on a pad, the crown's crest too; the pads
+        // a scalene triangle: each as wide as its leaves ask, clamp(n x 1.6 leaves, 3.2, 12 leaves), times its tier (1 at the
+        // lowest branch, .7 at the apex) and never narrower than holds them, no pad wider than the one below it, and the crown's
+        // crest at most three quarters across the widest cushion below it
         for (const tree of new Set(f.cush.map((c) => c.tree))) {
           const cs = f.cush.filter((c) => c.tree === tree), per = (c: { a: number; h: number; n: number }) => (c.a * c.h) / (c.n + 0.5);
-          const plain = cs.filter((c) => !(c.crown && c.role === 'crest')), base = Math.min(...plain.map(per));
-          for (const c of plain) expect(per(c) / base, width + 'px ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
-          const brMax = Math.max(0, ...cs.filter((c) => !c.crown).map((c) => c.a));
-          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) {
-            expect(c.a, width + 'px crown crest against the largest branch cushion').toBeGreaterThanOrEqual(1.15 * brMax - 0.01);
-            if (Math.abs(c.a - 1.15 * brMax) > 0.01) expect(Math.sqrt(per(c) / base)).toBeLessThanOrEqual(1.151);
+          for (const pid of new Set(cs.map((c) => c.pid))) {
+            const pc = cs.filter((c) => c.pid === pid), base = Math.min(...pc.map(per));
+            for (const c of pc) expect(per(c) / base, width + 'px ' + pid + ' ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
+            for (const a of pc) for (const b of pc) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
           }
-          for (const a of plain) for (const b of plain) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
+          const pads = f.pads.filter((q) => q.tree === tree).sort((a, b) => a.h - b.h);
+          for (let i = 1; i < pads.length; i++) expect(pads[i]!.PW, width + 'px ' + pads[i]!.pid + ' against the pad below it').toBeLessThanOrEqual(1.05 * pads[i - 1]!.PW);
+          for (const q of pads) expect(q.PW, width + 'px ' + q.pid + ' as wide as its leaves ask at its tier').toBeGreaterThanOrEqual(Math.max(3.2 * q.L, Math.min(12 * q.L, q.n * 1.6 * q.L)) * q.tier - 0.01);
+          const brMax = Math.max(0, ...cs.filter((c) => !c.crown).map((c) => c.a));
+          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) expect(c.a, width + 'px crown crest against the widest cushion below').toBeLessThanOrEqual(0.75 * brMax + 0.01);
+          if (pads.length > 1) expect(pads.at(-1)!.PW, width + 'px the apex against the widest pad below').toBeLessThanOrEqual(0.75 * Math.max(...pads.slice(0, -1).map((q) => q.PW)) + 0.01);
         }
         await page.close();
       }
@@ -1701,9 +1713,24 @@ describe('Grow page', () => {
     const order = w.gbOrderOf(w.gw.M || w.gbModel()) as { id: string; title: string }[], head = order.find((j) => fails(j.id)) ?? order[0]!;
     out.crown = crown.jid; out.head = head.id; out.failing = fails(head.id); out.title = head.title;
     if (S.journeys.some((j: { id: string }) => fails(j.id)) && !fails(crown.jid)) bad('a journey failed and the crown holds one that did not');
-    // its crest the largest cushion on the tree: at least 1.15 times across any branch's
+    // a scalene canopy: its crest at most three quarters across the widest cushion below it, and no pad wider than the one
+    // below it (to 5%), the lowest the widest
     const crest = crown.geo.cs.find((c: any) => c.role === 'crest');
-    for (const P of mine) if (!P.crown) for (const c of P.geo.cs) if (crest.a < 1.15 * c.a - 0.01) bad('the crown crest under 1.15 times a branch cushion', [P.jid, crest.a, c.a]);
+    const lowA = Math.max(0, ...mine.filter((P) => !P.crown).flatMap((P) => P.geo.cs.map((c: any) => c.a)));
+    if (lowA && crest.a > 0.75 * lowA + 0.01) bad('the crown crest over three quarters of the widest cushion below it', [crest.a, lowA]);
+    const lowPW = Math.max(0, ...mine.filter((P) => !P.crown).map((P) => P.geo.PW));
+    if (lowPW && crown.geo.PW > 0.75 * lowPW + 0.01) bad('the crown over three quarters of the widest pad below it', [crown.geo.PW, lowPW]);
+    const up = mine.slice().sort((a, b) => (a.crown ? 1 : a.b.h) - (b.crown ? 1 : b.b.h));
+    for (let i = 1; i < up.length; i++) if (up[i].geo.PW > 1.05 * up[i - 1].geo.PW) bad('a pad wider than the one below it', [up[i].id, up[i].geo.PW, up[i - 1].id, up[i - 1].geo.PW]);
+    // the crown in tiers: its crest on its riser above its shoulders, and (beside a desktop tree; on a phone it stays one
+    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each narrower than its crest
+    // where they hold its happy paths
+    const cshs = crown.geo.cs.filter((c: any) => c.role === 'shoulder'), mid = (c: any) => c.b - c.h / 2;
+    for (const c of cshs) if (mid(crest) >= mid(c)) bad('the crown crest not above its shoulder', [mid(crest), mid(c)]);
+    if (!B.L.narrow && crown.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0) >= 3) {
+      if (cshs.length < 1 || cshs.length > 2) bad('a crown of three or more leaves with no tier', cshs.length);
+      for (const c of cshs) if (c.lv.every((x: any) => x.polarity === 'happy') && c.a >= crest.a) bad('a crown shoulder as wide as its crest', [c.a, crest.a]);
+    }
     // the wood sized from the data: the trunk's girth from the leaves the tree carries, and about twelve girths tall
     out.nL = mine.reduce((a, P) => a + P.leaves.length, 0); out.D = T.D; out.Ht = T.Ht;
     if (T.Ht < 12 * T.D - 0.01) bad('a squat trunk', [T.Ht, T.D]);

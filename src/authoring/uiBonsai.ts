@@ -380,18 +380,20 @@ function gbCu(f){const T=k=>'translate('+gbF(f[0])+'px,'+gbF(f[1])+'px) scale('+
 
 /* A pad is grown, not stamped: dense cushions of foliage on the wood that carries them. The happy path sits on the crest,
    the highest cushion; guards on a shoulder cushion to either side, the first on the outer one, and a shoulder grows only
-   for a guard, so no cushion is ever empty; the ways it fails hang on short stems from the wood under the pad. A crest with
+   for a guard (or a crown's happy path, below), so no cushion is ever empty; the ways it fails hang on short stems from the wood under the pad. A crest with
    shoulders stands clear above them on its leaves' own twigs, so which tier a leaf is on reads at a glance. A crown is the
-   same cushions round the leader's top. One rule sizes every cushion on a tree: its area grows with the leaves it holds
-   (its width with their square root), the crown's crest let grow a seventh more and never more. A single journey's own guard
-   or failure pad holds all its leaves in one cushion. Leaves lie inside their cushion, apart, each turned along the twig it
+   same cushions round the leader's top, in tiers too: a crown of three or more happy paths and no guards deals them between its
+   crest and one or two smaller shoulders below it, so the apex is a crest on its riser, never one flat cloud (beside a desktop
+   tree; on a phone it stays one crest). On a pad one rule
+   sizes every cushion: its area grows with the leaves it holds (its width with their square root); how wide each pad is, the
+   tree decides (gbTree). A single journey's own guard or failure pad holds all its leaves in one cushion. Leaves lie inside their cushion, apart, each turned along the twig it
    grows on; in each group the minimum's leaves come first. Coordinates are the pad's own: x from its middle, y up from the
    lowest underside. */
 const GB_PET=3.5;
 /* the shortest distance between two segments: two leaves' midribs, so leaves are kept apart blade from blade */
 function gbSegD(a,b,c,d){const P=(p,q,r)=>{const dx=r[0]-q[0],dy=r[1]-q[1],l=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((p[0]-q[0])*dx+(p[1]-q[1])*dy)/l));return Math.hypot(p[0]-q[0]-t*dx,p[1]-q[1]-t*dy)};
  const s=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);if(s(a,b,c)*s(a,b,d)<0&&s(c,d,a)*s(c,d,b)<0)return 0;return Math.min(P(a,c,d),P(b,c,d),P(c,a,b),P(d,a,b))}
-function gbPadGeo(list,H,dir,seed,crown,K,pol,minA,lmin){const z=Math.max(.6,Math.pow(H/560,.75));
+function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Math.pow(H/560,.75));
  /* every leaf on a tree is the same size, so no leaf reads as bigger news than another; leaves are the data, so they lead:
     about nineteen pixels long beside a desktop tree, never under about eleven on a phone (lmin, from gbBuild) */
  const L0=Math.max(13,Math.min(19,17.5*z,H*.032)),L=Math.max(L0,lmin||0),W=L*.52,gap=16,d=dir||1;
@@ -400,7 +402,10 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,minA,lmin){const z=Math.max(.6,Mat
  const mk=(role,sd,lv)=>({role,sd,lv,ids:lv.map(x=>x.id),hang:[],a:0,h:0,b:0,x:0,seat:0,limf:null,pos:[],body:[]});
  const crest=one||g.happy.length||crown?mk('crest',0,one?gbOrd(list):g.happy):null;
  const sides={};sides[d]=[];sides[-d]=[];if(!one)g.guard.forEach((x,i)=>sides[i%2?-d:d].push(x));
- const sIn=sides[-d].length?mk('shoulder',-d,sides[-d]):null,sOut=sides[d].length?mk('shoulder',d,sides[d]):null;
+ /* (a crown with no guards and three or more happy paths: every other one to a shoulder, the first of those on the outer one,
+    so its crest keeps the most; on a phone, where the upper trunk's names need the room, the crown stays one crest) */
+ const hap=tier&&crown&&!one&&!g.guard.length&&g.happy.length>=3;if(hap){const lv=crest.lv;crest.lv=lv.filter((_,i)=>i%2===0);crest.ids=crest.lv.map(x=>x.id);lv.filter((_,i)=>i%2).forEach((x,i)=>sides[i%2?-d:d].push(x))}
+ const sIn=sides[-d].length?mk('shoulder',-d,sides[-d]):null,sOut=sides[d].length?mk('shoulder',d,sides[d]):null;if(hap)for(const c of [sIn,sOut])if(c)c.hap=true;
  const cs=[sIn,crest,sOut].filter(Boolean),shs=[sIn,sOut].filter(Boolean);
  /* a journey's failures hang under its outer shoulder, or under its crest when it has none; a crown's under its shoulders, or
     from a branchlet just under its crest */
@@ -418,7 +423,7 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,minA,lmin){const z=Math.max(.6,Mat
    const L0=cap(c,-1),R0=cap(c,1),xl=-L0.xe,xr=R0.xe,f=(q.x-xl)/((xr-xl)||1),base=(L0.yc-L0.rho)*(1-f)+(R0.yc-R0.rho)*f,xp=c.pk*Math.min(L0.xe,R0.xe),u=q.x<xp?(q.x-xp)/((xp-xl)||1):(q.x-xp)/((xr-xp)||1);
    return base-Math.max(0,c.h+base)*(1+Math.cos(Math.PI*Math.max(-1,Math.min(1,u))))/2},
   bY=(c,v)=>{const q=cap(c,v),ax=Math.abs(q.x);if(ax>q.xe)return q.yc+Math.sqrt(Math.max(0,q.rho*q.rho-(ax-q.xe)*(ax-q.xe)));return -c.bul*c.h*(1-Math.cos(Math.PI*ax/(q.xe||1)))/2};
- const size=(c,k)=>{c.a=k*(crown&&c.role==='crest'?1.15:1)*Math.sqrt((c.lv.length+.5)/ar(c));if(crown&&c.role==='crest')c.a=Math.max(c.a,minA||0);c.h=c.a*ar(c)};
+ const size=(c,k)=>{c.a=k*Math.sqrt((c.lv.length+.5)/ar(c));c.h=c.a*ar(c)};
  /* a leaf leans out along its twig: on a crest they fan from the wood under it, a little out from the trunk; on a shoulder
     lower, out over its own side; on a crown they fan from the leader */
  const ang=(c,px,id)=>{const v=Math.max(-1,Math.min(1,px/c.a)),j=(gbHash('lf:'+id)-.5)*12;let t;
@@ -440,17 +445,18 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,minA,lmin){const z=Math.max(.6,Mat
    for(let i=0;i<n;i++)for(let k=0;k<16&&!inside(c,P[i],th(i),2);k++){P[i][0]+=(core[0]-P[i][0])*.14;P[i][1]+=(core[1]-P[i][1])*.14;moved=true}
    if(!moved)break}
   c.pos=P.map((p,i)=>[p[0],p[1],th(i)]);for(let i=0;i<n;i++){if(!inside(c,P[i],th(i),1.5))return false;for(let j=i+1;j<n;j++)if(!ok(i,j))return false}return true};
- /* the smallest size, by the tree's one rule, at which every cushion holds its leaves (the caller passes the largest any pad
-    on the tree needs, so they all share it); never so small that a leaf stands more than about a third of its crest's height */
+ /* the smallest size at which every cushion holds its leaves, or the larger one the tree asks for (K); never so small that a
+    leaf stands more than about a third of its crest's height */
  let k=Math.max(K||0,L*1.22);const fit=k=>{for(const c of cs)size(c,k);return cs.every(place)};for(let i=0;i<48&&!fit(k);i++)k*=1.05;
  /* the clumps a cushion is heaped from: a row along its crest, two more than its leaves (three to seven), each a little
     larger or smaller than the next, whose tops scallop its edge; and a lower row in front */
  for(const c of cs){const r=gbRng(gbHash('cl:'+seed+':'+c.role+c.sd)),kt=Math.max(3,Math.min(7,c.lv.length+2)),sp=1.56*c.a/(kt-1),R=Math.min(c.h*.5,.64*sp);c.body=[];
   for(let i=0;i<kt;i++){const v=(i/(kt-1)*2-1)*.7+(r()-.5)*.08,rr=R*(.82+.36*r());c.body.push([v*c.a,tY(c,v)+rr-c.h*(.05+.06*r()),rr,0])}
   const kf=Math.max(2,Math.min(4,kt-1));for(let i=0;i<kf;i++){const v=(i/(kf-1)*2-1)*.52+(r()-.5)*.12,rr=c.h*.44*(.86+.26*r());c.body.push([v*c.a,-c.h*.34+(r()-.5)*c.h*.08,rr,1])}}
- /* a journey's crest stands clear above its shoulders, which reach out from under its flanks; a crown's shoulders hang
-    lower and further out to either side of its crest */
- const hs=Math.max(0,...shs.map(c=>c.h));if(crest&&shs.length){for(const c of shs){c.x=c.sd*(crown?crest.a*.5+c.a*.74:crest.a*.46+c.a*.62);c.seat=c.limf*c.h}crest.b=-(hs+gap);crest.seat=null}
+ /* a journey's crest stands clear above its shoulders, which reach out from under its flanks; a crown's guard shoulders hang
+    lower and further out to either side of its crest, its happy ones tucked in under the crest's flank, so the apex stays
+    compact */
+ const hs=Math.max(0,...shs.map(c=>c.h));if(crest&&shs.length){for(const c of shs){c.x=c.sd*(c.hap?crest.a*.3+c.a*.55:crown?crest.a*.5+c.a*.74:crest.a*.46+c.a*.62);c.seat=c.limf*c.h}crest.b=-(hs+gap);crest.seat=null}
  else{if(!crest&&shs.length===2)for(const c of shs)c.x=c.sd*c.a*1.02;for(const c of cs)c.seat=(c.limf||.2)*c.h}
  const lo=Math.min(...cs.map(c=>c.x-c.a)),hi=Math.max(...cs.map(c=>c.x+c.a)),PW=hi-lo;for(const c of cs){c.x-=(lo+hi)/2;c.u=PW/2+d*c.x}
  /* a failure's stem is short, never more than half as long as the crest is tall */
@@ -556,11 +562,23 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* one rule sizes every cushion on the tree: the size the most crowded of them needs to hold its leaves apart, so a bigger
     cushion always means more scenarios; the crown's shoulders reach out on the side away from the first branch, so the
     canopy balances over the roots */
- const pgeo=(pd,K,minA)=>gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,K,pd.pol,minA,M.lmin);
- for(const pd of padList){pd.leaves=leavesOf(pd);pd.geo=pgeo(pd,0)}const K=Math.max(...padList.map(pd=>pd.geo.need));for(const pd of padList)if(pd.geo.need<K)pd.geo=pgeo(pd,K);
+ const pgeo=(pd,K)=>gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,K,pd.pol,M.lmin,!M.nw);
+ for(const pd of padList){pd.leaves=leavesOf(pd);pd.geo=pgeo(pd,0)}
  const cpd=padList[0];
- /* the crown's crest is the largest cushion on the tree, at least 1.15 times across any branch's, however few leaves it holds */
- {const bm=Math.max(0,...padList.slice(1).flatMap(pd=>pd.geo.cs.map(c=>c.a))),c0=cpd.geo.cs.find(c=>c.role==='crest');if(c0&&c0.a<1.15*bm)cpd.geo=pgeo(cpd,K,1.15*bm)}
+ /* The canopy is a scalene triangle, the lowest branch the heaviest and the apex the lightest. Each pad is as wide as its
+    leaves ask, clamp(n x 1.6 leaves, 3.2, 12 leaves) (two pitches of eight tenths of a leaf each), times its tier: 1 at the lowest branch, .7 at the apex; never narrower
+    than holds its leaves. Then no pad is wider than the one below it (where the upper one is wider than its tier asks, to
+    hold its leaves, the lower grows to match), the apex is at most three quarters across the widest pad below it, and the
+    crown's crest is at most three quarters across the widest cushion below it (the pad with that cushion grows to match, and those under it with it). A pad's
+    width is linear in its size, so each is drawn at the size that gives it its width. */
+ if(m){const hOf=pd=>pd.crown?1:hs[pd.i],hLo=Math.min(...padList.map(hOf)),up=padList.slice().sort((a,b)=>hOf(b)-hOf(a)),tier=pd=>1-.3*(hOf(pd)-hLo)/((1-hLo)||1);
+  const want=pd=>{const L=pd.geo.L,n=pd.geo.cs.reduce((a,c)=>a+c.ids.length,0);return Math.max(3.2*L,Math.min(12*L,n*1.6*L))*tier(pd)};
+  const fit=new Map(padList.map(pd=>[pd,{k:pd.geo.need,PW:pd.geo.PW}])),wd=new Map(padList.map(pd=>[pd,Math.max(want(pd),pd.geo.PW)]));
+  for(let it=0;it<4;it++){for(let q=1;q<up.length;q++)wd.set(up[q],Math.max(wd.get(up[q]),wd.get(up[q-1])));
+   if(up.length>1){const lo=up[up.length-1],w0=wd.get(up[0]),wm=Math.max(...up.slice(1).map(pd=>wd.get(pd)));if(w0>.75*wm)wd.set(lo,Math.max(wd.get(lo),w0/.75*1.002))}
+   for(const pd of padList){const f=fit.get(pd);pd.geo=pgeo(pd,f.k*wd.get(pd)/f.PW)}
+   const c0=cpd.geo.cs.find(c=>c.role==='crest'),bm=Math.max(0,...padList.slice(1).flatMap(pd=>pd.geo.cs.map(c=>c.a)));if(!c0||c0.a<=.75*bm)break;
+   const ca=pd=>Math.max(...pd.geo.cs.map(c=>c.a)),lo=up.slice(1).reduce((a,pd)=>ca(pd)>ca(a)?pd:a);wd.set(lo,wd.get(lo)*c0.a/(.75*ca(lo))*1.002)}}
  const crc=cpd.geo.cs.find(c=>c.role==='crest'),gap=.022*H,inC=.32*crc.h-crc.bot-.035*H,lift=.02*H+6;let need=lit?.84*H:m<=1?.22*H:m<=2?.27*H:.38*H;
  /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
     upper trunk is not a bare pole (tried first, and kept only if nothing then overlaps) */
@@ -576,7 +594,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const nL=js.reduce((a,j)=>a+nl(j),0),Dd=Math.max(dmin||0,cpd.geo.L0*Math.max(1,Math.min(3,.45*Math.sqrt(nL))));
  /* (a phone's larger leaves make larger pads than the drawing's height allows for: there the trunk grows as tall as they need;
     and a trunk thickened for its pot grows as tall as twelve of its girths, whatever the drawing's height) */
- const Ht=Math.max(M.lmin?need:0,Math.min(.92*H,sap?need:Math.max(need,12.5*Dd)),sap||!dmin?0:12.1*Dd);const D=sap?Ht*.05:Dd;
+ /* (a crown in tiers stands its crest on its riser above its shoulders: the trunk grows that much taller, so the shoulders
+    take no room from the upper trunk's knots) */
+ const tl=cpd.geo.cs.some(c=>c.hap)?Math.max(0,-crc.bot):0;
+ const Ht=Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);const D=sap?Ht*.05:Dd;
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
  else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;items.forEach((it,i)=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
   /* with one or two branches the apex leans a little away from the first, so the tree's mass stays over its roots: the
@@ -654,7 +675,8 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const cdrop=cg.drop;
  /* Knots: parts the journeys share sit low on the trunk (most shared lowest, callee below caller); a journey's own parts sit
     on the bare wood of its branch, deepest nearest the trunk (a lone one toward the outer end of it, clear of the crotch,
-    where a shoot of its own can grow); the headline journey's own parts on the upper trunk. */
+    where a shoot of its own can grow; and, where the bare wood reaches that far, past the limb's first sixth, so a long limb
+    under a wide pad can still put one out); the headline journey's own parts on the upper trunk. */
  const depth=id=>{let s=0,n=0;for(const j of js){const i=j.units.indexOf(id);if(i>=0){s+=i/Math.max(1,j.units.length-1);n++}}return n?s/n:0};
  /* knots keep their distance along the wood, about two of their own lengths; where more files share a stretch than fit, the
     last knot there swells into a burl that holds the rest, and its card names every one */
@@ -666,7 +688,8 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const core=lit?[]:Object.keys(carry).filter(id=>carry[id]>1).sort((a,b)=>carry[b]-carry[a]||depth(b)-depth(a));
  const c0=.09,c1=Math.max(.16,h1-.05);group(core,fitN(c0,c1)).forEach((ids,i,a)=>onTrunk(ids,a.length===1?.16:c0+(c1-c0)*i/(a.length-1)));
  const ownA=apex.units.filter(id=>!U[id].root&&carry[id]===1).sort((a,b)=>depth(b)-depth(a));
- const fr=hs.filter((h,i)=>!back[i]);const hi=Math.min(lit?.74:.95,1-(inC+8+cdrop)/Ht),lo=Math.min(hi-.12,lit?.1:(fr.length?Math.max(...fr)+.06:.35));
+ const fr=hs.filter((h,i)=>!back[i]);const shB=cc.filter(Boolean).map(q=>q.bi),hi=Math.min(lit?.74:.95,1-(inC+8+cdrop)/Ht,...shB.map(bi=>(-tp[bi][1]-.85*tw[bi]-14)/Ht)),lo=Math.min(hi-.12,lit?.1:(fr.length?Math.max(...fr)+.06:.35));
+ /* (and none in the crotch of a branchlet the leader puts out for a crown's shoulder: clear of its fillet and a boss below it) */
  group(ownA,Math.min(5,fitN(lo,hi))).forEach((ids,i,a)=>onTrunk(ids,a.length===1?(lo+hi)/2:lo+(hi-lo)*i/(a.length-1)));
  /* never closer than that along the trunk, and none pushed into the crown: one that would be joins the burl below it */
  const kTop=gbNear(ty,hi);const tk=knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);
@@ -680,7 +703,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   while(tr.length>5){let best=null;for(let i=1;i<tr.length;i++){const a=tr[i-1],b=tr[i];if(help(a)&&help(b)&&(!best||b.k-a.k<best.b.k-best.a.k))best={a,b}}
    if(!best)break;const {a,b}=best,lead=a.ids.length>=b.ids.length?a:b,o=lead===a?b:a,k=Math.round((a.k*a.ids.length+b.k*b.ids.length)/(a.ids.length+b.ids.length));
    lead.ids.push(...o.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(o),1);tr=row()}}
- for(const b of br){if(b.pol)continue;const own=ownOf(b.j).sort((x,y)=>depth(y)-depth(x));const a0=b.Tk/2+8,a1=Math.max(a0+4,b.inner-4);const fit=Math.min(4,Math.max(1,Math.floor((a1-a0)/KG)+1));
+ for(const b of br){if(b.pol)continue;const own=ownOf(b.j).sort((x,y)=>depth(y)-depth(x));const a0=Math.max(b.Tk/2+8,Math.min(.16*b.len,b.inner-8)),a1=Math.max(a0+4,b.inner-4);const fit=Math.min(4,Math.max(1,Math.floor((a1-a0)/KG)+1));
   group(own,fit).forEach((ids,i,a)=>{const d=a.length===1?a0+(a1-a0)*.7:a0+(a1-a0)*i/(a.length-1);const k=gbNear(b.acc,d);knots.push({id:ids[0],ids,on:'b'+b.i,bid:b.id,k,p:b.pts[k],n:gbNorm(b.pts,k),w:b.w[k]})})}
  /* A knot is a boss the wood grew round, not a stud sewn on it: it stands out of the outside of the wood's bend (where the
     wood runs nearly straight, on alternate sides), a quarter to two fifths of the girth off the centre line, and swells the
@@ -712,7 +735,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  return {js,apex,items,br,tp,tw,bx,ty,pads,padList,origin,knots,more,veins,lanes,ctw,H,Ht,D,S,lit,hs,h1,x0,x1,y0,cx0:x0,cx1:x1,cy0:y0,key}}
 
 /* The whole drawing: trees placed side by side in one pot, labels beside their pads, roots in the soil. */
-function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.branch)||'grove';const S=gbHash('side:'+brn)<.5?-1:1;const narrow=width<720;
+function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.branch)||'grove';const S=gbHash('side:'+brn)<.5?-1:1;const narrow=width<720;M.nw=narrow;
  /* a phone draws the tree on a canvas a quarter wider and lets the drawing scale down whole, so its proportions hold instead
     of the trunk being squashed to fit; its text is set larger to match */
  if(narrow&&!sap)width*=GB_NK;
@@ -2025,7 +2048,7 @@ function gbShootSlots(pts,n){const acc=gbLen(pts),tot=acc[acc.length-1]||1;retur
 function gbTipOff(B){if(B.tip)B.tip.hidden=true;if(B.lead)B.lead.setAttribute('d','')}
 function gbHover(k,el){gw.hov=k||null;gbLight();gbPadLbl(k,el);if(k)gbTip(k,el);else gbPinTip()}
 /* Pointing at a journey's pad, or focusing it, names its cushions in small words where each fits: "happy path" over the crest,
-   "refuses" off a shoulder's outer edge, "fails" under the leaves that hang; a journey's guards or failures on a pad of their own
+   "refuses" off a guard shoulder's outer edge (a crown's happy shoulders go under its crest's word), "fails" under the leaves that hang; a journey's guards or failures on a pad of their own
    (gbPadGeo: one cushion) get theirs off its outer edge or under it, and no "happy path". A word is set only where it touches no
    name, number, cushion, leaf or wood and stays inside the drawing; one with no such place is left to the card and the key. */
 function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replaceChildren();
@@ -2045,7 +2068,7 @@ function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replace
   const edge=[[ox,my,out],[ox,cr.top+6,out],[ox,cr.bottom-6,out]],under=[[qx,cr.bottom+9,0],[mx,cr.bottom+9,0]],over=[[qx,cr.top-9,0],[mx,cr.top-9,0]];
   put(P.pol==='guard'?GB_W.refuses:GB_W.fails,P.pol==='guard'?[...edge,...under,...over]:[...under,...edge,...over]);return}
  if(cr&&cr.width&&cs[ci].ids.length){const mx=(cr.left+cr.right)/2;const my=(cr.top+cr.bottom)/2;put(GB_W.happy,[[mx,cr.top-9,0],[cr.left+4,cr.top-9,1],[cr.right-4,cr.top-9,-1],[cr.left-5,my,-1],[cr.right+5,my,1]])}
- cs.forEach((c,i)=>{if(c.role!=='shoulder'||!c.ids.length)return;const r=box(i);if(!r||!r.width)return;const out=cr?((r.left+r.right)/2<(cr.left+cr.right)/2?-1:1):c.sd,y=(r.top+r.bottom)/2;
+ cs.forEach((c,i)=>{if(c.role!=='shoulder'||!c.ids.length||c.hap)return;const r=box(i);if(!r||!r.width)return;const out=cr?((r.left+r.right)/2<(cr.left+cr.right)/2?-1:1):c.sd,y=(r.top+r.bottom)/2;
   /* at the shoulder's outer edge; where a name or the wood has that, just under or over it, toward the outside */
   const ox=out<0?r.left-5:r.right+5,qx=out<0?r.left+r.width*.3:r.right-r.width*.3;
   put(GB_W.refuses,[[ox,y,out],[ox,r.top+6,out],[ox,r.bottom-6,out],[qx,r.bottom+9,0],[qx,r.top-9,0],[(r.left+r.right)/2,r.bottom+9,0]])});
@@ -2157,11 +2180,11 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* the nearest points of two boxes, one on each */
  const near=(a,b)=>{const ax=(lo,hi)=>b[hi]<a[lo]?[a[lo],b[hi]]:b[lo]>a[hi]?[a[hi],b[lo]]:[(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2,(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2];const X=ax(0,2),Y=ax(1,3);return [[X[0],Y[0]],[X[1],Y[1]]]};
  /* The hairline back to what it explains, when the card is more than 16 px off: straight, or with one elbow (along, then
-    into the card's side) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
+    into the card's side, there or at either end of it) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
     word and off the lit wood, and it would rather not cross a cushion, foliage or the pot. */
  const lead=CB=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]];
-  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));if(Math.abs(my-pa[1])>4)opts.push([pa,[pa[0],my],[pa[0]<CB[0]?CB[0]:CB[2],my]])}
-  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));if(Math.abs(mx-pa[0])>4)opts.push([pa,[mx,pa[1]],[mx,pa[1]<CB[1]?CB[1]:CB[3]]])}
+  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4)opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
+  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
   let bestL=null;for(const pts of opts){let pen=pts.length>2?12:0,ok=true;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(pa,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
     for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-pa[0],p[1]-pa[1])>=G;
