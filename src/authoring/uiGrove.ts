@@ -351,9 +351,10 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 @media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}/* What happened: a scenario's run, step by step, in the panel beside the tree, which widens for it; under 1060 px a sheet */
 @media (min-width:1061px){.gw-stage.wide{grid-template-columns:minmax(0,1fr) min(640px,46vw)}}
 .gw-hap+.gw-dre{margin-left:14px}.gw-dre+.gw-wr{margin-left:12px}
+.gw-cacts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .gw-more{margin-top:4px;font-size:13.5px;line-height:19px;color:var(--ink)}.gw-flag .gw-more{display:block}
 /* on a phone, the ways into what happened are 44 px tall like every other target */
-@media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}.gw-result .btn,.gw-wr{min-height:44px}}
+@media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}.gw-result .btn,.btn.gw-wr,.gw-cacts .btn,.gw-call .btn,.gw-callrow .btn,.gw-meta .btn{min-height:44px}}
 .gw-dr{border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;background:var(--paper);min-width:0;margin-bottom:4px}
 .gw-drh{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start}
 .gw-drh .mk{font:600 17px/28px var(--mono);text-align:center}.gw-drh .mk.fail{color:var(--verm)}.gw-drh .mk.pass{color:var(--moss)}.gw-drh .mk.none{color:var(--ink3)}
@@ -821,6 +822,16 @@ function gwWriteEntry(x){const s=gw.state;return x&&!x.flow&&s&&s.done&&gwIn(x)?
 /* Where a failure's extra stand-in call came from, as grow --json says it, under the answer on its card: "The extra 900 charge came
    during step 3 (owner removes it again); step 4 counted them." Only when its run says so. */
 function gwMore(x){const t=x&&gw.view&&gw.view.more&&gw.view.more[x.id];const r=x&&gw.state.run[x.id];return t&&r&&r.st==='fail'?h('div',{class:'gw-more','data-testid':'grow-card-more'},t):null}
+/* Beside the answer on a scenario's card, as in the drawer: rerun its flow, heal a failure, and a link to the scenario. A grow that
+   ran from a config in a subfolder is rerun from that folder, and the card says so. */
+function gwCardActs(x){const s=gw.state,r=x&&s&&s.run[x.id];if(!x||!s||!s.done||!gwIn(x)||(r&&r.st==='run'))return null;
+ const fail=!!r&&r.st==='fail',flow=r&&r.flow||x.flow,cfg=s.flows&&s.flows.config||null,away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0,rerun=!!flow&&gwRan(x);
+ const copy=e=>{e.stopPropagation();const url=location.href;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>toast('Copied the link to this scenario.'),()=>toast('Link: '+url));return}}catch(er){}toast('Link: '+url)};
+ return [h('div',{class:'gw-cacts','data-testid':'grow-card-actions'},
+   rerun?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-card-rerun',disabled:away||!!ui.running||!!state.compileError,on:{click:e=>{e.stopPropagation();openTab('Run');runNow(flow)}}},'Rerun'):null,
+   fail?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-card-heal',on:{click:e=>{e.stopPropagation();openTab('Heal')}}},'Heal'):null,
+   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-card-copy',on:{click:copy}},'Copy link')),
+  rerun&&away?h('p',{class:'gw-drw'},'This grow ran with '+cfg+', so rerun it from that folder.'):null]}
 /* With several failures, the drawer of one pages to the next in the order the verdict counts them: "Failure 1 of 3" */
 function gwDrPager(x){const s=gw.state,f=s.scenarios.filter(q=>gwIn(q)&&s.run[q.id]&&s.run[q.id].st==='fail'&&gwRan(q)),i=f.indexOf(x);if(i<0||f.length<2)return null;
  const go=k=>()=>{if(f[k])gwDrOpen(f[k].id)};

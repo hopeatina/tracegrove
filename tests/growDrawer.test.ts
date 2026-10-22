@@ -389,6 +389,17 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('offers Write this flow on a phone’s card too, 44 px tall, and it puts the claim in the Intent box', async () => {
+    const page = await open(`#grow/${none}`, 390);
+    const write = page.locator('[data-testid="grow-card-write"]:visible');
+    await expect(write.count()).resolves.toBe(1);
+    await expect(write.textContent()).resolves.toBe('Write this flow');
+    expect(await write.evaluate((b) => b.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    await write.tap();
+    await page.waitForFunction(() => document.activeElement?.id === 'intent');
+    expect(await page.evaluate(() => (document.getElementById('intent') as HTMLTextAreaElement).value)).toBe(state.scenarios.find((x) => x.id === none)!.proves!.replaceAll('`', ''));
+    await page.close();
+  });
 
   it('says the run holds no record of the flow the grow recorded, instead of reading the run’s only flow as that one', async () => {
     const page = await open();
@@ -431,6 +442,28 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('offers Rerun, Heal and Copy link beside the answer on the selected failing scenario’s card, and Rerun and Copy link on a passed one', async () => {
+    const page = await open(`#grow/${failed}`);
+    const card = page.locator('.gw-insw'), acts = card.getByTestId('grow-card-actions');
+    await expect(acts.locator('button').allTextContents()).resolves.toEqual(['Rerun', 'Heal', 'Copy link']);
+    // right under the answer and the way to what happened, before what the scenario checks
+    expect(await card.evaluate((c) => {
+      const a = c.querySelector('[data-testid="grow-card-actions"]')!, hap = c.querySelector('[data-hap]')!, broke = c.querySelector('.gw-broke')!;
+      const after = (x: Element, y: Element) => !!(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const checks = Array.from(c.querySelectorAll('*')).find((e) => e.childElementCount === 0 && e.textContent === 'What it checks')!;
+      return { order: after(broke, hap) && after(hap, a) && after(a, checks), gap: Math.round(a.getBoundingClientRect().top - hap.getBoundingClientRect().bottom) <= 16 };
+    })).toEqual({ order: true, gap: true });
+    await expect(acts.getByTestId('grow-card-rerun').isDisabled()).resolves.toBe(false);
+    await acts.getByTestId('grow-card-copy').click();
+    await expect(page.locator('.toast').textContent()).resolves.toMatch(new RegExp(`^(Copied the link to this scenario\\.|Link: .*#grow/${failed})$`));
+    await acts.getByTestId('grow-card-heal').click();
+    await page.waitForFunction(() => (0, eval)('tab') === 'Heal');
+    await page.close();
+    const ok = await open(`#grow/${passed}`);
+    await ok.locator(`.gw-insw [data-hap="${passed}"]`).waitFor();
+    await expect(ok.locator('.gw-insw [data-testid="grow-card-actions"] button').allTextContents()).resolves.toEqual(['Rerun', 'Copy link']);
+    await ok.close();
+  });
 
   it('keeps what broke readable in the verdict at 1024 and 768 px: it wraps in words, never cut short to a tooltip', async () => {
     for (const width of [1024, 768]) {
