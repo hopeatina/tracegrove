@@ -1370,7 +1370,7 @@ describe('Grow page', () => {
   const growth = () => {
     const w = (0, eval)('({ gw, GB_NK })');
     const B = w.gw.B, L = B.L, kq: number = L.narrow ? w.GB_NK : 1;
-    const out = { limbs: 0, knots: 0, shoots: 0, tags: 0, rings: [] as string[], bad: [] as string[] };
+    const out = { limbs: 0, knots: 0, shoots: 0, dormant: 0, tags: 0, rings: [] as string[], counts: [] as Array<{ parts: string[]; leaves: number; more: number }>, bad: [] as string[] };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const off = (p: number[], pts: number[][]) => Math.min(...pts.slice(1).map((b, i) => {
       const a = pts[i]!, vx = b[0]! - a[0]!, vy = b[1]! - a[1]!, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * vx + (p[1]! - a[1]!) * vy) / (vx * vx + vy * vy || 1)));
@@ -1409,8 +1409,19 @@ describe('Grow page', () => {
         for (let i = 1; i < qs.length; i++) { const a = qs[i - 1], b = qs[i]; if (Math.hypot(a.bp[0] - b.bp[0], a.bp[1] - b.bp[1]) < 1.2 * Math.max(a.w, b.w) - 0.01) bad('bosses closer than 1.2 girths, not one burl', [a.ids, b.ids]); }
       }
     });
-    // a shoot rises from its own knot's boss, a trunk's on the boss's own side, and none stands within 40 px of another on one side
-    const T0 = L.trees[0], X0: number = L.xs[0], gs: any[] = B.shootGeo ?? [];
+    // a shoot rises from its own knot's boss, a trunk's on the boss's own side, and none stands within 40 px of another
+    const T0 = L.trees[0], X0: number = L.xs[0], gs: any[] = B.shootGeo ?? [], rest: any[] = B.shootRest ?? [];
+    // the wood as drawn, and every fork: a limb's foot on its parent and a twig's on its limb, with the girth there
+    const wood = Array.from(document.getElementById('gb-wood' + B.N)?.children ?? []) as SVGGeometryElement[], wpt = (B.svg as SVGSVGElement).createSVGPoint();
+    const onWood = (x: number, y: number) => { wpt.x = x; wpt.y = y; return wood.some((e) => e.isPointInFill(wpt)); };
+    const forks: number[][] = [];
+    L.trees.forEach((T: any, i: number) => {
+      const X: number = L.xs[i];
+      for (const b of T.br) { forks.push([T.tp[b.k][0] + X, T.tp[b.k][1], T.tw[b.k]]); for (const t of b.twigs ?? []) forks.push([t.pts[0][0] + X, t.pts[0][1], b.w[t.bi] ?? b.w[0]]); }
+      for (const t of T.ctw ?? []) forks.push([t.pts[0][0] + X, t.pts[0][1], T.tw[t.bi] ?? 1]);
+    });
+    if (wood.length < 1) bad('no wood to measure against');
+    const label = (id: string) => (w.gw.M.U[id] || {}).label || id;
     for (const g of gs) {
       out.shoots++;
       if (g.tip[1] >= g.base[1]) bad('shoot does not rise', g.kid);
@@ -1418,21 +1429,59 @@ describe('Grow page', () => {
       if (kn) {
         if (Math.hypot(g.base[0] - kn.bp[0] - X0, g.base[1] - kn.bp[1]) > kn.rb + 0.5) bad('shoot not from its own knot', g.kid);
         if (kn.on === 't' && (g.ns[0] * kn.n[0] + g.ns[1] * kn.n[1]) * kn.side <= 0) bad('trunk shoot off its boss side', g.kid);
+        // only on the outside of the bend
+        const P = kn.on === 't' ? { pts: T0.tp } : T0.br.find((b: any) => b.id === kn.bid), m = P.pts.length - 1;
+        const a = P.pts[Math.max(0, kn.k - 6)], c = P.pts[Math.min(m, kn.k + 6)], b = P.pts[kn.k];
+        const cv = (b[0] - (a[0] + c[0]) / 2) * kn.n[0] + (b[1] - (a[1] + c[1]) / 2) * kn.n[1];
+        if (Math.abs(cv) > 1.2 && (g.ns[0] * kn.n[0] + g.ns[1] * kn.n[1]) * Math.sign(cv) <= 0) bad('shoot on the inside of the bend', g.kid);
+        // off a limb's first 15 per cent
+        if (kn.on !== 't' && P.acc && P.acc[kn.k] < P.acc[m] * 0.15 - 0.01) bad('shoot in the first 15% of its limb', g.kid);
       }
-      for (const h of gs) if (h !== g && g.ns[0] * h.ns[0] + g.ns[1] * h.ns[1] > 0 && Math.hypot(g.base[0] - h.base[0], g.base[1] - h.base[1]) < 40 * kq - 0.01) bad('two shoots within 40 px on one side', [g.kid, h.kid]);
-      // its count: a tag tied at its own tip
-      const t = g.g?.querySelector('.shtag');
-      if (!t || getComputedStyle(t).display === 'none') continue;
+      // never at a fork or in its crotch: one and a half girths of the wood it grows from clear of every fork
+      const at = kn ? (kn.on === 't' ? T0.tw[kn.k] : T0.br.find((b: any) => b.id === kn.bid).w[kn.k]) : T0.tw[T0.tp.reduce((bi: number, q: number[], i: number) => Math.hypot(q[0]! + X0 - g.base[0], q[1]! - g.base[1]) < Math.hypot(T0.tp[bi][0] + X0 - g.base[0], T0.tp[bi][1] - g.base[1]) ? i : bi, 0)];
+      for (const f of forks) if (Math.hypot(g.base[0] - f[0]!, g.base[1] - f[1]!) < 1.5 * at - 0.01) bad('shoot within 1.5 girths of a fork', [g.kid, Math.round(Math.hypot(g.base[0] - f[0]!, g.base[1] - f[1]!)), Math.round(at)]);
+      // rising all the way, leaning no more than 35 degrees off upright
+      if (g.pts.some((q: number[], i: number) => i && q[1]! >= g.pts[i - 1][1])) bad('shoot droops', g.kid);
+      const lean = Math.atan2(Math.abs(g.tip[0] - g.base[0]), g.base[1] - g.tip[1]) * 180 / Math.PI;
+      if (lean > 35.5) bad('shoot leans more than 35 degrees', [g.kid, Math.round(lean)]);
+      // neither it nor its leaves lie on the wood
+      for (const q of g.pts.slice(3)) if (onWood(q[0], q[1])) { bad('shoot runs over the wood', g.kid); break; }
+      for (const el of Array.from(g.g?.querySelectorAll('.gb-lf.bud:not(.gone)') ?? []) as any[]) {
+        const q = el.__q, th = q[2] * Math.PI / 180, sc = q[3] || 1;
+        if ([4, 8, 12, 15].some((d) => onWood(q[0] + Math.cos(th) * d * sc, q[1] + Math.sin(th) * d * sc))) bad('shoot leaf over the wood', g.kid);
+      }
+      for (const h of gs) if (h !== g && Math.hypot(g.base[0] - h.base[0], g.base[1] - h.base[1]) < 40 * kq - 0.01) bad('two shoots within 40 px', [g.kid, h.kid]);
+    }
+    // a knot with no room for a shoot keeps its checks as a dormant bud on its own boss
+    for (const g of rest) {
+      out.dormant++;
+      const kn = T0.knots.find((q: any) => q.id === g.kid);
+      if (kn && Math.hypot(g.base[0] - kn.bp[0] - X0, g.base[1] - kn.bp[1]) > kn.rb + 0.5) bad('dormant bud not on its own knot', g.kid);
+      // it rises, or on a limb's underside stands out about level; it never hangs
+      if (g.tip[1] - g.base[1] > 0.4 * Math.hypot(g.tip[0] - g.base[0], g.tip[1] - g.base[1])) bad('dormant bud hangs', g.kid);
+      if ([0.5, 0.75, 1].some((f) => onWood(g.base[0] + (g.tip[0] - g.base[0]) * f, g.base[1] + (g.tip[1] - g.base[1]) * f))) bad('dormant bud grows back into the wood', g.kid);
+    }
+    // its count of the checks its leaves do not show: a bud-shaped tag tied at its own tip
+    for (const g of [...gs, ...rest]) {
+      const t = g.g?.querySelector('.shtag'), shown = !!t && getComputedStyle(t).display !== 'none';
+      out.counts.push({ parts: g.uids.map(label), leaves: g.g ? g.g.querySelectorAll('.gb-lf.bud:not(.gone)').length : 0, more: shown ? Number(String(t.querySelector('.shn').textContent).replace('+', '')) : 0 });
+      if (!shown) continue;
       out.tags++;
-      const tie = (t.querySelector('.shtie')?.getAttribute('d') ?? '').match(/[-\d.]+/g)?.map(Number) ?? [], r = t.querySelector('rect').getBBox();
+      const tie = (t.querySelector('.shtie')?.getAttribute('d') ?? '').match(/[-\d.]+/g)?.map(Number) ?? [], bud = t.querySelector('.sbud'), r = bud.getBBox();
       if (Math.hypot(tie[0]! - g.tip[0], tie[1]! - g.tip[1]) > 3) bad('count tied off its shoot tip', g.kid);
       if (tie[2]! < r.x - 1 || tie[2]! > r.x + r.width + 1 || tie[3]! < r.y - 1 || tie[3]! > r.y + r.height + 1) bad('tie ends off its tag', g.kid);
+      // tied in the open: the tie never runs over or behind the wood to a tag on the limb's far side
+      for (let i = 1; i <= 10; i++) { const f = i / 10; if (onWood(tie[0]! + (tie[2]! - tie[0]!) * f, tie[1]! + (tie[3]! - tie[1]!) * f)) { bad('count tied across the wood', g.kid); break; } }
+      // a bud, not a pill: round at the tie, drawn to a point away from it
+      const d = bud.getAttribute('d') || '', nums = (d.match(/-?[\d.]+/g) || []).map(Number), apex = [nums[0]!, nums[1]!];
+      if (/[aA]/.test(d) || Math.hypot(apex[0]! - tie[2]!, apex[1]! - tie[3]!) < Math.max(r.width, r.height) * 0.8) bad('count tag is not a bud pointing away from its tie', g.kid);
     }
-    for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
-      const a = gs[i].g?.querySelector('.shtag rect'), b = gs[j].g?.querySelector('.shtag rect');
+    const all = [...gs, ...rest];
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+      const a = all[i].g?.querySelector('.shtag .sbud'), b = all[j].g?.querySelector('.shtag .sbud');
       if (!a || !b || getComputedStyle(a.parentNode).display === 'none' || getComputedStyle(b.parentNode).display === 'none') continue;
       const p = a.getBoundingClientRect(), q = b.getBoundingClientRect();
-      if (p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom) bad('two counts overlap', [gs[i].kid, gs[j].kid]);
+      if (p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom) bad('two counts overlap', [all[i].kid, all[j].kid]);
     }
     // an existing flow is a graft bud at the knot it re-checks: a ring on the bark, off every shoot, nearer its own knot than any other
     for (const r of B.graftR ?? []) {
@@ -1443,7 +1492,27 @@ describe('Grow page', () => {
       if (el.classList.contains('gone')) continue;
       out.rings.push(el.getAttribute('aria-label') ?? '');
       if (el.closest('.budg')) bad('graft bud on a shoot');
-      if (!el.querySelector('circle.gring')) bad('graft bud with no ring');
+      if (!el.querySelector('ellipse.gring')) bad('graft bud with no swelling');
+    }
+    // one swelling of the bark for each flow, or past two one swelling marked with how many: bark-toned, longer along the grain
+    // than across it, lit on its rim and tipped with a tiny bud; never a ring
+    const byKnot = new Map<string, any[]>();
+    for (const r of B.graftR ?? []) byKnot.set(r.kid, [...(byKnot.get(r.kid) ?? []), r]);
+    const rgb = (c: string) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    for (const [kid, rs] of byKnot) {
+      const els = rs.map((r: any) => B.bud[r.xid]).filter((e: Element | undefined) => e && !e.classList.contains('gone'));
+      const drawn = els.filter((e: Element) => getComputedStyle(e.querySelector('.gsw')!).display !== 'none');
+      if (drawn.length !== (rs.length > 2 ? 1 : rs.length)) bad('graft swellings for ' + rs.length + ' flows', [kid, drawn.length]);
+      const num = drawn.map((e: Element) => e.querySelector('.gnum')?.textContent ?? '');
+      if (rs.length > 2 ? num.join() !== '\u00d7' + rs.length : num.some(Boolean)) bad('graft count', [kid, num]);
+      for (const e of drawn) {
+        const b = e.querySelector('ellipse.gring')!, rx = Number(b.getAttribute('rx')), ry = Number(b.getAttribute('ry'));
+        if (!(rx >= 3.5 && rx <= 5 && ry >= 2 && ry <= 3 && rx > ry)) bad('graft swelling not about 8 by 5', [kid, rx, ry]);
+        const [r, g2, bl] = rgb(getComputedStyle(b).fill);
+        if (Math.max(r!, g2!, bl!) - Math.min(r!, g2!, bl!) > 50 || g2! > r!) bad('graft swelling not in bark tones', [kid, getComputedStyle(b).fill]);
+        if (!e.querySelector('.gcres') || !e.querySelector('.gtip')) bad('graft swelling without its lit rim and bud tip', kid);
+        if (e.querySelector('circle:not(.hitc)')) bad('graft bud drawn as a ring', kid);
+      }
     }
     return out;
   };
@@ -1493,6 +1562,14 @@ describe('Grow page', () => {
         expect(cards.knot).toMatch(/\d+ in Max · (\d+ part checks? · )?4 existing flows/);
         expect(cards.ring).toContain('existing flow');
         expect(cards.ring).toContain('An existing flow');
+        // every knot's part checks are on its own shoot or dormant bud and nowhere else: its leaves and its count add up to what
+        // the Outline rolls up for that knot's parts
+        expect(g.tags, width + 'px').toBeGreaterThan(0);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.tree = 'outline'; w.gw.open = { own: true, reg: true }; w.growPaint(); });
+        const rolled = await page.evaluate(() => Object.fromEntries(Array.from(document.querySelectorAll('[data-testid="grow-outline"] .gb-bpf > summary'))
+          .map((s) => [s.querySelector('.pn')?.textContent ?? '', /^(\d+) part checks?$/.exec(s.querySelector('.gw-facts .tk')?.textContent ?? '')?.[1]]).filter(([, n]) => n).map(([k, n]) => [k, Number(n)])));
+        for (const c of g.counts) expect(c.leaves + c.more, width + 'px ' + c.parts.join(', ')).toBe(c.parts.reduce((a, p) => a + (rolled[p] ?? 0), 0));
+        expect(g.counts.flatMap((c) => c.parts).filter((p) => rolled[p]).sort(), width + 'px').toEqual(Object.keys(rolled).sort());
         await page.close();
       }
     } finally { await browser.close(); }
@@ -1587,7 +1664,7 @@ describe('Grow page', () => {
       const c = own(rec.ctag)[0]; if (c && start(c) < start(a)) bad('count before its shoot', rec.kid);
     }
     for (const el of Array.from(B.svg.querySelectorAll('.gb-gr')) as Element[]) {
-      const a = own(el)[0], c = el.querySelector('circle.gring'); if (!a || !c) continue;
+      const a = own(el)[0], c = el.querySelector('ellipse.gring'); if (!a || !c) continue;
       out.grafts++;
       const t = woodAt([Number(c.getAttribute('cx')), Number(c.getAttribute('cy'))], 6);
       if (t === Infinity) bad('graft bud off the wood', el.getAttribute('data-k'));
