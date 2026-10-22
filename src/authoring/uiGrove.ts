@@ -774,6 +774,9 @@ function gwDrEntry(x){if(!gwDrCan(x))return null;const ran=gwRan(x);
 /* a response body as it was recorded; JSON is laid out to read, the same text */
 const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
 const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
+/* whether the flow held before, from the runs saved beside this one, and that no run of the base branch is recorded to compare */
+function gwDrHist(hs){if(!hs||!hs.saved)return null;const s=gw.state,base=s.change&&s.change.base;const all=hs.saved===1?'its 1 saved run':'all '+hs.saved+' saved runs';
+ return (hs.failed===hs.saved?'Failed in '+all:hs.passed===hs.saved?'Passed in '+all:'Passed '+hs.passed+' of '+hs.saved+' saved runs')+(base?'; no run on '+base+' is recorded.':'.')}
 function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.sid);if(!x)return null;const r=s.run[x.id];const T=gwVia(x.title);
  const j=M.J.find(q=>(M.leaves[q.id]||[]).includes(x)),n=j?(gw.order||[]).indexOf(j.id)+1:0;const st=r&&r.st==='fail'?'fail':r&&r.st==='pass'?'pass':'none';
  const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',on:{keydown:e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gwDrClose()}}}});
@@ -787,7 +790,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}
  if(!d.data){gwPut(el,h('p',{class:'gw-drerr',role:'alert'},d.err||'The run could not be read.'),gwDrActs(x,null));return el}
  const D=d.data,steps=D.steps,all=steps.flatMap(q=>q.calls||[]),cur=d.step,hs=D.history;
- const hist=hs&&hs.saved?(hs.passed===0?'It has not passed in '+(hs.saved===1?'its 1 saved run':'any of its '+hs.saved+' saved runs'):hs.passed===hs.saved?'It passed in '+(hs.saved===1?'its 1 saved run':'all '+hs.saved+' saved runs'):'It passed in '+hs.passed+' of its '+hs.saved+' saved runs')+'.':null;
+ const hist=gwDrHist(hs);
  /* each step, and under it what it recorded: the answer the run contradicts, the stand-in calls made while it ran (placed by
     their own timestamps), and for a watch step what it expected and got, and how long it waited */
  const ol=h('ol',{class:'gw-drs','aria-label':'Steps'},steps.map((q,i)=>{const k=q.checks==='fail'&&q.result==='completed'?'fail':kind(q.result);const con=!!D.contradicts&&D.contradicts.at===i;const sx=[];
@@ -811,9 +814,9 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  if(key==='checked')body=steps.map((q,i)=>(q.checked||[]).length?grp(i,stepChecked(q.checked)):null);
  else if(key==='answered')body=answered.map(([q,i])=>grp(i,h('div',{class:'sub'},q.method+' '+q.path+(q.status!=null?' → '+q.status:'')),h('pre',{},gwDrPretty(q.answer)))).concat(steps.some(q=>q.method==='STANDIN')?[h('p',{class:'gw-drw'},'Watch steps get no answer from the app; they read what the stand-in recorded.')]:[]);
  else if(key==='called')body=steps.flatMap((q,i)=>all.filter(c=>c.during===q.id).map(c=>grp(i,stepCalls([c])))).concat(all.filter(c=>!steps.some(q=>q.id===c.during)).map(c=>h('div',{class:'gw-drg'},h('div',{class:'hd'},'Outside every step’s recorded time'),stepCalls([c]))));
- else if(key==='requests')body=steps.map((q,i)=>grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms'+(q.watch.polls!=null?' · polled '+q.watch.polls+' times':''):'')
+ else if(key==='requests')body=steps.map((q,i)=>grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms · '+(q.watch.polls!=null?q.watch.polls+' poll'+(q.watch.polls===1?'':'s'):'polls not recorded'):'')
    :q.method+' '+q.path+(q.request&&q.request.body?' '+q.request.body:'')+(q.request?' · as '+q.request.as:'')),
-  h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
+  h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.httpMs!=null?'app time not recorded':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
  gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,ol,
   h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),
   list,key?h('div',{class:'gw-drp',id:'gw-drp',role:'tabpanel','aria-labelledby':'gw-drt-'+key,'data-testid':'grow-happened-panel'},body):null,
@@ -839,6 +842,7 @@ function gwDrNone(x,r,j,M){const why=String(r&&r.why||(x.flow?'This grow did not
   x.proves?h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'It would prove'),h('p',{},...gwRich(x.proves))):null,
   h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'Where it starts'),at?h('p',{},...at):null,u.label&&!(j&&j.entry===x.unit)?h('p',{},'Part: ',...gwCodeText(gwPlain(u.label))):null,
    x.layers&&x.layers.length?h('p',{class:'gw-drw'},'Layers it crosses: '+x.layers.map(l=>GW.layers[l]||l).join(', ')):null),
+  x.realKey?h('div',{class:'gw-drsec','data-testid':'grow-happened-realkey'},h('span',{class:'gw-eyebrow'},'To run it for real'),h('p',{},'A real run needs '+x.realKey+'.')):null,
   h('div',{class:'gw-dra'},x.flow?null:h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-write',on:{click:()=>gwDrWrite(x)}},'Write this flow'),
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link'))]}
 /* The address follows the selection: the run a scenario opened while the Run tab still shows it, else what is selected here. */

@@ -99,12 +99,12 @@ describe('What happened, step by step', () => {
     }
     expect(calls.every((c) => c.key && c.repeat === false)).toBe(true);
     expect(d.steps[3]!.watch).toMatchObject({ deadlineMs: 5000, everyMs: 50 });
-    expect(d.oneLine).toBe('Step 3 (owner removes it again) answered charged 0, yet payments got a 900 charge during step 3, under a new idempotency key.');
+    expect(d.oneLine).toBe('Step 3 ("owner removes it again") answered {"seats":1,"charged":0}, yet payments received a 900 charge during step 3, under a new idempotency key.');
     // the services as recorded: never "all real", and a stand-in no step watched says its calls were not recorded
     expect(d.chips.map((c) => c.t)).toEqual([`run ${failRun}`, `verified · source ${d.source}`, 'application real', 'storage real', 'payments stand-in', 'email stand-in · calls not recorded']);
     expect(d.source).toMatch(/^[0-9a-f]{6}$/);
     expect(d.foot).toEqual(['No step watched email, so its calls are not recorded (only a watch step records a stand-in’s calls).', 'No step drives a screen, so there are no screenshots, video or transcript.']);
-    expect(d.history).toEqual({ saved: 1, passed: 0, lastPass: null });
+    expect(d.history).toEqual({ saved: 1, passed: 0, failed: 1, lastPass: null });
   });
 
   it('serves it only with the session token, and only from runs saved inside the project’s .tracegrove folder', async () => {
@@ -154,7 +154,9 @@ describe('What happened, step by step', () => {
     await expect(step(3)).resolves.toContain('answered {"seats":1,"charged":0}payments ← 900◀ contradicts its answer');
     await expect(step(2)).resolves.toContain('payments ← 900');
     await expect(step(1)).resolves.toContain('payments ← 4900');
-    await expect(d.getByTestId('grow-happened-oneline').textContent()).resolves.toBe('In one lineStep 3 (owner removes it again) answered charged 0, yet payments got a 900 charge during step 3, under a new idempotency key.');
+    await expect(d.getByTestId('grow-happened-oneline').textContent()).resolves.toBe('In one lineStep 3 ("owner removes it again") answered {"seats":1,"charged":0}, yet payments received a 900 charge during step 3, under a new idempotency key.');
+    // whether it held before, in the saved runs, and that no run of the base branch is recorded to set it against
+    await expect(d.locator('.gw-drhist').textContent()).resolves.toBe('Failed in its 1 saved run; no run on main is recorded.');
     const chips = await d.getByTestId('grow-happened-chips').locator('.gw-chip').allTextContents();
     expect(chips).toContain('payments stand-in'); expect(chips).toContain('email stand-in · calls not recorded');
     expect(chips.join(' ')).not.toMatch(/all real/);
@@ -178,6 +180,10 @@ describe('What happened, step by step', () => {
     await page.keyboard.press('End');
     await expect(sel()).resolves.toEqual({ focus: 'grow-happened-tab-requests', on: 'grow-happened-tab-requests', stops: 1 });
     await expect(panel()).resolves.toContain('POST /seats {"seats":1,"daysLeft":30} · as owner');
+    // a watch step counts its polls; an HTTP step says the app's own time was not recorded, never a number it does not have
+    await expect(panel()).resolves.toMatch(/watch payments POST \/v1\/charges · every 50 ms, up to 5000 ms · \d+ polls/);
+    await expect(panel()).resolves.toMatch(/step \d+ ms · HTTP \d+ ms · app time not recorded · answered 200/);
+    await expect(panel()).resolves.not.toMatch(/polled \d+ times/);
     await page.keyboard.press('ArrowRight');
     await expect(sel()).resolves.toEqual({ focus: 'grow-happened-tab-checked', on: 'grow-happened-tab-checked', stops: 1 });
     await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft');
@@ -238,6 +244,11 @@ describe('What happened, step by step', () => {
     await expect(drawer(page).textContent()).resolves.toContain('Where it starts');
     await expect(page.getByTestId('grow-happened-write').textContent()).resolves.toBe('Write this flow');
     expect(await page.evaluate(() => location.hash)).toBe(`#grow/${none}/steps`);
+    // one that reaches a third party says which key a real run needs
+    const keyed = state.scenarios.find((x) => !x.flow && x.realKey && state.run[x.id]?.st === 'not_run')!;
+    expect(keyed.realKey).toBe('STRIPE_SECRET_KEY or STRIPE_TEST_KEY');
+    await page.evaluate((id) => { location.hash = `#grow/${id}/steps`; }, keyed.id);
+    await expect(page.getByTestId('grow-happened-realkey').textContent()).resolves.toBe('To run it for realA real run needs STRIPE_SECRET_KEY or STRIPE_TEST_KEY.');
     await page.close();
   });
 

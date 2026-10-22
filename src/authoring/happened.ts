@@ -28,7 +28,8 @@ export type Happened = {
   oneLine: string; chips: HappenedChip[];
   /** what the run did not record, in plain sentences */
   foot: string[];
-  history: { saved: number; passed: number; lastPass: string | null };
+  /** the saved runs beside this one that ran the flow: how many, how many passed and failed a check, the newest that passed */
+  history: { saved: number; passed: number; failed: number; lastPass: string | null };
 };
 
 const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -116,14 +117,12 @@ function oneLineOf(c: CaseReport, steps: StepReport[], name: (x: StepReport) => 
   }
   const f = steps[i]!; const x = extraCall(steps, f);
   if (x) {
-    const k = x.at + 1, step = `Step ${k} (${name(steps[x.at]!)})`;
+    // the step as its flow names it, in quotes, and its answer as the run recorded it
+    const k = x.at + 1, step = `Step ${k} ("${name(steps[x.at]!)}")`;
     const what = x.call.amount !== null ? `${article(x.call.amount)} ${x.call.amount} ${x.one}` : `${/^[aeiou]/.test(x.one) ? 'an' : 'a'} ${x.one}`;
     const key = x.call.key && x.call.repeat === false ? ', under a new idempotency key' : '';
-    if (x.field) {
-      const said = JSON.stringify((JSON.parse(x.answer!) as Record<string, unknown>)[x.field]);
-      return { line: `${step} answered ${x.field} ${said}, yet ${x.call.standIn} got ${what} during step ${k}${key}.`, contradicts: { at: x.at, field: x.field } };
-    }
-    return { line: `${x.call.standIn} got its ${ordinal(x.nth)} ${x.one}, one more than the ${x.expected} expected, during step ${k} (${name(steps[x.at]!)})${key}.`.replace(/^./, (m) => m.toUpperCase()), contradicts: null };
+    if (x.field) return { line: `${step} answered ${cut(x.answer!, 120)}, yet ${x.call.standIn} received ${what} during step ${k}${key}.`, contradicts: { at: x.at, field: x.field } };
+    return { line: `${x.call.standIn} received its ${ordinal(x.nth)} ${x.one}, one more than the ${x.expected} expected, during step ${k} ("${name(steps[x.at]!)}")${key}.`.replace(/^./, (m) => m.toUpperCase()), contradicts: null };
   }
   const said = (f.checked ?? []).find((q) => q.held === false)?.says;
   const answered = f.answer ? ` It answered ${cut(f.answer, 120)}.` : '';
@@ -158,7 +157,7 @@ const outcomes = new Map<string, Array<{ caseId: string; outcome: string }> | nu
 function historyOf(root: string, caseId: string, current: string): Happened['history'] {
   let names: string[] = [];
   try { names = readdirSync(join(root, '.tracegrove', 'runs')).filter((n) => n !== 'latest' && SavedRunName.safeParse(n).success).sort().reverse(); } catch { names = []; }
-  let saved = 0, passed = 0, lastPass: string | null = null;
+  let saved = 0, passed = 0, failed = 0, lastPass: string | null = null;
   for (const name of names) {
     let dir: string;
     try { dir = savedRunDirectory(root, name); } catch { continue; }
@@ -174,8 +173,9 @@ function historyOf(root: string, caseId: string, current: string): Happened['his
     if (!mine) continue;
     saved++;
     if (mine.outcome === 'passed') { passed++; if (!lastPass && name !== current) lastPass = name; }
+    else if (mine.outcome === 'assertion_failed') failed++;
   }
-  return { saved, passed, lastPass };
+  return { saved, passed, failed, lastPass };
 }
 
 /** The drawer's reading of `caseId` in the run `name` saved under `root` (the folder whose .tracegrove holds it). */
