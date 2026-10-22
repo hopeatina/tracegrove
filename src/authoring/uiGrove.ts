@@ -137,7 +137,7 @@ ${BONSAI_CSS}
 /* (on a dark page the faded bark of an unused store and a pruned stub are lifted and edged with a fine light line, so they
    never sink into the page) */
 @media (prefers-color-scheme:dark){.gw-sw .un{opacity:.9}.gw-sw .wd.un{fill:#A08C76}.gw-sw .cutg .wd{fill:#9A866F}.gw-sw .wd.un,.gw-sw .cutg .wd{stroke:#D9CBB8;stroke-width:.55;stroke-opacity:.7}.gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 45%,var(--paper))}}
-.gw-sw .ring{fill:none;stroke:var(--ink);stroke-width:1}.gw-sw .grg{fill:color-mix(in srgb,var(--moss) 26%,var(--sw-lit));stroke:var(--moss);stroke-width:1.1}
+.gw-sw .ring{fill:none;stroke:var(--ink);stroke-width:1}
 .gw-sw .ntg{fill:color-mix(in srgb,var(--moss) 8%,var(--paper));stroke:var(--moss);stroke-width:.9}.gw-sw .ntn{font:500 6.6px var(--mono);fill:var(--moss);text-anchor:middle;dominant-baseline:central}.gw-sw .crk{fill:none;stroke:var(--verm);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-g{display:inline-flex;flex:none;align-items:center;line-height:0}.gb-gs .gw-sw{vertical-align:0}
 .gw-legend{display:grid;gap:6px;margin:8px 6px 2px;font:12px/17px var(--sans);color:var(--ink3)}
