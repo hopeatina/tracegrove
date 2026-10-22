@@ -27,8 +27,9 @@ export type GrowJsonSummary = {
   counts: { passed: number; failed: number; notTestedYet: number }; promises: { hold: number; of: number };
   failures: GrowFailure[];
   /** each scenario not tested yet, with its reason; `run` names the run of one that never reached its checks (the app did not
-   *  start, say), which is not a failure */
-  unproven: Array<{ scenario: string; title: string; reason: string; run?: string }>;
+   *  start, say), which is not a failure. When that run is saved here, `saved` is true and `evidence` lists its files, relative
+   *  to the folder grow ran in, as for a failure. */
+  unproven: Array<{ scenario: string; title: string; reason: string; run?: string; saved?: true; evidence?: string[] }>;
   /** why a grow stopped, and what to do: null unless it stopped or was cancelled */
   stopped: { code: string; detail: string; action: string } | null;
 };
@@ -62,6 +63,23 @@ const cellEvidence = (runDir: string, cellId: string) => {
   const cell = join(runDir, 'bundle', 'cells', cellBundleName(cellId));
   return ['receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl'].map((f) => join(cell, f)).filter((f) => existsSync(f));
 };
+/** Where a scenario not tested yet has a run saved here (one that never reached its checks), the files that say why: the run's
+ *  summary.json and its flow's cell, relative to the folder grow ran in. Null when its run is not saved here. */
+function unprovenEvidence(s: GrowState, dir: string, id: string): string[] | null {
+  const r = s.run[id]; const x = s.scenarios.find((y) => y.id === id);
+  if (!r?.run) return null;
+  const root = s.flows?.config ? configRunsRoot(dir, s.flows.config) : dir;
+  let runDir: string;
+  try { if (!root) return null; runDir = savedRunDirectory(root, r.run); } catch { return null; }
+  const out = [join(runDir, 'summary.json')].filter((f) => existsSync(f));
+  const flow = r.flow ?? x?.flow ?? null;
+  try {
+    const receipt = flow ? readVerifiedBundle(join(runDir, 'bundle')).receipts.find((q) => q.caseRef.id === flow) : undefined;
+    if (receipt) out.push(...cellEvidence(runDir, receipt.selectionCellId));
+  } catch { /* evidence that does not verify: its summary is still there to read */ }
+  return out.map((p) => relative(dir, p));
+}
+
 /**
  * One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. Only the flow
  * the grow recorded is read: a run that holds no record of it is never read as that flow, even when it holds only one other.
@@ -175,7 +193,7 @@ export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven
   return {
     verdict: v.verdict, exitCode: v.exitCode, exitMeaning: v.exitMeaning, mode: v.mode ?? MODES.find((m) => m.id === opts.mode)?.label ?? null, counts: v.counts, promises: v.promises,
     failures: read.map((f) => f.failure),
-    unproven: v.unproven,
+    unproven: v.unproven.map((u) => { const evidence = u.run ? unprovenEvidence(s, dir, u.scenario) : null; return evidence ? { ...u, saved: true as const, evidence } : u; }),
     stopped: s.blocked ? { code: s.blocked.code, detail: s.blocked.detail, action: s.blocked.action } : null,
   };
 }

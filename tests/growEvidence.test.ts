@@ -407,6 +407,22 @@ describe('A grow whose config is in a subfolder', () => {
     await tabbed.close();
   });
 
+  it('lists in grow --json the files of a run that never reached its checks, beside the config, as it does for a failure', () => {
+    const s = structuredClone(state);
+    s.run[failed] = { ...s.run[failed]!, st: 'not_run', why: 'Could not run: the app did not start (application exited before becoming ready)' };
+    const u = growJsonSummary(s, dir).unproven.find((x) => x.scenario === failed)!;
+    expect(u).toMatchObject({ run: failRun, saved: true });
+    expect(u.evidence![0]).toBe(`svc/.tracegrove/runs/${failRun}/summary.json`);
+    expect(u.evidence!.length).toBeGreaterThan(1);
+    for (const p of u.evidence!) { expect(p.startsWith(`svc/.tracegrove/runs/${failRun}/`)).toBe(true); expect(existsSync(join(dir, p))).toBe(true); }
+    // a run that is not saved here lists none
+    s.run[failed]!.run = '2026-10-22T00-00-00Z_error_gone00';
+    const gone = growJsonSummary(s, dir).unproven.find((x) => x.scenario === failed)!;
+    expect(gone).toMatchObject({ run: '2026-10-22T00-00-00Z_error_gone00' });
+    expect(gone).not.toHaveProperty('evidence');
+    expect(gone).not.toHaveProperty('saved');
+  });
+
   it('says a run is not saved there only when it is not, and then stays on the grow instead of offering to plant a config', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
@@ -674,6 +690,11 @@ describe('A flow an agent wrote that never reached its checks', () => {
     const summary = growJsonSummary(s, dir);
     expect(summary.failures).toEqual([]);
     expect(summary.unproven.find((x) => x.scenario === 's10')).toMatchObject({ reason: (e as { why: string }).why, run: flow.run });
+    // the run that says why is saved here, and grow --json points at its files
+    const u = summary.unproven.find((x) => x.scenario === 's10')!;
+    expect(u.saved).toBe(true);
+    expect(u.evidence![0]).toBe(`.tracegrove/runs/${flow.run}/summary.json`);
+    for (const p of u.evidence!) expect(existsSync(join(dir, p))).toBe(true);
   }, 120_000);
 
   it('reads a flow that did not compile as not tested yet, and one whose check did not hold as failed', async () => {
