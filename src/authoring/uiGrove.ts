@@ -343,17 +343,65 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-call .gw-vc{flex:none;display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:nowrap}
 .gw-call .gw-vm{flex:none;font-size:13px;color:var(--ink3);white-space:nowrap}
 .gw-call .gw-vgo{flex:none;margin-left:auto}
-@media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}`;
+@media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}/* What happened: a scenario's run, step by step, in the panel beside the tree, which widens for it; under 1060 px a sheet */
+@media (min-width:1061px){.gw-stage.wide{grid-template-columns:minmax(0,1fr) min(640px,46vw)}}
+.gw-hap+.gw-dre{margin-left:14px}
+.gw-dr{border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;background:var(--paper);min-width:0;margin-bottom:4px}
+.gw-drh{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start}
+.gw-drh .mk{font:600 17px/28px var(--mono);text-align:center}.gw-drh .mk.fail{color:var(--verm)}.gw-drh .mk.pass{color:var(--moss)}.gw-drh .mk.none{color:var(--ink3)}
+.gw-drh h2{margin:0;font:400 21px/28px var(--serif);letter-spacing:-.01em;max-width:none;text-wrap:balance;overflow-wrap:break-word}
+.gw-drh h2:focus:not(:focus-visible){outline:none}
+.gw-drh .meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:6px;font:12.5px/18px var(--mono);color:var(--ink3)}
+.gw-drh .w{font-weight:600;color:var(--ink2)}.gw-drh .w.fail{color:var(--verm-ink)}.gw-drh .w.pass{color:var(--moss)}
+.gw-drx{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink3);font:18px/1 var(--sans);cursor:pointer;padding:0}
+.gw-drx:hover{color:var(--ink);border-color:var(--ink3)}
+.gw-drc{margin-top:12px}
+.gw-drc .gw-chip.ok{background:var(--moss-bg);color:var(--moss)}.gw-drc .gw-chip.bad{background:var(--verm-bg);color:var(--verm-ink)}
+.gw-drc .gw-chip.standin{background:var(--gold-bg);color:var(--gold)}.gw-drc .gw-chip.none{background:none;border:1px dashed var(--line2);color:var(--ink3)}
+.gw-drhist{margin:8px 0 0;font-size:13px;line-height:18px;color:var(--ink3)}
+.gw-drs{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:2px}
+.gw-drs button{display:grid;grid-template-columns:20px 16px minmax(0,1fr) auto;gap:1px 8px;align-items:start;width:100%;padding:6px 10px;border:1px solid transparent;border-radius:8px;background:none;text-align:left;font:inherit;font-size:14px;line-height:20px;color:var(--ink);cursor:pointer}
+.gw-drs button:hover,.gw-drs button[aria-pressed=true]{background:var(--sel)}.gw-drs button[aria-pressed=true]{border-color:var(--line2)}
+.gw-drs .n{font:500 12px/20px var(--mono);color:var(--muted);text-align:right}
+.gw-drs .sm{font:600 13px/20px var(--mono);text-align:center}.gw-drs .sm.pass{color:var(--moss)}.gw-drs .sm.fail{color:var(--verm)}.gw-drs .sm.warn{color:var(--gold)}.gw-drs .sm.none{color:var(--ink3)}
+.gw-drs button.fail .t{color:var(--verm-ink);font-weight:500}.gw-drs .t{min-width:0;overflow-wrap:break-word}
+.gw-drs .ms{font:12px/20px var(--mono);color:var(--muted);white-space:nowrap;text-align:right}
+.gw-drs .sx{grid-column:3/-1;display:grid;gap:1px;font:12px/18px var(--mono);color:var(--ink3);overflow-wrap:anywhere;margin-bottom:2px}
+.gw-drs .sx .bad{color:var(--verm-ink);font-weight:600}
+.gw-dr1{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--stone);font-size:14px;line-height:20px;color:var(--ink)}
+.gw-dr1 .gw-eyebrow{margin-bottom:2px}
+.gw-drt{display:flex;flex-wrap:wrap;gap:0 2px;margin-top:14px;border-bottom:1px solid var(--line)}
+.gw-drt button{border:0;border-bottom:2px solid transparent;background:none;padding:6px 10px;margin-bottom:-1px;min-height:34px;font:inherit;font-size:13px;color:var(--ink3);cursor:pointer}
+.gw-drt button:hover{color:var(--ink)}.gw-drt button[aria-selected=true]{border-bottom-color:var(--ink);color:var(--ink);font-weight:500}
+.gw-drp{padding-top:6px;display:grid;gap:2px}
+.gw-drg{padding:7px 10px;border-radius:8px;min-width:0}.gw-drg.cur{background:var(--stone)}
+.gw-drg .hd{font:500 12px/18px var(--mono);color:var(--ink3);margin-bottom:3px;overflow-wrap:anywhere}
+.gw-drg .sub{font:12.5px/18px var(--mono);color:var(--ink2);overflow-wrap:anywhere}.gw-drg .meta{font:12px/18px var(--mono);color:var(--muted)}
+.gw-drg pre{margin:4px 0 0;max-height:240px;overflow:auto;padding:8px 10px;border-radius:6px;background:var(--code);font:12px/17px var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.gw-dra{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.gw-drw{margin:6px 0 0;font-size:12.5px;line-height:18px;color:var(--ink3)}
+.gw-drerr{margin:14px 0 0;color:var(--verm-ink)}
+.gw-drf{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;line-height:18px;color:var(--ink3)}.gw-drf p{margin:0 0 4px}
+.gw-drn{margin-top:14px;padding:10px 12px;border-radius:8px;border:1px dashed var(--line2);display:grid;gap:2px;font-size:14px;line-height:20px}.gw-drn span{color:var(--ink3);font-size:13px}
+.gw-drsec{margin-top:14px}.gw-drsec p{margin:0 0 4px;font-size:14px;line-height:20px}
+@media (max-width:1060px){.gw-insw.dr{position:fixed;inset:0;z-index:19;overflow-y:auto;overscroll-behavior:contain;background:var(--paper)}
+ html:has(.gw-insw.dr:not([hidden])){overflow:hidden}
+ .gw-insw.dr .gw-dr{border:0;border-radius:0;padding:0 16px 28px;max-width:760px;margin:0 auto}
+ .gw-insw.dr .gw-drh{position:sticky;top:0;z-index:1;background:var(--paper);padding:12px 0 10px;border-bottom:1px solid var(--line)}
+ .gw-dr .btn,.gw-drs button,.gw-drt button{min-height:44px}.gw-drx{width:44px;height:44px}.gw-drt button{padding:0 12px}.gw-drs button{padding:12px 10px}}
+`;
 
 export const GROVE_JS = String.raw`
 /* ---------- Grow: the change's tree, live ---------- */
 const GW=${CONST};
-const gw={el:null,svg:null,B:null,M:null,seen:new Set(),state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,hov:null,open:{},refocus:null,preview:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
+const gw={dr:null,el:null,svg:null,B:null,M:null,seen:new Set(),state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,hov:null,open:{},refocus:null,preview:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
 try{const v=localStorage.getItem('gw-tree');if(v==='outline'||v==='grove')gw.tree=v}catch(e){}
 /* The selection lives in the address, so a link can bring it back: #grow/<id> is what is selected (a scenario, a journey or a
-   part), and #grow/<scenario>/happened/step-<n> is the run that scenario made, open in the Run tab at step n. */
-const gwHASH=/^#grow\/([A-Za-z0-9_.-]+)(\/happened(?:\/step-(\d+))?)?$/;
-function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;gw.want={id:m[1],happened:!!m[2],step:m[3]?Math.max(0,Number(m[3])-1):null};return true}
+   part), #grow/<scenario>/happened/step-<n> is the run that scenario made, open in the Run tab at step n, and
+   #grow/<scenario>/steps/step-<n> is that run in the drawer beside the tree, at step n. */
+const gwHASH=/^#grow\/([A-Za-z0-9_.-]+)(\/happened(?:\/step-(\d+))?|\/steps(?:\/step-(\d+))?)?$/;
+function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;const n=m[3]||m[4];
+ gw.want={id:m[1],happened:!!m[2]&&m[2].startsWith('/happened'),steps:!!m[2]&&m[2].startsWith('/steps'),step:n?Math.max(0,Number(n)-1):null};return true}
 if(gwWant())tab='Discover';
 window.addEventListener('hashchange',()=>{if(!gwWant())return;if(tab!=='Discover'){tab='Discover';render()}else growPaint()});
 function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
@@ -693,9 +741,108 @@ async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
  openTab('Run')}
 /* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. */
 function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap',type:'button','data-hap':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwOpenRun(x.id)}}},'See what happened ›'):null}
+/* ---------- What happened: one scenario's run, step by step, beside the tree ---------- */
+/* The drawer reads the run the grow recorded for a scenario from that run's verified bundle (GET /api/runs/<run>/happened, which
+   needs the session token) and shows its steps, what each one recorded, one sentence for how it broke, and the evidence behind
+   it. It takes the inspector's place beside the tree, which stays drawn and lit; under 1060 px it is a sheet over the page. A
+   scenario with no run says why, what it would prove and where it starts. The address names it: #grow/<id>/steps/step-<n>. */
+const gwDrW={fail:'Failed',pass:'Passed',none:'Not tested yet'},gwDrM={pass:'✓',fail:'✗',warn:'!',none:'–'};
+/* a scenario this grow ran, or one it left untested once it is done, has a drawer; one cut by the mode or still running has not */
+const gwDrCan=x=>{const s=gw.state,r=x&&s&&s.run[x.id];return !!x&&gwIn(x)&&!(r&&r.st==='run')&&(gwRan(x)||!!s.done)};
+function gwDrOpen(sid,step,quiet,keep){const s=gw.state,x=s&&gwScen(sid);if(!gwDrCan(x))return;const ran=gwRan(x);
+ gw.dr={sid:sid,step:typeof step==='number'&&step>=0?step:null,tab:'checked',data:null,err:null,loading:ran,run:ran?s.run[sid].run:null};
+ gw.dr.focus=!keep;gw.pinned='s:'+sid;if(!keep)gw.drScroll=true;if(ran)gwDrLoad(gw.dr);if(!quiet)growPaint()}
+async function gwDrLoad(d){const s=gw.state,r=s.run[d.sid],x=gwScen(d.sid);const flow=r.flow||x.flow||'',cfg=s.flows&&s.flows.config||null,sub=cfg&&cfg.lastIndexOf('/')>0?cfg.slice(0,cfg.lastIndexOf('/')):null;
+ let out=null,err=null;
+ try{const res=await fetch('/api/runs/'+encodeURIComponent(r.run)+'/happened?case='+encodeURIComponent(flow)+(cfg?'&config='+encodeURIComponent(cfg):''),{headers:{'x-tracegrove-token':TOKEN}});
+  const j=await res.json().catch(()=>null);
+  if(res.ok&&j&&Array.isArray(j.steps))out=j;else err=j&&j.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':'The run '+r.run+' could not be read'+(j&&j.error?': '+j.error:'')+'.'}
+ catch(e){err='The run '+r.run+' could not be read.'}
+ if(gw.dr!==d)return;d.loading=false;d.data=out;d.err=err;if(out&&(d.step===null||d.step>=out.steps.length))d.step=out.at;
+ if(tab==='Discover')growPaint()}
+/* Close returns to the panel, and focus to the link that opened the drawer */
+function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus='d:'+d.sid;growPaint()}
+function gwDrCopy(){const url=location.href;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>toast('Copied the link to this step.'),()=>toast('Link: '+url));return}}catch(e){}toast('Link: '+url)}
+/* "Write this flow" puts the scenario's claim in the Intent box below the tree, where drafting writes flows */
+function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=null;render();const box=document.getElementById('intent');
+ if(box){box.value=ui.intent;box.focus({preventScroll:true});box.scrollIntoView({block:'center'})}toast('Its claim is in the Intent box below. Draft it there to write the flow.')}
+/* The way in, wherever a scenario is shown beside "See what happened ›" (which opens the Run tab) */
+function gwDrEntry(x){if(!gwDrCan(x))return null;const ran=gwRan(x);
+ return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':(ran?'What happened, step by step: ':'Why it is not tested yet: ')+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},ran?'Step by step ›':'Why not tested yet ›')}
+/* a response body as it was recorded; JSON is laid out to read, the same text */
+const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
+const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
+function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.sid);if(!x)return null;const r=s.run[x.id];const T=gwVia(x.title);
+ const j=M.J.find(q=>(M.leaves[q.id]||[]).includes(x)),n=j?(gw.order||[]).indexOf(j.id)+1:0;const st=r&&r.st==='fail'?'fail':r&&r.st==='pass'?'pass':'none';
+ const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',on:{keydown:e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gwDrClose()}}}});
+ const place=j?(n?'Journey '+n+', ':'')+gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check';
+ gwPut(el,h('div',{class:'gw-drh'},h('span',{class:'mk '+st,'aria-hidden':'true'},{fail:'✗',pass:'✓',none:'○'}[st]),
+  h('div',{style:'min-width:0'},h('h2',{id:'gw-dr-title',tabindex:'-1','data-testid':'grow-happened-title'},...gwRich(T.title)),
+   h('div',{class:'meta'},h('span',{class:'w '+st},gwDrW[st]),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),h('span',{},place),
+    h('span',{},x.criteria.length?'promise'+(x.criteria.length>1?'s ':' ')+x.criteria.join(', '):'no promise'))),
+  h('button',{class:'gw-drx',type:'button','aria-label':'Close what happened','data-testid':'grow-happened-close',on:{click:gwDrClose}},'×')));
+ if(!gwRan(x)){gwPut(el,gwDrNone(x,r,j,M));return el}
+ if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}
+ if(!d.data){gwPut(el,h('p',{class:'gw-drerr',role:'alert'},d.err||'The run could not be read.'),gwDrActs(x,null));return el}
+ const D=d.data,steps=D.steps,all=steps.flatMap(q=>q.calls||[]),cur=d.step,hs=D.history;
+ const hist=hs&&hs.saved?(hs.passed===0?'It has not passed in '+(hs.saved===1?'its 1 saved run':'any of its '+hs.saved+' saved runs'):hs.passed===hs.saved?'It passed in '+(hs.saved===1?'its 1 saved run':'all '+hs.saved+' saved runs'):'It passed in '+hs.passed+' of its '+hs.saved+' saved runs')+'.':null;
+ /* each step, and under it what it recorded: the answer the run contradicts, the stand-in calls made while it ran (placed by
+    their own timestamps), and for a watch step what it expected and got, and how long it waited */
+ const ol=h('ol',{class:'gw-drs','aria-label':'Steps'},steps.map((q,i)=>{const k=q.checks==='fail'&&q.result==='completed'?'fail':kind(q.result);const con=!!D.contradicts&&D.contradicts.at===i;const sx=[];
+  if(q.answer&&(con||k==='fail'&&q.method!=='STANDIN'))sx.push(['answered '+gwCut(q.answer,200),'']);
+  for(const c of all)if(c.during===q.id)sx.push([c.standIn+' ← '+(c.amount!=null?c.amount:c.method+' '+c.path),con?'bad':'']);
+  if(con)sx.push(['◀ contradicts its answer','bad']);
+  if(q.method==='STANDIN'||q.watch){for(const c of q.checked||[])sx.push([c.says,c.held===false?'bad':'']);
+   if(q.watch&&q.durationMs!=null)sx.push(['waited '+q.durationMs+' ms of its '+q.watch.deadlineMs+' ms deadline'+(q.watch.everyMs!=null?', polling every '+q.watch.everyMs+' ms':'')+' (not app time)',''])}
+  return h('li',{},h('button',{type:'button',class:k,'aria-pressed':String(cur===i),'data-testid':'grow-happened-step-'+(i+1),on:{click:()=>{d.step=i;gw.refocus='t:grow-happened-step-'+(i+1);growPaint()}}},
+   h('span',{class:'n'},String(i+1)),h('span',{class:'sm '+k},gwDrM[k]||'–',h('span',{class:'sr'},' '+(LABEL[k]||q.result))),h('span',{class:'t'},q.name),h('span',{class:'ms'},q.durationMs!=null?q.durationMs+' ms':''),
+   sx.length?h('span',{class:'sx'},sx.map(([t,c])=>h('span',{class:c||null},t))):null))}));
+ /* the evidence, in tabs that appear only when they have something to show */
+ const answered=steps.map((q,i)=>[q,i]).filter(([q])=>q.answer);const nCheck=steps.filter(q=>(q.checked||[]).length).length;
+ const tabs=[['checked','We checked',nCheck],['answered','App answered',answered.length],['called','Called out',all.length],['requests','Requests',steps.length]].filter(t=>t[2]>0);
+ const key=tabs.some(t=>t[0]===d.tab)?d.tab:tabs.length?tabs[0][0]:null;const pick=k=>{d.tab=k;gw.refocus='t:grow-happened-tab-'+k;growPaint()};
+ const list=key?h('div',{class:'gw-drt',role:'tablist','aria-label':'Evidence',on:{keydown:e=>{const o=tabs.map(t=>t[0]),i=o.indexOf(key);let m=-1;
+   if(e.key==='ArrowRight')m=(i+1)%o.length;else if(e.key==='ArrowLeft')m=(i-1+o.length)%o.length;else if(e.key==='Home')m=0;else if(e.key==='End')m=o.length-1;if(m<0)return;e.preventDefault();pick(o[m])}}},
+  tabs.map(t=>h('button',{type:'button',role:'tab',id:'gw-drt-'+t[0],'aria-selected':String(t[0]===key),'aria-controls':'gw-drp',tabindex:t[0]===key?'0':'-1','data-testid':'grow-happened-tab-'+t[0],on:{click:()=>pick(t[0])}},t[1]+' '+t[2]))):null;
+ const grp=(i,...kids)=>h('div',{class:'gw-drg'+(i===cur?' cur':'')},h('div',{class:'hd'},'Step '+(i+1)+' · '+steps[i].name),...kids);
+ let body=[];
+ if(key==='checked')body=steps.map((q,i)=>(q.checked||[]).length?grp(i,stepChecked(q.checked)):null);
+ else if(key==='answered')body=answered.map(([q,i])=>grp(i,h('div',{class:'sub'},q.method+' '+q.path+(q.status!=null?' → '+q.status:'')),h('pre',{},gwDrPretty(q.answer)))).concat(steps.some(q=>q.method==='STANDIN')?[h('p',{class:'gw-drw'},'Watch steps get no answer from the app; they read what the stand-in recorded.')]:[]);
+ else if(key==='called')body=steps.flatMap((q,i)=>all.filter(c=>c.during===q.id).map(c=>grp(i,stepCalls([c])))).concat(all.filter(c=>!steps.some(q=>q.id===c.during)).map(c=>h('div',{class:'gw-drg'},h('div',{class:'hd'},'Outside every step’s recorded time'),stepCalls([c]))));
+ else if(key==='requests')body=steps.map((q,i)=>grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms'+(q.watch.polls!=null?' · polled '+q.watch.polls+' times':''):'')
+   :q.method+' '+q.path+(q.request&&q.request.body?' '+q.request.body:'')+(q.request?' · as '+q.request.as:'')),
+  h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
+ gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,ol,
+  h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),
+  list,key?h('div',{class:'gw-drp',id:'gw-drp',role:'tabpanel','aria-labelledby':'gw-drt-'+key,'data-testid':'grow-happened-panel'},body):null,
+  gwDrActs(x,D),
+  D.foot.length?h('div',{class:'gw-drf','data-testid':'grow-happened-foot'},h('span',{class:'gw-eyebrow'},'Not recorded'),D.foot.map(t=>h('p',{},t))):null);
+ return el}
+/* Rerun, compare with the last run that passed, heal, the Run tab at this run and step, and a link to this step */
+function gwDrActs(x,D){const s=gw.state,d=gw.dr,r=s.run[x.id];const fail=!!r&&r.st==='fail';const flow=r&&r.flow||x.flow;const cfg=s.flows&&s.flows.config||null;const away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
+ const hs=D&&D.history;const why=[];
+ if(away)why.push('This grow ran with '+cfg+', so rerun and compare it from that folder.');
+ else if(fail&&hs&&!hs.lastPass)why.push('Compare with last pass: it never passed in '+gwDrRuns(hs.saved)+'.');
+ return [h('div',{class:'gw-dra'},
+   h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-rerun',disabled:!flow||away||!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(flow)}}},'Rerun'),
+   fail?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-compare',disabled:!(hs&&hs.lastPass)||away,on:{click:()=>{const c=ui.comparison;c.baseline=hs.lastPass;c.candidate=d.run;openTab('Compare')}}},'Compare with last pass'):null,
+   fail?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-heal',on:{click:()=>openTab('Heal')}},'Heal'):null,
+   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-runtab',on:{click:()=>gwOpenRun(x.id,d.step===null?undefined:d.step)}},'Run tab ↗'),
+   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link')),
+  why.length?h('p',{class:'gw-drw','data-testid':'grow-happened-why'},why.join(' ')):null]}
+/* A scenario with no run: why, what it would prove and where it starts, and the way to write its flow */
+function gwDrNone(x,r,j,M){const why=String(r&&r.why||(x.flow?'This grow did not run its flow':'No flow proves this yet')).replace(/([^.!?])$/,'$1.');const u=M.U[x.unit]||{};
+ const at=j?gbStarts(j,M):null;if(at&&typeof at[0]==='string')at[0]=at[0].charAt(0).toUpperCase()+at[0].slice(1);
+ return [h('div',{class:'gw-drn','data-testid':'grow-happened-none'},h('b',{},why),h('span',{},'Nothing has run, so there are no steps, checks or calls to show.')),
+  x.proves?h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'It would prove'),h('p',{},...gwRich(x.proves))):null,
+  h('div',{class:'gw-drsec'},h('span',{class:'gw-eyebrow'},'Where it starts'),at?h('p',{},...at):null,u.label&&!(j&&j.entry===x.unit)?h('p',{},'Part: ',...gwCodeText(gwPlain(u.label))):null,
+   x.layers&&x.layers.length?h('p',{class:'gw-drw'},'Layers it crosses: '+x.layers.map(l=>GW.layers[l]||l).join(', ')):null),
+  h('div',{class:'gw-dra'},x.flow?null:h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-write',on:{click:()=>gwDrWrite(x)}},'Write this flow'),
+   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link'))]}
 /* The address follows the selection: the run a scenario opened while the Run tab still shows it, else what is selected here. */
 function gwSyncHash(){if(gw.want)return;const hp=gw.happened;let want='';
  if(tab==='Run'&&hp&&ui.runName===hp.run&&ui.sel===hp.flow)want='#grow/'+hp.sid+'/happened/step-'+((ui.step||0)+1);
+ else if(tab==='Discover'&&gw.state&&gw.dr&&gw.pinned==='s:'+gw.dr.sid)want='#grow/'+gw.dr.sid+'/steps'+(gw.dr.run&&gw.dr.step!==null?'/step-'+(gw.dr.step+1):'');
  else if(tab==='Discover'&&gw.state&&gw.pinned&&/^[sju]:/.test(gw.pinned))want='#grow/'+gw.pinned.slice(2);
  const cur=location.hash;if(want===cur||(!want&&!/^#grow\//.test(cur)))return;
  const url=new URL(location.href);url.hash=want;history.replaceState(null,'',url.href)}
@@ -703,7 +850,8 @@ function gwSyncHash(){if(gw.want)return;const hp=gw.happened;let want='';
 function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.want=null;
  const k=s.scenarios.some(x=>x.id===w.id)?'s:'+w.id:(s.journeys||[]).some(j=>j.id===w.id)?'j:'+w.id:s.units.some(u=>u.id===w.id)?'u:'+w.id:null;
  if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
- if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step)}
+ if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step);
+ else if(w.steps&&k.startsWith('s:'))gwDrOpen(w.id,w.step,true);else gw.dr=null}
 /* The verdict, worked out once on the server (growVerdict) for this page, grow --json and the exit code: its own line above the
    tree, outside the result band. Its mark and word, then what it rests on: the first failure's promise and how it broke
    ("Removing a seat never charges the card" failed: expected 2 charges, got 3), with its promise; or what is not tested yet.
@@ -854,9 +1002,9 @@ const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
 function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  /* a repaint rebuilds controls; whatever had focus gets it back afterwards, by its key or its test id */
- const fa=document.activeElement,held=fa&&fa!==document.body&&gw.el.contains(fa)?(fa.getAttribute('data-ol')||(fa.getAttribute('data-testid')?'t:'+fa.getAttribute('data-testid'):null)):null;
+ const fa=document.activeElement,held=fa&&fa!==document.body&&gw.el.contains(fa)?(fa.getAttribute('data-ol')||(fa.getAttribute('data-dr')?'d:'+fa.getAttribute('data-dr'):null)||(fa.getAttribute('data-testid')?'t:'+fa.getAttribute('data-testid'):null)):null;
  if(!s){gwSet(S.start,gwStartCard(),gw.busy?h('p',{class:'row muted',style:'margin-top:12px'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading the branch'):null,gw.error?blocked(gw.error):null);
-  for(const k of ['head','call','verdict','rail','agents','two','error'])S[k].replaceChildren();S.tree.hidden=true;return}
+  for(const k of ['head','call','verdict','rail','agents','two','error'])S[k].replaceChildren();S.tree.hidden=true;gw.dr=null;S.ins.classList.remove('dr');S.stage.classList.remove('wide');return}
  S.start.replaceChildren();S.tree.hidden=false;gwRestore();
  const v=gw.view;const c=s.change;
  gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
@@ -895,16 +1043,25 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  else S.left.replaceChildren(gbOutline());
  /* the Outline already lists every journey and opens what is selected in place, so it stands alone at a readable width; only
     while the choice is open does the panel stay beside it, with what each mode proves */
- const alone=gw.tree==='outline'&&!(s.asked&&!s.modeBy);S.stage.classList.toggle('ol',alone);S.card.classList.toggle('olv',alone);
- if(alone)S.ins.replaceChildren();else gwSet(S.ins,gwInspector());S.ins.hidden=alone||!S.ins.firstChild;S.stage.classList.toggle('solo',!S.ins.firstChild);
+ /* the drawer follows what is pinned: another scenario opens in it, anything else closes it. While it is open it takes the
+    panel's place, beside the Outline too, and the panel widens for it */
+ if(gw.dr&&gw.pinned!=='s:'+gw.dr.sid){const p=gw.pinned;gw.dr=null;if(p&&p.startsWith('s:'))gwDrOpen(p.slice(2),null,true,true)}
+ const drOn=!!(gw.dr&&gwScen(gw.dr.sid));
+ const alone=gw.tree==='outline'&&!(s.asked&&!s.modeBy)&&!drOn;S.stage.classList.toggle('ol',alone);S.card.classList.toggle('olv',alone);
+ if(alone)S.ins.replaceChildren();else gwSet(S.ins,drOn?gwDrawer():gwInspector());S.ins.hidden=alone||!S.ins.firstChild;S.stage.classList.toggle('solo',!S.ins.firstChild);
+ S.ins.classList.toggle('dr',drOn);S.stage.classList.toggle('wide',drOn);
  requestAnimationFrame(gwInsFade);
  /* the Outline is the journey list, so it is not repeated below it */
  gwSet(S.two,gw.tree==='outline'?(()=>{const x=gwExt();return h('div',{class:'gw-two'+(x?'':' solo')},gwSpec(),x)})():h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwExt())));
  gwSet(S.error,gw.error?blocked(gw.error):null);
  /* focus stays where it was across a repaint: on the row, button or part of the tree that was used, or what was let go of */
- const find=k=>k.startsWith('t:')?gw.el.querySelector('[data-testid="'+k.slice(2).replace(/["\\]/g,'')+'"]'):[...gw.el.querySelectorAll('[data-ol]')].find(e=>e.getAttribute('data-ol')===k)||(gw.tree==='grove'&&gw.svg?[...gw.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k):null);
+ const find=k=>k.startsWith('d:')?gw.el.querySelector('[data-dr="'+k.slice(2).replace(/["\\]/g,'')+'"]'):k.startsWith('t:')?gw.el.querySelector('[data-testid="'+k.slice(2).replace(/["\\]/g,'')+'"]'):[...gw.el.querySelectorAll('[data-ol]')].find(e=>e.getAttribute('data-ol')===k)||(gw.tree==='grove'&&gw.svg?[...gw.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k):null);
  if(!gw.refocus&&held&&!gw.el.contains(document.activeElement))gw.refocus=held;
  if(gw.refocus){const k=gw.refocus;gw.refocus=null;const el=find(k);if(el)el.focus({preventScroll:true})}
+ /* an opened drawer takes focus on its heading, once it is on the page */
+ if(drOn&&gw.dr.focus&&S.ins.isConnected){const t=S.ins.querySelector('#gw-dr-title');if(t){gw.dr.focus=false;t.focus({preventScroll:true})}}
+ /* a drawer opened from far down the page comes into view */
+ if(gw.drScroll){gw.drScroll=false;const r=S.ins.getBoundingClientRect();if(drOn&&(r.top<0||r.top>innerHeight-120))S.ins.scrollIntoView({block:'start'})}
  /* switching to the Outline with something pinned brings its row into view */
  if(gw.reveal){const el=find(gw.reveal);gw.reveal=null;if(el)el.scrollIntoView({block:'nearest'})}
  gwSyncHash()}

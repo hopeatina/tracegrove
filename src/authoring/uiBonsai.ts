@@ -1355,7 +1355,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  svg.addEventListener('keydown',gbKeys);
  /* on a phone, a tap off the card under the drawing, on nothing that does a thing of its own, lets the card go */
  if(!gw.tapOff){gw.tapOff=true;document.addEventListener('click',e=>{const B2=gw.B,t=e.target;if(!B2||!B2.tip||B2.tip.hidden||!B2.tip.classList.contains('below')||!gw.pinned||!(t instanceof Element))return;
-  if(B2.tip.contains(t)||B2.svg.contains(t)||t.closest('button,a,summary,input,select,textarea,label,[data-ol],[data-k],[role=button]'))return;gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B2);growPaint()})}
+  if(B2.tip.contains(t)||B2.svg.contains(t)||t.closest('button,a,summary,input,select,textarea,label,[data-ol],[data-k],[role=button],.gw-dr'))return;gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B2);growPaint()})}
  /* the grey dots where a route never ran go under the knots they pass, which stand faint over them: each knot cuts them */
  {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
   for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
@@ -2041,7 +2041,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const wrap0=tip.parentNode,narrow=B.L.narrow||!!wrap0&&wrap0.clientWidth<480;
  if(narrow&&k===gw.pinned)tip.prepend(h('button',{class:'gb-x',type:'button','aria-label':'Close',on:{click:e=>{e.stopPropagation();gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B);growPaint()}}},'×'));
  /* and a phone's card of a scenario that ran opens its run */
- if(narrow&&k===gw.pinned&&k.startsWith('s:'))gwPut(tip,gwHappened(gwScen(k.slice(2))));
+ if(narrow&&k===gw.pinned&&k.startsWith('s:'))gwPut(tip,gwHappened(gwScen(k.slice(2))),gwDrEntry(gwScen(k.slice(2))));
  tip.hidden=false;const wrap=tip.parentNode;if(!wrap)return;
  /* on a phone there is no room beside anything: the card sits under the drawing, full width, and the drawing stays clear. It
     sits under what the drawing holds (the pot and the names in its ground), not under the empty margin below them, so a
@@ -2165,7 +2165,7 @@ function gbJourneyCard(jid){const s=gw.state,M=gw.M;const j=M.J.find(q=>q.id===j
  return [h('h3',{class:'gw-jt'},...gwRich(j.title)),h('div',{class:'where'},gwFacts([n?'Journey '+n:null,gbStarts(j,M),j.by&&j.by!=='rules'?'named by '+(j.by==='spec'?'the spec':j.by):null])),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,wound)),
   fails.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},fails.length===1?'Where it broke':fails.length+' failures'),
-   fails.flatMap(x=>[gbItem(x,{class:'gb-ols','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;gw.refocus='s:'+x.id;growPaint()}}},[gwBadge(x)]),h('div',{class:'err'},gwBroke(s.run[x.id],0,x.id)),gwHappened(x)])):null,
+   fails.flatMap(x=>[gbItem(x,{class:'gb-ols','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;gw.refocus='s:'+x.id;growPaint()}}},[gwBadge(x)]),h('div',{class:'err'},gwBroke(s.run[x.id],0,x.id)),gwHappened(x),gwDrEntry(x)])):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios'),h('div',{class:'gw-jst'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,gbToks(toks)),
    list.length&&gw.tree==='grove'?h('button',{class:'gw-lnk',on:{click:()=>{(gw.open||(gw.open={}))['j:'+jid]=true;gw.reveal='j:'+jid;gw.refocus='j:'+jid;growPaint()}}},'Listed under Journeys, below ↓'):null),
   crit.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Spec it answers'),h('div',{class:'gw-chips'},crit.map(gwCrit))):null]}
@@ -2175,7 +2175,7 @@ function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=
  return [h('h3',{class:'gw-st'},...gwRich(T.title)),T.via?h('div',{class:'gw-via'},'via ',...gwCodeText(T.via)):null,
   h('div',{class:'where'},...(j?[gbROLEW[gbPol(x)]+' · journey'+(n?' '+n:'')+': ',...gwRich(j.title)]:[(x.scenarioKind==='regression'?'existing flow':'part check')+' · ',...gwCodeText((M.U[x.unit]||{}).label||'')])),
   h('div',{class:'sec'},h('div',{class:'row',style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
-   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},gwBroke(r,0,x.id))):null,gwHappened(x),
+   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},gwBroke(r,0,x.id))):null,gwHappened(x),gwDrEntry(x),
    x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null),
   j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x),gbReach(M,j,x))):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},x.flow?h('span',{class:'gw-chip built'},x.flow):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
@@ -2211,7 +2211,7 @@ function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw
    [x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)]),
   r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180,x.id)):null,
   /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too */
-  !open&&gwRan(x)?h('div',{class:'gb-hapr'},gwHappened(x)):null,open?gbRowBody(x):null]}
+  !open&&gwRan(x)?h('div',{class:'gb-hapr'},gwHappened(x),gwDrEntry(x)):null,open?gbRowBody(x):null]}
 /* A row opened in place: where it broke first, when it broke; then the claim, said as what the run did with it; then its chips. */
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
  gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,
@@ -2220,7 +2220,7 @@ function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb
    /* the row's badge already says "no flow yet"; the body names the flow when there is one */
    x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):null,
    x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),
-  x.variants.length?gwLanes(x):null,r&&r.st==='not_run'&&r.why&&x.flow?h('span',{class:'small muted'},r.why):null,gwHappened(x));return el}
+  x.variants.length?gwLanes(x):null,r&&r.st==='not_run'&&r.why&&x.flow?h('span',{class:'small muted'},r.why):null,(e=>e.some(Boolean)?h('span',{},e):null)([gwHappened(x),gwDrEntry(x)]));return el}
 /* A journey as the lists draw it: its number and name as on the tree, where it starts, its state in the tree's words, the path
    it crosses, then its scenarios by what they prove, in the order its pad holds them. What the mode cut is listed by name. */
 function gbJourneyBlock(j,n,M,fold){const s=gw.state;const list=M.leaves[j.id]||[];const inm=gbOrd(list.filter(x=>!s.modeBy||gwIn(x))),out=gbByRole(list.filter(x=>s.modeBy&&!gwIn(x)));
