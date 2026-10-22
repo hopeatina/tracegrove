@@ -1137,13 +1137,146 @@ describe('Grow page', () => {
         expect(f.leaves, width + 'px').toBeGreaterThan(2);
         expect(f.bad, width + 'px').toEqual([]);
         // a cushion's area grows with how many leaves it holds, one tree's k for all; the crown's crest at most 15% larger across
+        // by its leaves, and always the largest cushion on the tree: at least 1.15 times across any branch's, raised to exactly
+        // that where it holds fewer leaves than one of them
         for (const tree of new Set(f.cush.map((c) => c.tree))) {
           const cs = f.cush.filter((c) => c.tree === tree), per = (c: { a: number; h: number; n: number }) => (c.a * c.h) / (c.n + 0.5);
           const plain = cs.filter((c) => !(c.crown && c.role === 'crest')), base = Math.min(...plain.map(per));
           for (const c of plain) expect(per(c) / base, width + 'px ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
-          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) expect(Math.sqrt(per(c) / base)).toBeLessThanOrEqual(1.151);
+          const brMax = Math.max(0, ...cs.filter((c) => !c.crown).map((c) => c.a));
+          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) {
+            expect(c.a, width + 'px crown crest against the largest branch cushion').toBeGreaterThanOrEqual(1.15 * brMax - 0.01);
+            if (Math.abs(c.a - 1.15 * brMax) > 0.01) expect(Math.sqrt(per(c) / base)).toBeLessThanOrEqual(1.151);
+          }
           for (const a of plain) for (const b of plain) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
         }
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
+  /** The tree's form as drawn: which journey the crown holds, how its wood is sized and set, and how its leaves sit. */
+  const form = () => {
+    const w = (0, eval)('({ gw, gbHf, gbModel, gbOrderOf })'), B = w.gw.B, S = w.gw.state, hf: number = w.gbHf(B);
+    const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, over: [] as number[], halos: 0, stem: 0 };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const on = (el: any) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    const pads = Object.values(B.pad) as any[], crown = pads.find((P) => P.crown), T = B.L.trees[crown.tree], mine = pads.filter((P) => P.tree === crown.tree);
+    // the crown holds the headline journey: the first in the tree's numbering that failed, else the first
+    const fails = (jid: string) => S.scenarios.some((x: any) => x.journey === jid && S.run[x.id]?.st === 'fail');
+    const order = w.gbOrderOf(w.gw.M || w.gbModel()) as { id: string; title: string }[], head = order.find((j) => fails(j.id)) ?? order[0]!;
+    out.crown = crown.jid; out.head = head.id; out.failing = fails(head.id); out.title = head.title;
+    if (S.journeys.some((j: { id: string }) => fails(j.id)) && !fails(crown.jid)) bad('a journey failed and the crown holds one that did not');
+    // its crest the largest cushion on the tree: at least 1.15 times across any branch's
+    const crest = crown.geo.cs.find((c: any) => c.role === 'crest');
+    for (const P of mine) if (!P.crown) for (const c of P.geo.cs) if (crest.a < 1.15 * c.a - 0.01) bad('the crown crest under 1.15 times a branch cushion', [P.jid, crest.a, c.a]);
+    // the wood sized from the data: the trunk's girth from the leaves the tree carries, and about twelve girths tall
+    out.nL = mine.reduce((a, P) => a + P.leaves.length, 0); out.D = T.D; out.Ht = T.Ht;
+    if (T.Ht < 12 * T.D - 0.01) bad('a squat trunk', [T.Ht, T.D]);
+    // the first branch about a third of the way up, on the outside of the trunk's bend there
+    const brs = mine.filter((P) => P.b && !P.b.back).map((P) => P.b).sort((a, b) => a.h - b.h), tp = T.tp as number[][];
+    if (brs.length) {
+      const b = brs[0], top = tp.findIndex((q) => -q[1]! >= T.Ht - 0.5), a0 = tp[0]!, a1 = tp[top < 0 ? tp.length - 1 : top]!, q = tp[b.k]!;
+      const dev = q[0]! - (a0[0]! + (a1[0]! - a0[0]!) * (a0[1]! - q[1]!) / ((a0[1]! - a1[1]!) || 1));
+      out.h1 = b.h;
+      if (b.h < 0.25 || b.h > 0.42) bad('the first branch not about a third up', b.h);
+      if (Math.sign(dev) !== b.dir) bad('the first branch on the inside of its bend', [dev, b.dir]);
+    }
+    // the apex back over the nebari: the crown's middle within a tenth of the trunk's height of the trunk's foot
+    const foot = crown.rt.tp[0], cx = crown.o[0] + crest.x;
+    out.lean = (cx - foot[0]) / T.Ht;
+    if (Math.abs(out.lean) > 0.1) bad('the crown not over the nebari', out.lean);
+    // a scalene canopy, foliage on both sides of the trunk, and every pad a journey's own leaves
+    const xs = mine.filter((P) => on(P.el)).map((P) => [P.o[0] - P.geo.PW / 2, P.o[0] + P.geo.PW / 2]);
+    out.sides = [cx - Math.min(...xs.map((x) => x[0]!)), Math.max(...xs.map((x) => x[1]!)) - cx];
+    if (Math.min(...out.sides) / Math.max(...out.sides) > 0.92) bad('a symmetric canopy', out.sides);
+    const sideOf = mine.filter((P) => !P.crown && on(P.el)).map((P) => Math.sign(P.o[0] - foot[0]));
+    if (sideOf.length > 1 && !(sideOf.includes(1) && sideOf.includes(-1))) bad('a side of the tree left empty', sideOf);
+    for (const P of mine) if (!P.leaves.length) bad('a pad with no leaf', P.jid);
+    // leaves lead: about nineteen pixels long beside a desktop tree, never under eleven on a phone
+    out.L = Math.min(...mine.map((P) => P.geo.L * hf));
+    for (const P of mine) {
+      const g = P.geo, L: number = g.L;
+      for (const [id, sl] of g.slot as Map<string, number[]>) {
+        const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
+        // the tufts at a leaf's foot are drawn behind it, so none covers a leaf
+        const tf = B.tuft?.[id]; if (tf && !(tf.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) bad('a tuft drawn over its leaf', id);
+        // a failed leaf carries a soft red halo at rest
+        if (el.classList.contains('fail') && !/pv-/.test(el.getAttribute('class') ?? '')) {
+          const cs = getComputedStyle(el.querySelector('.halo')), [r, gg] = (cs.stroke.match(/[\d.]+/g) ?? []).map(Number);
+          out.halos++;
+          if (+cs.opacity < 0.9 || cs.stroke === 'none' || !(r! > gg! + 60) || parseFloat(cs.strokeWidth) < 2 || +cs.strokeOpacity > 0.6) bad('a failed leaf with no soft red halo', [id, cs.opacity, cs.stroke, cs.strokeWidth]);
+        }
+        if (!sl[4]) continue;
+        // a failure on a short stem at thirty to forty-five degrees, out and down (along its branch, or away from the crown's
+        // middle), its blade lying over the cushion's rim
+        out.hung++;
+        const pts = B.ltw[id][0].__pts as number[][], E = pts[pts.length - 1]!, S0 = pts[Math.max(0, pts.length - 7)]!, dx = E[0]! - S0[0]!, dy = E[1]! - S0[1]!, st = Math.hypot(dx, dy);
+        const k = g.cOf.get(id), c = g.cs[k], mid = [P.o[0] + sl[0]!, P.o[1] + sl[1]!], th = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+        out.stem = Math.max(out.stem, st * hf);
+        if (st > 0.42 * L + 0.01) bad('a long stem', [id, st, L]);
+        if (th < 30 - 0.01 || th > 45 + 0.01) bad('a stem not at thirty to forty-five degrees, out and down', [id, th]);
+        if (Math.sign(dx) !== (P.b ? P.b.dir : Math.sign(mid[0]! - (P.o[0] + c.x)))) bad('a stem leaning in', id);
+        const fill = P.cu[k].el.querySelector('.pfill'), u = [Math.cos(sl[2]! * Math.PI / 180), Math.sin(sl[2]! * Math.PI / 180)];
+        let inside = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (fill.isPointInFill(new DOMPoint(mid[0]! + u[0]! * f * L, mid[1]! + u[1]! * f * L))) inside++; }
+        out.over.push(inside / 21);
+      }
+    }
+    return out;
+  };
+
+  it('puts the headline journey in the crown, its crest the largest, on wood sized from the data, with leaves that lead', async () => {
+    const bushy = await grownBushy();
+    const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const seen: Record<string, { nL: number; D: number }> = {};
+      for (const [name, state] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['bushy', bushy.state]] as const) {
+        for (const width of [1440, 768, 390]) {
+          const page = await treePage(browser, server.url, state, { width, reduce: true });
+          await page.waitForTimeout(400);
+          const f = await page.evaluate(form), at = name + ' ' + width + 'px';
+          expect(f.bad, at).toEqual([]);
+          expect(f.crown, at + ' crown').toBe(f.head);
+          if (width === 1440) {
+            seen[name] = { nL: f.nL, D: f.D };
+            expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(18);
+            expect(f.stem, at + ' stem').toBeLessThanOrEqual(8.5);
+            // the side panel's first failing or headline journey is the crown's
+            const ins = page.getByTestId('grow-inspector');
+            await expect.poll(() => ins.textContent()).toContain(f.failing ? 'The first failing journey' : 'The headline journey');
+            expect(await ins.locator('h3').first().textContent()).toBe(f.title.replace(/`/g, ''));
+          } else if (width < 500) expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(11);
+          // each failure's blade lies over its cushion's rim by about three tenths
+          for (const o of f.over) { expect(o, at + ' over the rim').toBeGreaterThan(0.12); expect(o, at + ' over the rim').toBeLessThan(0.5); }
+          if (name !== 'plotline') expect(f.hung, at).toBeGreaterThan(0);
+          if (name === 'bushy') expect(f.halos, at).toBeGreaterThan(0);
+          await page.close();
+        }
+      }
+      // a tree with fewer leaves stands on a slimmer trunk
+      const by = Object.values(seen).sort((a, b) => a.nL - b.nL);
+      for (let i = 1; i < by.length; i++) expect(by[i]!.D, JSON.stringify(by)).toBeGreaterThanOrEqual(by[i - 1]!.D);
+      expect(by[0]!.D, JSON.stringify(by)).toBeLessThan(by[by.length - 1]!.D);
+    } finally { await browser.close(); }
+  }, 180000);
+
+  it('fills a leaf still to prove on a dark page with a pale leaf, never the page showing through', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const page = await treePage(browser, server.url, folded('tracegrove-max.jsonl'), { width, scheme: 'dark', reduce: true });
+        await page.waitForTimeout(400);
+        const look = await page.evaluate(() => {
+          // a colour as the page paints it, whatever space it was mixed in: none or clear counts as a hole
+          const ctx = document.createElement('canvas').getContext('2d')!;
+          const lum = (c: string) => { if (c === 'none') return -1; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return a! < 200 ? -1 : (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255; };
+          const bg = lum(getComputedStyle(document.body).backgroundColor);
+          return { bg, leaves: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf:is(.in,.idle,.none):not(.gone):not(.bud) .blade')).map((e) => lum(getComputedStyle(e).fill)) };
+        });
+        expect(look.leaves.length, width + 'px').toBeGreaterThan(3);
+        for (const l of look.leaves) expect(l - look.bg, width + 'px pending leaf against the page').toBeGreaterThan(0.3);
         await page.close();
       }
     } finally { await browser.close(); }
