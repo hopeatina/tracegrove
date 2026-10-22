@@ -555,6 +555,9 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
   h('div',{class:'row'},h('button',{class:'btn','data-testid':'grow-go',disabled:gw.busy||!g.isRepo||!branch||branch===g.base,on:{click:growStart}},'Grow '+(branch||'this branch')),
    !g.isRepo?h('span',{class:'small muted'},'Not a git repo: grow compares a branch with its base.'):branch===g.base?h('span',{class:'small muted'},'This is the base branch. Pick a feature branch below.'):null))}
 /* scenarios that did not run, in the tree's words: no flow yet when nothing proves them, to prove when one exists */
+/* A verdict's counts each stay whole on a line ("1 failed", never "1" ending one line and "failed" starting the next); the
+   words are the same, so its text reads as before. */
+const gwClauses=t=>String(t).split(', ').flatMap((c,i)=>i?[', ',h('span',{class:'nw'},c)]:[c]);
 function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length,rest=nr.length-nf;
  return (nf?', '+nf+' with no flow yet':'')+(rest?', '+rest+' to prove':'')}
 /* The spec's line in the verdict counts each criterion once, in the spec panel's words. A count of none is left out, except
@@ -563,7 +566,7 @@ function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to 
  return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved'+['agent','part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
- return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun()),sub),
+ return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},gwClauses(t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun())),sub),
   h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs')))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
