@@ -11,12 +11,13 @@ import { relative, resolve } from 'node:path';
 
 export type GrowFlags = { dir?: string | undefined; branch?: string | undefined; base?: string | undefined; spec?: string | undefined; mode?: string | undefined; config?: string | undefined;
   agent?: string | undefined; model?: string | undefined; 'no-agent'?: boolean | undefined; 'no-prove'?: boolean | undefined; 'no-gh'?: boolean | undefined;
-  jsonl?: boolean | undefined; json?: boolean | undefined; yes?: boolean | undefined };
+  'allow-unproven'?: boolean | undefined; jsonl?: boolean | undefined; json?: boolean | undefined; yes?: boolean | undefined };
 
 const MODE_NAMES: Record<string, Mode> = { min: 'min', minimum: 'min', std: 'std', standard: 'std', max: 'max', maximum: 'max' };
 export const modeOf = (name: string | undefined): Mode | null => (name ? MODE_NAMES[name.toLowerCase()] ?? null : null);
 
-/** The exit code is the verdict's (see growVerdict): 1 when a check failed, 2 when the grow stopped, 4 when it was cancelled. */
+/** The exit code is the verdict's (see growVerdict): 0 ready, 1 a check failed, 2 stopped, 3 not proven yet (0 with
+ *  --allow-unproven), 4 cancelled. */
 export async function growCommand(flags: GrowFlags, write: (text: string) => void = (t) => process.stdout.write(t)): Promise<{ code: number; state: GrowState; events: GrowEvent[]; log: string | null; summary?: GrowJsonSummary }> {
   const out = process.stdout;
   const tty = !!out.isTTY && !flags.json && !flags.jsonl;
@@ -68,8 +69,9 @@ export async function growCommand(flags: GrowFlags, write: (text: string) => voi
     draw(true); write('\x1b[?25h'); process.off('SIGINT', stop);
   } else if (!flags.json && !flags.jsonl) write(`${renderGrove(result.state, { width: 118, elapsed: result.state.ms + 5000, clock: result.state.ms, color: false, log }).join('\n')}\n`);
   const s = result.state;
-  const verdict = growVerdict(s);
+  const allow = { allowUnproven: flags['allow-unproven'] === true };
+  const verdict = growVerdict(s, allow);
   // The same verdict the page shows, as its last line.
   if (!flags.json && !flags.jsonl) write(`${verdict.line}\n`);
-  return { code: verdict.exitCode, state: s, events: result.events, log, ...(flags.json ? { summary: growJsonSummary(s, dir) } : {}) };
+  return { code: verdict.exitCode, state: s, events: result.events, log, ...(flags.json ? { summary: growJsonSummary(s, dir, allow) } : {}) };
 }

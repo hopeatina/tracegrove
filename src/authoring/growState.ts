@@ -240,14 +240,15 @@ export type VerdictKind = 'not ready' | 'not proven yet' | 'ready' | 'stopped' |
 export const EXIT_MEANING: Record<VerdictKind, string> = { 'not ready': 'fix', 'not proven yet': 'prove more', ready: 'ready', stopped: 'blocked', cancelled: 'cancelled' };
 const VERDICT_WORD: Record<VerdictKind, string> = { 'not ready': 'Not ready', 'not proven yet': 'Not proven yet', ready: 'Ready', stopped: 'Stopped', cancelled: 'Cancelled' };
 const VERDICT_MARK: Record<VerdictKind, string> = { 'not ready': '✗', 'not proven yet': '◌', ready: '✓', stopped: '✕', cancelled: '✕' };
-const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven yet': 0, ready: 0, stopped: 2, cancelled: 4 };
+const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven yet': 3, ready: 0, stopped: 2, cancelled: 4 };
 
 /**
  * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
  * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result,
- * "Ready" otherwise. A grow that stopped or was cancelled keeps its own code.
+ * "Ready" otherwise. Exit codes: 1 fix, 3 prove more (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was
+ * cancelled (4) keeps its own code.
  */
-export function growVerdict(s: GrowState, _opts: { allowUnproven?: boolean } = {}) {
+export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean } = {}) {
   const inRun = s.scenarios.filter((x) => inMode(s, x));
   const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
   const failed = inRun.filter((x) => s.run[x.id]?.st === 'fail');
@@ -265,7 +266,7 @@ export function growVerdict(s: GrowState, _opts: { allowUnproven?: boolean } = {
     : kind === 'ready' ? (n ? `${passed.length} of ${scen(n)} in ${mode} passed` : `no scenarios in ${mode}`)
     : `${s.blocked!.code}: ${s.blocked!.detail}`;
   return {
-    verdict: kind, word: VERDICT_WORD[kind], mark: VERDICT_MARK[kind], exitCode: VERDICT_CODE[kind], exitMeaning: EXIT_MEANING[kind], mode,
+    verdict: kind, word: VERDICT_WORD[kind], mark: VERDICT_MARK[kind], exitCode: kind === 'not proven yet' && opts.allowUnproven ? 0 : VERDICT_CODE[kind], exitMeaning: EXIT_MEANING[kind], mode,
     counts: { passed: passed.length, failed: failed.length, notTestedYet: open.length },
     promises: { hold: s.criteria.filter((c) => criterionStatus(s, c.id).cls === 'pass').length, of: s.criteria.length },
     first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null } : null,

@@ -436,11 +436,11 @@ describe('terminal', () => {
     for (const l of frame.split('\n')) expect([...l].length).toBeLessThanOrEqual(120);
   });
 
-  it('streams JSON lines with --jsonl and exits 0', async () => {
+  it('streams JSON lines with --jsonl, and exits 3 when nothing was proved (not proven yet)', async () => {
     const dir = repo();
     let out = '';
     const { code } = await growCommand({ dir, branch: 'refunds', base: 'main', mode: 'min', 'no-prove': true, 'no-gh': true, 'no-agent': true, jsonl: true }, (t) => { out += t; });
-    expect(code).toBe(0);
+    expect(code).toBe(3);
     const events = out.trim().split('\n').map((l) => JSON.parse(l) as GrowEvent);
     expect(events.at(-1)!.kind).toBe('discovery.finished');
   });

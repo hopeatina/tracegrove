@@ -206,7 +206,13 @@ describe('The verdict', () => {
 
   it('is Not proven yet when nothing failed but a scenario in the mode has no result, and says why for each', () => {
     const v = growVerdict(plotline(noFailure));
-    expect(v).toMatchObject({ verdict: 'not proven yet', word: 'Not proven yet', mark: '◌', exitMeaning: 'prove more', counts: { passed: 3, failed: 0, notTestedYet: 4 }, first: null });
+    expect(v).toMatchObject({ verdict: 'not proven yet', word: 'Not proven yet', mark: '◌', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 3, failed: 0, notTestedYet: 4 }, first: null });
+    // --allow-unproven lets it pass the shell, and changes nothing else.
+    expect(growVerdict(plotline(noFailure), { allowUnproven: true })).toEqual({ ...v, exitCode: 0 });
+    // It never hides a failure, nor a grow that stopped.
+    expect(growVerdict(plotline(), { allowUnproven: true }).exitCode).toBe(1);
+    const stopped = plotline(noFailure); stop(stopped, 'git_unavailable');
+    expect(growVerdict(stopped, { allowUnproven: true }).exitCode).toBe(2);
     expect(v.unproven.map((x) => [x.scenario, x.reason])).toEqual([['s1', 'No flow proves this yet'], ['s5', 'No flow proves this yet'], ['s6', 'No flow proves this yet'], ['s10', 'It was still running when the grow stopped']]);
     expect(v.line).toBe('◌ Not proven yet: 4 of 7 scenarios in Minimum not tested yet');
   });
@@ -281,11 +287,31 @@ describe('grow --json and the exit code', () => {
     expect(summary).toMatchObject({ verdict: 'ready', exitCode: 0, exitMeaning: 'ready', counts: { passed: 2, failed: 0, notTestedYet: 0 }, failures: [], unproven: [] });
   }, 60_000);
 
-  it('says Not proven yet when the scenarios were not run, with the reason for each', async () => {
+  it('exits 3 and says Not proven yet when the scenarios were not run, with the reason for each; --allow-unproven exits 0', async () => {
     const dir = notesCount(false);
-    const { state, summary } = await growCommand({ ...flags(dir), 'no-prove': true, json: true }, () => {});
+    let out = '';
+    const { code, state, summary } = await growCommand({ ...flags(dir), 'no-prove': true, json: true }, (t) => { out += t; });
+    expect(code).toBe(3);
+    expect(out).toBe('');
     const min = state.scenarios.filter((x) => x.mode === 'min');
-    expect(summary).toMatchObject({ verdict: 'not proven yet', exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: min.length }, failures: [] });
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: min.length }, failures: [] });
     expect(summary!.unproven).toEqual(min.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: `Run with --prove to run ${x.flow}` })));
+    let said = '';
+    const allowed = await growCommand({ ...flags(dir), 'no-prove': true, 'allow-unproven': true }, (t) => { said += t; });
+    expect(allowed.code).toBe(0);
+    expect(said.trimEnd().split('\n').at(-1)).toBe(`◌ Not proven yet: ${min.length} of ${min.length} scenarios in Minimum not tested yet`);
+    expect((await growCommand({ ...flags(dir), 'no-prove': true, 'allow-unproven': true, json: true }, () => {})).summary).toMatchObject({ verdict: 'not proven yet', exitCode: 0, exitMeaning: 'prove more' });
   }, 60_000);
+
+  it('still exits 1 for a failed check with --allow-unproven, and takes the flag from the command line', () => {
+    const dir = notesCount(true);
+    const child = spawnSync(process.execPath, ['--import', resolve('node_modules/tsx/dist/loader.mjs'), resolve('src/cli/main.ts'), 'grow', '--dir', dir, '--branch', 'notes-count', '--base', 'main', '--mode', 'min', '--no-gh', '--no-agent', '--allow-unproven', '--json'],
+      { encoding: 'utf8', timeout: 60_000 });
+    expect(child.status).toBe(1);
+    expect((JSON.parse(child.stdout) as { summary: { exitCode: number } }).summary.exitCode).toBe(1);
+    const unproved = spawnSync(process.execPath, ['--import', resolve('node_modules/tsx/dist/loader.mjs'), resolve('src/cli/main.ts'), 'grow', '--dir', dir, '--branch', 'notes-count', '--base', 'main', '--mode', 'min', '--no-gh', '--no-agent', '--no-prove'],
+      { encoding: 'utf8', timeout: 60_000 });
+    expect(unproved.status).toBe(3);
+    expect(unproved.stdout.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: \d+ of \d+ scenarios in Minimum not tested yet$/);
+  }, 120_000);
 });

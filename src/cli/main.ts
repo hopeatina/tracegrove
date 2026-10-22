@@ -167,8 +167,10 @@ Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
        [--mode minimum|standard|max] [--config <c>]    trace every part five ways (rules, then Claude or Codex per lane), draft happy,
        [--agent claude|codex] [--no-agent]             sad and edge scenarios with mock and real variants, then prove them with real flows;
        [--no-prove] [--no-gh] [--yes] [--jsonl]        in a terminal, 1/2/3 then Enter picks how much; --jsonl streams the events;
-       [--json]                                        --json prints the log, the state and a summary: the verdict, each failure's
-                                                       run, step, expected and got with its evidence files, and what is not tested yet
+       [--json] [--allow-unproven]                     --json prints the log, the state and a summary: the verdict, each failure's
+                                                       run, step, expected and got with its evidence files, and what is not tested yet;
+                                                       exits 0 ready, 1 not ready (a check failed: fix), 3 not proven yet (a scenario in
+                                                       the mode has no result: prove more; --allow-unproven exits 0), 2 stopped, 4 cancelled
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
