@@ -66,6 +66,27 @@ export function comparedOf(predicate: PredicateT, record: { reasonCode: string |
   return leaf ? compared(leaf, record.reasonCode, step) : null;
 }
 
+/** One comparison a check made, and whether it held: null when its record cannot say (a recorded actual of null can be a value
+ *  that held or a path that was absent), which the page says as "not recorded", never as held. */
+export type Checked = Compared & { held: boolean | null; says: string };
+/**
+ * Every comparison a recorded check made, in the order its predicate declares them: what each expected and what the run recorded
+ * it got, worded as the verdict words a failure ("Expected 2 charges, got 3"). Only a check the run evaluated (passed or failed)
+ * has comparisons to show.
+ */
+export function checksOf(predicate: PredicateT, record: { result: string; reasonCode: string | null; actual: unknown }, step: { method: string; path: string }): Checked[] {
+  if (record.result !== 'pass' && record.result !== 'fail') return [];
+  const all = leaves(predicate, record.actual);
+  const broke = record.reasonCode ? failedLeaf(all, record.reasonCode) : undefined;
+  return all.map((l) => {
+    const reasons = reasonsOf(l);
+    const unsure = l.actual === null && l.p.kind !== 'status_equals' && l.p.kind !== 'json_path_count' && l.p.kind !== 'step_result';
+    const held = record.result === 'pass' ? true : l === broke ? false : !reasons.length ? true : unsure ? null : false;
+    const c = compared(l, l === broke ? record.reasonCode! : held === false ? reasons[0]! : '', step);
+    return { ...c, held, says: expGot(c) };
+  });
+}
+
 /** A value as the page writes it: text quoted, everything else as JSON. */
 const shown = (v: unknown): string => (typeof v === 'string' ? JSON.stringify(v) : JSON.stringify(v) ?? String(v));
 /**
@@ -88,6 +109,8 @@ function singular(word: string): string | null {
   if (/(?:ses|ies|oes|ches|zzes|ves)$/.test(word)) return null;
   return word.slice(0, -1);
 }
+/** The word a stand-in's count is said in, for `n` of them ("charge", "charges"), as the verdict says it. */
+export const countNoun = (check: string, n: unknown): string => nounOf(check, n);
 /**
  * One wording for every expected-and-got line, on the page and in `grow --json`: "Expected 2 charges, got 3" for a stand-in's
  * call count (counted in the route's own word), "Expected body.count 0, got 1" for any other check, which it names.

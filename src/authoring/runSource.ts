@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { EXIT_CODES } from '../core/executor.ts';
-import { CaseSpec, DigestSchema, EffectiveConfig, HostPlan, RepositoryPath, digestOfValue, refKey, type Step } from '../protocol/index.ts';
+import { BoundaryObservation, CaseSpec, DigestSchema, EffectiveConfig, HostPlan, RepositoryPath, digestOfValue, refKey, verifySelfDigest, type ExecutionReceipt, type Step } from '../protocol/index.ts';
 import { caseReport } from './run.ts';
-import { TestRunReport, invalidateRunReport } from './runReport.ts';
+import { TestRunReport, invalidateRunReport, type CaseReport } from './runReport.ts';
 import { describeSnapshot } from './verificationSource.ts';
 import type { VerificationSourceBinding } from './sourceSelection.ts';
 import type { CompiledFlowInfo, CompiledStepInfo } from './compile.ts';
@@ -42,6 +42,25 @@ function stepInfo(step: Step, persona: string, assertions: CaseSpec['assertions'
   return { ...common, method: step.kind.startsWith('job.') ? 'JOB' : step.kind === 'mcp.call' ? 'MCP' : 'UI', path: step.id };
 }
 
+/**
+ * Each service a case's run used, as its sealed records say: every boundary it observed (the application, its storage) in the
+ * mode it observed it, then every stand-in the host launched in place of a third party, with whether a step recorded its calls.
+ * Only boundary observations bound to the receipt count; nothing is called real that the run did not observe as real.
+ */
+const MODE_WORD: Record<string, string> = { real: 'real', stubbed: 'stand-in', recorded_replay: 'recorded replay', synthetic_runtime: 'synthetic', unknown: 'not recorded' };
+function servicesOf(runDir: string, receipt: ExecutionReceipt, host: HostPlan | null, steps: CaseReport['steps']): NonNullable<CaseReport['services']> {
+  let boundaries: BoundaryObservation[] = [];
+  try {
+    const raw = JSON.parse(readBoundedFile(join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId), 'boundaries.json'), 4 * 1024 * 1024).toString('utf8')) as unknown[];
+    boundaries = raw.map((b) => BoundaryObservation.parse(b)).filter((b) => verifySelfDigest(b) && receipt.boundaryObservationRefs.some((r) => refKey(r) === refKey(b.ref)));
+  } catch { boundaries = []; }
+  const watched = new Set(steps.flatMap((x) => (x.calls ?? []).length || x.method === 'STANDIN' ? [x.path.split(' ')[0]!] : []));
+  return [...boundaries.map((b) => ({ name: b.boundaryId, mode: MODE_WORD[b.observedMode] ?? b.observedMode })),
+    // a host plan the bundle does not hold cannot say which stand-ins ran, so that is said, never left as "all real"
+    ...(host ? (host.launch?.standIns ?? []).map((x) => ({ name: x.name, mode: 'stand-in', calls: watched.has(x.name) ? 'recorded' as const : 'not recorded' as const }))
+      : [{ name: 'stand-ins', mode: 'not recorded' }])];
+}
+
 /** Reconstruct every product fact from one verified capture. Summary fields supply file hints only. */
 export function readRunSource(runDir: string, input: unknown): CheckedRunReport {
   const parsed = TestRunReport.safeParse(input);
@@ -64,9 +83,11 @@ export function readRunSource(runDir: string, input: unknown): CheckedRunReport 
       const hint = report.cases.find(c => c.caseId === spec.ref.id)?.file;
       const flow: CompiledFlowInfo = { caseId: spec.ref.id, file: RepositoryPath.safeParse(hint).success ? hint! : '', title: spec.purpose,
         tags: [], risk: spec.risk, fixtures: [], steps: spec.steps.map(step => stepInfo(step, spec.personaRef.id, spec.assertions)) };
-      const verified = caseReport(receipt, flow, spec.assertions);
+      const verified = caseReport(receipt, flow, spec.assertions, spec.steps);
       // Requests are read from the sealed events, bound to the receipt's events digest.
       try { verified.requests = verifiedObservedRequests(receipt, readBoundedFile(join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId), 'events.jsonl'), 16 * 1024 * 1024)); } catch { verified.requests = []; }
+      const host = HostPlan.safeParse(bundle.documents[refKey(bundle.selection.cells.find((c) => c.selectionCellId === receipt.selectionCellId)?.executionHostRef ?? receipt.executionHostRef)]);
+      verified.services = servicesOf(runDir, receipt, host.success ? host.data : null, verified.steps);
       return verified;
     });
     const starts = bundle.receipts.flatMap(receipt => receipt.startedAt ? [receipt.startedAt] : []).sort();
