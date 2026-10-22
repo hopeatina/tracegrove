@@ -458,6 +458,19 @@ describe('What happened, with several failures', () => {
     await phone.close();
   });
 
+  it('counts a saved run in the flow’s history once it is whole, even when it was read while still being written', () => {
+    const failRun = state.run[state.scenarios.find((x) => state.run[x.id]?.flow === 'seats.remove-seat')!.id]!.run!;
+    const runs = join(dir, '.tracegrove', 'runs'), late = join(runs, '2026-01-01T00-00-02Z_fail_c0ffee');
+    const before = happenedIn(dir, failRun, 'seats.remove-seat')!.history;
+    // its summary is written, its evidence not yet: it is not counted
+    cpSync(join(runs, failRun, 'summary.json'), join(late, 'summary.json'));
+    expect(happenedIn(dir, failRun, 'seats.remove-seat')!.history).toEqual(before);
+    // once its evidence is there and verifies, it is
+    for (const name of readdirSync(join(runs, failRun))) if (name !== 'summary.json') cpSync(join(runs, failRun, name), join(late, name), { recursive: true });
+    expect(happenedIn(dir, failRun, 'seats.remove-seat')!.history).toEqual({ ...before, saved: before.saved + 1, failed: before.failed + 1 });
+    rmSync(late, { recursive: true, force: true });
+  });
+
   it('lists each stand-in call once when two watch steps read the same route', async () => {
     writeFileSync(join(dir, 'tracegrove', 'seats', 'twice.flow.yaml'), ['title: Each charge is counted as it lands', 'risk: critical', 'tags: [billing, seats]', 'steps:',
       '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 200',

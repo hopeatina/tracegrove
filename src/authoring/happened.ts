@@ -153,8 +153,9 @@ function footOf(c: CaseReport, steps: StepReport[]): string[] {
   return out;
 }
 
-/** The saved runs beside this one that ran the flow, newest first, as their verified evidence says; read once each. */
-const outcomes = new Map<string, Array<{ caseId: string; outcome: string }> | null>();
+/** The saved runs beside this one that ran the flow, newest first, as their verified evidence says; read once each once it
+ *  verifies. A run that does not verify yet (one still being written, say) is read again next time, never kept as unreadable. */
+const outcomes = new Map<string, Array<{ caseId: string; outcome: string }>>();
 function historyOf(root: string, caseId: string, current: string): Happened['history'] {
   let names: string[] = [];
   try { names = readdirSync(join(root, '.tracegrove', 'runs')).filter((n) => n !== 'latest' && SavedRunName.safeParse(n).success).sort().reverse(); } catch { names = []; }
@@ -164,11 +165,11 @@ function historyOf(root: string, caseId: string, current: string): Happened['his
     try { dir = savedRunDirectory(root, name); } catch { continue; }
     // A run's summary names the flows it ran; one that does not name this flow is passed over unread.
     try { if (!readFileSync(join(dir, 'summary.json'), 'utf8').includes(JSON.stringify(caseId))) continue; } catch { /* no summary: read its evidence */ }
-    let cases = outcomes.get(dir);
-    if (cases === undefined) {
+    let cases = outcomes.get(dir) ?? null;
+    if (!cases) {
       const r = isRunDirectory(dir) ? readSavedRun(dir) : null;
       cases = r && r.evidenceStatus === 'verified' ? r.cases.map((q) => ({ caseId: q.caseId, outcome: q.outcome })) : null;
-      outcomes.set(dir, cases);
+      if (cases) outcomes.set(dir, cases);
     }
     const mine = cases?.find((q) => q.caseId === caseId);
     if (!mine) continue;
