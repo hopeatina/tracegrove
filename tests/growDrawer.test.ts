@@ -317,6 +317,32 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('opened from the verdict at 1440 × 900, shows the step that broke, the answer in one line and Rerun, Heal and Run tab right under it, all on screen', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await page.getByTestId('grow-verdict-open').click();
+    await opened(page);
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    await page.waitForTimeout(100);
+    await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
+    const seen = await page.evaluate(() => {
+      const d = document.querySelector('[data-testid="grow-happened"]')!;
+      const whole = (e: Element | null) => { if (!e) return null; const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; };
+      const at = (id: string) => whole(d.querySelector(`[data-testid="${id}"]`));
+      const after = (x: Element, y: Element) => !!(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const one = d.querySelector('[data-testid="grow-happened-oneline"]')!, rerun = d.querySelector('[data-testid="grow-happened-rerun"]')!;
+      const steps = d.querySelector('.gw-drs')!, tabs = d.querySelector('[role="tablist"]')!;
+      return { head: whole(d.querySelector('.gw-drh')), step: whole(d.querySelector('.gw-drs [aria-pressed=true]')), oneline: at('grow-happened-oneline'),
+        rerun: at('grow-happened-rerun'), heal: at('grow-happened-heal'), runtab: at('grow-happened-runtab'),
+        // the steps, then the answer, then what to do about it, then the evidence, and the link to this step last
+        order: after(steps, one) && after(one, rerun) && after(rerun, tabs) && after(tabs, d.querySelector('[data-testid="grow-happened-copy"]')!),
+        under: rerun.closest('.gw-dra')!.previousElementSibling === one, copies: d.querySelectorAll('[data-testid="grow-happened-copy"]').length };
+    });
+    expect(seen).toEqual({ head: true, step: true, oneline: true, rerun: true, heal: true, runtab: true, order: true, under: true, copies: 1 });
+    await page.close();
+  });
+
   it('does not preview a mode under a pointer that has not moved while the page scrolled to the drawer', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
@@ -614,6 +640,44 @@ describe('What happened in a run that never reached its checks', () => {
     expect([e.history.saved, e.history.passed, e.history.failed, e.unfinished.notReached]).toEqual([2, 1, 0, 1]);
     expect(e.historyLine).toBe('Passed 1 of 2 saved runs; 1 never reached its checks.');
   }, 120_000);
+
+  it('opened from Not proven yet’s next action, says why it could not run on screen, above the steps it never ran, at 1440 × 900 and on a phone', async () => {
+    // the seats branch, whose app exits before it is ready: every flow's run never reaches its checks
+    const dir = plotlineSeats(); mine.push(dir);
+    const app = join(dir, 'app', 'billing.mjs');
+    writeFileSync(app, `console.error('billing is down');\nprocess.exit(3);\n${readFileSync(app, 'utf8')}`);
+    git(dir, 'commit', '-qam', 'Billing that never starts');
+    const { state } = await grow({ dir, branch: 'seats', base: 'main', mode: 'min', prove: true, gh: false, agent: { off: true } });
+    expect(growVerdict(state)).toMatchObject({ verdict: 'not proven yet', exitCode: 3 });
+    const server = await startUi({ dir, branch: 'seats', port: 0, token: TOKEN });
+    const browser = await chromium.launch({ headless: true });
+    const errors: string[] = [];
+    try {
+      for (const [width, height] of [[1440, 900], [390, 844]] as const) {
+        const phone = width < 500;
+        const page = await browser.newPage({ viewport: { width, height }, isMobile: phone, hasTouch: phone });
+        page.on('pageerror', (e) => { errors.push(String(e)); });
+        await page.goto(server.url);
+        const next = page.getByTestId('grow-verdict-next');
+        await expect(next.textContent()).resolves.toBe('See why it could not run ›');
+        await next.click();
+        await page.getByTestId('grow-happened-oneline').waitFor();
+        await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+        await page.waitForTimeout(100);
+        const seen = await page.evaluate(() => {
+          const d = document.querySelector('[data-testid="grow-happened"]')!;
+          const whole = (e: Element | null) => { if (!e) return null; const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; };
+          const one = d.querySelector('[data-testid="grow-happened-oneline"]')!, steps = d.querySelector('.gw-drs')!, rerun = d.querySelector('[data-testid="grow-happened-rerun"]')!;
+          const after = (x: Element, y: Element) => !!(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
+          return { text: one.textContent, oneline: whole(one), rerun: whole(rerun), head: whole(d.querySelector('.gw-drh')), order: after(one, rerun) && after(rerun, steps),
+            notRun: Array.from(d.querySelectorAll('.gw-drs li')).every((li) => /not run/.test(li.textContent ?? '')) };
+        });
+        expect(seen, `${width}`).toEqual({ text: 'In one lineCould not run: the app did not start (application exited before becoming ready).', oneline: true, rerun: true, head: true, order: true, notRun: true });
+        await page.close();
+      }
+    } finally { await browser.close(); await server.close(); }
+    expect(errors).toEqual([]);
+  }, 180_000);
 
   it('says the saved runs as they went: failures, runs that never reached their checks, cancelled and inconclusive ones', () => {
     const none = { notReached: 0, cancelled: 0, inconclusive: 0 };

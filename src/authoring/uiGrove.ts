@@ -797,10 +797,13 @@ function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus=d.from||'d
 /* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used,
    or one pressed while another dialog is open over the page, is left alone */
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||gwOverlay(e.target)||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
-/* The drawer's head and the step it opened on (with no run, its buttons) both come into view: the page scrolls as little as it
-   can, and the panel beside the tree, or the sheet under its head, scrolls inside itself */
+/* The drawer's head and the step it opened on (with no run, its buttons) both come into view, and its actions under the answer
+   too when all of them fit: the page scrolls as little as it can, and the panel beside the tree, or the sheet under its head,
+   scrolls inside itself */
 function gwDrReveal(){const S=gw.slots,box=S&&S.ins,el=box&&box.querySelector('.gw-dr');if(!el||!el.isConnected)return;const m=8;
- const hd=el.querySelector('.gw-drh'),st=el.querySelector('.gw-drs [aria-pressed=true]')||el.querySelector('.gw-dra')||hd;const sheet=getComputedStyle(box).position==='fixed';
+ const hd=el.querySelector('.gw-drh'),acts=el.querySelector('.gw-dra');let st=el.querySelector('.gw-drs [aria-pressed=true]')||acts||hd;const sheet=getComputedStyle(box).position==='fixed';
+ if(acts&&acts!==st){const room=Math.min(innerHeight,sheet?box.getBoundingClientRect().height:innerHeight)-2*m,top=hd.getBoundingClientRect().top;
+  if(Math.max(acts.getBoundingClientRect().bottom,st.getBoundingClientRect().bottom)-top<=room&&acts.getBoundingClientRect().bottom>st.getBoundingClientRect().bottom)st=acts}
  if(box.scrollHeight>box.clientHeight+1){const r=box.getBoundingClientRect(),a=hd.getBoundingClientRect(),b=st.getBoundingClientRect();let dy=0;
   if(sheet){if(b.top<a.bottom)dy=b.top-a.bottom-m;else if(b.bottom>r.bottom-m)dy=Math.min(b.bottom-(r.bottom-m),b.top-a.bottom-m)}
   else if(a.top<r.top)dy=a.top-r.top;else if(b.bottom>r.bottom-m)dy=Math.min(b.bottom-(r.bottom-m),a.top-r.top);
@@ -891,14 +894,21 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  else if(key==='requests')body=steps.map((q,i)=>q.result==='not_run'?grp(i,h('div',{class:'sub'},'not sent: the run stopped before this step')):grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms · '+(q.watch.polls!=null?q.watch.polls+' poll'+(q.watch.polls===1?'':'s'):'polls not recorded'):'')
    :gwDrPath(q)+(q.request&&q.request.body?' '+q.request.body+(q.request.declared?' (body as declared)':''):'')+(q.request?' · as '+q.request.as:'')),
   h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.httpMs!=null?'app time not recorded':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
- gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,ol,
-  h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),
+ /* the answer in one line, and what to do about it (rerun, compare, heal, the Run tab) right under it, so they are on screen
+    with the step that broke; a run that never reached its checks says why before the steps it never ran. The link to this
+    step closes the drawer, after its evidence. */
+ const one=[h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),gwDrActs(x,D,true)];
+ const unreached=steps.length>0&&steps.every(q=>q.result==='not_run');
+ gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,
+  unreached?one:null,ol,unreached?null:one,
   list,key?h('div',{class:'gw-drp',id:'gw-drp',role:'tabpanel','aria-labelledby':'gw-drt-'+key,'data-testid':'grow-happened-panel'},body):null,
-  gwDrActs(x,D),
-  D.foot.length?h('div',{class:'gw-drf','data-testid':'grow-happened-foot'},h('span',{class:'gw-eyebrow'},'Not recorded'),D.foot.map(t=>h('p',{},t))):null);
+  D.foot.length?h('div',{class:'gw-drf','data-testid':'grow-happened-foot'},h('span',{class:'gw-eyebrow'},'Not recorded'),D.foot.map(t=>h('p',{},t))):null,
+  h('div',{class:'gw-dra gw-drend'},gwDrCopyBtn()));
  return el}
-/* Rerun, compare with the last run that passed, heal, the Run tab at this run and step, and a link to this step */
-function gwDrActs(x,D){const s=gw.state,d=gw.dr,r=s.run[x.id];const fail=!!r&&r.st==='fail';const flow=r&&r.flow||x.flow;const cfg=s.flows&&s.flows.config||null;const away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
+const gwDrCopyBtn=()=>h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link');
+/* Rerun, compare with the last run that passed, heal, the Run tab at this run and step, and a link to this step (left for the
+   drawer's end when it sits under the answer) */
+function gwDrActs(x,D,under){const s=gw.state,d=gw.dr,r=s.run[x.id];const fail=!!r&&r.st==='fail';const flow=r&&r.flow||x.flow;const cfg=s.flows&&s.flows.config||null;const away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
  const hs=D&&D.history;const why=[];
  if(away)why.push('This grow ran with '+cfg+', so rerun and compare it from that folder.');
  else if(fail&&hs&&!hs.lastPass)why.push('Compare with last pass: it never passed in '+gwDrRuns(hs.saved)+'.');
@@ -907,7 +917,7 @@ function gwDrActs(x,D){const s=gw.state,d=gw.dr,r=s.run[x.id];const fail=!!r&&r.
    fail?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-compare',disabled:!(hs&&hs.lastPass)||away,on:{click:()=>{const c=ui.comparison;c.baseline=hs.lastPass;c.candidate=d.run;openTab('Compare')}}},'Compare with last pass'):null,
    fail?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-heal',on:{click:()=>openTab('Heal')}},'Heal'):null,
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-runtab',on:{click:()=>gwOpenRun(x.id,d.step===null?undefined:d.step)}},'Run tab ↗'),
-   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link')),
+   under?null:gwDrCopyBtn()),
   why.length?h('p',{class:'gw-drw','data-testid':'grow-happened-why'},why.join(' ')):null]}
 /* A scenario with no run: why, what it would prove and where it starts, and the way to write its flow */
 function gwDrNone(x,r,j,M){const why=String(r&&r.why||(x.flow?'This grow did not run its flow':'No flow proves this yet')).replace(/([^.!?])$/,'$1.');const u=M.U[x.unit]||{};
