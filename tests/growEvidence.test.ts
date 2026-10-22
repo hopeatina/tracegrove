@@ -4,8 +4,9 @@ import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
-import { grow, writtenFlowResult } from '../src/authoring/grow.ts';
-import { draftWithAgent } from '../src/authoring/workspace.ts';
+import { attributeWritten, grow, writtenFlowResult } from '../src/authoring/grow.ts';
+import type { ChangeUnit } from '../src/authoring/growChange.ts';
+import { draftWithAgent, type ProvedFlow } from '../src/authoring/workspace.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, inMode, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
@@ -824,6 +825,26 @@ describe('A flow an agent wrote that never reached its checks', () => {
   const FLOW = ['title: Without a token the count is refused', 'tags: [discovered]', 'steps:', '  - name: anonymous is refused', '    GET: /notes/count', '    as: none', '    expect: 401', ''].join('\n');
   /** The plotline grow, with s10's run replaced by what the written flow proved. */
   const asWritten = (flow: Parameters<typeof writtenFlowResult>[1]) => plotline((e) => (e.kind === 'scenario.failed' && e.scenario === 's10' ? { v: e.v, seq: e.seq, ms: e.ms, ...writtenFlowResult('s10', flow) } as GrowEvent : e));
+
+  it('gives a scenario to the written flow that reached its route before one that served nothing, whichever file came first', () => {
+    const units = [{ id: 'u1', kind: 'route', method: 'GET', path: '/notes/count', label: 'GET /notes/count' }] as unknown as ChangeUnit[];
+    const open = [{ id: 's2', unit: 'u1', title: 'Without a token the count is refused', proves: 'A caller with no token gets 401 or 403, never the count.' }] as unknown as GrowState['scenarios'];
+    const flow = (file: string, more: Partial<ProvedFlow>): ProvedFlow => ({ file, caseIds: [], outcome: 'failed', repairs: 0, detail: null, served: [], run: null, caseOutcome: null, failure: null, verified: null, ...more });
+    const title = 'Without a token the count is refused';
+    // the first file did not compile, so it served nothing; the second reached GET /notes/count and passed. Both say the same thing.
+    const broken = { file: 'a.flow.yaml', title, flow: flow('a.flow.yaml', { detail: 'unknown method FROB', failure: '(compile): unknown method FROB' }) };
+    const good = { file: 'b.flow.yaml', title, flow: flow('b.flow.yaml', { outcome: 'proven', caseIds: ['discovered.count-anonymous'], served: ['GET /notes/count'], run: 'r1', caseOutcome: 'passed', verified: true }) };
+    expect(writtenFlowResult('s2', broken.flow).kind).toBe('scenario.not_run');
+    const ids = (m: Map<string, { id: string }>) => [...m].map(([f, x]) => [f, x.id]);
+    expect(ids(attributeWritten([broken, good], open, units))).toEqual([['b.flow.yaml', 's2']]);
+    expect(ids(attributeWritten([good, broken], open, units))).toEqual([['b.flow.yaml', 's2']]);
+    // alone, the one that served nothing is still the scenario its title says, read as not tested yet
+    expect(ids(attributeWritten([broken], open, units))).toEqual([['a.flow.yaml', 's2']]);
+    // a flow that served another route never takes it, and neither does one whose title says something else
+    const other = { file: 'c.flow.yaml', title, flow: flow('c.flow.yaml', { outcome: 'proven', caseIds: ['discovered.other'], served: ['GET /notes'], run: 'r2', caseOutcome: 'passed', verified: true }) };
+    expect(ids(attributeWritten([other], open, units))).toEqual([]);
+    expect(ids(attributeWritten([{ ...broken, title: 'Deleting a note' }], open, units))).toEqual([]);
+  });
 
   it('reads an app that did not start as not tested yet, with the reason and the run that says so: exit 3, never 1', async () => {
     const dir = notesCount(false);

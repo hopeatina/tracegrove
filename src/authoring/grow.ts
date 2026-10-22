@@ -783,6 +783,31 @@ export function writtenFlowResult(scenario: string, flow: Pick<ProvedFlow, 'outc
   return { kind: 'scenario.not_run', scenario, why, ...(flow.run ? { run: flow.run } : {}), ...(flow.caseOutcome ? { outcome: flow.caseOutcome } : {}) };
 }
 
+/**
+ * The scenario each flow an agent wrote speaks for, by file. A written flow speaks for a scenario when it says the same thing (two
+ * or more terms shared with the scenario's title and claim) and either reached that scenario's route, or served nothing at all:
+ * one that did not compile, whose run never reached its checks, or whose evidence did not verify leaves no request on record, so
+ * it is the scenario its title says, read only as not tested yet, with why. Flows that reached a route are matched first, then
+ * those that served nothing, only to the scenarios still open, so one that served nothing never takes a scenario from a later
+ * flow that reached its route. Each scenario takes at most one flow.
+ */
+export function attributeWritten(written: Array<{ file: string; title: string; flow: ProvedFlow | undefined }>, open: GrowState['scenarios'], units: ChangeUnit[]): Map<string, GrowState['scenarios'][number]> {
+  const out = new Map<string, GrowState['scenarios'][number]>(); const taken = new Set<string>();
+  const unreached = (flow: ProvedFlow) => flow.served.length === 0 && writtenFlowResult('', flow).kind === 'scenario.not_run';
+  for (const pass of ['reached', 'unreached'] as const) {
+    for (const { file, title, flow } of written) {
+      if (!flow || out.has(file) || (pass === 'unreached') !== unreached(flow)) continue;
+      const said = termsOf(title);
+      const target = open.map((s) => { const u = units.find((y) => y.id === s.unit);
+        const reached = !!u && flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
+        const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
+        return { s, score: !taken.has(s.id) && (pass === 'unreached' || reached) && shared >= 2 ? shared : 0 }; }).filter((q) => q.score).sort((a, b) => b.score - a.score)[0]?.s;
+      if (target) { out.set(file, target); taken.add(target.id); }
+    }
+  }
+  return out;
+}
+
 async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | null) {
   const { emit, state } = ctx;
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[state.mode]);
@@ -850,20 +875,13 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     try {
       const drafted = await draftWithAgent({ dir: root, branch: null, intent, overrides: { provider: agent.provider, model: agent.model }, prove: true,
         onActivity: (line) => emit({ kind: 'agent.said', agent: 'd1', line }), ...(ctx.signal ? { signal: ctx.signal } : {}) });
+      const written = drafted.agent.files.map((file) => ({ file, flow: drafted.prove?.flows.find((f) => f.file === file),
+        title: (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })() }));
+      const targets = attributeWritten(written, draftable.filter((s) => !state.run[s.id]), ctx.units);
       let x = 1;
-      for (const file of drafted.agent.files) {
+      for (const { file, flow } of written) {
         const ext = `x${++x}`;
-        const flow = drafted.prove?.flows.find((f) => f.file === file);
-        // A written flow speaks for a scenario only when it reached that scenario's route and says the same thing. One that served
-        // nothing (it did not compile, its run never reached its checks, or its evidence did not verify, which leaves no request on
-        // record) is the scenario its title says, and is read only as not tested yet, with why: it can neither pass nor fail it.
-        const title = (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })();
-        const said = termsOf(title);
-        const unreached = !!flow && flow.served.length === 0 && writtenFlowResult('', flow).kind === 'scenario.not_run';
-        const target = flow ? draftable.map((s) => { const u = ctx.units.find((y) => y.id === s.unit)!;
-          const reached = flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
-          const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
-          return { s, score: !state.run[s.id] && (reached || unreached) && shared >= 2 ? shared : 0 }; }).filter((x) => x.score).sort((a, b) => b.score - a.score)[0]?.s : undefined;
+        const target = targets.get(file);
         emit({ kind: 'extension.written', ext, extKind: file.endsWith('.action.yaml') ? 'action' : 'flow', name: basename(file), path: relative(ctx.dir, join(root, file)),
           why: 'No existing flow proved this scenario.', state: 'unproven', need: 'Counts once its run passes end to end; review it before relying on it.', unit: target?.unit ?? null });
         if (!flow || !target) continue;
