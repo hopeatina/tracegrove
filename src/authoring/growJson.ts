@@ -4,12 +4,12 @@
  * not record is null.
  */
 import { existsSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { expGot } from './checkCompare.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
 import { MODES, growVerdict, growView, inMode, plainTitle, failReason, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
-import { savedRunDirectory } from './runLocation.ts';
+import { configRunsRoot, savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
 
 export type GrowFailure = {
@@ -51,7 +51,8 @@ function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFail
   if (!run) return found;
   let runDir: string;
   // A run that is not saved in this folder leaves `saved` false, and nothing to point at.
-  try { runDir = savedRunDirectory(join(dir, dirname(s.flows?.config ?? '.')), run); } catch { return found; }
+  const root = s.flows?.config ? configRunsRoot(dir, s.flows.config) : dir;
+  try { if (!root) return found; runDir = savedRunDirectory(root, run); } catch { return found; }
   out.saved = true;
   const rel = (p: string) => relative(dir, p);
   if (existsSync(join(runDir, 'summary.json'))) out.evidence.push(rel(join(runDir, 'summary.json')));

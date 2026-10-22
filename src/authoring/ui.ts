@@ -33,7 +33,7 @@ import { readRunSource, readSavedRun } from './runSource.ts';
 import { envList } from '../environments/commands.ts';
 import { runEnvDoctor } from '../environments/doctorCache.ts';
 import { SavedRunName } from './runReport.ts';
-import { isRunDirectory } from './runLocation.ts';
+import { configRunsRoot, isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
 import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
 import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
@@ -97,6 +97,12 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       .map((name) => { const r = readSavedRun(join(runsDir, name));
         return { name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, evidenceStatus: r.evidenceStatus, bundleVerified: r.bundleVerified, environment: r.environment ?? null,
           cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }; });
+  };
+  /** Where a named run is saved: in this folder, or, for a grow whose config is in a subfolder (`?config=`, as the grow recorded
+   *  it), beside that config, where the grow saved it. Null for a config outside this folder. */
+  const runRoot = (url: URL): string | null => {
+    const config = url.searchParams.get('config');
+    return config === null || config === '' ? dir : configRunsRoot(dir, config);
   };
   const testDir = () => {
     try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
@@ -325,9 +331,11 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
       if ((req.method === 'GET' || req.method === 'HEAD') && video) {
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
         try {
-          if (readSavedRun(join(dir, STATE_DIR, 'runs', decodeURIComponent(video[1]!))).evidenceStatus !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
-          const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
+          if (readSavedRun(join(root, STATE_DIR, 'runs', decodeURIComponent(video[1]!))).evidenceStatus !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
+          const bytes = readRunVideo(root, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
           const range = videoRange(req.headers.range, bytes.length);
           const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
             'cross-origin-resource-policy': 'same-origin', 'x-content-type-options': 'nosniff' };
@@ -355,7 +363,9 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
-        const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
+        const file = join(root, STATE_DIR, 'runs', name, 'summary.json');
         return existsSync(dirname(file)) ? send(200, readSavedRun(dirname(file))) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {

@@ -663,25 +663,30 @@ function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to 
 const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'||r.st==='not_run'))};
 async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];const say=t=>{if(!quiet)toast(t)};
  if(!x||!gwRan(x)){say('No run was recorded for this scenario.');return false}
- const flow=r.flow||x.flow;let run;
- try{run=await api('/api/runs/'+encodeURIComponent(r.run))}catch(e){say('The run '+r.run+' is not saved in this folder any more.');return false}
+ /* the grow saved its runs beside the config it ran with (dogfood/tracegrove.config.yaml saves them in dogfood/), so they are
+    read from there; "not saved" is said only when that folder has no such run */
+ const flow=r.flow||x.flow,cfg=s.flows&&s.flows.config||null,sub=cfg&&cfg.lastIndexOf('/')>0?cfg.slice(0,cfg.lastIndexOf('/')):null;let run;
+ try{run=await api('/api/runs/'+encodeURIComponent(r.run)+(cfg?'?config='+encodeURIComponent(cfg):''))}
+ catch(e){say(e&&e.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':'The run '+r.run+' could not be read'+(e&&e.error?': '+e.error:'')+'.');return false}
  const c=(run.cases||[]).find(k=>k.caseId===flow)||((run.cases||[]).length===1?run.cases[0]:null);
  if(!c){say('The run '+r.run+' has no record of '+(flow||'this scenario')+'.');return false}
  const steps=c.steps.filter(k=>k.declared!==false);const bad=k=>k&&(k.result==='failed'||k.result==='cancelled'||(k.checks==='fail'&&k.result==='completed'));
  let i=c.failure?steps.findIndex(k=>k.name===c.failure.step||k.id===c.failure.step):-1;if(i<0||!bad(steps[i]))i=steps.findIndex(bad);
  if(typeof at==='number'&&at>=0&&at<steps.length)i=at;
- ui.runName=r.run;ui.run=run;ui.sel=c.caseId;ui.step=Math.max(0,i);gw.happened={sid:sid,run:r.run,flow:c.caseId};gw.pinned='s:'+sid;
+ ui.runName=r.run;ui.runAt={name:r.run,config:cfg};ui.run=run;ui.sel=c.caseId;ui.step=Math.max(0,i);gw.happened={sid:sid,run:r.run,flow:c.caseId};gw.pinned='s:'+sid;
  /* the list of runs the Run tab offers may predate this grow */
  try{state=await api('/api/overview')}catch(e){}
  openTab('Run');return true}
 /* "Open the runs" opens the first failure's run at its failing step; with no failure, the latest run this grow made. It is
    never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say), it says so and
-   tries the next failure's run, then the newest run this grow saved, and at last opens the Run tab as it is. */
+   tries the next failure's run, then the newest run this grow saved, and at last opens the Run tab as it is. A grow whose
+   config is in a subfolder stays here instead: this folder's Run tab would only offer to plant a config it already has. */
 async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
  const fails=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x));
  const ran=s.scenarios.filter(x=>gwRan(x)&&fails.indexOf(x)<0).sort((a,b)=>String(s.run[b.id].run).localeCompare(String(s.run[a.id].run)));
  const tries=fails.concat(ran);
  for(let i=0;i<tries.length;i++)if(await gwOpenRun(tries[i].id,undefined,i>0))return;
+ if(!state.hasConfig&&s.flows&&s.flows.config){if(!tries.length)toast('This grow saved no run to open.');return}
  openTab('Run')}
 /* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. */
 function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap',type:'button','data-hap':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwOpenRun(x.id)}}},'See what happened ›'):null}

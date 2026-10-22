@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -8,20 +8,23 @@ import { grow } from '../src/authoring/grow.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
+import { configRunsRoot } from '../src/authoring/runLocation.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
 import { plainLine } from '../src/cli/renderGrove.ts';
 
 /* The notes sample on main, and a branch, checked out, that adds GET /notes/count with two flows that prove it and three
-   criteria in its commit. With `buggy`, the count forgets to filter by owner, so "another user counts none" fails at step 3. */
+   criteria in its commit. With `buggy`, the count forgets to filter by owner, so "another user counts none" fails at step 3.
+   With `sub`, the project (its config, flows and app) sits in that subfolder of the repo, as a dogfood project does. */
 const temps: string[] = [];
 const git = (dir: string, ...args: string[]) => execFileSync('git', ['-C', dir, '-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { stdio: 'pipe' }).toString();
-function notesCount(buggy: boolean): string {
-  const dir = mkdtempSync(join(tmpdir(), 'tracegrove-evidence-')); temps.push(dir);
+function notesCount(buggy: boolean, sub = ''): string {
+  const repo = mkdtempSync(join(tmpdir(), 'tracegrove-evidence-')); temps.push(repo);
+  const dir = sub ? join(repo, sub) : repo;
   cpSync(join(import.meta.dirname, '..', 'src', 'samples', 'notes-api'), dir, { recursive: true });
-  git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Notes sample');
-  git(dir, 'checkout', '-qb', 'notes-count');
+  git(repo, 'init', '-q', '-b', 'main'); git(repo, 'add', '-A'); git(repo, 'commit', '-qm', 'Notes sample');
+  git(repo, 'checkout', '-qb', 'notes-count');
   const app = join(dir, 'app', 'app.mjs');
   writeFileSync(app, readFileSync(app, 'utf8').replace('  const match = url.pathname.match(', [
     "  if (req.method === 'GET' && url.pathname === '/notes/count') {",
@@ -38,9 +41,9 @@ function notesCount(buggy: boolean): string {
   writeFileSync(join(dir, 'tracegrove', 'notes', 'count-anonymous.flow.yaml'), [
     'title: Without a token the count is refused', 'tags: [notes]', 'steps:',
     '  - name: anonymous is refused', '    GET: /notes/count', '    as: none', '    expect: 401', ''].join('\n'));
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', "Count notes\n\n## Acceptance criteria\n- [ ] GET /notes/count returns how many notes the caller owns\n- [ ] Another user's notes are never counted\n- [ ] Without a token the count is refused");
-  return dir;
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-qm', "Count notes\n\n## Acceptance criteria\n- [ ] GET /notes/count returns how many notes the caller owns\n- [ ] Another user's notes are never counted\n- [ ] Without a token the count is refused");
+  return repo;
 }
 const cleanTemps = () => { for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true }); };
 
@@ -257,6 +260,101 @@ describe('From a grown scenario to its run', () => {
     const stopped = plotline(); stop(stopped, 'git_unavailable');
     await show(stopped);
     expect(await v.count()).toBe(0);
+    await page.close();
+  });
+});
+
+describe('A grow whose config is in a subfolder', () => {
+  /* The project sits in svc/ of its repo, as tg's dogfood/ does: the grow finds svc/tracegrove.config.yaml and saves its runs
+     in svc/.tracegrove/runs. The page's server runs over the repo, which has no config of its own. */
+  let dir = '', state: GrowState, server: UiServer, browser: Browser;
+  let failed = '', failRun = '';
+  const errors: string[] = [];
+  beforeAll(async () => {
+    dir = notesCount(true, 'svc');
+    ({ state } = await grow({ dir, branch: 'notes-count', base: 'main', mode: 'min', prove: true, gh: false, agent: { off: true } }));
+    failed = state.scenarios.find((x) => state.run[x.id]?.st === 'fail')!.id;
+    failRun = state.run[failed]!.run!;
+    server = await startUi({ dir, branch: 'notes-count', port: 0, token: 'tk-0123456789abcdef' });
+    browser = await chromium.launch({ headless: true });
+  }, 120_000);
+  afterAll(async () => { await browser?.close(); await server?.close(); cleanTemps(); expect(errors).toEqual([]); });
+  async function open(hash = ''): Promise<Page> {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url + hash);
+    return page;
+  }
+  const where = (page: Page) => page.evaluate(() => { const w = (0, eval)('({ ui, tab })'); return { tab: w.tab, run: w.ui.runName, sel: w.ui.sel, step: w.ui.step }; });
+  const landed = async (page: Page) => { await page.waitForFunction(() => (0, eval)('tab') === 'Run' && !!(0, eval)('ui').run); return where(page); };
+  const runTabShows = async (page: Page) => {
+    await expect(page.getByText('No tracegrove.config.yaml in this folder yet.').count()).resolves.toBe(0);
+    await expect(page.locator('aside[aria-label="Step detail"]').textContent()).resolves.toContain('notes.count › step 3 of 4');
+  };
+
+  it('saves its runs beside that config, and grow --json says so', () => {
+    expect(state.flows?.config).toBe('svc/tracegrove.config.yaml');
+    expect(existsSync(join(dir, 'svc', '.tracegrove', 'runs', failRun, 'summary.json'))).toBe(true);
+    expect(existsSync(join(dir, '.tracegrove', 'runs', failRun))).toBe(false);
+    const [f] = growJsonSummary(state, dir).failures;
+    expect(f).toMatchObject({ run: failRun, saved: true, step: 3 });
+    for (const p of f!.evidence) expect(p.startsWith(`svc/.tracegrove/runs/${failRun}/`)).toBe(true);
+  });
+
+  it('reads a run beside the config the page names, refuses a config outside the folder, and says not found only when it is not there', async () => {
+    const get = (path: string) => fetch(new URL(path, server.url));
+    const run = `/api/runs/${encodeURIComponent(failRun)}`;
+    expect((await get(run)).status).toBe(404);
+    const ok = await get(`${run}?config=${encodeURIComponent('svc/tracegrove.config.yaml')}`);
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { cases: Array<{ caseId: string }> }).cases.map((c) => c.caseId)).toContain('notes.count');
+    expect((await get(`/api/runs/2026-10-22T00-00-00Z_fail_gone00?config=${encodeURIComponent('svc/tracegrove.config.yaml')}`)).status).toBe(404);
+    for (const bad of ['../elsewhere/tracegrove.config.yaml', '/etc/tracegrove.config.yaml', 'svc/../../tracegrove.config.yaml']) {
+      expect((await get(`${run}?config=${encodeURIComponent(bad)}`)).status).toBe(400);
+      expect((await get(`${run}/media/${'a'.repeat(64)}?case=notes.count&config=${encodeURIComponent(bad)}`)).status).toBe(400);
+    }
+  });
+
+  it('places a grow’s runs beside its config, and refuses a path that leaves the folder or passes through a link', () => {
+    expect(configRunsRoot(dir, 'tracegrove.config.yaml')).toBe(dir);
+    expect(configRunsRoot(dir, 'svc/tracegrove.config.yaml')).toBe(join(dir, 'svc'));
+    expect(configRunsRoot(dir, './svc/tracegrove.config.yaml')).toBe(join(dir, 'svc'));
+    // A folder that is not there is still where its runs would be: they are simply not saved there.
+    expect(configRunsRoot(dir, 'gone/tracegrove.config.yaml')).toBe(join(dir, 'gone'));
+    for (const bad of ['', '../svc/tracegrove.config.yaml', '/etc/tracegrove.config.yaml', 'svc/../../x/tracegrove.config.yaml']) expect(configRunsRoot(dir, bad)).toBeNull();
+    symlinkSync(join(dir, 'svc'), join(dir, 'linked'));
+    expect(configRunsRoot(dir, 'linked/tracegrove.config.yaml')).toBeNull();
+  });
+
+  it('opens the failure’s run at its failing step from the verdict, the card and Open the runs, never the Initialize card', async () => {
+    const page = await open();
+    await page.getByTestId('grow-verdict-open').click();
+    expect(await landed(page)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count', step: 2 });
+    await runTabShows(page);
+    // The run picker offers the run the grow opened, though this folder's own list has none.
+    await expect(page.locator('select[aria-label="Run"]').inputValue()).resolves.toBe(failRun);
+    await page.close();
+    const runs = await open();
+    await runs.getByTestId('grow-open-runs').click();
+    expect(await landed(runs)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    await runTabShows(runs);
+    await runs.close();
+    // The address alone brings it back, read from beside the config again.
+    const again = await open(`#grow/${failed}/happened/step-3`);
+    expect(await landed(again)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    await runTabShows(again);
+    await again.close();
+  });
+
+  it('says a run is not saved there only when it is not, and then stays on the grow instead of offering to plant a config', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    await page.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].run) w.gw.state.run[k].run = '2026-10-22T00-00-00Z_pass_gone' + k; });
+    await page.getByTestId('grow-open-runs').click();
+    await page.locator('.toast').waitFor();
+    await expect(page.locator('.toast').textContent()).resolves.toMatch(/^The run 2026-10-22T00-00-00Z_pass_gone\w+ is not saved in svc any more\.$/);
+    expect((await where(page)).tab).toBe('Discover');
+    await expect(page.getByText('No tracegrove.config.yaml in this folder yet.').count()).resolves.toBe(0);
     await page.close();
   });
 });
