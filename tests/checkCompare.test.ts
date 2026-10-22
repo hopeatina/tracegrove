@@ -21,6 +21,26 @@ describe('What a failed check compared', () => {
   });
 });
 
+describe('The word a stand-in count is said in', () => {
+  const say = (route: string, expected: number, got: number) => expGot({ check: `payments ${route} call count`, expected, got });
+  it('is the route’s own plural only when its singular is sure, else calls, the unit the run recorded', () => {
+    expect(say('POST /v1/charges', 2, 3)).toBe('Expected 2 charges, got 3');
+    expect(say('POST /v1/charges', 1, 2)).toBe('Expected 1 charge, got 2');
+    expect(say('POST /v1/addresses', 1, 2)).toBe('Expected 1 address, got 2');
+    expect(say('POST /v1/batches', 1, 2)).toBe('Expected 1 batch, got 2');
+    expect(say('POST /v1/notes', 1, 0)).toBe('Expected 1 note, got 0');
+    // Words that only end in s, or whose singular is not sure, are never guessed at.
+    expect(say('GET /v1/status', 1, 2)).toBe('Expected 1 call, got 2');
+    expect(say('GET /v1/aliases', 1, 0)).toBe('Expected 1 call, got 0');
+    expect(say('GET /v1/aliases', 2, 0)).toBe('Expected 2 calls, got 0');
+    expect(say('GET /news', 1, 3)).toBe('Expected 1 call, got 3');
+    expect(say('GET /analysis', 2, 1)).toBe('Expected 2 calls, got 1');
+    expect(say('POST /v1/caches', 1, 2)).toBe('Expected 1 call, got 2');
+    expect(say('POST /v1/companies', 1, 2)).toBe('Expected 1 call, got 2');
+    expect(say('GET /v1/notes/{id}', 1, 2)).toBe('Expected 1 call, got 2');
+  });
+});
+
 describe('A saved run’s steps', () => {
   /* The plotline failure, as its receipt records it: three HTTP steps held, then the stand-in counted 3 charges where 2 were declared. */
   const stand = { kind: 'stand_in', standIn: 'payments', route: { method: 'POST', path: '/v1/charges' }, count: 3, calls: [], attempts: 1 };

@@ -56,14 +56,25 @@ export function comparedOf(predicate: PredicateT, record: { reasonCode: string |
 
 /** A value as the page writes it: text quoted, everything else as JSON. */
 const shown = (v: unknown): string => (typeof v === 'string' ? JSON.stringify(v) : JSON.stringify(v) ?? String(v));
-/** The thing a stand-in route's calls are, in its own word: "charges" for POST /v1/charges, else "calls". */
+/**
+ * The thing a stand-in route's calls are, in its own word: "charges" for POST /v1/charges, else "calls". The word is the
+ * route's last segment only when it is plainly a plural whose singular is sure: never a word that only ends in s (status,
+ * analysis, news, aliases, companies), which counts in calls instead, the unit the run recorded.
+ */
 function nounOf(check: string, n: unknown): string {
   const route = / call count$/.test(check) ? check.replace(/ call count$/, '') : null;
   if (route === null) return '';
   const last = (route.split(' ').pop() ?? '').split('?')[0]!.split('/').filter(Boolean).pop() ?? '';
-  const plural = /^[a-z]{3,}s$/.test(last) && !/ss$/.test(last) ? last : 'calls';
-  if (n !== 1) return plural;
-  return /(?:ss|x|ch|sh|z)es$/.test(plural) ? plural.slice(0, -2) : plural.slice(0, -1);
+  const one = /^[a-z]{3,}s$/.test(last) ? singular(last) : null;
+  return one === null ? (n === 1 ? 'call' : 'calls') : n === 1 ? one : last;
+}
+/** The singular of a plural that has only one: "charges" → "charge", "addresses" → "address", "batches" → "batch"; null
+ *  when the word is not plainly a plural or its singular is not sure ("status", "aliases", "entries", "heroes", "leaves"). */
+function singular(word: string): string | null {
+  if (/(?:ss|us|is|ws)$/.test(word)) return null;
+  if (/(?:sses|xes|tches|nches|rches|shes)$/.test(word)) return word.slice(0, -2);
+  if (/(?:ses|ies|oes|ches|zzes|ves)$/.test(word)) return null;
+  return word.slice(0, -1);
 }
 /**
  * One wording for every expected-and-got line, on the page and in `grow --json`: "Expected 2 charges, got 3" for a stand-in's
