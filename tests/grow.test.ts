@@ -1208,7 +1208,7 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 240000);
-  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, centred, feathered and short of the next boss', async () => {
+  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, centred, feathered, crisp, cut square and short of the next boss, and no red in the wood at rest', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1241,10 +1241,38 @@ describe('Grow page', () => {
         const end = R.red[R.red.length - 1];
         const stops = reds.map((e) => Array.from(document.querySelector(e.getAttribute('fill')!.slice(4, -1))!.querySelectorAll('stop')).map((q) => Number(q.getAttribute('stop-opacity'))));
         const cs = (e: Element) => getComputedStyle(e).fill, probeFill = (v: string) => { const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.style.fill = v; B.svg.append(r); const f = getComputedStyle(r).fill; r.remove(); return f; };
-        const out = { red, glow, stops, dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)') };
-        w.gbHover(null);
+        // the red's outline, walked every half pixel: none of it outside the limb's bark
+        let outline = 0, outside = 0;
+        for (const e of reds as SVGPathElement[]) { const n = e.getTotalLength(); for (let s = 0; s < n; s += .5) { const q = e.getPointAtLength(s); outline++; if (!inside(wood)(q.x, q.y)) outside++; } }
+        // each end cut square across the limb: where the red begins, at offsets across it, along the limb's own tangent there
+        const square = (from: 'start' | 'end') => {
+          const q = R.red as number[][], i = from === 'start' ? 0 : q.length - 1, j = from === 'start' ? Math.min(q.length - 1, 3) : Math.max(0, q.length - 4);
+          const a = q[i]!, l = Math.hypot(q[j]![0]! - a[0]!, q[j]![1]! - a[1]!) || 1, t = [(q[j]![0]! - a[0]!) / l, (q[j]![1]! - a[1]!) / l], n = [-t[1]!, t[0]!];
+          const f = inside(reds), c = [a[0]! + t[0]! * 4, a[1]! + t[1]! * 4], [h1, h2] = reach(f, c, n), h = Math.min(h1!, h2!);
+          const first = (v: number) => { for (let u = -12; u <= 12; u += .05) if (f(a[0]! + t[0]! * u + n[0]! * v, a[1]! + t[1]! * u + n[1]! * v)) return u; return NaN; };
+          const u0 = first(0); let worst = 0;
+          for (const k of [-.7, -.35, .35, .7]) worst = Math.max(worst, Math.abs(first(k * h) - u0) / Math.abs(k * h));
+          return h > 0 && isFinite(worst) ? Math.atan(worst) * 180 / Math.PI : 90;
+        };
+        const m = (B.svg as SVGSVGElement).getScreenCTM()!, mid = R.red.slice(Math.floor(R.red.length * .3), Math.ceil(R.red.length * .7) + 1).map((q: number[]) => { const s = new DOMPoint(q[0], q[1]).matrixTransform(m); return [s.x, s.y]; });
+        const out = { red, glow, stops, dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)'), filters: reds.map((e) => getComputedStyle(e).filter), outline, outside, ends: [square('start'), square('end')], mid };
         return out;
       };
+      // At rest, nothing pointed at and nothing pinned: no red stroke in the wood, and the wood where the scenario broke shows
+      // no red, on its spine or either side of it (the knot's own crack and name stay red; they are not on this stretch)
+      const rest = () => {
+        const w = (0, eval)('({ gw, gbRoute, gbGirth })'), B = w.gw.B, S = w.gw.state;
+        const x = S.scenarios.find((q: { id: string }) => B.leaf[q.id] && S.run[q.id] && S.run[q.id].st === 'fail');
+        const R = w.gbRoute(x), q = R.red as number[][];
+        let m = (B.svg as SVGSVGElement).getScreenCTM()!; const top = new DOMPoint(q[0]![0], q[0]![1]).matrixTransform(m); window.scrollBy(0, top.y - 400); m = (B.svg as SVGSVGElement).getScreenCTM()!;
+        const spots: number[][] = [];
+        for (let i = 0; i < q.length - 1; i++) {
+          const a = q[i]!, b = q[i + 1]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!) || 1, n = [-(b[1]! - a[1]!) / l, (b[0]! - a[0]!) / l], G = w.gbGirth(B, a);
+          for (const k of [-.15, 0, .15]) { const s = new DOMPoint(a[0]! + n[0]! * k * G, a[1]! + n[1]! * k * G).matrixTransform(m); spots.push([s.x, s.y]); }
+        }
+        return { reds: B.gRed.querySelectorAll('path.sapw').length + (B.sapW.getAttribute('d') ? 1 : 0), spots };
+      };
+      const hot = (c: number[]) => c[0]! - Math.max(c[1]!, c[2]!) > 60;
       const lum = (css: string) => {
         const m = css.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/), n = css.match(/rgba?\((\d+), (\d+), (\d+)/);
         const c = m ? m.slice(1, 4).map(Number) : n!.slice(1, 4).map((x) => Number(x) / 255);
@@ -1253,15 +1281,32 @@ describe('Grow page', () => {
       };
       for (const scheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme: scheme });
+        await page.waitForTimeout(300);
+        const at = await page.evaluate(rest);
+        expect(at.reds, scheme + ' a red stroke at rest').toBe(0);
+        const still = await pixels(browser, (await page.screenshot()).toString('base64'), at.spots);
+        expect(still.filter(hot), scheme + ' red in the wood at rest').toEqual([]);
         const r = await page.evaluate(probe);
-        // The red is the limb's own wood: inside its body, about half its girth wide, on the spine.
+        await page.waitForTimeout(300);
+        // (lit, the same look finds the red on its spine: the look at rest above is one that sees red where there is red)
+        const lit = await pixels(browser, (await page.screenshot()).toString('base64'), r.mid);
+        expect(lit.filter(hot).length, scheme + ' red on the spine when lit ' + JSON.stringify(lit)).toBeGreaterThan(0);
+        await page.evaluate(() => (0, eval)('gbHover')(null));
+        // The red is the limb's own wood: inside its body, about half its girth wide, on the spine, a crisp stroke with no
+        // blur, every point of its outline inside the bark, and each end cut square across the limb.
         expect(r.red.length, scheme).toBeGreaterThan(0);
         for (const [wood, red, skew, edge] of r.red) {
           expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.4);
           expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.6);
           expect(skew!, scheme + ' red off the spine').toBeLessThanOrEqual(1.5);
+          expect(skew! / wood!, scheme + ' red off the spine, of the girth').toBeLessThanOrEqual(.1);
           expect(edge!, scheme + ' red outside the wood').toBeGreaterThanOrEqual(0);
         }
+        expect(r.filters.length, scheme).toBeGreaterThan(0);
+        for (const f of r.filters) expect(f, scheme + ' red blurred').toBe('none');
+        expect(r.outline, scheme).toBeGreaterThan(10);
+        expect(r.outside, scheme + ' red outline outside the bark').toBe(0);
+        for (const a of r.ends) expect(a, scheme + ' red end off the limb’s normal (deg)').toBeLessThanOrEqual(15);
         // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, faded in and out.
         expect(r.start, scheme).toBe(true);
         expect(r.clear, scheme).toBe(true);

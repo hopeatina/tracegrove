@@ -165,7 +165,7 @@ export const BONSAI_CSS = String.raw`
 .gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.8px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
-.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{filter:blur(.5px);opacity:.92}.gb .rs{stop-color:var(--sap-red)}
+.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{opacity:.92}.gb .rs{stop-color:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
@@ -1086,7 +1086,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  B.gCur=gCur;B.gBud=gBud;B.gWood=gWood;B.gKn=gKn;B.defs=defs;B.N=N;
  /* the lit route inside the wood: its halo, its amber body, the grey dots past a break, the red wood where it broke, the cream
     core along its spine; and the red's own spine, unpainted, which a card keeps clear of (gbLight) */
- B.sapU=sv('path',{class:'sapu',d:''});B.sapR=sv('path',{class:'sapr',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.gRed=sv('g',{class:'sapred'});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapR,B.sapX,B.gRed,B.sap,B.sapW);
+ B.sapU=sv('path',{class:'sapu',d:''});B.sapR=sv('path',{class:'sapr',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.gRed=sv('g',{class:'sapred','clip-path':'url(#'+clipId+')'});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapR,B.sapX,B.gRed,B.sap,B.sapW);
  B.lead=sv('path',{class:'tiplead',d:''});gCur.append(B.lead);
  /* an animation that has not finished yet: started at its first build, continued by any rebuild; a piece of wood keeps its
     reveal (gbWood) in el.__r, whose clock everything that grows on it reads */
@@ -1864,9 +1864,8 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  else if(rootPart){const rr=B.L.roots.find(q=>q.id===L.part);if(rr){const up=rr.pts.slice().reverse();for(const jid of L.js){const pid=(B.padsOf[jid]||[]).find(q=>!B.pad[q].pol)||(B.padsOf[jid]||[])[0];const P=pid&&B.pad[pid];if(!P)continue;
    /* (up the root to where it forks from the trunk above the soil, then up the trunk: no spur down into the ground) */
    const sp=gbSpine(P.rt,P.o),f=gbFork(sp,rr);d+=(d?' ':'')+line(gbSmooth([...sp.slice(0,f.iJ),...f.out].reverse(),1))}if(!d)d=line(up)}}
- /* where a failing scenario broke stays red at rest, and for whatever is lit that holds it; a passing leaf's route, or a
-    journey that does not hold the failure, shows no red */
- if(!x)for(const e of B.fails||[])if(woundOn(e)){const R=gbRoute(e.x);if(R&&R.dw)dw+=(dw?' ':'')+R.dw}
+ /* the wood where a scenario broke turns red only while that scenario's route is lit; at rest its knot's crack and its red
+    name say where it broke, and the wood stays wood */
  /* the glow runs only where the sap ran: it ends at the break, or just past the hop a leaf's own scenario checks. Past a
     break the route is small grey dots, under the faint knots it never reached; past the hop it checks, plain wood. The glow
     and the red are bands inside the wood, sized from its girth (gbRibbon, gbRed) */
@@ -1977,13 +1976,18 @@ function gbRibbon(B,d,k,mn,mx){let out='';for(const run of gbSubs(d)){const a=gb
   const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
   const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
   out+=(out?' ':'')+'M'+[...Lf,...cap(e,me,w[n]/2,1),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
-/* Where it broke, the wood itself turns red: half the girth wide on the spine, feathered in and out along its length (a
-   gradient from one end to the other), in the wood's own group, so the bosses on either side stand over it */
+/* Where it broke, the limb's own wood turns red: a crisp stroke half the girth wide on its centre line, each end cut square
+   across the limb, feathered in and out along its length (each stop set where the path itself reaches that share of its
+   length), clipped to the bark, in the wood's own group, so the bosses on either side stand over it */
 function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
- for(const run of gbSubs(dw)){const a=run[0],e=run[run.length-1],id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
+ for(const run of gbSubs(dw)){const A=gbLen(run),T=A[A.length-1];if(!(T>2))continue;const n=Math.max(2,Math.ceil(T/1.2)),P=gbResample(run,n);
+  const w0=P.map(q=>Math.max(6,Math.min(30,gbGirth(B,q)))),w=w0.map((_,k)=>{let s=0,c=0;for(let j=Math.max(0,k-3);j<=Math.min(n,k+3);j++){s+=w0[j];c++}return s/c});
+  const a=P[0],e=P[n],cx=e[0]-a[0],cy=e[1]-a[1],cl=cx*cx+cy*cy||1,on=f=>{const q=P[Math.round(f*n)];return Math.max(0,Math.min(1,((q[0]-a[0])*cx+(q[1]-a[1])*cy)/cl))};
+  const id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
   if(!gr){gr=sv('linearGradient',{id,gradientUnits:'userSpaceOnUse'},...[[0,0],[.28,1],[.72,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})));B.defs.append(gr)}
   for(const [k,v] of [['x1',a[0]],['y1',a[1]],['x2',e[0]],['y2',e[1]]])gr.setAttribute(k,gbF(v));
-  g.append(sv('path',{class:'sapw',d:gbRibbon(B,'M'+run.map(gbP).join(' L'),.5,3,15),fill:'url(#'+id+')'}))}}
+  const st=gr.querySelectorAll('stop');st[1].setAttribute('offset',gbF(on(.28)));st[2].setAttribute('offset',gbF(on(.72)));
+  g.append(sv('path',{class:'sapw',d:gbBand(P,w,.5,-.5),fill:'url(#'+id+')'}))}}
 /* Every file's name and every shoot's count, placed against one set of things to keep clear of: the wood (trunk, branches,
    twigs, roots), every cushion's outline and 4 px round it, every leaf with its stalk, the shoots and their leaves, the knots,
    the pot and the soil, the plant tags, and every other name and number. A count sits just off its shoot's tip. The names are
