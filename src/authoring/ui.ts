@@ -18,7 +18,8 @@ import { initProject } from './init.ts';
 import { draftFlow, gitInfo, safeRef } from './discover.ts';
 import { discoverLive, draftWithAgent } from './workspace.ts';
 import { grow, lastGrow } from './grow.ts';
-import { growView, type GrowState, type Mode } from './growState.ts';
+import { type GrowState, type Mode, type VerdictFacts } from './growState.ts';
+import { growViewAt } from './growJson.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
@@ -62,6 +63,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   let active: { id: string; kind: 'run' | 'heal' | 'draft' | 'grow'; controller: AbortController; cancelling: boolean } | null = null;
   /** The live grow waiting for a mode choice, if any: answered by POST /api/grow/mode. */
   let growPick: { id: string; done: (mode: Mode | null) => void } | null = null;
+  // What each grow's first failure recorded, read once per run for the verdict (runs never change once saved).
+  const growFacts = new Map<string, VerdictFacts>();
   let closing = false;
   let closePromise: Promise<void> | null = null;
   const pendingBodies = new Map<IncomingMessage, ServerResponse>();
@@ -282,7 +285,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/grow/last') {
         const branch = url.searchParams.get('branch') || gitInfo(dir).current;
         let last = null; try { last = branch ? lastGrow(dir, safeRef(branch)) : null; } catch { last = null; }
-        return send(200, last ? { ...last, view: growView(last.state) } : null);
+        return send(200, last ? { ...last, view: growViewAt(last.state, dir, growFacts) } : null);
       }
       if (req.method === 'POST' && url.pathname === '/api/grow') {
         // Live discovery of a change, streamed as server-sent events over a token-guarded POST:
@@ -298,7 +301,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         res.on('close', () => { if (!res.writableFinished) operation.controller.abort(); });
         sse('session', { id: operation.id });
         let snapshot: GrowState | null = null; let last = 0; let timer: ReturnType<typeof setTimeout> | null = null;
-        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growView(snapshot) }); };
+        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growViewAt(snapshot, dir, growFacts) }); };
         const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, agent: { off: !body.agent }, signal: operation.controller.signal,
           ...(body.mode ? {} : { chooseMode: () => new Promise<Mode | null>((done) => { growPick = { id: operation.id, done }; operation.controller.signal.addEventListener('abort', () => done(null), { once: true }); }) }) },
         (event, state) => { sse('event', event); snapshot = state; if (Date.now() - last >= 100) flush(); else timer ??= setTimeout(flush, 100); });

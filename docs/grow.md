@@ -13,7 +13,7 @@ tracegrove grow --json                   # the log, the state and a summary: the
 
 One verdict, computed once from the grow's counts (`growVerdict`), is what the Discover tab shows on its own line above the tree, what the terminal prints last, and what `--json` puts in its `summary`:
 
-- **Not ready** when a check failed. The page names the first failure in plain words with its promise, and **See what happened ›** opens its run at the failing step.
+- **Not ready** when a check failed. It names the promise that failed and how, from the first failure's run: “Removing a seat never charges the card” failed: expected 2 charges, got 3 (a stand-in's call count is counted in its route's own word; any other check is named, as in expected body.count 0, got 1). When the run is not here it says the reason the grow recorded. **See what happened ›** opens its run at the failing step.
 - **Not proven yet** when nothing failed but a scenario in the chosen mode has no result.
 - **Ready** otherwise.
 

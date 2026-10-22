@@ -53,3 +53,23 @@ export function comparedOf(predicate: PredicateT, record: { reasonCode: string |
   const leaf = failedLeaf(leaves(predicate, record.actual), record.reasonCode);
   return leaf ? compared(leaf, record.reasonCode, step) : null;
 }
+
+/** A value as the page writes it: text quoted, everything else as JSON. */
+const shown = (v: unknown): string => (typeof v === 'string' ? JSON.stringify(v) : JSON.stringify(v) ?? String(v));
+/** The thing a stand-in route's calls are, in its own word: "charges" for POST /v1/charges, else "calls". */
+function nounOf(check: string, n: unknown): string {
+  const route = / call count$/.test(check) ? check.replace(/ call count$/, '') : null;
+  if (route === null) return '';
+  const last = (route.split(' ').pop() ?? '').split('?')[0]!.split('/').filter(Boolean).pop() ?? '';
+  const plural = /^[a-z]{3,}s$/.test(last) && !/ss$/.test(last) ? last : 'calls';
+  if (n !== 1) return plural;
+  return /(?:ss|x|ch|sh|z)es$/.test(plural) ? plural.slice(0, -2) : plural.slice(0, -1);
+}
+/**
+ * One wording for every expected-and-got line, on the page and in `grow --json`: "Expected 2 charges, got 3" for a stand-in's
+ * call count (counted in the route's own word), "Expected body.count 0, got 1" for any other check, which it names.
+ */
+export function expGot(c: Compared): string {
+  const noun = nounOf(c.check, c.expected);
+  return noun ? `Expected ${shown(c.expected)} ${noun}, got ${shown(c.got)}` : `Expected ${c.check} ${shown(c.expected)}, got ${shown(c.got)}`;
+}

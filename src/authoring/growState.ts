@@ -3,6 +3,7 @@
  * One stream, `tracegrove.discovery-event/v1`, drives the terminal, `--jsonl`, MCP and the UI. Views
  * never invent progress: each one folds the same events with `applyGrow` and draws the result.
  */
+import { expGot } from './checkCompare.ts';
 
 export const GROW_EVENT_VERSION = 'tracegrove.discovery-event/v1';
 export const PHASES = ['Read the change and its spec', 'Grow the tree', 'Trace each branch', 'Draft scenarios', 'Choose how much', 'Prove it'] as const;
@@ -215,15 +216,16 @@ export function growSummary(s: GrowState) {
   };
 }
 
-/** What the UI draws besides raw state: the same derived answers the terminal computes. */
-export function growView(s: GrowState) {
+/** What the UI draws besides raw state: the same derived answers the terminal computes. `broke` is what the first failure's
+ *  run recorded (growJson's verdictFacts reads it), so the verdict can say how it failed. */
+export function growView(s: GrowState, broke: VerdictFacts | null = null) {
   return {
     criteria: s.criteria.map((c) => ({ ...c, status: criterionStatus(s, c.id), units: (s.linked[c.id] ?? []).map((l) => l.unit) })),
     depth: Object.fromEntries(s.units.map((u) => [u.id, { pips: depthOf(s, u.id), score: depthScore(s, u.id) }])),
     gaps: Object.fromEntries(s.units.map((u) => [u.id, unitHasGap(s, u.id)])),
     counts: { min: modeCount(s, 'min'), std: modeCount(s, 'std'), max: modeCount(s, 'max') },
     summary: growSummary(s),
-    verdict: growVerdict(s),
+    verdict: growVerdict(s, { broke }),
   };
 }
 export type GrowView = ReturnType<typeof growView>;
@@ -248,7 +250,18 @@ const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven 
  * "Ready" otherwise. Exit codes: 1 fix, 3 prove more (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was
  * cancelled (4) keeps its own code.
  */
-export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean } = {}) {
+/** What the first failure's run recorded: the step that broke, and the check there with what it expected and got. Null
+ *  fields were not recorded (the run is gone, or its evidence does not say). */
+export type VerdictFacts = { step: number | null; stepName: string | null; check: string | null; expected: unknown; got: unknown };
+/** How a failure broke, in words: what its check expected and got when the run recorded it, else the reason its result gave. */
+function howItBroke(r: RunState | undefined, broke: VerdictFacts | null | undefined): string | null {
+  if (broke?.check) { const t = expGot({ check: broke.check, expected: broke.expected, got: broke.got }); return t.charAt(0).toLowerCase() + t.slice(1); }
+  const why = String(r?.why ?? '').trim(); const i = why.indexOf(': ');
+  const said = (i > 0 ? why.slice(i + 2) : why).split('\n')[0]!.trim();
+  return said || null;
+}
+
+export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke?: VerdictFacts | null } = {}) {
   const inRun = s.scenarios.filter((x) => inMode(s, x));
   const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
   const failed = inRun.filter((x) => s.run[x.id]?.st === 'fail');
@@ -261,19 +274,25 @@ export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean } = {}
   const mode = MODES.find((m) => m.id === s.mode)!.label;
   const n = inRun.length, scen = (k: number) => `${k} scenario${k === 1 ? '' : 's'}`;
   const promiseWords = (p: string | null) => (p ? ` (promise${p.includes(',') ? 's' : ''} ${p})` : '');
-  const detail = kind === 'not ready' ? `${plainTitle(first!.title)}${promiseWords(promise(first!))}${failed.length > 1 ? `, and ${failed.length - 1} more failed` : ''}`
+  // A failure is named by the promise its scenario makes, then how it broke: "“Removing a seat never charges the card” failed:
+  // expected 2 charges, got 3". The title alone would say the opposite of what happened.
+  const how = first ? howItBroke(s.run[first.id], opts.broke) : null;
+  const text = kind === 'not ready' ? `“${plainTitle(first!.title)}” failed${how ? `: ${how}` : ', with no reason recorded'}`
     : kind === 'not proven yet' ? `${open.length} of ${scen(n)} in ${mode} not tested yet`
     : kind === 'ready' ? (n ? `${passed.length} of ${scen(n)} in ${mode} passed` : `no scenarios in ${mode}`)
     : `${s.blocked!.code}: ${s.blocked!.detail}`;
+  const detail = kind === 'not ready' ? `${text}${promiseWords(promise(first!))}${failed.length > 1 ? `, and ${failed.length - 1} more failed` : ''}` : text;
   return {
     verdict: kind, word: VERDICT_WORD[kind], mark: VERDICT_MARK[kind], exitCode: kind === 'not proven yet' && opts.allowUnproven ? 0 : VERDICT_CODE[kind], exitMeaning: EXIT_MEANING[kind], mode,
     counts: { passed: passed.length, failed: failed.length, notTestedYet: open.length },
     promises: { hold: s.criteria.filter((c) => criterionStatus(s, c.id).cls === 'pass').length, of: s.criteria.length },
-    first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null } : null,
+    first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null,
+      step: opts.broke?.step ?? null, check: opts.broke?.check ?? null, expected: opts.broke?.check ? opts.broke.expected : null, got: opts.broke?.check ? opts.broke.got : null } : null,
     failed: failed.map((x) => x.id), more: Math.max(0, failed.length - 1),
     unproven: open.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: reasonOf(x) })),
-    /** What the verdict rests on, in words; with the mark and the word, the line the terminal prints. */
-    detail, line: `${VERDICT_MARK[kind]} ${VERDICT_WORD[kind]}: ${detail}`,
+    /** What the page says beside the mark and the word; `detail` adds the promise and how many more failed, and with the mark
+     *  and the word it is the line the terminal prints. */
+    text, detail, line: `${VERDICT_MARK[kind]} ${VERDICT_WORD[kind]}: ${detail}`,
   };
 }
 export type GrowVerdict = ReturnType<typeof growVerdict>;

@@ -692,13 +692,14 @@ function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.wan
  if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
  if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step)}
 /* The verdict, worked out once on the server (growVerdict) for this page, grow --json and the exit code: its own line above the
-   tree, outside the result band. Its mark and word, then the first failure in plain words with its promise, or what is not
-   tested yet; then the way to what happened. Until the scenarios have run its place is kept, saying so. */
+   tree, outside the result band. Its mark and word, then what it rests on: the first failure's promise and how it broke
+   ("Removing a seat never charges the card" failed: expected 2 charges, got 3), with its promise; or what is not tested yet.
+   Then the way to what happened. Until the scenarios have run its place is kept, saying so. */
 function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)return null;
  if(!s.done)return h('div',{class:'gw-call wait','data-testid':'grow-verdict'},h('span',{class:'gw-vp'},'◌ No verdict yet'),h('span',{class:'gw-vt'},'It comes once the scenarios have run.'));
  const f=V.first,tone=V.verdict==='not ready'?'bad':V.verdict==='ready'?'ok':'open';
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
-  h('span',{class:'gw-vt',title:f?f.title:V.detail},...gwRich(f?f.title:V.detail.charAt(0).toUpperCase()+V.detail.slice(1))),
+  h('span',{class:'gw-vt',title:V.text},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
   f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>gwOpenRun(f.scenario)}},'See what happened ›'):null)}

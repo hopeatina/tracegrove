@@ -4,7 +4,7 @@
  * stream with --jsonl.
  */
 import { grow, type GrowOptions } from '../authoring/grow.ts';
-import { growJsonSummary, type GrowJsonSummary } from '../authoring/growJson.ts';
+import { growJsonSummary, verdictFacts, type GrowJsonSummary } from '../authoring/growJson.ts';
 import { growVerdict, type GrowEvent, type GrowState, type Mode } from '../authoring/growState.ts';
 import { plainLine, renderGrove } from './renderGrove.ts';
 import { relative, resolve } from 'node:path';
@@ -70,7 +70,7 @@ export async function growCommand(flags: GrowFlags, write: (text: string) => voi
   } else if (!flags.json && !flags.jsonl) write(`${renderGrove(result.state, { width: 118, elapsed: result.state.ms + 5000, clock: result.state.ms, color: false, log }).join('\n')}\n`);
   const s = result.state;
   const allow = { allowUnproven: flags['allow-unproven'] === true };
-  const verdict = growVerdict(s, allow);
+  const verdict = growVerdict(s, { ...allow, broke: flags.json || flags.jsonl ? null : verdictFacts(s, dir) });
   // The same verdict the page shows, as its last line.
   if (!flags.json && !flags.jsonl) write(`${verdict.line}\n`);
   return { code: verdict.exitCode, state: s, events: result.events, log, ...(flags.json ? { summary: growJsonSummary(s, dir, allow) } : {}) };

@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
-import { growVerdict, inMode, plainTitle, type GrowState, type RunState } from './growState.ts';
+import { growVerdict, growView, inMode, plainTitle, type GrowState, type RunState, type VerdictFacts } from './growState.ts';
 import { savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
 
@@ -31,42 +31,62 @@ export function brokeLine(r: RunState | undefined): string {
 }
 
 /** One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. */
-function failureOf(s: GrowState, dir: string, id: string): GrowFailure {
+function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFailure; stepName: string | null } {
   const x = s.scenarios.find((y) => y.id === id)!; const r = s.run[id];
   const flow = r?.flow ?? x.flow ?? null; const run = r?.run ?? null;
   const out: GrowFailure = { scenario: id, title: plainTitle(x.title), promise: x.criteria.length ? x.criteria.join(', ') : null, flow, run,
     step: null, check: null, expected: null, got: null, says: brokeLine(r), evidence: [] };
-  if (!run) return out;
+  const found = { failure: out, stepName: null as string | null };
+  if (!run) return found;
   let runDir: string;
-  try { runDir = savedRunDirectory(join(dir, dirname(s.flows?.config ?? '.')), run); } catch { return out; }
+  try { runDir = savedRunDirectory(join(dir, dirname(s.flows?.config ?? '.')), run); } catch { return found; }
   const rel = (p: string) => relative(dir, p);
   if (existsSync(join(runDir, 'summary.json'))) out.evidence.push(rel(join(runDir, 'summary.json')));
   try {
     const bundle = readVerifiedBundle(join(runDir, 'bundle'));
     const receipt = bundle.receipts.find((q) => q.caseRef.id === flow) ?? (bundle.receipts.length === 1 ? bundle.receipts[0] : undefined);
-    if (!receipt) return out;
+    if (!receipt) return found;
     const cell = join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId));
     for (const f of ['receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl']) if (existsSync(join(cell, f))) out.evidence.push(rel(join(cell, f)));
     const c = readSavedRun(runDir).cases.find((q) => q.caseId === receipt.caseRef.id);
-    if (!c) return out;
+    if (!c) return found;
     const steps = c.steps.filter((q) => q.declared !== false);
     const bad = (q: (typeof steps)[number] | undefined) => !!q && (q.result === 'failed' || q.result === 'cancelled' || (q.checks === 'fail' && q.result === 'completed'));
     let i = c.failure ? steps.findIndex((q) => q.name === c.failure!.step || q.id === c.failure!.step) : -1;
     if (i < 0 || !bad(steps[i])) i = steps.findIndex(bad);
-    if (i < 0) return out;
-    const at = steps[i]!; out.step = i + 1;
+    if (i < 0) return found;
+    const at = steps[i]!; out.step = i + 1; found.stepName = at.name;
     // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same.
     if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got });
   } catch { /* evidence that does not verify gives no expected or got */ }
-  return out;
+  return found;
 }
+
+const factsOf = (f: { failure: GrowFailure; stepName: string | null }): VerdictFacts =>
+  ({ step: f.failure.step, stepName: f.stepName, check: f.failure.check, expected: f.failure.expected, got: f.failure.got });
+/**
+ * What the first failure's run recorded, for the verdict to say how it failed. Runs never change once saved, so a `cache`
+ * (kept by the page's server across a live grow's many paints) reads each one once.
+ */
+export function verdictFacts(s: GrowState, dir: string, cache?: Map<string, VerdictFacts>): VerdictFacts | null {
+  const first = s.scenarios.find((x) => inMode(s, x) && s.run[x.id]?.st === 'fail');
+  const run = first && s.run[first.id]?.run;
+  if (!first || !run) return null;
+  const key = `${first.id} ${run}`; const known = cache?.get(key);
+  if (known) return known;
+  const facts = factsOf(readFailure(s, dir, first.id)); cache?.set(key, facts);
+  return facts;
+}
+/** The page's view of a grow, with the verdict saying how its first failure broke. */
+export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>) => growView(s, verdictFacts(s, dir, cache));
 
 /** The summary `grow --json` prints beside the log and the state. */
 export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven?: boolean } = {}): GrowJsonSummary {
-  const v = growVerdict(s, opts);
+  const read = s.scenarios.filter((x) => inMode(s, x) && s.run[x.id]?.st === 'fail').map((x) => readFailure(s, dir, x.id));
+  const v = growVerdict(s, { ...opts, broke: read[0] ? factsOf(read[0]) : null });
   return {
     verdict: v.verdict, exitCode: v.exitCode, exitMeaning: v.exitMeaning, mode: v.mode, counts: v.counts, promises: v.promises,
-    failures: s.scenarios.filter((x) => inMode(s, x) && s.run[x.id]?.st === 'fail').map((x) => failureOf(s, dir, x.id)),
+    failures: read.map((f) => f.failure),
     unproven: v.unproven,
   };
 }

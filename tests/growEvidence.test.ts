@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { grow } from '../src/authoring/grow.ts';
+import { expGot } from '../src/authoring/checkCompare.ts';
 import { growJsonSummary } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState } from '../src/authoring/growState.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
@@ -163,7 +164,8 @@ describe('From a grown scenario to its run', () => {
     await page.getByTestId('grow-result').waitFor();
     const v = page.getByTestId('grow-verdict');
     const title = plainTitle(state.scenarios.find((x) => x.id === failed)!.title);
-    await expect(v.textContent()).resolves.toBe(`✗ Not ready${title}promises C1, C2See what happened ›`);
+    // It names the promise that failed and how, from the run's recorded check: never the title alone, which says the opposite.
+    await expect(v.textContent()).resolves.toBe(`✗ Not ready“${title}” failed: expected body.count 0, got 1promises C1, C2See what happened ›`);
     const fit = () => page.evaluate(() => {
       const v = document.querySelector('[data-testid="grow-verdict"]') as HTMLElement, r = v.getBoundingClientRect();
       const tree = document.querySelector('[data-testid="grow"] .gw-tree')!.getBoundingClientRect();
@@ -176,7 +178,12 @@ describe('From a grown scenario to its run', () => {
     // The plotline grow's verdict fits the same way.
     const plot = plotline();
     await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot) });
-    await expect(v.textContent()).resolves.toBe('✗ Not readyRemoving a seat never charges the cardpromise C2See what happened ›');
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 calls, got 3promise C2See what happened ›');
+    expect(await fit()).toEqual({ inBand: false, above: true, height: 44, oneLine: true, whole: true });
+    // With its run's recorded check, as the server reads it, the count is said in the route's own word.
+    const facts = { step: 4, stepName: 'only the Team upgrade and the added seat were charged', check: 'payments POST /v1/charges call count', expected: 2, got: 3 };
+    await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot, facts) });
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 charges, got 3promise C2See what happened ›');
     expect(await fit()).toEqual({ inBand: false, above: true, height: 44, oneLine: true, whole: true });
     await page.close();
   });
@@ -219,9 +226,36 @@ describe('The verdict', () => {
       counts: { passed: 3, failed: 1, notTestedYet: 3 }, promises: { hold: 1, of: 5 }, failed: ['s10'], more: 0,
       first: { scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8' } });
     expect(v.unproven).toEqual(['s1', 's5', 's6'].map((id) => ({ scenario: id, title: plainTitle(s.scenarios.find((x) => x.id === id)!.title), reason: 'No flow proves this yet' })));
-    expect(v.line).toBe('✗ Not ready: Removing a seat never charges the card (promise C2)');
+    // It says the promise failed, and how, from what the grow recorded: the title alone would say the opposite of what happened.
+    expect(v.text).toBe('“Removing a seat never charges the card” failed: expected 2 calls, got 3');
+    expect(v.line).toBe('✗ Not ready: “Removing a seat never charges the card” failed: expected 2 calls, got 3 (promise C2)');
     // The page reads the very same answer.
     expect(growView(s).verdict).toEqual(v);
+  });
+
+  it('says how the first failure broke from its run’s recorded check when there is one, in the same words as the page', () => {
+    const s = plotline();
+    const facts = { step: 4, stepName: 'only the Team upgrade and the added seat were charged', check: 'payments POST /v1/charges call count', expected: 2, got: 3 };
+    const v = growVerdict(s, { broke: facts });
+    expect(v.first).toMatchObject({ scenario: 's10', step: 4, check: 'payments POST /v1/charges call count', expected: 2, got: 3 });
+    expect(v.line).toBe('✗ Not ready: “Removing a seat never charges the card” failed: expected 2 charges, got 3 (promise C2)');
+    expect(growView(s, facts).verdict).toEqual(v);
+    // Without a recorded check, the first failure's own reason; without that either, it says so.
+    expect(growVerdict(s).first).toMatchObject({ step: null, check: null, expected: null, got: null });
+    const silent = plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why: '' } : e));
+    expect(growVerdict(silent).text).toBe('“Removing a seat never charges the card” failed, with no reason recorded');
+    // Only the first line of a long reason.
+    const long = plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why: '(app startup): application exited before becoming ready\n    at ModuleLoader.resolve' } : e));
+    expect(growVerdict(long).text).toBe('“Removing a seat never charges the card” failed: application exited before becoming ready');
+  });
+
+  it('words every expected and got one way: a stand-in count in its route’s word, any other check by its name', () => {
+    expect(expGot({ check: 'payments POST /v1/charges call count', expected: 2, got: 3 })).toBe('Expected 2 charges, got 3');
+    expect(expGot({ check: 'payments POST /v1/charges call count', expected: 1, got: 2 })).toBe('Expected 1 charge, got 2');
+    expect(expGot({ check: 'mail POST /v3/mail/send call count', expected: 1, got: 0 })).toBe('Expected 1 call, got 0');
+    expect(expGot({ check: 'billing POST /v1/addresses call count', expected: 1, got: 2 })).toBe('Expected 1 address, got 2');
+    expect(expGot({ check: 'body.count', expected: 0, got: 1 })).toBe('Expected body.count 0, got 1');
+    expect(expGot({ check: 'body.state', expected: 'open', got: 'closed' })).toBe('Expected body.state "open", got "closed"');
   });
 
   it('is Not proven yet when nothing failed but a scenario in the mode has no result, and says why for each', () => {
@@ -296,6 +330,15 @@ describe('grow --json and the exit code', () => {
     expect(printed.state.done).toBeTruthy();
     expect(printed.summary).toMatchObject({ verdict: 'not ready', exitCode: 1, failures: [{ step: 3 }] });
   }, 90_000);
+
+  it('prints a failure’s verdict as its last line: the promise that failed, and what its check expected and got', async () => {
+    const dir = notesCount(true);
+    let out = '';
+    const { code, state } = await growCommand(flags(dir), (t) => { out += t; });
+    expect(code).toBe(1);
+    const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
+    expect(out.trimEnd().split('\n').at(-1)).toBe(`✗ Not ready: “${plainTitle(x.title)}” failed: expected body.count 0, got 1 (promises C1, C2)`);
+  }, 60_000);
 
   it('exits 0 and says Ready when every scenario in the mode passed, and prints the verdict as the last line', async () => {
     const dir = notesCount(false);
