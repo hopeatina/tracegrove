@@ -473,6 +473,52 @@ describe('What happened, with several failures', () => {
     rmSync(late, { recursive: true, force: true });
   });
 
+  it('says the path a step sent as the run recorded it, and calls only a stand-in watch’s wait not app time', async () => {
+    const { report } = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'tracegrove/billing/upgrade-charges-once.flow.yaml' });
+    expect(report.cases.map((c) => c.caseId)).toEqual(['billing.upgrade-charges-once']);
+    const run = basename(report.runDir);
+    const d = happenedIn(dir, run, 'billing.upgrade-charges-once')!;
+    const [upgrade, charged, onTeam, other] = d.steps;
+    // the flow declares GET /invoices/{invoiceId}; the run sent the invoice the first step saved
+    expect(other!.path).toBe('/invoices/{invoiceId}');
+    const invoice = (JSON.parse(upgrade!.answer!) as { invoice: { id: string } }).invoice.id;
+    expect(other!.request).toMatchObject({ path: `/invoices/${invoice}`, as: 'credential other_tenant_token' });
+    expect(upgrade!.request).toMatchObject({ path: '/subscription', as: 'owner' });
+    expect(upgrade!.request!.declared).toBeUndefined();
+    expect(charged!.method).toBe('STANDIN'); expect(onTeam!.watch).toBeTruthy(); expect(onTeam!.method).toBe('GET');
+    const passed = state.scenarios.find((x) => state.run[x.id]?.st === 'pass')!.id;
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await page.getByTestId('grow-result').waitFor();
+    await page.evaluate(([id, name]) => { const g = (0, eval)('gw'); g.state.run[id!].run = name; g.state.run[id!].flow = 'billing.upgrade-charges-once'; location.hash = `#grow/${id}/steps`; }, [passed, run]);
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    // a stand-in watch waits on the stand-in, not the app; a polled read of the app is the app's own time
+    await expect(page.getByTestId('grow-happened-step-2').textContent()).resolves.toMatch(/deadline, polling every \d+ ms \(not app time\)/);
+    await expect(page.getByTestId('grow-happened-step-3').textContent()).resolves.toMatch(/waited \d+ ms of its \d+ ms deadline/);
+    await expect(page.getByTestId('grow-happened-step-3').textContent()).resolves.not.toContain('not app time');
+    await page.getByTestId('grow-happened-tab-requests').click();
+    const req = (await page.getByTestId('grow-happened-panel').textContent()) ?? '';
+    expect(req).toContain(`GET /invoices/${invoice} · as credential other_tenant_token`);
+    expect(req).not.toContain('{invoiceId}');
+    await page.getByTestId('grow-happened-tab-answered').click();
+    await expect(page.getByTestId('grow-happened-panel').textContent()).resolves.toContain(`GET /invoices/${invoice} → 404`);
+    // a body that names a saved value is said as its flow declares it, since the body sent is not recorded
+    writeFileSync(join(dir, 'tracegrove', 'seats', 'noted.flow.yaml'), ['title: A seat change can carry the invoice it follows', 'risk: critical', 'tags: [billing, seats]', 'steps:',
+      '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 200', '    save: { invoiceId: invoice.id }',
+      '  - name: owner adds a seat with a note', '    POST: /seats', '    json: { seats: 2, daysLeft: 30, note: "{invoiceId}" }', '    expect: 200', ''].join('\n'));
+    const noted = await runTests({ configPath: join(dir, 'tracegrove.config.yaml'), grep: 'tracegrove/seats/noted.flow.yaml' });
+    const n = happenedIn(dir, basename(noted.report.runDir), 'seats.noted')!;
+    expect(n.steps.map((x) => x.request?.declared ?? false)).toEqual([false, true]);
+    await page.evaluate(([id, name]) => { const g = (0, eval)('gw'); g.state.run[id!].run = name; g.state.run[id!].flow = 'seats.noted'; location.hash = `#grow/${id}/steps`; }, [passed, basename(noted.report.runDir)]);
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="grow-happened"] .gw-drs li').length === 2);
+    await page.getByTestId('grow-happened-tab-requests').click();
+    const said = (await page.getByTestId('grow-happened-panel').textContent()) ?? '';
+    expect(said).toContain('POST /seats {"seats":2,"daysLeft":30,"note":"{invoiceId}"} (body as declared) · as owner');
+    expect(said).toContain('POST /subscription {"plan":"team"} · as owner');
+    await page.close();
+  }, 120_000);
+
   it('lists each stand-in call once when two watch steps read the same route', async () => {
     writeFileSync(join(dir, 'tracegrove', 'seats', 'twice.flow.yaml'), ['title: Each charge is counted as it lands', 'risk: critical', 'tags: [billing, seats]', 'steps:',
       '  - name: owner moves to Team', '    POST: /subscription', '    json: { plan: team }', '    expect: 200',

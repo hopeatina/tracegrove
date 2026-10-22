@@ -807,6 +807,9 @@ function gwDrPager(x){const s=gw.state,f=s.scenarios.filter(q=>gwIn(q)&&s.run[q.
 /* every stand-in call the run recorded, each once: a watch step reads all the calls its stand-in has had so far, so two watch
    steps on one route both hold the earlier calls */
 const gwDrCalls=steps=>{const seen=new Set();return steps.flatMap(q=>q.calls||[]).filter(c=>{const k=JSON.stringify([c.standIn,c.method,c.path,c.at,c.key]);if(seen.has(k))return false;seen.add(k);return true})};
+/* the route a step sent: its path as the runner recorded sending it, else as its flow declares it, which says so when it names a
+   saved value ("{invoiceId}") */
+const gwDrPath=q=>q.method+' '+(q.request&&q.request.path?q.request.path:q.path+(/\{[A-Za-z_]\w*\}/.test(q.path)?' (as declared)':''));
 /* a response body as it was recorded; JSON is laid out to read, the same text */
 const gwDrPretty=t=>{try{return JSON.stringify(JSON.parse(t),null,2)}catch(e){return t}};
 const gwDrRuns=n=>n===1?'its 1 saved run':n+' saved runs';
@@ -836,7 +839,7 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
   for(const c of all)if(c.during===q.id)sx.push([c.standIn+' ← '+(c.amount!=null?c.amount:c.method+' '+c.path),con?'bad':'']);
   if(con)sx.push(['◀ contradicts its answer','bad']);
   if(q.method==='STANDIN'||q.watch){for(const c of q.checked||[])sx.push([c.says,c.held===false?'bad':'']);
-   if(q.watch&&q.durationMs!=null)sx.push(['waited '+q.durationMs+' ms of its '+q.watch.deadlineMs+' ms deadline'+(q.watch.everyMs!=null?', polling every '+q.watch.everyMs+' ms':'')+' (not app time)',''])}
+   if(q.watch&&q.durationMs!=null)sx.push(['waited '+q.durationMs+' ms of its '+q.watch.deadlineMs+' ms deadline'+(q.watch.everyMs!=null?', polling every '+q.watch.everyMs+' ms':'')+(q.method==='STANDIN'?' (not app time)':''),''])}
   return h('li',{},h('button',{type:'button',class:k,'aria-pressed':String(cur===i),'data-testid':'grow-happened-step-'+(i+1),on:{click:()=>{d.step=i;gw.refocus='t:grow-happened-step-'+(i+1);growPaint()}}},
    h('span',{class:'n'},String(i+1)),h('span',{class:'sm '+k},gwDrM[k]||'–',h('span',{class:'sr'},' '+(LABEL[k]||q.result))),h('span',{class:'t'},q.name),h('span',{class:'ms'},q.durationMs!=null?q.durationMs+' ms':''),
    sx.length?h('span',{class:'sx'},sx.map(([t,c])=>h('span',{class:c||null},t))):null))}));
@@ -850,10 +853,10 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  const grp=(i,...kids)=>h('div',{class:'gw-drg'+(i===cur?' cur':'')},h('div',{class:'hd'},'Step '+(i+1)+' · '+steps[i].name),...kids);
  let body=[];
  if(key==='checked')body=steps.map((q,i)=>(q.checked||[]).length?grp(i,stepChecked(q.checked)):null);
- else if(key==='answered')body=answered.map(([q,i])=>grp(i,h('div',{class:'sub'},q.method+' '+q.path+(q.status!=null?' → '+q.status:'')),h('pre',{},gwDrPretty(q.answer)))).concat(steps.some(q=>q.method==='STANDIN')?[h('p',{class:'gw-drw'},'Watch steps get no answer from the app; they read what the stand-in recorded.')]:[]);
+ else if(key==='answered')body=answered.map(([q,i])=>grp(i,h('div',{class:'sub'},gwDrPath(q)+(q.status!=null?' → '+q.status:'')),h('pre',{},gwDrPretty(q.answer)))).concat(steps.some(q=>q.method==='STANDIN')?[h('p',{class:'gw-drw'},'Watch steps get no answer from the app; they read what the stand-in recorded.')]:[]);
  else if(key==='called')body=steps.flatMap((q,i)=>all.filter(c=>c.during===q.id).map(c=>grp(i,stepCalls([c])))).concat(all.filter(c=>!steps.some(q=>q.id===c.during)).map(c=>h('div',{class:'gw-drg'},h('div',{class:'hd'},'Outside every step’s recorded time'),stepCalls([c]))));
  else if(key==='requests')body=steps.map((q,i)=>grp(i,h('div',{class:'sub'},q.method==='STANDIN'||q.watch?'watch '+(q.method==='STANDIN'?q.path:q.method+' '+q.path)+(q.watch?' · '+(q.watch.everyMs!=null?'every '+q.watch.everyMs+' ms, ':'')+'up to '+q.watch.deadlineMs+' ms · '+(q.watch.polls!=null?q.watch.polls+' poll'+(q.watch.polls===1?'':'s'):'polls not recorded'):'')
-   :q.method+' '+q.path+(q.request&&q.request.body?' '+q.request.body:'')+(q.request?' · as '+q.request.as:'')),
+   :gwDrPath(q)+(q.request&&q.request.body?' '+q.request.body+(q.request.declared?' (body as declared)':''):'')+(q.request?' · as '+q.request.as:'')),
   h('div',{class:'meta'},q.method==='STANDIN'||q.watch?(q.durationMs!=null?'took '+q.durationMs+' ms':'its time was not recorded'):[q.durationMs!=null?'step '+q.durationMs+' ms':null,q.httpMs!=null?'HTTP '+q.httpMs+' ms':null,q.httpMs!=null?'app time not recorded':null,q.status!=null?'answered '+q.status:null].filter(Boolean).join(' · ')||'its times were not recorded')));
  gwPut(el,h('div',{class:'gw-chips gw-drc','data-testid':'grow-happened-chips'},D.chips.map(c=>h('span',{class:'gw-chip'+(c.tone?' '+c.tone:'')},c.t))),hist?h('p',{class:'gw-drhist'},hist):null,ol,
   h('div',{class:'gw-dr1','data-testid':'grow-happened-oneline'},h('span',{class:'gw-eyebrow'},'In one line'),D.oneLine),

@@ -22,8 +22,9 @@ export const StepReport = z.object({ id: Text, name: Text, method: Text, path: T
    *  call's own timestamp, or null when no step's does. */
   calls: z.array(z.object({ standIn: Text, method: Text, path: Text, status: z.number().int(), at: Text, key: Text.nullable(), repeat: z.boolean().optional(),
     faulted: z.boolean(), amount: z.number().nullable(), currency: Text.nullable(), description: Text.nullable(), during: Text.nullable() }).strict()).max(200).optional(),
-  /** What the step sent, from its sealed spec: the body (cut at 4 KB) and who it acted as. */
-  request: z.object({ body: Text.nullable(), as: Text }).strict().optional(),
+  /** What the step sent: the body from its sealed spec (cut at 4 KB; `declared` when it names a saved value the runner filled
+   *  in, so the body sent may differ), who it acted as, and the path the runner recorded sending, saved values filled in. */
+  request: z.object({ body: Text.nullable(), as: Text, path: Text.optional(), declared: z.boolean().optional() }).strict().optional(),
   /** How long the HTTP exchange itself took, as the runner timed it. */
   httpMs: z.number().nonnegative().optional(),
   /** A watch step polls until its check holds or its deadline passes: the deadline, how often it looked, how many times. */

@@ -106,6 +106,9 @@ const field = <T extends 'number' | 'string'>(json: unknown, key: string, type: 
   const v = json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>)[key] : undefined;
   return typeof v === type ? v as T extends 'number' ? number : string : null;
 };
+/** Whether a sealed request body names a saved value ("{invoiceId}") that the runner fills in when it sends it. */
+const templated = (v: unknown): boolean => typeof v === 'string' ? /\{[A-Za-z_][A-Za-z0-9_]*\}/.test(v)
+  : Array.isArray(v) ? v.some(templated) : !!v && typeof v === 'object' && Object.values(v as Record<string, unknown>).some(templated);
 /** Who a step acted as, from its sealed auth: the persona's own name, no session, or a named credential. */
 function actedAs(auth: { kind: string; name?: string } | undefined, persona: string): string {
   return !auth ? persona : auth.kind === 'none' ? 'no session' : auth.kind === 'credential' ? `credential ${auth.name ?? ''}`.trim() : persona;
@@ -134,7 +137,12 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     // it sent, and, for a watch step, its deadline and the stand-in calls it read.
     const checked = own.flatMap((a) => { const d = assertions.find((x) => x.id === a.assertionId); return d ? checksOf(d.predicate, a, { method: info?.method ?? '', path: info?.path ?? '' }) : []; });
     const spec = specSteps.find((x) => x.id === s.stepId);
-    const sent = spec?.kind === 'http.request' ? { body: spec.body === null ? null : excerpt(spec.body, 4096), as: actedAs(spec.auth, persona) } : null;
+    // The path it sent is the one the runner recorded (a saved value filled in); the body is the sealed spec's, which says so
+    // when it names a saved value the runner filled in, since the body sent is not recorded.
+    let sentPath: string | null = null;
+    try { const u = http && typeof (output as { url?: unknown }).url === 'string' ? new URL((output as { url: string }).url) : null; sentPath = u ? `${u.pathname}${u.search}` : null; } catch { sentPath = null; }
+    const sent = spec?.kind === 'http.request' ? { body: spec.body === null ? null : excerpt(spec.body, 4096), as: actedAs(spec.auth, persona),
+      ...(sentPath ? { path: sentPath } : {}), ...(templated(spec.body) ? { declared: true } : {}) } : null;
     const watch = spec && 'pollIntervalMs' in spec ? { deadlineMs: spec.timeoutMs, everyMs: spec.pollIntervalMs, polls: typeof (s.output as { attempts?: unknown } | null)?.attempts === 'number' ? (s.output as { attempts: number }).attempts : null } : null;
     const calls = standIn.success ? standIn.data.calls.map((c) => ({ standIn: standIn.data.standIn, method: c.method, path: c.path, status: c.status, at: c.at, key: c.key ?? null,
       ...(c.repeat !== undefined ? { repeat: c.repeat } : {}), faulted: c.faulted, amount: field(c.json, 'amount', 'number'), currency: field(c.json, 'currency', 'string'),
