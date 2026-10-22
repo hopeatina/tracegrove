@@ -465,12 +465,12 @@ function gwSw(k){
     on a solid stake pushed into the soil beside its tip */
  if(k==='root')return gwSvg(22,14,sv('path',{d:'M.5 6.5 C4.6 6.6 8.8 7.1 13.8 8.3 C14.2 8.5 14 8.9 13.6 9 C8.6 9 4.6 9.2 .5 9.6 Z',class:'wd'}),sv('path',{d:'M16.6 11 L16.6 4.6',class:'stk sd'}),
   sv('rect',{x:0,y:8.6,width:22,height:5.4,class:'dirt'}),sv('path',{d:'M.5 8.6 L21.5 8.6',class:'soil'}),sv('rect',{x:12.6,y:1,width:8,height:3.8,rx:1,class:'tag'}));
- /* a store no journey uses as the pot shows it: a short severed root sunk to half its depth in the soil, faded bark tapering
-    from its cut face, and right beside the cut face the stake of its dashed tag */
- if(k==='unused'){const d='M5 6.1 C9.4 6.3 14 7.3 19.8 8.5 L19.8 9.1 C14 10.3 9.4 11.3 5 11.5 Z';return gwSvg(22,14,sv('path',{d,class:'bed'}),sv('path',{d,class:'wd un'}),
-  sv('ellipse',{cx:5,cy:8.8,rx:1.5,ry:2.7,class:'cf'}),sv('path',{d:'M4.7 7.2 A.8 1.6 0 0 1 4.7 10.4',class:'rg'}),
-  sv('rect',{x:0,y:8.8,width:22,height:5.2,class:'dirt'}),sv('path',{d:'M.5 8.8 L21.5 8.8',class:'soil'}),
-  sv('path',{d:'M2.4 10.6 L2.4 4.6',class:'stk sd'}),sv('rect',{x:1.2,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
+ /* a store no journey uses as the pot shows it: faded bark running out from the foot, partly sunk in the soil and tapering
+    to a cut face, its dashed tag's stake pushed into the cut face */
+ if(k==='unused'){const d='M.5 6.4 C6 6.8 11 7.2 17 6.9 L17 10.7 C11 10.6 6 11.2 .5 11.6 Z';return gwSvg(22,14,sv('path',{d,class:'bed'}),sv('path',{d,class:'wd un'}),
+  sv('rect',{x:0,y:9.2,width:22,height:4.8,class:'dirt'}),sv('path',{d:'M.5 9.2 L21.5 9.2',class:'soil'}),
+  sv('ellipse',{cx:17,cy:8.8,rx:1.3,ry:1.9,class:'cf'}),sv('path',{d:'M16.8 7.6 A.6 1.2 0 0 1 16.8 10',class:'rg'}),
+  sv('path',{d:'M17 8.8 L17 4.6',class:'stk sd'}),sv('rect',{x:10.6,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
  /* the route as the tree draws it inside the wood, in three marks: the amber glow with its cream core, the wood turned red

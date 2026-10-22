@@ -759,7 +759,21 @@ describe('Grow page', () => {
     const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]) }));
     const lr = L.roots.find((r: { loose: boolean }) => r.loose);
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
-    return { lip, foot, ext, loose, seal, room, nebari, sunk, trees: L.trees.length };
+    // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
+    // stands above the soil, and the cut face and stake as drawn
+    const root = lr ? (() => {
+      const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], face = lg!.querySelector('.rcut')!;
+      const shows = lr.pts.slice(0, Math.floor(n * .7)).map((p: number[], i: number) => (L.sy(p[0]!) + .7 - (p[1]! - lr.w[i] / 2)) / lr.w[i]);
+      return { start: Math.abs(lr.pts[0][0] - X) / hb, past: (Math.abs(e[0] - X) - hb) / L.kpx, shows: Math.min(...shows), endTop: e[1] - lr.w[n - 1] / 2 - L.sy(e[0]),
+        face: [Number(face.getAttribute('cx')) - e[0], Number(face.getAttribute('cy')) - e[1]], faceBox: box(face), op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
+    })() : null;
+    // the pot: its lip a deeper rim of lighter clay than the body with a highlight along its top, its walls leaning in to the foot
+    const body = svg.querySelector('.pot-b') as SVGPathElement, lipB = svg.querySelector('.lip-b')!, pt = (svg as SVGSVGElement).createSVGPoint();
+    const across = (y: number) => { let a = Infinity, b = -Infinity; for (let x = L.potC - L.potL / 2 - 4; x <= L.potC + L.potL / 2 + 4; x += .25) { pt.x = x; pt.y = y; if (body.isPointInFill(pt)) { a = Math.min(a, x); b = Math.max(b, x); } } return b - a; };
+    const stopOf = (fill: string) => getComputedStyle(svg.querySelector(fill.replace(/^url\("?|"?\)$/g, '') + ' stop:nth-child(2)')!).stopColor;
+    const pot = { lipH: Number(lipB.getAttribute('height')), over: (box(body).l - box(lipB).l), taper: across(L.D - 1) / across(3), lipStop: stopOf(lipB.getAttribute('fill')!), bodyStop: stopOf(body.getAttribute('fill')!),
+      hi: Number(getComputedStyle(svg.querySelector('.lip-hi')!).opacity), body: box(body), sealBox: svg.querySelector('.seal') ? box(svg.querySelector('.seal')!) : null, sealOp: svg.querySelector('.seal') ? Number(getComputedStyle(svg.querySelector('.seal')!).opacity) : 0 };
+    return { lip, foot, ext, loose, seal, room, nebari, sunk, root, pot, moss: svg.querySelectorAll('.mc, .moss').length, trees: L.trees.length };
   };
 
   it('roots the tree in its pot: buttress roots that taper into the soil, a service named outside the rim on its side at every width, an unused store sunk with a one-line dashed tag, and the whole repo name on the seal', async () => {
@@ -813,6 +827,34 @@ describe('Grow page', () => {
         expect(dash, at).not.toBe('none');
         expect(Math.min(Math.abs(stake.cx - cut.l), Math.abs(stake.cx - cut.r)), at).toBeLessThanOrEqual(cut.w + 4);
         for (const dy of g.sunk) expect(Math.abs(dy), at).toBeLessThan(1.5);
+        // ... and a root of its own, faded, running out from under the nebari seventy to ninety pixels past the foot, about
+        // two fifths of it above the soil, its cut end standing out of it with the stake pushed into the cut face.
+        const rt = g.root!;
+        expect(rt.start, at).toBeLessThanOrEqual(1);
+        expect(rt.past, at).toBeGreaterThanOrEqual(69.5);
+        expect(rt.past, at).toBeLessThanOrEqual(90.5);
+        expect(rt.shows, at).toBeGreaterThanOrEqual(.25);
+        expect(rt.endTop, at).toBeLessThan(-1);
+        expect(Math.hypot(rt.face[0]!, rt.face[1]!), at).toBeLessThan(.5);
+        expect(Math.abs(stake.cx - rt.faceBox.cx), at).toBeLessThanOrEqual(rt.faceBox.w / 2);
+        expect(rt.op, at).toBeGreaterThanOrEqual(.35);
+        expect(rt.op, at).toBeLessThanOrEqual(.75);
+        // Bare soil: no moss, which carries nothing.
+        expect(g.moss, at).toBe(0);
+        // The pot: a lip about four units deep standing out past the wall, of lighter clay than the body with a highlight along
+        // its top, and walls that lean in, the bottom about ninety-six hundredths of the top.
+        expect(g.pot.lipH, at).toBeGreaterThanOrEqual(4);
+        expect(g.pot.over, at).toBeGreaterThan(1);
+        expect(g.pot.taper, at).toBeGreaterThan(.93);
+        expect(g.pot.taper, at).toBeLessThan(.975);
+        expect(g.pot.hi, at).toBeGreaterThanOrEqual(.5);
+        expect(g.pot.lipStop, at).not.toBe(g.pot.bodyStop);
+        // The seal in the middle of the face, between the lip and the foot, at full strength.
+        const sb = g.pot.sealBox!;
+        expect(Math.abs(sb.cx - g.pot.body.cx), at).toBeLessThanOrEqual(1.5);
+        expect(sb.t, at).toBeGreaterThan(g.lip.b);
+        expect(sb.b, at).toBeLessThan(g.foot.t);
+        expect(g.pot.sealOp, at).toBe(1);
         // The seal keeps the whole repo name, on one line or broken at a hyphen, every line inside the face.
         expect(g.seal.map((x: { text: string }) => x.text).join(''), at).toBe(repoName);
         for (const line of g.seal) expect(line.len, at + ': ' + line.text).toBeLessThanOrEqual(g.room + .5);
@@ -835,22 +877,35 @@ describe('Grow page', () => {
       const row = page.locator('[data-testid="grow-outline"] .gb-olr', { hasText: 'seats table' });
       expect(await row.locator('.t').evaluate((t) => t.firstChild!.textContent + (t.querySelector('.un')?.textContent ?? ''))).toBe('seats table · unused');
       expect(await row.locator('.fd').textContent()).toBe('Feeds no journey');
-      // On a dark page the seal's letters stand at least three to one against the clay.
+      // On a light page and a dark one the seal's letters stand at least three to one against the clay, and a service's root
+      // over the rim at least three to one against the page.
       await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.tree = 'grove'; w.growPaint(); });
-      await page.emulateMedia({ colorScheme: 'dark' });
-      const fills = await page.evaluate(() => {
+      const colours = () => {
         const svg = document.querySelector('[data-testid="grow"] svg.gb[role=group]')!;
         const probe = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); probe.style.fill = 'var(--pot)'; svg.append(probe);
-        const out = { pot: getComputedStyle(probe).fill, seal: getComputedStyle(svg.querySelector('.seal .sm')!).fill }; probe.remove(); return out;
-      });
+        const ext = svg.querySelector('.rt.dep.ext .w')!, bg = getComputedStyle(document.body).backgroundColor;
+        const out = { pot: getComputedStyle(probe).fill, seal: getComputedStyle(svg.querySelector('.seal .sm')!).fill, extFill: getComputedStyle(ext).fill, extEdge: getComputedStyle(ext).stroke, bg }; probe.remove(); return out;
+      };
+      const light = await page.evaluate(colours);
+      await page.emulateMedia({ colorScheme: 'dark' });
+      const fills = await page.evaluate(colours);
       const lum = (css: string) => {
         const m = css.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/), n = css.match(/rgba?\((\d+), (\d+), (\d+)/);
         const c = m ? m.slice(1, 4).map(Number) : n!.slice(1, 4).map((x) => Number(x) / 255);
         const lin = c.map((x) => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
         return .2126 * lin[0]! + .7152 * lin[1]! + .0722 * lin[2]!;
       };
-      const [hi, lo] = [lum(fills.seal), lum(fills.pot)].sort((a, b) => b - a);
-      expect((hi! + .05) / (lo! + .05), JSON.stringify(fills)).toBeGreaterThanOrEqual(3);
+      const ratio = (a: string, b: string) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi! + .05) / (lo! + .05); };
+      expect(ratio(fills.seal, fills.pot), JSON.stringify(fills)).toBeGreaterThanOrEqual(3);
+      expect(ratio(light.seal, light.pot), JSON.stringify(light)).toBeGreaterThanOrEqual(3);
+      expect(ratio(fills.extFill, fills.bg), JSON.stringify(fills)).toBeGreaterThanOrEqual(3);
+      expect(ratio(fills.extEdge, fills.bg), JSON.stringify(fills)).toBeGreaterThanOrEqual(4.5);
+      // A short project name carries its folder's too.
+      const short = await page.evaluate(() => {
+        const w = (0, eval)('({ gw, growPaint, state })'); w.state.config = { ...(w.state.config ?? {}), project: 'tg' }; w.gw.B.key = 'stale'; w.growPaint();
+        return Array.from(document.querySelectorAll('[data-testid="grow"] svg.gb[role=group] .seal .sm')).map((t) => t.textContent).join('');
+      });
+      expect(short).toBe('tg · ' + repoName);
       await page.close();
     } finally { await browser.close(); }
   }, 120000);

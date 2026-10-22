@@ -24,13 +24,13 @@ export const BONSAI_CSS = String.raw`
  --pad:color-mix(in srgb,var(--moss) 44%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 30%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 70%,var(--paper));
  --fol-hi:color-mix(in srgb,var(--moss) 58%,var(--paper));--fol:color-mix(in srgb,var(--moss) 72%,var(--paper));--fol-lo:color-mix(in srgb,var(--moss) 86%,var(--paper));--fsh-hi:color-mix(in srgb,var(--moss) 70%,var(--paper));--fsh:color-mix(in srgb,var(--moss) 83%,var(--paper));--fsh-lo:color-mix(in srgb,var(--moss) 95%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 16%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 34%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 62%,var(--paper));
- --pot:color-mix(in srgb,var(--ochre) 26%,var(--line2));--pot-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#3A2A20);--pot-lit:color-mix(in srgb,var(--pot) 78%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 80%,#3A2A20);--soil-c:color-mix(in srgb,#6B4A32 72%,var(--soil));--soil-lit:color-mix(in srgb,#8A6A4C 60%,var(--soil));--pebble:color-mix(in srgb,var(--line2) 70%,var(--paper));--rt-cut:var(--wood);--rt-ext:var(--wood);--stake:#B09676;--moss-rim:color-mix(in srgb,var(--pad) 55%,var(--pad-lit))}
+ --pot:color-mix(in srgb,var(--ochre) 26%,var(--line2));--pot-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#3A2A20);--pot-lit:color-mix(in srgb,var(--pot) 78%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 80%,#3A2A20);--soil-c:color-mix(in srgb,#6B4A32 72%,var(--soil));--soil-lit:color-mix(in srgb,#8A6A4C 60%,var(--soil));--pebble:color-mix(in srgb,var(--line2) 70%,var(--paper));--rt-cut:var(--wood);--rt-ext:var(--wood);--stake:#B09676}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--wood:#6E5F50;--wood-lit:#8A7864;--wood-shade:#4A3F35;--wood-old:#5E574E;--knot:#4E4238;--knot-lit:#93826E;--cut:#B9A684;--cutc:color-mix(in srgb,var(--ink3) 82%,var(--paper));--shoot:#A9CF72;--graft:color-mix(in srgb,var(--moss) 70%,#fff);
  --pad:color-mix(in srgb,var(--moss) 50%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 66%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 30%,var(--paper));
  --fol-hi:color-mix(in srgb,var(--moss) 56%,var(--paper));--fol:color-mix(in srgb,var(--moss) 45%,var(--paper));--fol-lo:color-mix(in srgb,var(--moss) 34%,var(--paper));--fsh-hi:color-mix(in srgb,var(--moss) 45%,var(--paper));--fsh:color-mix(in srgb,var(--moss) 35%,var(--paper));--fsh-lo:color-mix(in srgb,var(--moss) 25%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 22%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 40%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 38%,var(--paper));
  --leaf-pend:color-mix(in oklab,var(--fol-hi) 84%,#fff);
- --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468;--moss-rim:#7FA36F}}
+ --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468}}
 .gb .w{fill:var(--wood)}.gb .w.old{fill:var(--wood-old)}.gb .lt{fill:var(--wood-lit)}.gb .sh{fill:var(--wood-shade)}
 .gb .grain{fill:none;stroke:var(--wood-shade);stroke-width:.8;stroke-linecap:round;opacity:.32}
 .gb .jin{fill:var(--paper);stroke:var(--wood-old);stroke-width:.9;stroke-linejoin:round}
@@ -137,13 +137,12 @@ export const BONSAI_CSS = String.raw`
 .gb .leader{fill:none;stroke:var(--line2);stroke-width:1}
 .gb .badge circle{fill:var(--paper);stroke:var(--ink3);stroke-width:1}.gb .badge text{font:600 11px var(--mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}.gb.nw .badge text{font-size:14px}.gb.nw .klbl{font-size:12.8px;stroke-width:3.8px}.gb.nw .mlbl,.gb.nw .cuttag{font-size:13.4px}.gb.nw .note{font-size:14.7px}
 .gb .badge.fail circle{stroke:var(--verm);fill:var(--verm-bg)}.gb .badge.sel circle{stroke:var(--ink);stroke-width:2}.gb .badge.pruned{display:none}
-/* the repository's seal is pressed into the clay: no chip, only its letters cut a little into the face, the cut's upper edge in
-   shadow and its lower edge catching the light; quiet, low and to one side, like a potter's mark */
-.gb .seal{opacity:.75}.gb .seal text{font-family:var(--mono);font-weight:500;letter-spacing:.03em}.gb .seal .sm{fill:color-mix(in srgb,var(--pot-dk) 70%,#000)}.gb .seal .sd{fill:color-mix(in srgb,var(--pot-dk) 48%,#000);opacity:.75}.gb .seal .sl{fill:color-mix(in srgb,var(--pot) 50%,#fff);opacity:.5}
-/* (on a dark page the cut shows the paler clay inside it, at least three to one against the face, with a darker inset along its
-   upper edge) */
-@media (prefers-color-scheme:dark){.gb .seal{opacity:1}.gb .seal .sm{fill:color-mix(in srgb,var(--pot) 34%,#fff)}.gb .seal .sd{fill:color-mix(in srgb,var(--pot-dk) 45%,#000);opacity:.9}.gb .seal .sl{fill:color-mix(in srgb,var(--pot) 60%,#fff);opacity:.25}}
-.gb .stake{fill:none;stroke:var(--stake);stroke-linecap:round}.gb .tag{fill:var(--paper);stroke:color-mix(in srgb,var(--line2) 70%,var(--ink3));stroke-width:.9}.gb .rt.hl .stake,.gb .rt.sel .stake{stroke:color-mix(in srgb,var(--stake) 60%,var(--ink))}.gb .rt.hl .tag,.gb .rt.sel .tag{stroke:var(--ink3)}.gb .pot{fill:var(--pot)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:.8;opacity:.4;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.9;stroke-linecap:round}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .soil{fill:var(--soil-c)}.gb .mc0{fill:color-mix(in srgb,var(--pad-shade) 70%,#000);opacity:.6}.gb .mc1{fill:color-mix(in srgb,var(--pad-shade) 72%,var(--pad))}.gb .mc2{fill:color-mix(in srgb,var(--pad) 70%,var(--pad-shade))}.gb .mc3{fill:var(--moss-rim)}.gb .soilx,.gb .mc,.gb .seal,.gb .rhi,.gb .rcutg,.gb .ptag{pointer-events:none}
+/* the repository's seal is pressed into the clay: no chip, only its letters cut into the middle of the face, darker than the
+   clay at three to one or more, with a light edge a pixel below where the cut catches the light; like a potter's mark */
+.gb .seal text{font-family:var(--mono);font-weight:500;letter-spacing:.03em}.gb .seal .sm{fill:color-mix(in srgb,var(--pot-dk) 50%,#000)}.gb .seal .sl{fill:color-mix(in srgb,var(--pot) 50%,#fff);opacity:.45}
+/* (on a dark page the cut shows the paler clay inside it, at least three to one against the face, with no edge) */
+@media (prefers-color-scheme:dark){.gb .seal .sm{fill:color-mix(in srgb,var(--pot) 28%,#fff)}.gb .seal .sl{display:none}}
+.gb .stake{fill:none;stroke:var(--stake);stroke-linecap:round}.gb .tag{fill:var(--paper);stroke:color-mix(in srgb,var(--line2) 70%,var(--ink3));stroke-width:.9}.gb .rt.hl .stake,.gb .rt.sel .stake{stroke:color-mix(in srgb,var(--stake) 60%,var(--ink))}.gb .rt.hl .tag,.gb .rt.sel .tag{stroke:var(--ink3)}.gb .pot{fill:var(--pot)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:1;opacity:.55;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:color-mix(in srgb,var(--pot-dk) 70%,#000);stroke-width:1;opacity:.8;stroke-linecap:round}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .soil{fill:var(--soil-c)}.gb .soilx,.gb .seal,.gb .rhi,.gb .rcutg,.gb .ptag{pointer-events:none}
 @media (prefers-color-scheme:dark){.gb .gl{fill:#5A4A3E;opacity:1}.gb .gd{opacity:.3}}
 .gb .rring{fill:none;stroke:var(--paper);stroke-width:3;opacity:0;transition:opacity .2s}.gb .rt.hl .rring{opacity:1}.gb .rt.sel .rring{opacity:1;stroke:var(--ink);stroke-width:1.6}
 .gb .rt.hl .w,.gb .rt.sel .w{fill:var(--wood-lit)}.gb .rt.hl .rlbl,.gb .rt.sel .rlbl{fill:var(--ink);font-weight:600}.gb.dim .rt:not(.hl):not(.sel){opacity:.32}
@@ -153,11 +152,10 @@ export const BONSAI_CSS = String.raw`
 /* every root is wood: a fine darker edge parts a finger from the one behind it, and its upper side catches the light. A service's root is
    lifted in the dark so it never fades into the night; a severed root is half-faded bark with a pale cut face and two rings */
 .gb .nbf .w,.gb .rt .w{stroke:color-mix(in srgb,var(--wood-shade) 70%,#000);stroke-width:.6;stroke-opacity:.7;stroke-linejoin:round}.gb .nbf .w{stroke-width:.8;stroke-opacity:.85}.gb .nbf .rhi{opacity:.62}.gb .rbed{fill:var(--soil-c)}.gb .rhi{fill:var(--wood-lit);opacity:.42}.gb .rt.ext:not(.hl):not(.sel) .w{fill:var(--rt-ext)}
-.gb .rt.loose .w{fill:var(--rt-cut);opacity:.5;stroke:none}.gb .rcut{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.55;opacity:.95}.gb .rring2{fill:none;stroke:var(--wood-shade);stroke-width:.4;opacity:.7}.gb .rt.loose .tag{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 2}.gb .rlim{fill:var(--wood-lit);opacity:.5;pointer-events:none}.gb .rlbl.tg .nt{fill:var(--muted)}
-/* (on a dark page the roots, the nebari and the moss are lifted a step above the trunk's wood and the soil, and every root
+.gb .rt.loose .w{fill:var(--rt-cut);opacity:.6;stroke-opacity:.5}.gb .rt.loose .rlim{opacity:.3}.gb .rcut{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.55;opacity:.95}.gb .rring2{fill:none;stroke:var(--wood-shade);stroke-width:.4;opacity:.7}.gb .rt.loose .tag{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 2}.gb .rlim{fill:var(--wood-lit);opacity:.5;pointer-events:none}.gb .rlbl.tg .nt{fill:var(--muted)}
+/* (on a dark page the roots and the nebari are lifted a step above the trunk's wood and the soil, and every root
    carries a brighter rim light along its upper edge, so the ground never sinks into the night) */
-@media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.75}.gb .rt.ext .w{stroke:#4A3F35;stroke-opacity:.9;stroke-width:.5}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}
- .gb .mc1{fill:color-mix(in srgb,var(--moss) 56%,var(--paper))}.gb .mc2{fill:color-mix(in srgb,var(--moss) 43%,var(--paper))}.gb .mc3{fill:color-mix(in srgb,var(--moss) 82%,var(--paper))}.gb .mc0{fill:#0b120d;opacity:.55}}
+@media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.7}.gb .rt.ext .w{stroke:color-mix(in srgb,var(--rt-ext) 55%,#fff);stroke-opacity:.9;stroke-width:.8}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}}
  /* the lit route is sap in the wood: an amber band about three tenths of the girth wide with a soft halo round it and a fine
     cream core along its spine, so it reads as a glow on the bark on a light page and a dark one; where it broke, the wood
     itself is red (gbRed), feathered in and out */
@@ -745,13 +743,15 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
    return sp.map(([d,len,f,w0])=>({d,len:live.has(d)&&len>.6?.4:len,f,w0}))};
   /* half the foot's width where it meets the soil, from the trunk as drawn */
   const halfAt=T=>{let k=0;while(k<T.tp.length-1&&T.tp[k][1]>-8)k++;return T.tw[k]/2},nbEnd=(T,q)=>q.d*halfAt(T)*(1+2*q.len*(q.f?.85:1));
-  const looseLen=Math.max(24,Math.min(36,.1*tall)),mossW=22*Math.sqrt(kpx);
-  /* the pot's ends hold the nebari, a third party's root running out to the rim, a store's root, and a severed root with
-     room around it */
-  {let A=Infinity,Bz=-Infinity;trees.forEach((T,i)=>{const X=xs[i];for(const d of [-1,1]){const rch=Math.max(halfAt(T),...nbSpec(T,i).filter(q=>q.d===d).map(q=>d*nbEnd(T,q))),dp=deps.filter(q=>q.i===i&&q.d===d);
-    /* (and on a side no named root runs along, room for a mound of moss between the nebari and anything laid there) */
+  const looseLen=Math.max(70,Math.min(90,.22*tall))*kpx,bareW=22*Math.sqrt(kpx);
+  /* the pot's ends hold the nebari, a third party's root running out to the rim, a store's root, and an unused store's root
+     running out from the nebari with its tag staked in its cut end */
+  {let A=Infinity,Bz=-Infinity;trees.forEach((T,i)=>{const X=xs[i],busyD=d=>deps.some(q=>q.i===i&&q.d===d&&!q.loose);for(const d of [-1,1]){const rch=Math.max(halfAt(T),...nbSpec(T,i).filter(q=>q.d===d).map(q=>d*nbEnd(T,q))),dp=deps.filter(q=>q.i===i&&q.d===d);
+    /* (and on a side no named root runs along, a stretch of bare soil past the nebari) */
     let nd=rch+18*kpx;if(dp.some(q=>q.ext))nd=Math.max(nd,rch+30*kpx);if(dp.some(q=>!q.ext&&!q.loose))nd=Math.max(nd,rch+26*kpx);
-    else if(!dp.some(q=>q.ext))nd=Math.max(nd,rch+mossW+(dp.some(q=>q.loose)?36*kpx+looseLen:22*kpx));
+    else if(!dp.some(q=>q.ext))nd=Math.max(nd,rch+bareW+22*kpx);
+    /* (an unused store's root on this side: its run past the foot, and half its tag beyond the stake in its cut end) */
+    for(const q of deps)if(q.i===i&&q.loose&&(busyD(q.d)&&!busyD(-q.d)?-q.d:q.d)===d){const tw=gbW(gwCut(M.U[q.id].label,22)+' · unused',8.6*kpx*.61)+10*kpx;nd=Math.max(nd,halfAt(T)+looseLen+Math.max(12*kpx,tw/2-4*kpx))}
     if(d<0)A=Math.min(A,X-nd);else Bz=Math.max(Bz,X+nd)}});
    /* (a pot short at one end slides that way first, as far as the other end has room to spare, before it grows) */
    let a=potC-potL/2,b=potC+potL/2;if(!lone&&(a>A||b<Bz)){if(a>A){const k=Math.min(a-A,Math.max(0,b-Bz));a-=k;b-=k}if(b<Bz){const k=Math.min(Bz-b,Math.max(0,A-a));a+=k;b+=k}a=Math.min(a,A);b=Math.max(b,Bz);potL=b-a;potC=(a+b)/2}}
@@ -765,7 +765,7 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* the ground a front root lies on: nearer the eye than the soil's far edge, so lower in the drawing */
   const fy=x=>{const a=sy(x)+.7;return a+.5*(-1-a)};
   const knobs=(seed,n)=>{const r=gbRng(seed),ph=r()*6.28,ph2=r()*6.28;return Array.from({length:n+1},(_,i)=>[1+.13*Math.sin(i*.95+ph),.55*Math.sin(i*.6+ph2)])};
-  const wallX=(dd,y)=>{const k=5*Math.max(0,y-2)/Math.max(1,D-2);return dd>0?pb-k:pa+k};
+  const tpr=lone?5:Math.max(5,.02*potL),wallX=(dd,y)=>{const k=tpr*Math.max(0,y-2)/Math.max(1,D-2);return dd>0?pb-k:pa+k};
   const roots=[];
   /* the nebari, unnamed, are laid first, back fingers before front ones, so the named roots lie over them */
   trees.forEach((T,i)=>{const X=xs[i],hb=halfAt(T),G=2*hb;const fs0=[];nbSpec(T,i).forEach((q,k)=>{const n=18,kb=knobs(gbHash('nb'+i+':'+k),n);const a=X+q.d*hb*.45,e=X+nbEnd(T,q);const pts=[],w=[];
@@ -797,20 +797,21 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   for(const r of roots)if(r.pts)for(let k=0;k<r.pts.length;k+=2)woodP.push([r.pts[k][0],r.pts[k][1],r.w[k]/2,r]);
   const bgap=(b,q)=>Math.hypot(Math.max(b[0]-q[2],0,q[0]-b[2]),Math.max(b[1]-q[3],0,q[1]-b[3]));
   const clr=(b,own,body,tg)=>{let c=1e9;for(const q of woodP)if((q[3]!==own||!own)&&!(tg&&q[3]&&q[1]-q[2]>=b[3]+4))c=Math.min(c,Math.hypot(Math.max(b[0]-q[0],0,q[0]-b[2]),Math.max(b[1]-q[1],0,q[1]-b[3]))-q[2]);for(const q of padB)c=Math.min(c,bgap(b,body?[q[0],q[1],q[2],q[4]]:q));return c};
-  /* the pot is the repository: its name pressed into the face's lower right (centred on a small bowl), in full while it fits
-     the free face. Its type steps down to about seven pixels first, then the name breaks after a hyphen onto two lines,
-     and only then is its end cut; never its middle. A monospace letter is six tenths of its size, and three hundredths more
-     apart */
-  let repo='';try{repo=(state.config&&state.config.project)||String(state.dir||'').split('/').pop()||''}catch(e){}
-  const seal=repo&&potL>60?(()=>{const sy0=D-6,ax=lone?potC:wallX(1,sy0)-7*kpx,room=lone?potL*.62:ax-(wallX(-1,sy0)+7*kpx),cw=f=>f*.63;
-   const sizes=[8.6,8.2,7.8,7.4,7].map(f=>f*kpx),fit=ls=>sizes.find(f=>Math.max(...ls.map(l=>l.length))*cw(f)<=room);
-   const out=(lines,f)=>({lines,fs:f,x:ax,y:lone?D*.5+f*.35:sy0,an:lone?'middle':'end',lh:f*1.12,room});
+  /* the pot is the repository: its name pressed into the middle of the face, in full while it fits. A short project name
+     also carries its folder's ("tg · tracegrove"). Its type steps down to about seven pixels first, then the name breaks
+     after a hyphen onto two lines, and only then is its end cut; never its middle. A monospace letter is six tenths of its
+     size, and three hundredths more apart */
+  let repo='';try{const dn=String(state.dir||'').split('/').pop()||'';repo=(state.config&&state.config.project)||dn;if(repo.length<4&&dn&&dn!==repo)repo+=' · '+dn}catch(e){}
+  /* (between the shadow under the lip and the incised band above the foot, its walls' taper and a margin either side) */
+  const seal=repo&&potL>60?(()=>{const top=Math.min(8,D*.24)+1,bot=D-4.4,mid=(top+bot)/2,ax=potC,room=lone?potL*.62:wallX(1,bot)-wallX(-1,bot)-14*kpx,cw=f=>f*.63;
+   const sizes=[9.4,9,8.6,8.2,7.8,7.4,7].map(f=>f*kpx),sm=sizes[sizes.length-1],fit=ls=>sizes.find(f=>Math.max(...ls.map(l=>l.length))*cw(f)<=room),two=q=>q*1.12+q*.75<=bot-top;
+   const out=(lines,f)=>({lines,fs:f,x:ax,y:lone?D*.5+f*.35:mid+(lines.length-1)*f*.56+f*.35,an:'middle',lh:f*1.12,room});
    let f=fit([repo]);if(f)return out([repo],f);
-   /* two lines need the face's height: the upper line's top stays below the shadow under the lip */
-   if(!lone&&sy0-sizes[4]*1.12-sizes[4]*.75>=Math.min(8,D*.24)+1){let best=null;for(let i=1;i<repo.length-1;i++)if(/[-_./]/.test(repo[i-1])){const ls=[repo.slice(0,i),repo.slice(i)],n=Math.max(ls[0].length,ls[1].length);if(!best||n<best.n)best={ls,n}}
-    if(best){const ok=sizes.filter(q=>sy0-q*1.12-q*.75>=Math.min(8,D*.24)+1),g=ok.find(q=>best.n*cw(q)<=room);if(g)return out(best.ls,g);
+   /* two lines need the face's height */
+   if(!lone&&two(sm)){let best=null;for(let i=1;i<repo.length-1;i++)if(/[-_./]/.test(repo[i-1])){const ls=[repo.slice(0,i),repo.slice(i)],n=Math.max(ls[0].length,ls[1].length);if(!best||n<best.n)best={ls,n}}
+    if(best){const ok=sizes.filter(two),g=ok.find(q=>best.n*cw(q)<=room);if(g)return out(best.ls,g);
      const m=ok[ok.length-1];if(m&&best.ls[0].length*cw(m)<=room){const n=Math.max(2,Math.floor(room/cw(m)));return out([best.ls[0],best.ls[1].length>n?best.ls[1].slice(0,n-1)+'…':best.ls[1]],m)}}}
-   const m=sizes[4],n=Math.max(2,Math.floor(room/cw(m)));return out([repo.slice(0,n-1)+'…'],m)})():null;
+   const m=sm,n=Math.max(2,Math.floor(room/cw(m)));return out([repo.slice(0,n-1)+'…'],m)})():null;
   const fs=narrow?11*GB_NK:10.5,cw=fs*.61,tfs=8.6*kpx,tcw=tfs*.61;
   /* names: a third party's at the rim its root goes over, just outside the pot on that side and reading outward from the root,
      level with where it comes down past the lip; and "trace stops", a label of its own, beside the open end of the tail,
@@ -823,9 +824,8 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
    if(r.stop){const nx=zx+d*5.5*kpx,w1=gbW('trace stops',cw);rl.push({r,x:nx,y:zy,anchor:d>0?'start':'end',t:'trace stops',note:true});if(d>0)x1=Math.max(x1,nx+w1+8);else x0=Math.min(x0,nx-w1-8)}}
   /* a store's name on a plant tag: a small rounded tag standing about twelve units above the soil on a wooden stake pushed into
      it, never within sixteen pixels of the wood. A live store's stake stands on its root, at its tip or back along it. A
-     store no journey uses is a short severed root sunk to half its depth in the soil apart from the flare, its cut face to
-     the trunk and the stake right beside the cut face, the tag reaching out over the root; both move along the soil together
-     until the tag is clear. Its tag reads "<store> · unused" on one line at every width: the type steps down to eight
+     store no journey uses is a faded root running out from the nebari seventy to ninety pixels past the foot, partly sunk
+     in the soil, its end cut and the stake pushed into the cut face, the tag over the root's end. Its tag reads "<store> · unused" on one line at every width: the type steps down to eight
      pixels, then the store's name is cut at its end, and " · unused" always stays */
   /* (where the pot has no clear stretch wide enough, the tag leans out past the rim on its stake, away from the trunk) */
   const tagAt=(sx,lab,out,f,lean)=>{f=f||tfs;const ww=gbW(lab,f*.61)+10*kpx,th=f*1.45,gy=sy(sx),bot=gy-11;const lo=pa-10+ww/2,hi=pb+10-ww/2,pre=lean?sx+lean*(ww/2-6*kpx):sx,cx=out?sx+out*ww/2:lo>hi?(pa+pb)/2:Math.max(lo,Math.min(hi,pre));
@@ -838,24 +838,27 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
     if(best&&best.c<ok)ov:for(let ii=n-1;ii>=Math.floor(n*.45);ii-=2)for(const f of [.4,.7,1]){const g=tagAt(r.pts[ii][0],lab,r.d*f);g.c=score(g,r);g.t=t;if(g.c>best.c+.5)best=g;if(g.c>=ok)break ov}}
    else{const busy=d=>deps.some(q=>q.i===r.tree&&q.d===d&&!q.loose);let sides=[r.d,-r.d].filter(d=>!busy(d));if(!sides.length)sides=[r.d];
     const full=M.U[r.id].label,vars=[...[8.6,8.3,8].map(f=>[t,f*kpx]),...[16,12,9].filter(n=>n<full.length).map(n=>[gwCut(full,n),8*kpx])],whole=vars.slice(0,3),cut=vars.slice(3);
-    /* the stake stands just in front of the cut face, on the trunk's side; the root runs out from it toward the rim */
-    const w0=9*kpx,gap=d=>d*(w0*.42+2.6*kpx);
+    /* the root's cut end stands its run past the foot (shortened toward seventy pixels, and never past the rim, where the
+       tag has no room), and the stake stands in it */
+    const hb=halfAt(T),cutAt=(d,len)=>{const c=X+d*(hb+len);return d>0?Math.min(c,pb-9*kpx):Math.max(c,pa+9*kpx)},lens=[...new Set([looseLen,80*kpx,70*kpx].filter(l=>l<=looseLen+.01))];
     /* (the whole name where it stands well clear, then where it is merely clear, then in smaller type, then leaning out past
        the rim; and only then a cut name) */
-    const look=(vs,need,lean)=>{for(const [vt,f] of vs)for(const d of sides){const rim=d>0?pb:pa;const nb=Math.max(halfAt(T),...roots.filter(q=>!q.id&&q.tree===r.tree&&q.d===d).map(q=>d*(q.pts[q.pts.length-1][0]-X)),...roots.filter(q=>q.id&&q.pts&&q.tree===r.tree&&q.d===d).map(q=>d*(q.pts[q.pts.length-1][0]-X)));
-      for(let s0=rim-d*(7*kpx+looseLen),k=0;lean?k<8:d*(s0-gap(d)-X)>=nb+12*kpx;s0-=d*5*kpx,k++)for(const o of lean?[.4,.7,1]:[0]){const g=tagAt(s0-gap(d),vt+' · unused',d*o,f,o?0:d);g.c=score(g,r);g.s0=s0;g.d=d;g.t=vt;if(!best||g.c>best.c+.5)best=g;if(g.c>=need)return g}}return null};
+    const look=(vs,need,lean)=>{for(const [vt,f] of vs)for(const d of sides)for(const len of lens){const sc=cutAt(d,len);
+      for(const o of lean?[.4,.7,1]:[0]){const g=tagAt(sc,vt+' · unused',d*o,f,o?0:d);g.c=score(g,r);g.s0=sc;g.d=d;g.t=vt;if(!best||g.c>best.c+.5)best=g;if(g.c>=need)return g}}return null};
     const hit=look(whole.slice(0,1),ok)||look(whole.slice(0,1),6*kpx)||look(whole.slice(1),6*kpx)||look(whole.slice(0,1),ok,1)||look(cut,6*kpx);if(hit)best=hit;
-    if(!best){const d=r.d,s0=d>0?pb-7*kpx-looseLen:pa+7*kpx+looseLen;best=tagAt(s0-gap(d),t+' · unused',0,tfs,d);best.s0=s0;best.d=d;best.t=t}
-    /* the severed root: a short length of bark from its cut face to a fine end, its centre on the soil's surface so only its
-       upper half shows, the end going under */
-    const d=best.d,s0=best.s0,n=16,kb=knobs(gbHash('cut:'+r.id),n);r.d=d;r.pts=[];r.w=[];
-    for(let ii=0;ii<=n;ii++){const t=ii/n,x=s0+d*looseLen*t,ww=Math.max(1.5*kpx,(w0-7*kpx*Math.pow(t,.85))*(1+.06*(kb[ii][0]-1)/.13));
-     r.pts.push([x,sy(x)+.7-.5*kpx*Math.sin(t*3.1416)+(t>.72?Math.pow((t-.72)/.28,1.5)*(ww*.5+1.4):0)]);r.w.push(ww)}}
+    if(!best){const d=r.d,sc=cutAt(d,looseLen);best=tagAt(sc,t+' · unused',0,tfs,d);best.s0=sc;best.d=d;best.t=t}
+    /* the root: bark from under the foot to its cut end, thick where it leaves and tapering, its centre a little under the
+       soil's surface so about two fifths of it shows; over its last stretch it lifts, so the cut face stands out of the soil */
+    const d=best.d,sc=best.s0,xa=X+d*hb*.5,n=24,kb=knobs(gbHash('cut:'+r.id),n),wa=Math.max(8.5*kpx,.64*hb),wc=Math.max(7*kpx,.36*hb);r.d=d;r.pts=[];r.w=[];
+    for(let ii=0;ii<=n;ii++){const t=ii/n,x=xa+(sc-xa)*t,ww=(wa+(wc-wa)*Math.pow(t,.7))*(ii<n-1?1+.06*(kb[ii][0]-1)/.13:1),dy=Math.min(1.4,.7+.2*ww);
+     r.pts.push([x,sy(x)+(t<=.72?dy:dy+(.7-.28*ww-dy)*Math.pow((t-.72)/.28,1.4))]);r.w.push(ww)}}
    if(!best)continue;taken2.push(best.box);
-   rl.push({r,x:best.x,y:best.top+best.th/2+best.f*.36,anchor:'middle',t:best.t,unused:!!r.loose,tag:true,fs:best.f,ww:best.ww,th:best.th,sx:best.sx,gy:best.gy,bot:best.bot,top:best.top,mb:[best.sx-6,best.top,best.sx+6,best.gy],
+   rl.push({r,x:best.x,y:best.top+best.th/2+best.f*.36,anchor:'middle',t:best.t,unused:!!r.loose,tag:true,fs:best.f,ww:best.ww,th:best.th,sx:best.sx,gy:best.gy,bot:best.bot,top:best.top,
     box:[best.box[0]-16*kpx,best.box[1]-16*kpx,best.box[2]+16*kpx,best.gy+2]});x0=Math.min(x0,best.box[0]-6);x1=Math.max(x1,best.box[2]+6)}
   const stopX=rl.some(l=>l.r.stop&&l.r.ext);
   const yb=Math.max(0,...rl.filter(l=>l.below||l.note).map(l=>l.y+5));
+  /* (an unused store's root leaves from under the nebari, so it is drawn first) */
+  roots.sort((a,b)=>(b.loose?1:0)-(a.loose?1:0));
   L={trees,xs,potL,potC,D,fh,kpx,fy,roots,rl,fs,sy,wallX,seal,x0,x1,y0:y0-8,y1:Math.max(yb,D+fh+(lone?10:12)+(stopX?10:0)),narrow,S,H0,lone};
   /* too wide: a lower tree has smaller pads and labels, down to the height where its leaves reach their smallest; below
      that only the trunk would shrink and the pads pile into each other, so past it the drawing scales down whole instead */
@@ -964,26 +967,29 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  const barkOn=(tw,parent)=>{if(sap)return;clip.append(sv('path',{d:tw.getAttribute('d')}));const bl=sv('g',{'clip-path':'url(#'+clipId+')',filter:'url(#'+softId+')'}),lw=sv('g',{},bl);parent.append(lw);shade(tw.__pts,tw.__w,0,bl);tw.__also=[lw]};
  const ribFlat=(pts,w)=>{const A=[],Z=[];pts.forEach((q,i)=>{const n=gbNorm(pts,i),h=w[i]/2;A.push([q[0]+n[0]*h,q[1]+n[1]*h]);Z.push([q[0]-n[0]*h,q[1]-n[1]*h])});return 'M'+A.map(gbP).join(' L')+' L'+Z.reverse().map(gbP).join(' L')+'Z'};
  /* the pot: an unglazed rectangle, about as deep as the trunk is thick, with a two-unit lip and splayed feet, or a small round
-    bowl for a lone literati; inside it a mound of soil with low mounds of moss, which the roots lie in and the trunk rises out of */
+    bowl for a lone literati; inside it a mound of bare soil, which the roots lie in and the trunk rises out of */
  const pc=L.potC,pl=L.potL,D=L.D,lone=L.lone,pa=pc-pl/2,pb=pc+pl/2,fh=L.fh||5,kx=L.kpx||1;
+ /* its walls lean in toward the foot, the bottom about ninety-six hundredths of the top (L.wallX is the same line) */
+ const tp=Math.max(5,.02*pl),ww=y=>tp*Math.max(0,y-2)/Math.max(1,D-2);
  const gid='gb-pot'+N,vid='gb-potv'+N,sid='gb-potsh'+N,soid='gb-soil'+N;const pw=lone?pl/2:pl/2;
  /* unglazed clay lit from the left like the wood, a shadow under the lip, and a soft shadow on the ground */
  defs.append(sv('linearGradient',{id:gid,gradientUnits:'userSpaceOnUse',x1:gbF(pc-pw),y1:'0',x2:gbF(pc+pw),y2:'0'},sv('stop',{offset:0,style:'stop-color:var(--pot-lit)'}),sv('stop',{offset:.4,style:'stop-color:var(--pot)'}),sv('stop',{offset:1,style:'stop-color:var(--pot-dk)'})),
+  sv('linearGradient',{id:gid+'l',gradientUnits:'userSpaceOnUse',x1:gbF(pc-pw),y1:'0',x2:gbF(pc+pw),y2:'0'},sv('stop',{offset:0,style:'stop-color:color-mix(in srgb,var(--pot-lit) 70%,#fff)'}),sv('stop',{offset:.4,style:'stop-color:var(--pot-lit)'}),sv('stop',{offset:1,style:'stop-color:var(--pot)'})),
   sv('linearGradient',{id:vid,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:0,style:'stop-color:#000;stop-opacity:.2'}),sv('stop',{offset:1,style:'stop-color:#000;stop-opacity:0'})),
   sv('radialGradient',{id:sid},sv('stop',{offset:0,style:'stop-color:#000;stop-opacity:.16'}),sv('stop',{offset:1,style:'stop-color:#000;stop-opacity:0'})),
   sv('linearGradient',{id:soid,gradientUnits:'userSpaceOnUse',x1:'0',y1:'-9',x2:'0',y2:'3'},sv('stop',{offset:0,style:'stop-color:var(--soil-lit)'}),sv('stop',{offset:1,style:'stop-color:var(--soil-c)'})));
  if(lone){const r=pl/2;gPot.append(sv('ellipse',{cx:gbF(pc),cy:gbF(D+3.5),rx:gbF(r*.8),ry:3.5,fill:'url(#'+sid+')'}),sv('path',{class:'pot-ft',d:'M'+gbF(pc-r*.3)+' '+gbF(D)+' L'+gbF(pc+r*.3)+' '+gbF(D)+' L'+gbF(pc+r*.27)+' '+gbF(D+3.4)+' L'+gbF(pc-r*.27)+' '+gbF(D+3.4)+'Z'}),
    sv('path',{fill:'url(#'+gid+')',d:'M'+gbF(pc-r)+' 1 L'+gbF(pc+r)+' 1 Q'+gbF(pc+r*.96)+' '+gbF(D)+' '+gbF(pc+r*.55)+' '+gbF(D+2)+' L'+gbF(pc-r*.55)+' '+gbF(D+2)+' Q'+gbF(pc-r*.96)+' '+gbF(D)+' '+gbF(pc-r)+' 1Z'}),
    sv('rect',{x:gbF(pc-r+1),y:2.2,width:gbF(2*r-2),height:5,fill:'url(#'+vid+')'}))}
- else{const f=Math.max(12,.075*pl);
+ else{const f=Math.max(12,.075*pl),sh=Math.min(8,D*.24);
   /* splayed feet under the ends: tucked under the pot, their outer sides leaning out, so it stands wide and steady */
   const foot=(xo,dd)=>{const xi=xo-dd*f,yb=D+fh;return 'M'+gbF(xi)+' '+gbF(D-1)+' L'+gbF(xo)+' '+gbF(D-1)+' L'+gbF(xo+dd*.55*fh)+' '+gbF(yb-1.2)+' Q'+gbF(xo+dd*.62*fh)+' '+gbF(yb)+' '+gbF(xo+dd*(.62*fh-1.4))+' '+gbF(yb)+
    ' L'+gbF(xi+dd*1.6)+' '+gbF(yb)+' C'+gbF(xi+dd*.4)+' '+gbF(yb)+' '+gbF(xi)+' '+gbF(D+fh*.55)+' '+gbF(xi)+' '+gbF(D-1)+'Z'};
   gPot.append(sv('ellipse',{cx:gbF(pc),cy:gbF(D+fh+.6),rx:gbF(pl/2+10),ry:4.4,fill:'url(#'+sid+')'}),sv('path',{class:'pot-ft',d:foot(pa+.085*pl,-1)}),sv('path',{class:'pot-ft',d:foot(pb-.085*pl,1)}),
-   sv('path',{fill:'url(#'+gid+')',d:'M'+gbF(pa+.5)+' 2 L'+gbF(pb-.5)+' 2 L'+gbF(pb-4.6)+' '+gbF(D-2)+' Q'+gbF(pb-5)+' '+gbF(D)+' '+gbF(pb-7)+' '+gbF(D)+' L'+gbF(pa+7)+' '+gbF(D)+' Q'+gbF(pa+5)+' '+gbF(D)+' '+gbF(pa+4.6)+' '+gbF(D-2)+'Z'}),
-   sv('rect',{x:gbF(pa+1),y:2,width:gbF(pl-2),height:gbF(Math.min(8,D*.24)),fill:'url(#'+vid+')'}),
+   sv('path',{class:'pot-b',fill:'url(#'+gid+')',d:'M'+gbF(pa+.5)+' 2 L'+gbF(pb-.5)+' 2 L'+gbF(pb-ww(D-2))+' '+gbF(D-2)+' Q'+gbF(pb-tp)+' '+gbF(D)+' '+gbF(pb-tp-2)+' '+gbF(D)+' L'+gbF(pa+tp+2)+' '+gbF(D)+' Q'+gbF(pa+tp)+' '+gbF(D)+' '+gbF(pa+ww(D-2))+' '+gbF(D-2)+'Z'}),
+   sv('path',{fill:'url(#'+vid+')',d:'M'+gbF(pa+1)+' 2 L'+gbF(pb-1)+' 2 L'+gbF(pb-1-ww(2+sh))+' '+gbF(2+sh)+' L'+gbF(pa+1+ww(2+sh))+' '+gbF(2+sh)+'Z'}),
    /* a fine incised band just above the foot, as on a Tokoname pot */
-   sv('path',{class:'pot-inc',d:'M'+gbF(pa+5.4)+' '+gbF(D-3.4)+' L'+gbF(pb-5.4)+' '+gbF(D-3.4)}),sv('path',{class:'pot-inc lit',d:'M'+gbF(pa+5.5)+' '+gbF(D-2.6)+' L'+gbF(pb-5.5)+' '+gbF(D-2.6)}))}
+   sv('path',{class:'pot-inc',d:'M'+gbF(pa+ww(D-3.4)+.8)+' '+gbF(D-3.4)+' L'+gbF(pb-ww(D-3.4)-.8)+' '+gbF(D-3.4)}),sv('path',{class:'pot-inc lit',d:'M'+gbF(pa+ww(D-2.6)+.9)+' '+gbF(D-2.6)+' L'+gbF(pb-ww(D-2.6)-.9)+' '+gbF(D-2.6)}))}
  const soilD=lift=>{const xa=pa+1.5,xb=pb-1.5,n=48;let d='M'+gbF(xa)+' 2.4';for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n;d+=' L'+gbF(x)+' '+gbF(L.sy(x)+lift)}return d+' L'+gbF(xb)+' 2.4Z'};
  /* the soil is granular: a fine scatter of lighter and darker grains */
  defs.append(sv('pattern',{id:soid+'g',patternUnits:'userSpaceOnUse',width:11,height:7},...[[1.5,1.4,.75,'gl'],[6,3.6,.6,'gd'],[8.8,1,.55,'gl'],[3.4,5.2,.5,'gd'],[9.6,5.6,.65,'gl']].map(([x,y,r,c])=>sv('circle',{cx:x,cy:y,r,class:c}))));
@@ -1000,52 +1006,33 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  const gNbF=sv('g',{class:'nbfront'});gSoil.append(gNbF);
  /* the air: everything but the soil, the lip and the pot. Moss, a stake's foot and a root's hover ring are cut off where they
     would go into the ground, and so is the bark detail drawn over the wood (a knot's fibres), so none of it shows in the soil */
- const airId='gb-air'+N,lx=lone?2.5:1.5;{let g='M'+gbF(pa-lx)+' -1';for(let i=0;i<=48;i++){const x=pa+1.5+(pl-3)*i/48;g+=' L'+gbF(x)+' '+gbF(Math.min(-1,L.sy(x)+.7))}
+ const airId='gb-air'+N,lx=2.5;{let g='M'+gbF(pa-lx)+' -1';for(let i=0;i<=48;i++){const x=pa+1.5+(pl-3)*i/48;g+=' L'+gbF(x)+' '+gbF(Math.min(-1,L.sy(x)+.7))}
   g+=' L'+gbF(pb+lx)+' -1 L'+gbF(pb+lx)+' '+gbF(D+fh+2)+' L'+gbF(pa-lx)+' '+gbF(D+fh+2)+'Z';
   defs.append(sv('clipPath',{id:airId},sv('path',{'clip-rule':'evenodd',d:'M'+gbF(vx-10)+' '+gbF(vy-10)+' L'+gbF(vx+W+10)+' '+gbF(vy-10)+' L'+gbF(vx+W+10)+' '+gbF(vy+VH+10)+' L'+gbF(vx-10)+' '+gbF(vy+VH+10)+'Z '+g})));
   defs.append(sv('clipPath',{id:airId+'p'},sv('path',{'clip-rule':'evenodd',d:'M'+gbF(vx-10)+' '+gbF(vy-10)+' L'+gbF(vx+W+10)+' '+gbF(vy-10)+' L'+gbF(vx+W+10)+' '+gbF(vy+VH+10)+' L'+gbF(vx-10)+' '+gbF(vy+VH+10)+'Z M'+gbF(pa-lx)+' -1 L'+gbF(pb+lx)+' -1 L'+gbF(pb+lx)+' '+gbF(D+fh+2)+' L'+gbF(pa-lx)+' '+gbF(D+fh+2)+'Z'})));
   const kl=svg.querySelector(':scope>g.knots');if(kl&&!kl.hasAttribute('clip-path'))kl.setAttribute('clip-path','url(#'+airId+')')}
- /* moss in four to six low mounds of mixed sizes on both sides of the trunk where there is room (two on a small bowl): each a
-    few overlapping irregular ellipses in two greens, a darker underside and a lighter rim along the top, clipped at the soil;
-    never against the trunk, a root, a stake or a name */
- {const r=gbRng(gbHash('moss:'+key)),mk=Math.sqrt(kx);
-  const busy=(a,b)=>L.xs.some((X,i)=>b>X-.62*L.trees[i].D-6&&a<X+.62*L.trees[i].D+6)||L.roots.some(q=>q.pts&&q.pts.some((p,ii)=>p[0]>a-(q.loose?9:5)&&p[0]<b+(q.loose?9:5)&&p[1]-q.w[ii]/2<L.sy(p[0])+.4))||L.rl.some(l=>l.mb&&b>l.mb[0]-5&&a<l.mb[2]+5);
-  /* the soil that is clear runs between the trunk, the roots and the stakes; the mounds go to the roomiest runs, a side
-     at a time, sized to fit and spaced unevenly so they never stand in a row */
-  const want=lone?2:pl>300?6:pl>180?5:4,mw0=(lone?14:21)*mk,mwn=(lone?8:9)*mk,gap=5*mk,X0=L.xs[0],runs=[];
-  {let s0=null;for(let x=Math.ceil(pa+6);x<=pb-6;x++){const ok=x+1<=pb-7&&!busy(x,x+1);if(ok&&s0===null)s0=x;if(!ok&&s0!==null){runs.push({a:s0,b:x,n:0});s0=null}}}
-  const cap=R=>R.b-R.a<mwn?0:Math.min(3,Math.floor((R.b-R.a+gap)/(mwn+gap))),onSide=R=>runs.filter(Q=>(Q.a<X0)===(R.a<X0)).reduce((t,Q)=>t+Q.n,0);
-  for(let k=0;k<want;k++){let best=null,bs=-Infinity;for(const R of runs){if(R.n>=cap(R))continue;const sc=(R.b-R.a)/(R.n+1)-40*onSide(R);if(sc>bs){bs=sc;best=R}}if(!best)break;best.n++}
-  const pick=[];for(const R of runs){if(!R.n)continue;const len=R.b-R.a,ws=[];for(let i=0;i<R.n;i++)ws.push(mw0*(i%2?.45+r()*.25:.85+r()*.4));if(r()<.5)ws.reverse();
-   {const room=len-(R.n-1)*gap,tot=ws.reduce((t,w)=>t+w,0);if(tot>room)for(let i=0;i<R.n;i++)ws[i]=Math.max(mwn,ws[i]*room/tot)}
-   const slack=Math.max(0,len-ws.reduce((t,w)=>t+w,0)-(R.n-1)*gap),wt=[];for(let i=0;i<=R.n;i++)wt.push(.3+r());const wsum=wt.reduce((t,w)=>t+w,0);
-   let x=R.a;for(let i=0;i<R.n;i++){x+=slack*wt[i]/wsum;pick.push([x+ws[i]/2,ws[i]]);x+=ws[i]+gap}}
-  for(const [x,mw] of pick){const n=4+Math.floor(r()*6),mh=(1.8+r()*2.2)*mk*Math.min(1,mw/(18*mk)),es=[];
-   for(let e=0;e<n;e++){const u=(e+.15+r()*.7)/n,pr=Math.sin(Math.PI*u),rx=Math.min(mw*.34,(3+r()*4)*mk*(.7+.4*pr)),qx=Math.max(x-mw/2+rx*.85,Math.min(x+mw/2-rx*.85,x-mw/2+u*mw)),ry=(1.5+r()*1.1)*mk*(.75+.3*pr);
-    es.push([qx,L.sy(qx)+.9-ry*.5-pr*mh*.45-(e%2?ry*.35:0)+(r()-.5)*.9,rx,ry,(r()-.5)*36,r()<.45?'mc2':'mc1'])}
-   const el=(q,dy,c)=>sv('ellipse',{class:c,cx:gbF(q[0]),cy:gbF(q[1]+dy),rx:gbF(q[2]),ry:gbF(q[3]),transform:'rotate('+gbF(q[4])+' '+gbF(q[0])+' '+gbF(q[1]+dy)+')'});
-   const g=sv('g',{class:'mc','clip-path':'url(#'+airId+')'});for(const q of es)g.append(el(q,-.55,'mc3'));for(const q of es)g.append(el(q,.85,'mc0'));for(const q of es)g.append(el(q,0,q[5]));gSoil.append(g)}}
- /* the lip, over the soil's edge: the same clay, lit along its top, with a dark line where it overhangs the wall */
- gSoil.append(sv('g',{class:'lip'},sv('rect',{x:gbF(pa-lx),y:-1,width:gbF(pl+2*lx),height:lone?3.4:3.2,rx:1.2,fill:'url(#'+gid+')'}),
-  sv('path',{class:'lip-hi',d:'M'+gbF(pa-lx+.9)+' -.45 L'+gbF(pb+lx-.9)+' -.45'}),sv('path',{class:'lip-lo',d:'M'+gbF(pa-lx+.6)+' '+(lone?'2.1':'1.9')+' L'+gbF(pb+lx-.6)+' '+(lone?'2.1':'1.9')})));
- /* the pot is the repository: its name pressed into the clay at the face's lower right, about six units above the foot
-    (centred on a small bowl): no chip, just letters cut into the face, their upper edge in shadow and their lower edge
-    catching the light */
+ /* the lip, over the soil's edge: a rim about four units deep standing out past the wall, the clay a step lighter than the
+    body, a fine highlight along its top and a dark line where it overhangs the wall */
+ gSoil.append(sv('g',{class:'lip'},sv('rect',{class:'lip-b',x:gbF(pa-lx),y:-1.2,width:gbF(pl+2*lx),height:4.2,rx:1.4,fill:'url(#'+gid+'l)'}),
+  sv('path',{class:'lip-hi',d:'M'+gbF(pa-lx+1)+' -.6 L'+gbF(pb+lx-1)+' -.6'}),sv('path',{class:'lip-lo',d:'M'+gbF(pa-lx+.7)+' 2.6 L'+gbF(pb+lx-.7)+' 2.6'})));
+ /* the pot is the repository: its name pressed into the middle of the clay's face: no chip, just letters cut into it, a
+    shade darker than the clay at three to one or more, their lower edge catching the light */
  if(L.seal){const q=L.seal,n=q.lines.length;
   const tx=(dx,dy,c)=>q.lines.map((t,i)=>sv('text',{x:gbF(q.x+dx),y:gbF(q.y-(n-1-i)*q.lh+dy),'text-anchor':q.an,class:c,style:'font-size:'+gbF(q.fs)+'px'},t));
-  gPot.append(sv('g',{class:'seal','aria-hidden':'true','data-room':gbF(q.room)},...tx(-.5,-.5,'sd'),...tx(.5,.5,'sl'),...tx(0,0,'sm')))}
+  gPot.append(sv('g',{class:'seal','aria-hidden':'true','data-room':gbF(q.room)},...tx(0,.7,'sl'),...tx(0,0,'sm')))}
  /* roots: the nebari first, then the named ones over them; a third party's goes over the lip, so it is drawn after it */
  L.roots.forEach((r,i)=>{if(!r.pts)return;const id='r'+i+(r.id?':'+r.id:'');const g=sv('g',r.id?{class:'rt dep'+(r.ext?' ext':' store')+(r.loose?' loose':'')+(r.stop?' stop':''),'data-k':'u:'+r.id,tabindex:-1,role:'button','aria-label':M.U[r.id].label+', what the change depends on'+(r.loose?', on no journey':'')+(r.stop?', where tracing stops':'')}:{class:'nbf'+(r.front?' fr':'')});
   if(!r.ext)g.setAttribute('clip-path','url(#'+airId+'p)');
-  /* a severed root is sunk to half its depth: only what stands above the soil's surface shows, its cut face a half moon */
+  /* an unused store's root is partly sunk: only what stands above the soil's surface shows, its cut end lifting out of it */
   const body=r.loose?sv('g',{class:'rsev','clip-path':'url(#'+airId+')'}):g;if(r.loose)g.append(body);
   const pts=r.pts,n=pts.length;const wd=piece(id,pts,r.w,'w',body,r.tree*250+80,520),delay=gbWT(wd.__r,1)-520-now;if(r.id){(B.rootE=B.rootE||{})[r.id]=delay+520;(B.rootR=B.rootR||{})[r.id]=wd.__r}
   /* a root's upper side catches the light, which parts each finger from the one behind it, and its upper edge carries a fine
      rim light, so on a dark page it stands off the soil and the night */
   if(!r.loose){const m=gbNorm(pts,Math.floor(n*.35)),up=m[1]<0?1:-1,hl=sv('path',{class:'rhi',d:gbBand(pts.slice(0,r.ext?Math.ceil(n*.62):n),r.w,up*.25,up*.9)}),rim=sv('path',{class:'rlim',d:gbBand(pts,r.w,up*.74,up*1.04)});g.append(hl,rim);anim('rhi:'+id,hl,delay+520,300,'fade');anim('rlim:'+id,rim,delay+520,300,'fade')}
-  /* a severed root ends in a cut face: pale wood with two growth rings, cut on a slant so it shows */
+  else{const m=gbNorm(pts,Math.floor(n*.5)),up=m[1]<0?1:-1,rim=sv('path',{class:'rlim',d:gbBand(pts,r.w,up*.7,up*1.02)});body.append(rim);anim('rlim:'+id,rim,delay+520,300,'fade')}
+  /* its far end is cut: a face of pale wood with two growth rings, cut on a slant so it shows */
   if(r.loose)wd.before(sv('path',{d:wd.getAttribute('d'),class:'rbed'}));
-  if(r.loose){const c=pts[0],w0=r.w[0],a=Math.atan2(pts[2][1]-c[1],pts[2][0]-c[0])*180/Math.PI,rx=w0*.42,ry=w0*.54,arc=(k,a0,a1)=>{const p=t=>[c[0]+Math.cos(t)*rx*k,c[1]+Math.sin(t)*ry*k];return 'M'+gbP(p(a0))+' A'+gbF(rx*k)+' '+gbF(ry*k)+' 0 1 1 '+gbP(p(a1))};
+  if(r.loose){const c=pts[n-1],w0=r.w[n-1],a=Math.atan2(c[1]-pts[n-3][1],c[0]-pts[n-3][0])*180/Math.PI,rx=w0*.42,ry=w0*.54,arc=(k,a0,a1)=>{const p=t=>[c[0]+Math.cos(t)*rx*k,c[1]+Math.sin(t)*ry*k];return 'M'+gbP(p(a0))+' A'+gbF(rx*k)+' '+gbF(ry*k)+' 0 1 1 '+gbP(p(a1))};
    body.append(sv('g',{class:'rcutg',transform:'rotate('+gbF(a)+' '+gbP(c)+')'},sv('ellipse',{class:'rcut',cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(rx),ry:gbF(ry)}),sv('path',{class:'rring2',d:arc(.64,-2.2,1.9)}),sv('path',{class:'rring2',d:arc(.3,-1.4,2.6)})))}
   if(r.id){body.insertBefore(sv('path',{d:wd.getAttribute('d'),class:'rring','clip-path':'url(#'+airId+')'}),body.firstChild);
    g.append(sv('path',{d:gbLine(pts),class:'hitl','stroke-width':14}));
@@ -1053,9 +1040,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
     defs.append(sv('linearGradient',{id:gid,gradientUnits:'userSpaceOnUse',x1:gbF(e[0]),y1:gbF(e[1]),x2:gbF(z[0]),y2:gbF(z[1])},sv('stop',{offset:0,style:'stop-color:var(--muted);stop-opacity:1'}),sv('stop',{offset:1,style:'stop-color:var(--muted);stop-opacity:.15'})));
     const tl=sv('g',{class:'tailg'},sv('path',{class:'tail',d:'M'+gbP(e)+' L'+gbP(z),stroke:'url(#'+gid+')'}),sv('circle',{class:'tailend',cx:gbF(z[0]),cy:gbF(z[1]+2.2),r:1.9}));g.append(tl);anim('tail:'+id,tl,delay+520,300,'fade')}
    B.root[r.id]=g;B.pos[r.id]=pts[Math.min(n-1,Math.floor(n*(r.ext?.5:.6)))];B.nav.push('u:'+r.id);B.navEl['u:'+r.id]=g}
-  /* a store's plant tag: a small rounded tag on a wooden stake pushed into the soil, its foot cut off at the soil */
-  if(r.id&&!r.ext){const l=L.rl.find(q=>q.r===r&&q.tag);if(l){
-   const tg=sv('g',{class:'ptag'},sv('path',{class:'stake','clip-path':'url(#'+airId+')','stroke-width':gbF(1.35*kx),d:'M'+gbP([l.sx,l.gy+3.6*kx])+' L'+gbP([l.sx,l.bot+1])}),sv('rect',{class:'tag',x:gbF(l.x-l.ww/2),y:gbF(l.top),width:gbF(l.ww),height:gbF(l.th),rx:gbF(2.6*kx)}));g.append(tg);anim('stake:'+id,tg,delay+560,300,'fade')}}
+  /* a store's plant tag: a small rounded tag on a wooden stake pushed into the soil, its foot cut off at the soil; an unused
+     store's stake is pushed into its root's cut face */
+  if(r.id&&!r.ext){const l=L.rl.find(q=>q.r===r&&q.tag);if(l){const ft=r.loose?pts[n-1][1]:l.gy+3.6*kx;
+   const tg=sv('g',{class:'ptag'},sv('path',{class:'stake','clip-path':'url(#'+airId+')','stroke-width':gbF(1.35*kx),d:'M'+gbP([l.sx,ft])+' L'+gbP([l.sx,l.bot+1])}),sv('rect',{class:'tag',x:gbF(l.x-l.ww/2),y:gbF(l.top),width:gbF(l.ww),height:gbF(l.th),rx:gbF(2.6*kx)}));g.append(tg);anim('stake:'+id,tg,delay+560,300,'fade')}}
   if(!r.id&&r.front){const T=L.trees[r.tree],a=pts[0][0],e=pts[n-1][0],dd=e>a?1:-1,fid='gb-nbm'+N+'-'+i;
    /* it grows out of the trunk's surface: faded in over its first stretch, which lies over the trunk */
    defs.append(sv('linearGradient',{id:fid+'g',gradientUnits:'userSpaceOnUse',x1:gbF(a),y1:'0',x2:gbF(a+dd*.36*T.D),y2:'0'},sv('stop',{offset:0,style:'stop-color:#000'}),sv('stop',{offset:1,style:'stop-color:#fff'})),
