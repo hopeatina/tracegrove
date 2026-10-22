@@ -119,6 +119,8 @@ ${BONSAI_CSS}
 @media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
 .gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
+/* on a dark page a leaf still to prove is the tree's pale leaf, a lightened cushion green, never the page showing through */
+@media (prefers-color-scheme:dark){.gw-sw .lf.in,.gw-sw .lf.none{fill:color-mix(in oklab,color-mix(in srgb,var(--moss) 56%,var(--paper)) 84%,#fff)}}
 .gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
 .gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cal{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cres{fill:none;stroke:var(--sw-crs);stroke-width:.8;stroke-linecap:round}.gw-sw .rim{fill:var(--sw-rim)}
 .gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
@@ -518,7 +520,7 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
     own.length?{cls:'muted',label:'Part checks',n:m=>upto(own,m)}:null,reg.length?{cls:'muted',label:'Existing flows',n:m=>upto(reg,m)}:null,{tot:true,label:'Scenarios',n:m=>v.counts[m]}]),
    h('p',{class:'small muted',style:'margin:10px 0 0'},gwTouch()?'Tap a mode to see it on the tree: what it keeps stays, what it cuts fades. Tap it again to choose; nothing runs until you do.':'Point at a mode to see it on the tree: what it keeps stays, what it cuts fades. Nothing runs until you pick.'));return card}
  if(!pin){if(!s.done&&s.focus&&!(s.asked&&!s.modeBy)){pin='u:'+s.focus;live=true;const ag=s.agents.find(a=>!a.done&&a.unit===s.focus);who='Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')}
-  else if(M.J.length){const order=gw.order&&gw.order.length?gw.order:M.J.map(j=>j.id);const failing=order.find(id=>(M.leaves[id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail'));pin='j:'+(failing||order[0]);who=failing?'The first failing journey':'The headline journey'}}
+  else if(M.J.length){const hd=gbHead(M,M.J),failing=(M.leaves[hd.id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail');pin='j:'+hd.id;who=failing?'The first failing journey':'The headline journey'}}
  if(!pin){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},'Follows the tracer as it works. Select a journey, a leaf or a knot to pin it.'));return card}
  /* under the tree (a tablet or a phone) the Journeys card comes straight after and opens a journey or a scenario in place, and
     a phone draws a tapped leaf's card under the tree: there the panel steps aside rather than say the same things again */
@@ -661,9 +663,12 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
 /* The leaves a pad of the tree holds, as the tree drew it (gbBuild): the journey's own pad (pol null) or its guard or failure pad.
    A key row counts what its pad holds, so it says what the pad's label says on a wide screen and nothing is counted twice. */
 function gwPadLeaves(jid,pol){const B=gw.B;if(!B||!B.padsOf||!B.pad)return null;const pid=(B.padsOf[jid]||[]).find(q=>B.pad[q]&&(B.pad[q].pol||null)===pol);return pid?B.pad[pid].leaves:null}
-function gwPolKeys(one){const s=gw.state,M=gw.M;if(!one||!M||!M.J.length)return [];const j=M.J[0];const vis=s.modeBy?s.mode:null,inMode=x=>!s.modeBy||gwIn(x);
- return [['guard','R','What it refuses'],['failure','F','How it fails']].map(([p,b,t])=>{const list=gw.B&&gw.B.padsOf?gwPadLeaves(j.id,p)||[]:(M.leaves[j.id]||[]).filter(x=>gbPol(x)===p),inm=list.filter(inMode);if(!list.length)return null;
-  return h('li',{class:'pol'+(inm.length?'':' cut')},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},t),' · ',...gwRich(gwVia(gbOrd(inm.length?inm:list)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
+function gwPolKeys(one){const s=gw.state,M=gw.M,B=gw.B;if(!M||!M.J.length)return [];
+ /* a tree of two journeys grows the headline journey's guards or failures on a branch of its own too, lettered the same */
+ const j=one?M.J[0]:B&&B.pad&&B.padsOf?M.J.find(q=>(B.padsOf[q.id]||[]).some(pid=>B.pad[pid]&&B.pad[pid].pol)):null;if(!j)return [];const n=gbOrderOf(M).indexOf(j)+1;
+ const vis=s.modeBy?s.mode:null,inMode=x=>!s.modeBy||gwIn(x);
+ return [['guard','R','What it refuses'],['failure','F','How it fails']].map(([p,b,t])=>{const list=B&&B.padsOf?gwPadLeaves(j.id,p)||[]:one?(M.leaves[j.id]||[]).filter(x=>gbPol(x)===p):[],inm=list.filter(inMode);if(!list.length)return null;
+  return h('li',{class:'pol'+(inm.length?'':' cut')},h('span',{class:'no','aria-hidden':'true'},b),h('span',{},h('span',{class:'pt'},(one?'':'Journey '+n+' · ')+(one?t:t.toLowerCase())),' · ',...gwRich(gwVia(gbOrd(inm.length?inm:list)[0].title).title),' ',h('span',{class:'gw-jst'},gbToks(gbTok(list,j,vis,inMode)))))}).filter(Boolean)}
 /* Where a leaf sits on a pad, drawn small with the tree's own pad and leaf: the one it names solid, the other two faint. */
 function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:tr,class:'lp-lf'+(pos===k?'':' dim')});
  /* the tree's pad: a crest cushion over two shoulder cushions, each with its shaded underside */
@@ -671,9 +676,9 @@ function gwPadMark(pos){const lf=(k,tr)=>sv('path',{d:gbLeafD(9,4.6),transform:t
  const band=(x0,x1,base)=>{const m=(x0+x1)/2;return 'M'+gwF(x0+.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base-5)+' '+gwF(x1-.4)+' '+gwF(base-.2)+' Q'+m+' '+gwF(base+1.4)+' '+gwF(x0+.4)+' '+gwF(base-.2)+'Z'};
  const C=[[4,18.5,14,22.4],[29.5,44,13,22.4],[13,35,7.6,21.6]];
  return sv('svg',{class:'gw-svg gb gw-lpad',width:42,height:30,viewBox:'0 0 48 34','aria-hidden':'true',focusable:'false'},
-  sv('path',{d:'M15.6 23 L14.8 26.2',class:'lp-st'+(pos==='hang'?'':' dim')}),
+  sv('path',{d:'M11.2 19.8 L9.4 21',class:'lp-st'+(pos==='hang'?'':' dim')}),
   ...C.flatMap(([x0,x1,t,b])=>[sv('path',{d:dome(x0,x1,t,b),class:'lp-pad'}),sv('path',{d:band(x0,x1,b),class:'lp-band'})]),
-  lf('crest','translate(24 5.2) rotate(-90)'),lf('shoulder','translate(42.4 11.2) rotate(-34)'),lf('hang','translate(14.3 30.7) rotate(96)'))}
+  lf('crest','translate(24 5.2) rotate(-90)'),lf('shoulder','translate(42.4 11.2) rotate(-34)'),lf('hang','translate(5.6 23.4) rotate(145)'))}
 /* A row of the key: its name, then its items on the key's shared tracks. Nothing when it has no items. */
 function gwKeyRow(head,items,cls){const k=items.flat(Infinity).filter(Boolean);return k.length?h('div',{class:'gw-lg'+(cls?' '+cls:''),role:'group','aria-label':head},h('span',{class:'lh'},head),h('div',{class:'lgi'},k)):null}
 /* Where a one-journey tree grows a leaf: the happy path on the crown, and what it refuses or how it fails on a branch of its
@@ -703,7 +708,9 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
     shoulder, how it fails hangs beneath. A one-journey tree grows its happy path as the crown and what it refuses and how it
     fails as branches of their own; one of those it has no branch for sits on the crown's pad as on any other */
  const pm=(k,t)=>h('span',{class:'gw-li'},gwPadMark(k),h('span',{},t)),bm=(k,t)=>h('span',{class:'gw-li'},gwBranchMark(k),h('span',{},t));
- let where=null;if(M&&M.J.length>1)where=row('Where a leaf sits',[pm('crest','happy path'),pm('shoulder','what it refuses'),pm('hang','how it fails')],'where');
+ let where=null;if(M&&M.J.length>1){/* the headline journey's guards or failures may grow on a branch of their own (a tree of two journeys) */
+  const P=gw.B&&gw.B.pad?Object.values(gw.B.pad):[],br=p=>P.some(q=>q.pol===p),pad=p=>P.length?P.some(q=>!q.pol&&(q.leaves||[]).some(x=>gbPol(x)===p)):true;
+  where=row('Where a leaf sits',[pm('crest','happy path'),pad('guard')?pm('shoulder','what it refuses'):null,br('guard')?bm('branch','what it refuses, on a branch of its own'):null,pad('failure')?pm('hang','how it fails'):null,br('failure')?bm('branch','how it fails, on a branch of its own'):null],'where')}
  else if(one){const j=M.J[0],crown=gwPadLeaves(j.id,null)||M.leaves[j.id]||[],own=p=>!!(gw.B&&gw.B.padsOf&&gwPadLeaves(j.id,p)),on=p=>crown.some(x=>gbPol(x)===p);
   where=row('Where a leaf sits',[bm('crown','happy path, on the crown'),own('guard')?bm('branch','what it refuses, on a branch of its own'):on('guard')?pm('shoulder','what it refuses'):null,
    own('failure')?bm('branch','how it fails, on a branch of its own'):on('failure')?pm('hang','how it fails'):null],'where')}
