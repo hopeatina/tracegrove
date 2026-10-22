@@ -632,7 +632,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
-  it('never starts a line of a wrapped path with an arrow, and hangs its later lines in, in the inspector, the cards and the Outline', async () => {
+  it('starts each later line of a wrapped path with its arrow, never ends a line on one, and lines it up with the first, in the inspector, the cards and the Outline', async () => {
     const { dir, state } = await grownWithFailure();
     // A journey long enough to wrap in the panel and on a phone: its path crosses more parts, one with a long file path.
     const j = state.journeys[0]!;
@@ -645,32 +645,38 @@ describe('Grow page', () => {
     try {
       for (const width of [1440, 390]) {
         const page = await growPage(browser, server.url, state, width);
-        const check = async (where: string) => {
-          const paths = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-hp')).filter((p) => (p as HTMLElement).offsetParent !== null).map((p) => {
-            const hops = Array.from(p.children);
+        const check = async (where: string, sel: string) => {
+          const paths = await page.evaluate((sel) => Array.from(document.querySelectorAll(sel)).filter((p) => (p as HTMLElement).offsetParent !== null).map((p) => {
+            const hops = Array.from(p.children) as HTMLElement[];
             const first = hops[0]!.getBoundingClientRect();
             return hops.map((hop, i) => {
-              const sp = hop.querySelector('.sp'), label = sp ? sp.previousElementSibling : null, r = hop.getBoundingClientRect();
-              const lr = label ? Array.from(label.getClientRects()).at(-1)! : null, sr = sp ? sp.getBoundingClientRect() : null;
-              return { i, last: i === hops.length - 1, hasSep: !!sp, sepWithLabel: !sr || !lr || Math.abs(sr.bottom - lr.bottom) < 6, sepAfter: !sr || !lr || sr.left >= lr.right - 1, newLine: i > 0 && r.top > first.top + 4 && r.left < first.left + 40, indent: r.left - first.left, text: hop.textContent };
+              const r = hop.getBoundingClientRect(), prev = i ? hops[i - 1]!.getBoundingClientRect() : null, label = hop.lastElementChild as HTMLElement | null;
+              const lr = label ? label.getClientRects()[0]! : r, arrow = getComputedStyle(hop, '::before').content;
+              return { i, arrow: arrow.includes('›'), inText: (hop.textContent ?? '').includes('›'), lineStart: !!prev && r.top > prev.top + 4, left: r.left - first.left, labelIn: lr.left - r.left, sameLine: Math.abs(lr.top - r.top) < 6, text: hop.textContent };
             });
-          }));
+          }), sel);
           expect(paths.length, where).toBeGreaterThan(0);
           let wrapped = 0;
           for (const hops of paths) for (const hop of hops) {
-            // Every hop but the last carries its arrow after it, on its own last line; the last carries none.
-            expect(hop.hasSep, where + ': ' + hop.text).toBe(!hop.last);
-            expect(hop.sepWithLabel && hop.sepAfter, where + ': ' + hop.text).toBe(true);
-            // A hop that starts a later line hangs in from the first.
-            if (hop.newLine) { wrapped++; expect(hop.indent, where + ': ' + hop.text).toBeGreaterThan(8); }
+            // Every hop but the first is led by its arrow, drawn before its name and on its name's line; none carries one after it.
+            expect(hop.arrow, where + ': ' + hop.text).toBe(hop.i > 0);
+            expect(hop.inText, where + ': ' + hop.text).toBe(false);
+            expect(hop.sameLine, where + ': ' + hop.text).toBe(true);
+            // A hop that starts a later line starts at the first hop's left edge, its arrow first, so no line ends on an arrow.
+            if (hop.lineStart) { wrapped++; expect(Math.abs(hop.left), where + ': ' + hop.text).toBeLessThanOrEqual(2); expect(hop.labelIn, where + ': ' + hop.text).toBeGreaterThan(4); }
           }
           expect(wrapped, where).toBeGreaterThan(0);
         };
         // The inspector's journey, and the Journeys card below it.
         await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 'j:' + id; w.gw.open = { ['j:' + id]: true }; w.growPaint(); }, j.id);
-        await check(width + ' grove');
-        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.tree = 'outline'; w.growPaint(); });
-        await check(width + ' outline');
+        await check(width + ' grove', '[data-testid="grow"] .gw-hp');
+        // The card of a scenario on that journey, beside its leaf (on a phone, under the tree).
+        const sid = state.scenarios.find((x) => x.journey === j.id && x.mode === 'min')!.id;
+        await page.evaluate(([sid, phone]) => { const w = (0, eval)('({ gw, growPaint, gbTip })'); w.gw.pinned = phone ? 's:' + sid : null; w.growPaint();
+          if (!phone) w.gbTip('s:' + sid, Array.from(w.gw.B.svg.querySelectorAll('[data-k]')).find((e) => (e as Element).getAttribute('data-k') === 's:' + sid)); }, [sid, width < 480] as const);
+        await check(width + ' card', '.gb-tip .gw-hp');
+        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.tree = 'outline'; w.growPaint(); });
+        await check(width + ' outline', '[data-testid="grow"] .gw-hp');
         await page.close();
       }
     } finally { await browser.close(); }
@@ -1254,6 +1260,286 @@ describe('Grow page', () => {
     applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'scenario.failed', scenario: failed.id, took: 12, run: null, why: 'only one row is written: expected 1, got 2' } as GrowEvent);
     return { dir, state };
   }
+
+  it('keeps every card’s words inside its border, sizes it to its longest name, sets its prose in the UI sans, and never ends one of its lines on a dot', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const state = folded(file);
+        for (const width of [1440, 768, 390]) {
+          const phone = width < 480;
+          const page = await growPage(browser, server.url, state, width, phone);
+          await page.waitForTimeout(2500);
+          const seen = await page.evaluate((phone) => {
+            const w = (0, eval)('({ gw, gbHover, growPaint })'), B = w.gw.B, out: string[] = [];
+            const things: Array<[string, Element]> = [];
+            for (const id of Object.keys(B.leaf)) if (!B.leaf[id].classList.contains('gone') && B.leaf[id].getBoundingClientRect().width) things.push(['s:' + id, B.leaf[id]]);
+            for (const id of Object.keys(B.root)) things.push(['u:' + id, B.root[id]]);
+            for (const k of Object.keys(B.klbl)) if (B.knot[k]) things.push(['u:' + B.knot[k].__ids[0], B.knot[k]]);
+            let cards = 0;
+            const check = (k: string) => {
+              const tip = w.gw.B.tip as HTMLElement;
+              if (!tip || tip.hidden) { out.push(k + ': no card'); return; }
+              cards++;
+              const cs = getComputedStyle(tip), r = tip.getBoundingClientRect(), px = (v: string) => parseFloat(v) || 0;
+              const L = r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft) - 1, R = r.right - px(cs.borderRightWidth) - px(cs.paddingRight) + 1, T = r.top + px(cs.borderTopWidth) - 1, Bo = r.bottom - px(cs.borderBottomWidth) + 1;
+              if (tip.scrollWidth > tip.clientWidth + .5) out.push(k + ': its words scroll sideways');
+              // every line of every text in the card stays inside its padding (a dot clipped at a line's start is meant to be out of view)
+              const walk = document.createTreeWalker(tip, NodeFilter.SHOW_TEXT);
+              for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+                const el = n.parentElement!;
+                if (!(n.textContent ?? '').trim() || el.closest('.sp') || el.closest('.gb-x')) continue;
+                const rg = document.createRange(); rg.selectNodeContents(n);
+                if (Array.from(rg.getClientRects()).some((q) => q.width > .5 && (q.left < L || q.right > R || q.top < T || q.bottom > Bo))) out.push(k + ': "' + (n.textContent ?? '').trim().slice(0, 40) + '" runs over its border');
+              }
+              // a dot between facts goes with the fact after it, so no line ends on one
+              for (const sp of Array.from(tip.querySelectorAll('.gw-sl .sp'))) {
+                const t = sp.nextElementSibling, a = sp.getBoundingClientRect(), b = t ? t.getClientRects()[0] : null;
+                if (b && Math.abs(a.top - b.top) > 4) out.push(k + ': a line ends on a dot in "' + (sp.parentElement!.parentElement!.textContent ?? '') + '"');
+              }
+              // prose in the UI sans; mono only for the paths and routes it names
+              if (/mono/i.test(cs.fontFamily)) out.push(k + ': card set in mono');
+              for (const st of Array.from(tip.querySelectorAll('.st'))) if (/mono/i.test(getComputedStyle(st).fontFamily)) out.push(k + ': "' + (st.textContent ?? '').slice(0, 30) + '" set in mono');
+              for (const p of Array.from(tip.querySelectorAll('.path'))) if (!/mono/i.test(getComputedStyle(p).fontFamily)) out.push(k + ': its path is not in mono');
+              // beside the tree, as wide as its longest name needs, within 280 to 380 px; under it, as wide as the tree, and on a phone with a Close of 44 px
+              const below = tip.classList.contains('below');
+              if (!below && (r.width < 279.5 || r.width > 380.5)) out.push(k + ': card ' + Math.round(r.width) + ' px wide');
+              if (phone) { const x = tip.querySelector('.gb-x'), xr = x ? x.getBoundingClientRect() : null; if (!xr || xr.width < 43.5 || xr.height < 43.5) out.push(k + ': no Close of 44 px'); }
+            };
+            for (const [k, el] of things) {
+              if (phone) { w.gw.hov = null; w.gw.pinned = k; w.growPaint(); } else w.gbHover(k, el);
+              check(k);
+            }
+            if (phone) { w.gw.pinned = null; w.growPaint(); } else w.gbHover(null);
+            return { cards, out };
+          }, phone);
+          expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
+          expect(seen.out, name + ' ' + width).toEqual([]);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 240000);
+
+  it('gives each leaf on a phone a target of 44 px, takes a tap to the nearest leaf, and closes its card with a Close of 44 px or a tap outside it', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 390, true);
+        await page.waitForTimeout(2500);
+        await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
+        await page.waitForTimeout(200);
+        const leaves = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), B = w.gw.B;
+          return ([...Object.values(B.leaf), ...Object.values(B.bud)] as Element[]).filter((e) => !e.classList.contains('gone') && !e.classList.contains('cut') && e.getBoundingClientRect().width).map((e) => {
+            const c = e.querySelector('.hitp') as SVGCircleElement | null, m = c ? c.getScreenCTM()! : null, b = c ? c.getBoundingClientRect() : null;
+            return { k: e.getAttribute('data-k')!, d: c && m ? 2 * c.r.baseVal.value * Math.hypot(m.a, m.b) : 0, x: b ? b.left + b.width / 2 : 0, y: b ? b.top + b.height / 2 : 0 };
+          });
+        });
+        expect(leaves.length, name).toBeGreaterThan(3);
+        for (const l of leaves) expect(l.d, name + ' ' + l.k).toBeGreaterThanOrEqual(43.5);
+        const pinned = () => page.evaluate(() => (0, eval)('gw').pinned as string | null);
+        const unpin = () => page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.hov = null; w.growPaint(); });
+        // what a tap there should find: the leaf nearest it, within its 22 px; nothing, if a name or a knot is on top
+        const want = (x: number, y: number) => page.evaluate(([x, y]) => {
+          const t = document.elementFromPoint(x, y), k = t && t.closest('[data-k]'), B = (0, eval)('gw').B;
+          if (!t || !t.closest('svg.gb') || (k && !k.classList.contains('gb-lf') && !k.classList.contains('pad'))) return null;
+          const d = ([...Object.values(B.leaf), ...Object.values(B.bud)] as Element[]).filter((e) => !e.classList.contains('gone') && !e.classList.contains('cut')).map((e) => {
+            const b = e.querySelector('.hitp')!.getBoundingClientRect(); return [Math.hypot(b.left + b.width / 2 - x, b.top + b.height / 2 - y), e.getAttribute('data-k')!] as const;
+          }).filter((q) => q[0] <= 21).sort((a, b) => a[0] - b[0]);
+          return d.length && (d.length === 1 || d[1]![0] - d[0]![0] > 3) ? d[0]![1] : null;
+        }, [x, y] as const);
+        let taps = 0;
+        for (const l of leaves) for (const [dx, dy] of [[0, 0], [14, 0], [-14, 0], [0, 14], [0, -14]] as const) {
+          const k = await want(l.x + dx, l.y + dy);
+          if (!k) continue;
+          await page.touchscreen.tap(l.x + dx, l.y + dy);
+          await page.waitForTimeout(60);
+          expect(await pinned(), name + ': tap at ' + l.k + ' +' + dx + ',' + dy).toBe(k);
+          taps++;
+          await unpin();
+        }
+        expect(taps, name).toBeGreaterThan(leaves.length);
+        // the card a tap opens closes with its own Close of 44 px, or with a tap anywhere outside it
+        const l = leaves.find((q) => q.k.startsWith('s:'))!;
+        await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(l.k);
+        const x = (await page.locator('.gb-tip .gb-x').boundingBox())!;
+        expect(Math.min(x.width, x.height), name).toBeGreaterThanOrEqual(44);
+        await page.locator('.gb-tip .gb-x').tap(); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(null);
+        expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
+        await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
+        await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(l.k);
+        await page.locator('.gw-legend .lh').last().tap(); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(null);
+        expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 180000);
+
+  it('fits the header’s time and button in its column at every width, with no dot left at a line’s end, and says <0.1 s for a step under 100 ms', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const state = folded(file);
+        for (const width of [1440, 1024, 768, 390]) {
+          const page = await growPage(browser, server.url, state, width, width < 480);
+          const seen = await page.evaluate(() => {
+            const g = document.querySelector('[data-testid="grow"]')!.getBoundingClientRect(), meta = document.querySelector('.gw-head > .gw-meta')!, out: string[] = [];
+            const walk = document.createTreeWalker(meta, NodeFilter.SHOW_TEXT);
+            for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+              if (!(n.textContent ?? '').trim() || n.parentElement!.closest('.sp')) continue;
+              const rg = document.createRange(); rg.selectNodeContents(n);
+              for (const q of Array.from(rg.getClientRects())) if (q.width > .5 && (q.right > g.right + .5 || q.left < g.left - .5)) out.push('"' + n.textContent + '" runs out of the column');
+            }
+            for (const b of Array.from(meta.querySelectorAll('button'))) { const r = b.getBoundingClientRect(); if (r.right > g.right + .5) out.push('the button runs out of the column'); }
+            for (const sp of Array.from(meta.querySelectorAll('.gw-sl .sp'))) { const t = sp.nextElementSibling, a = sp.getBoundingClientRect(), b = t ? t.getClientRects()[0] : null; if (b && Math.abs(a.top - b.top) > 4) out.push('a line ends on a dot'); }
+            const steps = Array.from(document.querySelectorAll('.ph > span')).map((e) => e.textContent ?? '');
+            return { out, steps, fmt: [(0, eval)('gwStep')(40), (0, eval)('gwStep')(99), (0, eval)('gwStep')(100), (0, eval)('gwStep')(7300)] };
+          });
+          expect(seen.out, name + ' ' + width).toEqual([]);
+          expect(seen.steps.some((t) => /^0\.0 s$/.test(t)), name + ' ' + width + ': ' + seen.steps.join(', ')).toBe(false);
+          expect(seen.fmt).toEqual(['<0.1 s', '<0.1 s', '0.1 s', '7.3 s']);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 120000);
+
+  it('keeps the modes’ counts in a block of their own under the key, says In all in both tables, and keys the shoot, its count and the graft bud', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const state = folded('tracegrove-max.jsonl');
+      const page = await growPage(browser, server.url, state, 1440);
+      await page.waitForTimeout(2500);
+      const key = await page.evaluate(() => {
+        const lg = document.querySelector('.gw-legend')!, rows = Array.from(lg.querySelectorAll(':scope > .gw-lg')), cmp = lg.querySelector(':scope > .gw-lgcmp');
+        const last = rows.at(-1)!.getBoundingClientRect(), c = cmp ? cmp.getBoundingClientRect() : null, first = rows[0]!.getBoundingClientRect();
+        return {
+          head: cmp ? cmp.querySelector('h4')?.textContent : null, gap: c ? c.top - last.bottom : -1, left: c ? c.left - first.left : -1,
+          inGrid: rows.some((r) => r.querySelector('table')), total: cmp ? Array.from(cmp.querySelectorAll('tr')).at(-1)!.querySelector('th, td')!.textContent : null,
+          items: Array.from(lg.querySelectorAll('.gw-li')).map((e) => e.lastElementChild!.textContent),
+        };
+      });
+      expect(key.head).toBe('What each mode proves');
+      expect(key.inGrid).toBe(false);
+      expect(key.gap).toBeGreaterThanOrEqual(16);
+      expect(Math.abs(key.left)).toBeLessThanOrEqual(1);
+      expect(key.total).toBe('In all');
+      expect(key.items).toEqual(expect.arrayContaining(['a shoot: part checks', 'more checks on a shoot than it has leaves', 'a graft bud: an existing flow']));
+      // the panel's table before a choice is the same table, its total named the same
+      await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.modeBy = null; w.gw.state.asked = true; w.gw.pinned = null; w.growPaint(); });
+      const ins = await page.evaluate(() => { const i = document.querySelector('[data-testid="grow-inspector"]')!; return { h: i.querySelector('h3')?.textContent, total: Array.from(i.querySelectorAll('tr')).at(-1)!.querySelector('th, td')!.textContent, first: i.querySelector('thead th, tr th')!.textContent }; });
+      expect(ins).toEqual({ h: 'What each mode proves', total: 'In all', first: 'Scenarios' });
+      await page.close();
+      // a mode that cut a shoot keys the scar it leaves, when the tree shows one
+      const pl = await growPage(browser, server.url, folded('plotline-seats.jsonl'), 1440);
+      await pl.waitForTimeout(2500);
+      const scar = await pl.evaluate(() => ({ shown: Array.from(document.querySelectorAll('svg.gb .shscar')).some((e) => (e as HTMLElement).style.display !== 'none' && e.getBoundingClientRect().width > 0), keyed: Array.from(document.querySelectorAll('.gw-legend .gw-li')).some((e) => e.textContent === 'where a shoot was cut') }));
+      expect(scar.keyed).toBe(scar.shown);
+      await pl.close();
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('opens the failing or the headline journey under the tree with its path and scenarios, and lists a service’s checks under Roots in the Outline, never among the parts', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const state = folded(file);
+        const page = await growPage(browser, server.url, state, 1440);
+        const card = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-scenarios"] details.gb-jr')).map((d) => ({
+          open: (d as HTMLDetailsElement).open, failed: d.classList.contains('failed'), path: !!d.querySelector('.gb-path'), rows: d.querySelectorAll('.gb-ols').length,
+          mark: getComputedStyle(d.querySelector('summary')!, '::before').content,
+        })));
+        expect(card.length, name).toBe(2);
+        const anyFail = card.some((c) => c.failed);
+        card.forEach((c, i) => {
+          expect(c.open, name + ' ' + i).toBe(anyFail ? c.failed : i === 0);
+          expect(c.mark, name + ' ' + i).toContain(c.open ? '▾' : '▸');
+          if (c.open) { expect(c.path, name + ' ' + i).toBe(true); expect(c.rows, name + ' ' + i).toBeGreaterThan(0); }
+        });
+        // "Listed under Journeys, below" opens a closed journey there
+        const closed = card.findIndex((c) => !c.open);
+        await page.evaluate((i) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 'j:' + w.gw.order[i]; w.growPaint(); }, closed);
+        await page.getByRole('button', { name: 'Listed under Journeys, below ↓' }).click();
+        expect(await page.evaluate((i) => (document.querySelectorAll('[data-testid="grow-scenarios"] details.gb-jr')[i] as HTMLDetailsElement).open, closed), name).toBe(true);
+        // the Outline: the leaf key right under the Journeys heading; a route greyed past its break; a root's checks under Roots
+        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.tree = 'outline'; w.gw.open = { own: true, reg: true }; w.growPaint(); });
+        const ol = await page.evaluate(() => {
+          const o = document.querySelector('[data-testid="grow-outline"]')!, w = (0, eval)('({ gw })'), S = w.gw.state;
+          const roots = S.units.filter((u: { root: boolean; label: string }) => u.root).map((u: { label: string }) => u.label);
+          const head = Array.from(o.children).find((e) => /^Journeys/.test(e.textContent ?? ''));
+          const parts: string[] = [], under: string[] = [];
+          for (const x of Array.from(o.querySelectorAll('.gb-bpx'))) { let sub = ''; for (const e of Array.from(x.children)) { if (e.classList.contains('gb-sub')) sub = e.textContent ?? ''; else { const t = e.querySelector(':scope > summary .pn')?.textContent ?? ''; (sub === 'Roots' ? under : parts).push(t + ' | ' + (e.querySelector(':scope > summary .gw-facts')?.textContent ?? '')); } } }
+          const un = Array.from(o.querySelectorAll('.gb-path .hop.un button')).map((b) => +getComputedStyle(b).opacity);
+          return { next: head?.nextElementSibling?.className, roots, parts, under, un, reached: o.querySelectorAll('.gb-path .hop:not(.un)').length, rc: Array.from(o.querySelectorAll('.gb-olr .rc')).map((e) => e.textContent) };
+        });
+        expect(ol.next, name).toBe('gb-olkey');
+        for (const r of ol.roots) expect(ol.parts.some((p) => p.startsWith(r + ' |')), name + ': ' + r).toBe(false);
+        if (name === 'tracegrove') {
+          expect(ol.under, name).toEqual([expect.stringMatching(/^Calls to GitHub \| 3 checks/)]);
+          expect(ol.rc, name).toContain('Max checks 3 calls to GitHub');
+        } else {
+          expect(ol.un.length, name).toBeGreaterThan(0);
+          for (const o of ol.un) expect(o, name).toBeLessThanOrEqual(.6);
+          expect(ol.reached, name).toBeGreaterThan(0);
+        }
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('names a pad’s places on hover, the happy path, what it refuses and how it fails, each near its cushion and clear of every name, leaf and the wood', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 1440);
+        await page.waitForTimeout(2500);
+        const seen = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, out: string[] = [], words: string[] = [];
+          const meet = (p: DOMRect, q: DOMRect) => Math.min(p.right, q.right) - Math.max(p.left, q.left) > .5 && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > .5;
+          const svg = B.svg.getBoundingClientRect();
+          for (const g of Array.from(B.svg.querySelectorAll('g.pad[data-k]')) as Element[]) {
+            w.gbHover(g.getAttribute('data-k'), g);
+            const ls = Array.from(B.svg.querySelectorAll('.padlbl')) as SVGTextElement[], rs = ls.map((t) => t.getBoundingClientRect());
+            const names = Array.from(B.svg.querySelectorAll('.klbl.on, .kpip.on, .rlbl, .shtag, .lbl')).map((e) => (e as Element).getBoundingClientRect()).filter((r) => r.width);
+            const blades = Array.from(B.svg.querySelectorAll('.gb-lf:not(.gone) .blade')).map((e) => (e as Element).getBoundingClientRect()).filter((r) => r.width);
+            const cush = Object.values(B.pad).flatMap((P) => ((P as { cu?: Array<{ el?: Element }> }).cu || []).map((c) => c && c.el ? c.el.getBoundingClientRect() : null)).filter(Boolean) as DOMRect[];
+            const own = ((B.pad[g.getAttribute('data-pad')!] as { cu?: Array<{ el?: Element }> }).cu || []).map((c) => c && c.el ? c.el.getBoundingClientRect() : null).filter(Boolean) as DOMRect[];
+            ls.forEach((t, i) => {
+              const r = rs[i]!; words.push(t.textContent ?? '');
+              if (r.left < svg.left || r.right > svg.right || r.top < svg.top || r.bottom > svg.bottom) out.push(t.textContent + ': out of the drawing');
+              rs.forEach((q, j) => { if (j > i && meet(r, q)) out.push(t.textContent + ' meets ' + ls[j]!.textContent); });
+              if (names.some((q) => meet(r, q))) out.push(t.textContent + ' meets a name');
+              if (blades.some((q) => meet(r, q))) out.push(t.textContent + ' meets a leaf');
+              if (cush.some((q) => meet(r, q))) out.push(t.textContent + ' meets a cushion');
+              const near = Math.min(...own.map((q) => Math.hypot(Math.max(q.left - r.right, 0, r.left - q.right), Math.max(q.top - r.bottom, 0, r.top - q.bottom))), ...blades.map((q) => Math.hypot(Math.max(q.left - r.right, 0, r.left - q.right), Math.max(q.top - r.bottom, 0, r.top - q.bottom))));
+              if (near > 16) out.push(t.textContent + ' ' + Math.round(near) + ' px from its pad');
+              for (const e of Array.from(B.svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]) {
+                const mm = e.getScreenCTM()!.inverse();
+                for (const [fx, fy] of [[0, .5], [.5, .5], [1, .5]]) { const p = new DOMPoint(r.left + r.width * fx!, r.top + r.height * fy!).matrixTransform(mm); if (e.isPointInFill(p)) { out.push(t.textContent + ' sits on the wood'); break; } }
+              }
+            });
+            w.gbHover(null);
+            if (B.svg.querySelectorAll('.padlbl').length) out.push('labels stay after the hover');
+          }
+          return { out, words };
+        });
+        expect(seen.out, name).toEqual([]);
+        expect(seen.words, name).toEqual(expect.arrayContaining(['happy path', 'refuses', 'fails']));
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
 
   it('grows every leaf on a twig from the wood, inside its own opaque cushion, the tiers apart and each cushion sized by its leaves', async () => {
     const { dir, state } = await grownBushy();
