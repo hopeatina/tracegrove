@@ -2310,6 +2310,36 @@ describe('Grow page', () => {
     return s;
   };
 
+  it('says a pad’s final words in the same paint a mode is picked: what it keeps and cuts only while a mode is pointed at before a choice, never with what was pruned', async () => {
+    const { dir, state } = await grownBushy();
+    withMax(state);
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    // each pad's state line, both its lines as one
+    const words = () => { const B = (0, eval)('gw').B; return Object.fromEntries(Object.keys(B.lbl).filter((id) => !B.lbl[id].badge).map((id) => [id, [B.lbl[id].t2.textContent, B.lbl[id].t3.textContent].filter(Boolean).join(' · ')])) as Record<string, string>; };
+    try {
+      for (const s of [state, recordedGrow('plotline-seats.jsonl')]) {
+        // asked, so nothing has run yet
+        const asked = { ...s, asked: true, modeBy: null, mode: 'min' as const, run: {} };
+        const page = await treePage(browser, server.url, asked, { width: 1440 });
+        await settled(page);
+        const pointed = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString());
+        expect(Object.values(pointed).some((t) => /keeps \d+/.test(t)), JSON.stringify(pointed)).toBe(true);
+        const first = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString());
+        expect(Object.values(first).some((t) => /pruned/.test(t)), JSON.stringify(first)).toBe(true);
+        for (const t of Object.values(first)) expect(/keeps|cuts/.test(t) && /pruned/.test(t), t).toBe(false);
+        await settled(page);
+        expect(await page.evaluate((f) => (0, eval)('(' + f + ')')(), words.toString())).toEqual(first);
+        // and the choice, once it is recorded, says the same
+        const chosen = { ...asked, asked: false, modeBy: 'you' as const };
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, chosen);
+        expect(await page.evaluate((f) => (0, eval)('(' + f + ')')(), words.toString())).toEqual(first);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
   it('heads each journey once: the branch of what it refuses hangs on its journey unnumbered, so the eyebrows number the journeys and no more', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });

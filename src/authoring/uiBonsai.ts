@@ -1419,7 +1419,9 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
  if(vis&&!inm.length){const lo=list.reduce((a,x)=>gbRank[x.mode]<gbRank[a]?x.mode:a,'max');return [['pruned in '+gbModeName(vis)+' · '+gbModeName(lo)+' grows '+(list.length===1?'it':'them'),'n']]}
  const T=[];if(c('fail'))T.push([c('fail')+' failed','f']);if(c('pass'))T.push([c('pass')+' passed','p']);if(c('run'))T.push([c('run')+' running','r']);
  const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),ow=w=>open.filter(x=>gwOpenWord(x)===w).length,cr=ow('could not run'),nf=ow('no flow yet'),tp=ow('to prove');
- if(!ran.length&&!s.modeBy){const km=vis||'min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' could not run','n']);if(tp)T.push([tp+' to prove','n']);if(nf)T.push([nf+' no flow yet','n'])}
+ /* what a mode would keep and cut is said only before one is picked; from the paint a mode is picked in, the pad says what it
+    holds in that mode and what was pruned, its final words, never both */
+ if(!ran.length&&!vis){const km='min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' could not run','n']);if(tp)T.push([tp+' to prove','n']);if(nf)T.push([nf+' no flow yet','n'])}
  if(pr)T.push(['+'+pr+' pruned','n']);return T}
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
