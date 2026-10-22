@@ -2323,9 +2323,9 @@ describe('Grow page', () => {
         const asked = { ...s, asked: true, modeBy: null, mode: 'min' as const, run: {} };
         const page = await treePage(browser, server.url, asked, { width: 1440 });
         await settled(page);
-        const pointed = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString());
+        const pointed = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
         expect(Object.values(pointed).some((t) => /keeps \d+/.test(t)), JSON.stringify(pointed)).toBe(true);
-        const first = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString());
+        const first = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
         expect(Object.values(first).some((t) => /pruned/.test(t)), JSON.stringify(first)).toBe(true);
         for (const t of Object.values(first)) expect(/keeps|cuts/.test(t) && /pruned/.test(t), t).toBe(false);
         await settled(page);
