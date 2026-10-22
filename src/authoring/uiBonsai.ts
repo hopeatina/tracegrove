@@ -1469,8 +1469,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       /* the leaf moves in its own frame, so the same motion is put into it: the cut point, the drop and the turn seen from the leaf */
       const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),ms=el.__cutMs=fell?GB_FALL:GB_BACK,o={duration:ms,delay:lag,easing:GB_EASEIN,fill:'forwards'};
       el.__fall=fell?[el.__g.animate(gbFallK(lp,ld[0],ld[1],th),o)]:[el.__g.animate(gbBackK(lp),o)];if(tw&&tw.animate)el.__fall.push(tw.animate(fell?gbFallK(piv,dx,dy,th):gbBackK(piv),o));
-      setTimeout(()=>{if(el.__in===false){el.classList.replace('cut','gone');gbPaint()}},ms+lag+40)}
-     cls+=el.__cutAt&&Date.now()-el.__cutAt<(el.__cutMs||GB_FALL)+(el.__lag||0)?' cut pv-out':' gone'}else{el.__cutAt=0;if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}
+      /* (it is cut until its own motion ends, on the clock that plays it, however long the rest of this paint takes) */
+      {const f=el.__fall[0];f.finished.then(()=>{if(el.__fall&&el.__fall[0]===f&&el.__in===false){el.classList.replace('cut','gone');gbPaint()}},()=>{})}}
+     cls+=el.__fall&&el.__fall[0].playState!=='finished'?' cut pv-out':' gone'}else{el.__cutAt=0;if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}
     if(pv&&!add){const keep=gbRank[x.mode]<=gbRank[pv];cls+=keep?' pv-in':' pv-out';if(!keep)cutN++}
     el.setAttribute('class',cls);el.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t);
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
