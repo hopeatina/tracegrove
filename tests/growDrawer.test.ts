@@ -316,6 +316,28 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('does not preview a mode under a pointer that has not moved while the page scrolled to the drawer', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    const go = page.getByTestId('grow-result-steps');
+    await go.waitFor();
+    const box = (await go.boundingBox())!;
+    await page.mouse.move(box.x + 5, box.y + 5); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const before = await page.evaluate(() => scrollY);
+    await page.mouse.down(); await page.mouse.up();
+    await opened(page);
+    await page.waitForFunction((y) => scrollY !== y, before);
+    await page.waitForTimeout(400);
+    const said = () => page.evaluate(() => ({ preview: (0, eval)('gw').preview, line: document.querySelector('[data-testid="grow-mode-preview"]')?.textContent ?? '' }));
+    expect(await said()).toEqual({ preview: null, line: expect.not.stringMatching(/^Preview/) });
+    // a real move of the pointer previews again
+    const max = (await page.getByTestId('grow-mode-max').boundingBox())!;
+    await page.mouse.move(max.x + 10, max.y + 10); await page.mouse.move(max.x + 20, max.y + 12);
+    await page.waitForFunction(() => (0, eval)('gw').preview === 'max');
+    await page.close();
+  });
+
   it('opens the Run tab at that run and step, where the step lists what it checked and the calls it read', async () => {
     const page = await open(`#grow/${failed}/steps`);
     await opened(page);

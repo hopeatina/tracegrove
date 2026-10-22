@@ -793,7 +793,8 @@ function gwDrReveal(){const S=gw.slots,box=S&&S.ins,el=box&&box.querySelector('.
   if(dy)box.scrollTop+=dy}
  if(sheet)return;const a=hd.getBoundingClientRect(),b=st.getBoundingClientRect(),vh=innerHeight;let wy=0;
  if(a.top<m)wy=a.top-m;else if(b.bottom>vh-m)wy=Math.min(b.bottom-(vh-m),a.top-m);
- if(wy)window.scrollBy({top:wy,behavior:'instant'})}
+ /* the page moves under a pointer that has not: a mode it now rests on is not previewed until the pointer itself moves */
+ if(wy){gw.armed=false;window.scrollBy({top:wy,behavior:'instant'})}}
 function gwDrCopy(){const url=location.href;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>toast('Copied the link to this step.'),()=>toast('Link: '+url));return}}catch(e){}toast('Link: '+url)}
 /* "Write this flow" puts the scenario's claim in the Intent box below the tree, where drafting writes flows */
 function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=null;render();const box=document.getElementById('intent');
