@@ -82,6 +82,11 @@ describe('From a grown scenario to its run', () => {
   }
   const where = (page: Page) => page.evaluate(() => { const w = (0, eval)('({ ui, tab, gw })'); return { tab: w.tab, run: w.ui.runName, sel: w.ui.sel, step: w.ui.step, pinned: w.gw.pinned, hash: location.hash }; });
   const landed = async (page: Page) => { await page.waitForFunction(() => (0, eval)('tab') === 'Run' && !!(0, eval)('ui').run); return where(page); };
+  /* What happened, in the drawer beside the tree, once it has read the run (or said why it could not) */
+  const drawn = async (page: Page) => {
+    await page.getByTestId('grow-happened-oneline').or(page.getByTestId('grow-happened-none')).or(page.locator('.gw-drerr')).waitFor();
+    return page.evaluate(() => { const w = (0, eval)('({ gw, tab })'); return { tab: w.tab, sid: w.gw.dr?.sid, run: w.gw.dr?.run, step: w.gw.dr?.step, hash: location.hash }; });
+  };
 
   it('records the flow each scenario ran, and the run its result came from', () => {
     expect(state.run[failed]).toMatchObject({ st: 'fail', flow: 'notes.count' });
@@ -92,14 +97,18 @@ describe('From a grown scenario to its run', () => {
     expect(failRun).not.toBe(passRun);
   });
 
-  it('opens the failed leaf’s own run at the step that broke, from its card', async () => {
+  it('opens what happened in the failed leaf’s own run, in the drawer on the step that broke, from its card; Run tab ↗ opens that run there', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
     await page.locator(`[data-testid="grow"] svg [data-k="s:${failed}"]`).first().dispatchEvent('click');
     const link = page.locator(`.gw-insw [data-hap="${failed}"]`);
     await expect(link.textContent()).resolves.toBe('See what happened ›');
     await link.click();
-    expect(await landed(page)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
+    expect(await drawn(page)).toEqual({ tab: 'Discover', sid: failed, run: failRun, step: 2, hash: `#grow/${failed}/happened/step-3` });
+    await expect(page.getByTestId('grow-happened-step-3').getAttribute('aria-pressed')).resolves.toBe('true');
+    // From the drawer, the Run tab at the same run and step
+    await page.getByTestId('grow-happened-runtab').click();
+    expect(await landed(page)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/run/step-3` });
     await expect(page.locator('aside[aria-label="Step detail"]').textContent()).resolves.toContain('notes.count › step 3 of 4');
     await page.close();
   });
@@ -109,7 +118,7 @@ describe('From a grown scenario to its run', () => {
     const steps = run.cases.find((c) => c.caseId === 'notes.count')!.steps;
     expect(steps.map((x) => [x.checks, x.compared ?? null])).toEqual([['pass', null], ['pass', null], ['fail', { check: 'body.count', expected: 0, got: 1 }], ['pass', null]]);
     expect(steps.map((x) => x.answer)).toEqual([expect.stringContaining('"title":"Counted"'), '{"count":1}', '{"count":1}', '{"count":1}']);
-    const page = await open(`#grow/${failed}/happened/step-3`);
+    const page = await open(`#grow/${failed}/run/step-3`);
     await landed(page);
     const detail = page.locator('aside[aria-label="Step detail"]');
     await expect(detail.getByTestId('step-expected').textContent()).resolves.toBe('body.count: 0');
@@ -134,17 +143,17 @@ describe('From a grown scenario to its run', () => {
     expect(elsewhere.size).toBe(0);
   });
 
-  it('opens the same run from the Outline row, and a passed scenario at its first step', async () => {
+  it('opens the same run in the drawer from the Outline row, and a passed scenario at its first step', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
     await page.getByTestId('grow-view-outline').click();
     await page.locator(`.gb-ols[data-sid="${failed}"]`).first().click();
     await page.locator(`.gb-olin [data-hap="${failed}"]`).click();
-    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
-    await page.evaluate(() => { (0, eval)('tab="Discover";render()'); });
+    expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: failed, run: failRun, step: 2 });
+    await page.getByTestId('grow-happened-close').click();
     await page.locator(`.gb-ols[data-sid="${passed}"]`).first().click();
     await page.locator(`.gb-olin [data-hap="${passed}"]`).click();
-    expect(await landed(page)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0, hash: `#grow/${passed}/happened/step-1` });
+    expect(await drawn(page)).toEqual({ tab: 'Discover', sid: passed, run: passRun, step: 0, hash: `#grow/${passed}/happened/step-1` });
     await page.close();
   });
 
@@ -157,7 +166,7 @@ describe('From a grown scenario to its run', () => {
     await expect(broke.textContent()).resolves.toBe('See what happened ›');
     await expect(list.locator(`.gb-ols[data-sid="${passed}"] + .gb-hapr [data-hap="${passed}"]`).count()).resolves.toBe(1);
     await broke.click();
-    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: failed, run: failRun, step: 2 });
     await page.close();
     // Opened in place, the row says it once, in its body.
     const again = await open();
@@ -165,11 +174,11 @@ describe('From a grown scenario to its run', () => {
     await again.getByTestId('grow-scenarios').locator(`.gb-ols[data-sid="${passed}"]`).click();
     await expect(again.getByTestId('grow-scenarios').locator(`[data-hap="${passed}"]`).count()).resolves.toBe(1);
     await again.getByTestId('grow-scenarios').locator(`.gb-olin [data-hap="${passed}"]`).click();
-    expect(await landed(again)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0 });
+    expect(await drawn(again)).toMatchObject({ tab: 'Discover', sid: passed, run: passRun, step: 0 });
     await again.close();
   });
 
-  it('opens the run of a scenario that never reached its checks from its card, to show why it is not tested yet', async () => {
+  it('opens the run of a scenario that never reached its checks in the drawer from its card, to show why it is not tested yet', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
     await page.evaluate(({ id, run }) => {
@@ -178,31 +187,42 @@ describe('From a grown scenario to its run', () => {
       w.gw.pinned = 's:' + id; w.growPaint();
     }, { id: passed, run: passRun });
     await page.locator(`.gw-insw [data-hap="${passed}"]`).click();
-    expect(await landed(page)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0, hash: `#grow/${passed}/happened/step-1` });
+    expect(await drawn(page)).toEqual({ tab: 'Discover', sid: passed, run: passRun, step: 0, hash: `#grow/${passed}/happened/step-1` });
+    await page.getByTestId('grow-happened-runtab').click();
+    expect(await landed(page)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0, hash: `#grow/${passed}/run/step-1` });
     await page.close();
   });
 
-  it('"Open the runs" opens the first failure’s run, not the latest run', async () => {
+  it('"Open the runs" opens the first failure’s run in the drawer, not the latest run', async () => {
     const page = await open();
     await expect(page.getByTestId('grow-open-runs').textContent()).resolves.toBe('Open the runs');
     await page.getByTestId('grow-open-runs').click();
-    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: failed, run: failRun, step: 2 });
     await page.close();
   });
 
-  it('"Open the runs" is never a dead end: when the first failure’s run is not saved here it says so and opens the next run this grow saved', async () => {
+  it('"Open the runs" is never a dead end: when the first failure’s run is not saved here the drawer says so and still offers to rerun it, and with no failure it opens the next run this grow saved', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
     // The failure's run is gone (a grow that proved in a worktree of its own saves its runs there).
     await page.evaluate((id) => { const w = (0, eval)('({ gw })'); w.gw.state.run[id].run = '2026-10-22T00-00-00Z_fail_gone00'; }, failed);
     await page.getByTestId('grow-open-runs').click();
-    expect(await landed(page)).toMatchObject({ tab: 'Run', run: passRun, sel: 'notes.count-anonymous' });
-    await expect(page.locator('.toast').textContent()).resolves.toBe('The run 2026-10-22T00-00-00Z_fail_gone00 is not saved in this folder any more.');
+    expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: failed, run: '2026-10-22T00-00-00Z_fail_gone00' });
+    await expect(page.locator('.gw-drerr').textContent()).resolves.toBe('The run 2026-10-22T00-00-00Z_fail_gone00 is not saved in this folder any more.');
+    await expect(page.getByTestId('grow-happened-rerun').isDisabled()).resolves.toBe(false);
     await page.close();
+    // With no failure, the newest run this grow saved, in the Run tab: when it is gone it says so and opens the next one.
+    const next = await open();
+    await next.getByTestId('grow-result').waitFor();
+    await next.evaluate(({ f, p }) => { const w = (0, eval)('({ gw })'); w.gw.state.run[f].st = 'pass'; w.gw.state.run[p].run = '2026-12-31T00-00-00Z_pass_gone00'; }, { f: failed, p: passed });
+    await next.getByTestId('grow-open-runs').click();
+    expect(await landed(next)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count' });
+    await expect(next.locator('.toast').textContent()).resolves.toBe('The run 2026-12-31T00-00-00Z_pass_gone00 is not saved in this folder any more.');
+    await next.close();
     // With none of its runs here, it still opens the Run tab.
     const none = await open();
     await none.getByTestId('grow-result').waitFor();
-    await none.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].run) w.gw.state.run[k].run = '2026-10-22T00-00-00Z_pass_gone' + k; });
+    await none.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].run) { w.gw.state.run[k].st = 'pass'; w.gw.state.run[k].run = '2026-10-22T00-00-00Z_pass_gone' + k; } });
     await none.getByTestId('grow-open-runs').click();
     await none.waitForFunction(() => (0, eval)('tab') === 'Run');
     await none.close();
@@ -210,14 +230,20 @@ describe('From a grown scenario to its run', () => {
 
   it('keeps the selection in the address and brings it back on load', async () => {
     const page = await open(`#grow/${failed}/happened/step-3`);
-    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
-    // Another step chosen in the Run tab moves the address with it.
-    await page.locator('button.step').nth(1).click();
+    expect(await drawn(page)).toEqual({ tab: 'Discover', sid: failed, run: failRun, step: 2, hash: `#grow/${failed}/happened/step-3` });
+    // Another step chosen in the drawer moves the address with it.
+    await page.getByTestId('grow-happened-step-2').click();
     expect((await where(page)).hash).toBe(`#grow/${failed}/happened/step-2`);
     await page.close();
     const again = await open(`#grow/${failed}/happened/step-2`);
-    expect(await landed(again)).toMatchObject({ run: failRun, step: 1 });
+    expect(await drawn(again)).toMatchObject({ sid: failed, run: failRun, step: 1 });
     await again.close();
+    // The Run tab has its own address, and another step chosen there moves it.
+    const run = await open(`#grow/${failed}/run/step-3`);
+    expect(await landed(run)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/run/step-3` });
+    await run.locator('button.step').nth(1).click();
+    expect((await where(run)).hash).toBe(`#grow/${failed}/run/step-2`);
+    await run.close();
     // A selection alone pins it on the grow page, and choosing another moves the address.
     const pinned = await open(`#grow/${passed}`);
     await pinned.waitForFunction((k) => (0, eval)('gw').pinned === k, `s:${passed}`);
@@ -256,10 +282,10 @@ describe('From a grown scenario to its run', () => {
     await page.close();
   });
 
-  it('opens the first failure’s run at its failing step from the verdict', async () => {
+  it('opens the first failure’s run in the drawer at its failing step from the verdict', async () => {
     const page = await open();
     await page.getByTestId('grow-verdict-open').click();
-    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
+    expect(await drawn(page)).toEqual({ tab: 'Discover', sid: failed, run: failRun, step: 2, hash: `#grow/${failed}/happened/step-3` });
     await page.close();
   });
 
@@ -284,6 +310,7 @@ describe('From a grown scenario to its run', () => {
     expect(await v.count()).toBe(0);
     await page.close();
   });
+
 });
 
 describe('A grow whose config is in a subfolder', () => {
@@ -312,6 +339,11 @@ describe('A grow whose config is in a subfolder', () => {
   const runTabShows = async (page: Page) => {
     await expect(page.getByText('No tracegrove.config.yaml in this folder yet.').count()).resolves.toBe(0);
     await expect(page.locator('aside[aria-label="Step detail"]').textContent()).resolves.toContain('notes.count › step 3 of 4');
+  };
+  /* the drawer read the failure's run from beside the config, on its failing step */
+  const drawerShows = async (page: Page) => {
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    expect(await page.evaluate(() => { const d = (0, eval)('gw').dr; return { sid: d.sid, run: d.run, step: d.step }; })).toEqual({ sid: failed, run: failRun, step: 2 });
   };
 
   it('saves its runs beside that config, and grow --json says so', () => {
@@ -348,9 +380,11 @@ describe('A grow whose config is in a subfolder', () => {
     expect(configRunsRoot(dir, 'linked/tracegrove.config.yaml')).toBeNull();
   });
 
-  it('opens the failure’s run at its failing step from the verdict, the card and Open the runs, never the Initialize card', async () => {
+  it('opens the failure’s run at its failing step from the verdict, the card and Open the runs, in the drawer and then the Run tab, never the Initialize card', async () => {
     const page = await open();
     await page.getByTestId('grow-verdict-open').click();
+    await drawerShows(page);
+    await page.getByTestId('grow-happened-runtab').click();
     expect(await landed(page)).toMatchObject({ tab: 'Run', run: failRun, sel: 'notes.count', step: 2 });
     await runTabShows(page);
     // The run picker offers the run the grow opened, though this folder's own list has none.
@@ -358,20 +392,33 @@ describe('A grow whose config is in a subfolder', () => {
     await page.close();
     const runs = await open();
     await runs.getByTestId('grow-open-runs').click();
+    await drawerShows(runs);
+    await runs.getByTestId('grow-happened-runtab').click();
     expect(await landed(runs)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
     await runTabShows(runs);
     await runs.close();
-    // The address alone brings it back, read from beside the config again.
+    // The address alone brings each back, read from beside the config again.
     const again = await open(`#grow/${failed}/happened/step-3`);
-    expect(await landed(again)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
-    await runTabShows(again);
+    await drawerShows(again);
     await again.close();
+    const tabbed = await open(`#grow/${failed}/run/step-3`);
+    expect(await landed(tabbed)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    await runTabShows(tabbed);
+    await tabbed.close();
   });
 
   it('says a run is not saved there only when it is not, and then stays on the grow instead of offering to plant a config', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();
     await page.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].run) w.gw.state.run[k].run = '2026-10-22T00-00-00Z_pass_gone' + k; });
+    // the failure's run, in the drawer
+    await page.getByTestId('grow-open-runs').click();
+    await page.locator('.gw-drerr').waitFor();
+    await expect(page.locator('.gw-drerr').textContent()).resolves.toBe(`The run 2026-10-22T00-00-00Z_pass_gone${failed} is not saved in svc any more.`);
+    expect((await where(page)).tab).toBe('Discover');
+    await page.getByTestId('grow-happened-close').click();
+    // with no failure, the newest run this grow saved
+    await page.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].st === 'fail') w.gw.state.run[k].st = 'pass'; });
     await page.getByTestId('grow-open-runs').click();
     await page.locator('.toast').waitFor();
     await expect(page.locator('.toast').textContent()).resolves.toMatch(/^The run 2026-10-22T00-00-00Z_pass_gone\w+ is not saved in svc any more\.$/);
@@ -421,8 +468,12 @@ describe('One failure, worded one way everywhere', () => {
     await page.getByTestId('grow-view-outline').click();
     const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
     expect(row.startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
-    // The Run tab: its "Needs a fix" card and the recorded case failure on the step.
+    // The drawer, on the step that broke.
     await page.getByTestId('grow-verdict-open').click();
+    await page.getByTestId('grow-happened-oneline').waitFor();
+    await expect(page.getByTestId('grow-happened-step-2').textContent()).resolves.toContain('Expected 1 charge, got 2');
+    // The Run tab: its "Needs a fix" card and the recorded case failure on the step.
+    await page.getByTestId('grow-happened-runtab').click();
     await page.waitForFunction(() => (0, eval)('tab') === 'Run' && !!(0, eval)('ui').run);
     const run = (await page.locator('#main').textContent())!;
     expect(run).toContain(words);

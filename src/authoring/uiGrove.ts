@@ -402,11 +402,12 @@ const GW=${CONST};
 const gw={dr:null,el:null,svg:null,B:null,M:null,seen:new Set(),state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,hov:null,open:{},refocus:null,preview:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
 try{const v=localStorage.getItem('gw-tree');if(v==='outline'||v==='grove')gw.tree=v}catch(e){}
 /* The selection lives in the address, so a link can bring it back: #grow/<id> is what is selected (a scenario, a journey or a
-   part), #grow/<scenario>/happened/step-<n> is the run that scenario made, open in the Run tab at step n, and
-   #grow/<scenario>/steps/step-<n> is that run in the drawer beside the tree, at step n. */
-const gwHASH=/^#grow\/([A-Za-z0-9_.-]+)(\/happened(?:\/step-(\d+))?|\/steps(?:\/step-(\d+))?)?$/;
-function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;const n=m[3]||m[4];
- gw.want={id:m[1],happened:!!m[2]&&m[2].startsWith('/happened'),steps:!!m[2]&&m[2].startsWith('/steps'),step:n?Math.max(0,Number(n)-1):null};return true}
+   part), #grow/<scenario>/happened/step-<n> is what happened in the run that scenario made, in the drawer beside the tree at
+   step n, and #grow/<scenario>/run/step-<n> is that run in the Run tab, at step n. An address made before the drawer had its
+   name (#grow/<scenario>/steps/step-<n>) opens the drawer too. */
+const gwHASH=/^#grow\/([A-Za-z0-9_.-]+)(?:\/(happened|steps|run)(?:\/step-(\d+))?)?$/;
+function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;const n=m[3];
+ gw.want={id:m[1],happened:m[2]==='happened'||m[2]==='steps',run:m[2]==='run',step:n?Math.max(0,Number(n)-1):null};return true}
 if(gwWant())tab='Discover';
 window.addEventListener('hashchange',()=>{if(!gwWant())return;if(tab!=='Discover'){tab='Discover';render()}else growPaint()});
 function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
@@ -713,9 +714,11 @@ function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&
 function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
  return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved'+['agent','part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
 /* ---------- From a scenario to its run ---------- */
-/* A scenario that ran opens the Run tab at its own run and flow, the ones the grow recorded for it (never "the latest run"), at
-   the step that broke, or at its first step when it passed: the way History opens a run. One whose run never reached its
-   checks (the app did not start, say) is not tested yet, and opens that run too, to show why. */
+/* What happened in a scenario's run opens in the drawer beside the tree (gwDrOpen). From there, "Run tab ↗" opens the Run tab at
+   the scenario's own run and flow, the ones the grow recorded for it (never "the latest run"), at the step the drawer is on, or
+   the step that broke, or its first step when it passed: the way History opens a run. One whose run never reached its checks
+   (the app did not start, say) is not tested yet, and opens that run too, to show why. A run that holds no record of the flow
+   the grow recorded is never read as that flow, even when it holds only one other. */
 const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'||r.st==='not_run'))};
 async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];const say=t=>{if(!quiet)toast(t)};
  if(!x||!gwRan(x)){say('No run was recorded for this scenario.');return false}
@@ -724,8 +727,8 @@ async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r
  const flow=r.flow||x.flow,cfg=s.flows&&s.flows.config||null,sub=cfg&&cfg.lastIndexOf('/')>0?cfg.slice(0,cfg.lastIndexOf('/')):null;let run;
  try{run=await api('/api/runs/'+encodeURIComponent(r.run)+(cfg?'?config='+encodeURIComponent(cfg):''))}
  catch(e){say(e&&e.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':'The run '+r.run+' could not be read'+(e&&e.error?': '+e.error:'')+'.');return false}
- const c=(run.cases||[]).find(k=>k.caseId===flow)||((run.cases||[]).length===1?run.cases[0]:null);
- if(!c){say('The run '+r.run+' has no record of '+(flow||'this scenario')+'.');return false}
+ const c=flow?(run.cases||[]).find(k=>k.caseId===flow):null;
+ if(!c){say(flow?'The run '+r.run+' has no record of '+flow+'.':'This grow did not record which flow made the run '+r.run+', so it is not read as this scenario.');return false}
  const steps=c.steps.filter(k=>k.declared!==false);const bad=k=>k&&(k.result==='failed'||k.result==='cancelled'||(k.checks==='fail'&&k.result==='completed'));
  let i=c.failure?steps.findIndex(k=>k.name===c.failure.step||k.id===c.failure.step):-1;if(i<0||!bad(steps[i]))i=steps.findIndex(bad);
  if(typeof at==='number'&&at>=0&&at<steps.length)i=at;
@@ -733,24 +736,26 @@ async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r
  /* the list of runs the Run tab offers may predate this grow */
  try{state=await api('/api/overview')}catch(e){}
  openTab('Run');return true}
-/* "Open the runs" opens the first failure's run at its failing step; with no failure, the latest run this grow made. It is
-   never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say), it says so and
-   tries the next failure's run, then the newest run this grow saved, and at last opens the Run tab as it is. A grow whose
-   config is in a subfolder stays here instead: this folder's Run tab would only offer to plant a config it already has. */
+/* "Open the runs" opens what happened in the first failure's run, in the drawer, at its failing step; the drawer says so when
+   that run is not saved here any more, and still offers to rerun it. With no failure, it opens the newest run this grow made in
+   the Run tab. It is never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say),
+   it says so and tries the next newest, and at last opens the Run tab as it is. A grow whose config is in a subfolder stays here
+   instead: this folder's Run tab would only offer to plant a config it already has. */
 async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
- const fails=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x));
- const ran=s.scenarios.filter(x=>gwRan(x)&&fails.indexOf(x)<0).sort((a,b)=>String(s.run[b.id].run).localeCompare(String(s.run[a.id].run)));
- const tries=fails.concat(ran);
+ const fail=s.scenarios.find(x=>gwIn(x)&&s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x)&&gwDrCan(x));
+ if(fail){gwDrOpen(fail.id);if(gw.dr)gw.dr.from='t:grow-open-runs';return}
+ const tries=s.scenarios.filter(x=>gwRan(x)).sort((a,b)=>String(s.run[b.id].run).localeCompare(String(s.run[a.id].run)));
  for(let i=0;i<tries.length;i++)if(await gwOpenRun(tries[i].id,undefined,i>0))return;
  if(!state.hasConfig&&s.flows&&s.flows.config){if(!tries.length)toast('This grow saved no run to open.');return}
  openTab('Run')}
-/* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. */
-function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap',type:'button','data-hap':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwOpenRun(x.id)}}},'See what happened ›'):null}
+/* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. It
+   opens what happened in that run in the drawer beside the tree, on the step that broke. */
+function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap gw-dre',type:'button','data-hap':x.id,'data-dr':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'See what happened ›'):null}
 /* ---------- What happened: one scenario's run, step by step, beside the tree ---------- */
 /* The drawer reads the run the grow recorded for a scenario from that run's verified bundle (GET /api/runs/<run>/happened, which
    needs the session token) and shows its steps, what each one recorded, one sentence for how it broke, and the evidence behind
    it. It takes the inspector's place beside the tree, which stays drawn and lit; under 1060 px it is a sheet over the page. A
-   scenario with no run says why, what it would prove and where it starts. The address names it: #grow/<id>/steps/step-<n>. */
+   scenario with no run says why, what it would prove and where it starts. The address names it: #grow/<id>/happened/step-<n>. */
 const gwDrW={fail:'Failed',pass:'Passed',none:'Not tested yet'},gwDrM={pass:'✓',fail:'✗',warn:'!',none:'–'};
 /* a scenario this grow ran, or one it left untested once it is done, has a drawer; one cut by the mode or still running has not */
 const gwDrCan=x=>{const s=gw.state,r=x&&s&&s.run[x.id];return !!x&&gwIn(x)&&!(r&&r.st==='run')&&(gwRan(x)||!!s.done)};
@@ -799,9 +804,10 @@ function gwDrCopy(){const url=location.href;try{if(navigator.clipboard&&navigato
 /* "Write this flow" puts the scenario's claim in the Intent box below the tree, where drafting writes flows */
 function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=null;render();const box=document.getElementById('intent');
  if(box){box.value=ui.intent;box.focus({preventScroll:true});box.scrollIntoView({block:'center'})}toast('Its claim is in the Intent box below. Draft it there to write the flow.')}
-/* The way in, wherever a scenario is shown beside "See what happened ›" (which opens the Run tab) */
-function gwDrEntry(x){if(!gwDrCan(x))return null;const ran=gwRan(x);
- return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':(ran?'What happened, step by step: ':'Why it is not tested yet: ')+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},ran?'Step by step ›':'Why not tested yet ›')}
+/* The way into the drawer of a scenario with no run, wherever one is shown: why it is not tested yet. One that ran has "See what
+   happened ›" (gwHappened) instead. */
+function gwDrEntry(x){if(!gwDrCan(x)||gwRan(x))return null;
+ return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':'Why it is not tested yet: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'Why not tested yet ›')}
 /* A scenario no flow proves offers to write that flow on its card, beside the way into why it is not tested yet */
 function gwWriteEntry(x){const s=gw.state;return x&&!x.flow&&s&&s.done&&gwIn(x)?h('button',{class:'btn sm gw-wr',type:'button','data-testid':'grow-card-write','aria-label':'Write this flow: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow'):null}
 /* With several failures, the drawer of one pages to the next in the order the verdict counts them: "Failure 1 of 3" */
@@ -891,10 +897,11 @@ function gwDrNone(x,r,j,M){const why=String(r&&r.why||(x.flow?'This grow did not
   x.realKey?h('div',{class:'gw-drsec','data-testid':'grow-happened-realkey'},h('span',{class:'gw-eyebrow'},'To run it for real'),h('p',{},'A real run needs '+x.realKey+'.')):null,
   h('div',{class:'gw-dra'},x.flow?null:h('button',{class:'btn sm',type:'button','data-testid':'grow-happened-write',on:{click:()=>gwDrWrite(x)}},'Write this flow'),
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-happened-copy',on:{click:gwDrCopy}},'Copy link'))]}
-/* The address follows the selection: the run a scenario opened while the Run tab still shows it, else what is selected here. */
+/* The address follows the selection: the run a scenario opened while the Run tab still shows it, else the drawer, else what is
+   selected here. */
 function gwSyncHash(){if(gw.want)return;const hp=gw.happened;let want='';
- if(tab==='Run'&&hp&&ui.runName===hp.run&&ui.sel===hp.flow)want='#grow/'+hp.sid+'/happened/step-'+((ui.step||0)+1);
- else if(tab==='Discover'&&gw.state&&gw.dr&&gw.pinned==='s:'+gw.dr.sid)want='#grow/'+gw.dr.sid+'/steps'+(gw.dr.run&&gw.dr.step!==null?'/step-'+(gw.dr.step+1):'');
+ if(tab==='Run'&&hp&&ui.runName===hp.run&&ui.sel===hp.flow)want='#grow/'+hp.sid+'/run/step-'+((ui.step||0)+1);
+ else if(tab==='Discover'&&gw.state&&gw.dr&&gw.pinned==='s:'+gw.dr.sid)want='#grow/'+gw.dr.sid+'/happened'+(gw.dr.run&&gw.dr.step!==null?'/step-'+(gw.dr.step+1):'');
  else if(tab==='Discover'&&gw.state&&gw.pinned&&/^[sju]:/.test(gw.pinned))want='#grow/'+gw.pinned.slice(2);
  const cur=location.hash;if(want===cur||(!want&&!/^#grow\//.test(cur)))return;
  const url=new URL(location.href);url.hash=want;history.replaceState(null,'',url.href)}
@@ -902,8 +909,8 @@ function gwSyncHash(){if(gw.want)return;const hp=gw.happened;let want='';
 function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.want=null;
  const k=s.scenarios.some(x=>x.id===w.id)?'s:'+w.id:(s.journeys||[]).some(j=>j.id===w.id)?'j:'+w.id:s.units.some(u=>u.id===w.id)?'u:'+w.id:null;
  if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
- if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step);
- else if(w.steps&&k.startsWith('s:'))gwDrOpen(w.id,w.step,true);else gw.dr=null}
+ if(w.run&&k.startsWith('s:'))gwOpenRun(w.id,w.step);
+ else if(w.happened&&k.startsWith('s:'))gwDrOpen(w.id,w.step,true);else gw.dr=null}
 /* The verdict, worked out once on the server (growVerdict) for this page, grow --json and the exit code: its own line above the
    tree, outside the result band. Its mark and word, then what it rests on: the first failure's promise and how it broke
    ("Removing a seat never charges the card" failed: expected 2 charges, got 3), with its promise; or what is not tested yet.
@@ -915,7 +922,7 @@ function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)r
   h('span',{class:'gw-vt',title:V.text},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
   f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
-  f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>gwOpenRun(f.scenario)}},'See what happened ›'):null)}
+  f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
 /* The first failure's run, step by step, beside the tree: from the result band, above the fold */
 function gwResultSteps(){const V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwScen(f.scenario);if(!x||!gwRan(x)||!gwDrCan(x)||gw.state.run[x.id].st!=='fail')return null;
  return h('button',{class:'btn ghost sm gw-rsteps',type:'button','data-testid':'grow-result-steps','aria-label':'What happened, step by step: '+gwPlain(gwVia(x.title).title),on:{click:()=>{gwDrOpen(x.id);if(gw.dr)gw.dr.from='t:grow-result-steps'}}},'Step by step ›')}

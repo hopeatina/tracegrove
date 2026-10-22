@@ -193,7 +193,7 @@ describe('What happened, step by step', () => {
     const chips = await d.getByTestId('grow-happened-chips').locator('.gw-chip').allTextContents();
     expect(chips).toContain('payments stand-in'); expect(chips).toContain('email stand-in · calls not recorded');
     expect(chips.join(' ')).not.toMatch(/all real/);
-    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-4`);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/happened/step-4`);
     await page.close();
   });
 
@@ -247,9 +247,9 @@ describe('What happened, step by step', () => {
     const page = await open(`#grow/${failed}/steps/step-3`);
     const d = await opened(page);
     await expect(page.getByTestId('grow-happened-step-3').getAttribute('aria-pressed')).resolves.toBe('true');
-    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-3`);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/happened/step-3`);
     await page.getByTestId('grow-happened-step-2').click();
-    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-2`);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/happened/step-2`);
     await page.reload(); await page.getByTestId('grow-result').waitFor(); await opened(page);
     await expect(page.getByTestId('grow-happened-step-2').getAttribute('aria-pressed')).resolves.toBe('true');
     // brought back from the address, it takes focus on its heading and shows its head and that step
@@ -308,7 +308,7 @@ describe('What happened, step by step', () => {
     await opened(page);
     await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe('Removing a seat never charges the card');
     await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
-    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-4`);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/happened/step-4`);
     expect(await inView(page)).toEqual({ head: true, step: true });
     await page.keyboard.press('Escape');
     await expect(drawer(page).count()).resolves.toBe(0);
@@ -362,7 +362,7 @@ describe('What happened, step by step', () => {
     await expect(drawer(page).textContent()).resolves.toContain('It would prove');
     await expect(drawer(page).textContent()).resolves.toContain('Where it starts');
     await expect(page.getByTestId('grow-happened-write').textContent()).resolves.toBe('Write this flow');
-    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${none}/steps`);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${none}/happened`);
     // one that reaches a third party says which key a real run needs
     const keyed = state.scenarios.find((x) => !x.flow && x.realKey && state.run[x.id]?.st === 'not_run')!;
     expect(keyed.realKey).toBe('STRIPE_SECRET_KEY or STRIPE_TEST_KEY');
@@ -573,18 +573,18 @@ describe('What happened, with several failures', () => {
       prev: (document.querySelector('[data-testid="grow-happened-prev"]') as HTMLButtonElement | null)?.disabled, next: (document.querySelector('[data-testid="grow-happened-next"]') as HTMLButtonElement | null)?.disabled, hash: location.hash }));
     expect(await pager()).toMatchObject({ text: 'Failure 1 of 2', prev: true, next: false });
     await page.getByTestId('grow-happened-next').click();
-    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), fails[1]);
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/happened`), fails[1]);
     await page.getByTestId('grow-happened-oneline').waitFor();
     expect(await pager()).toMatchObject({ text: 'Failure 2 of 2', prev: false, next: true });
     await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe(state.scenarios.find((x) => x.id === fails[1])!.title.replaceAll('`', ''));
     await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
     await page.getByTestId('grow-happened-prev').click();
-    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), fails[0]);
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/happened`), fails[0]);
     expect(await pager()).toMatchObject({ text: 'Failure 1 of 2' });
     // a scenario that passed has no pager
     const passed = state.scenarios.find((x) => state.run[x.id]?.st === 'pass')!.id;
     await page.evaluate((id) => { location.hash = `#grow/${id}/steps`; }, passed);
-    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/steps`), passed);
+    await page.waitForFunction((id) => location.hash.startsWith(`#grow/${id}/happened`), passed);
     await page.getByTestId('grow-happened-oneline').waitFor();
     await expect(page.getByTestId('grow-happened-pager').count()).resolves.toBe(0);
     await page.close();
