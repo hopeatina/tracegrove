@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { comparedOf } from '../src/authoring/checkCompare.ts';
+import { comparedOf, expGot } from '../src/authoring/checkCompare.ts';
 import type { CompiledFlowInfo } from '../src/authoring/compile.ts';
 import { caseReport } from '../src/authoring/run.ts';
 import type { CaseSpec, ExecutionReceipt } from '../src/protocol/index.ts';
 
+const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 /* A check the run recorded, read back the way the reducer (src/core/reducer.ts) words its failures. */
 describe('What a failed check compared', () => {
   const http = { method: 'GET', path: '/notes/count' };
@@ -58,10 +59,13 @@ describe('A saved run’s steps', () => {
   });
 
   it('say the count a stand-in wanted when its step has no compiled expectation, as a saved run read back has none', () => {
-    expect(caseReport(receipt, flow, assertions).failure).toMatchObject({ step: 'only the added seat was charged', message: 'expected 2 calls, got 3' });
+    // In the one wording the verdict and grow --json use (expGot), whether the run is read back or just compiled.
+    expect(caseReport(receipt, flow, assertions).failure).toMatchObject({ step: 'only the added seat was charged', message: 'expected 2 charges, got 3' });
     const compiled: CompiledFlowInfo = { ...flow, steps: flow.steps.map((s) => (s.method === 'STANDIN' ? { ...s, expectation: '2 calls received' } : s)) };
-    expect(caseReport(receipt, compiled, assertions).failure!.message).toBe('expected 2 calls, got 3');
-    // With no recorded check to read either, it still says it plainly.
+    expect(caseReport(receipt, compiled, assertions).failure!.message).toBe('expected 2 charges, got 3');
+    expect(caseReport(receipt, compiled, assertions).failure!.message).toBe(lowerFirst(expGot(caseReport(receipt, compiled, assertions).steps[2]!.compared!)));
+    // With no recorded check to read, the compiled expectation; with neither, it still says it plainly.
+    expect(caseReport(receipt, compiled, []).failure!.message).toBe('expected 2 calls, got 3');
     expect(caseReport(receipt, flow, []).failure!.message).toBe('expected a different call count, got 3');
   });
 

@@ -15,7 +15,7 @@ import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
 import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CaseSpec, type ExecutionReceipt } from '../protocol/index.ts';
 import { getPath } from '../core/reducer.ts';
-import { comparedOf } from './checkCompare.ts';
+import { comparedOf, expGot } from './checkCompare.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -147,10 +147,13 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const stepId = failedAssertion.assertionId.replace(/\.expect$/, '');
     const step = receipt.steps.find((s) => s.stepId === stepId);
     const standIn = StandInObservation.safeParse(step?.output);
-    // The count it wanted: the compiled expectation ("2 calls received"), else the one its recorded check compared.
-    const wanted = steps.find((x) => x.id === stepId)?.compared?.expected;
-    const fromCheck = typeof wanted === 'number' ? `${wanted} call${wanted === 1 ? '' : 's'}` : null;
-    const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? fromCheck ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
+    // A count it can compare is said in the one wording the verdict, grow --json and the page use (checkCompare's expGot:
+    // "expected 2 charges, got 3"); with no recorded check to read, the compiled expectation ("2 calls received").
+    const compared = steps.find((x) => x.id === stepId)?.compared;
+    const said = compared ? expGot(compared) : null;
+    const counted = !standIn.success || !/^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? null
+      : said ? said.charAt(0).toLowerCase() + said.slice(1)
+      : `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}`;
     const message = counted ?? (failedAssertion.reasonCode ? explainDiffers(failedAssertion.reasonCode, step?.output, assertions, stepId) : `assertion ${failedAssertion.result}`);
     failure = { step: stepInfo.get(stepId)?.name ?? stepId, message, observed: observedLine(step?.output) };
   } else if (receipt.outcome !== 'passed') {

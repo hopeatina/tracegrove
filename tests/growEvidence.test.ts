@@ -359,6 +359,56 @@ describe('A grow whose config is in a subfolder', () => {
   });
 });
 
+describe('One failure, worded one way everywhere', () => {
+  /* plotline-billing (the saas-billing sample) on main, and a branch that charges the card a second time after an upgrade to
+     Team: "the card was charged the Team price once" expected 1 payments charge and got 2. */
+  let dir = '', state: GrowState, server: UiServer, browser: Browser, failed = '';
+  const errors: string[] = [];
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'tracegrove-wording-')); temps.push(dir);
+    cpSync(join(import.meta.dirname, '..', 'src', 'samples', 'saas-billing'), dir, { recursive: true });
+    git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Billing sample');
+    git(dir, 'checkout', '-qb', 'seat-fee');
+    const app = join(dir, 'app', 'billing.mjs');
+    const before = readFileSync(app, 'utf8'), at = '    const result = await charge(account, amount, body.plan);\n';
+    expect(before.includes(at)).toBe(true);
+    writeFileSync(app, before.replace(at, `${at}    if (result.ok && body.plan === 'team') await charge(account, 900, 'team seat');\n`));
+    git(dir, 'commit', '-qam', 'Charge the first Team seat with the upgrade');
+    ({ state } = await grow({ dir, branch: 'seat-fee', base: 'main', mode: 'max', prove: true, gh: false, agent: { off: true } }));
+    failed = state.scenarios.find((x) => state.run[x.id]?.st === 'fail' && state.run[x.id]?.flow === 'billing.upgrade-charges-once')!.id;
+    server = await startUi({ dir, branch: 'seat-fee', port: 0, token: 'tk-0123456789abcdef' });
+    browser = await chromium.launch({ headless: true });
+  }, 180_000);
+  afterAll(async () => { await browser?.close(); await server?.close(); cleanTemps(); expect(errors).toEqual([]); });
+
+  it('says the count the same way in the grow’s recorded reason, the verdict, grow --json, the page’s rows and the Run tab', async () => {
+    const words = 'expected 1 charge, got 2';
+    // The reason the grow recorded, from the run's own failure message.
+    expect(state.run[failed]!.why).toBe(`the card was charged the Team price once: ${words}`);
+    // The verdict and grow --json, from the run's recorded check.
+    const v = growVerdict(state, { broke: verdictFacts(state, dir) });
+    expect(v.first?.scenario).toBe(failed);
+    expect(v.text).toBe(`“${plainTitle(state.scenarios.find((x) => x.id === failed)!.title)}” failed: ${words}`);
+    const f = growJsonSummary(state, dir).failures.find((x) => x.scenario === failed)!;
+    expect(f.says.startsWith('Expected 1 charge, got 2. Step 2 (')).toBe(true);
+    // The page: the verdict, and the row's "Broke at check" line in the Outline.
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain(`failed: ${words}`);
+    await page.getByTestId('grow-view-outline').click();
+    const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
+    expect(row.startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
+    // The Run tab: its "Needs a fix" card and the recorded case failure on the step.
+    await page.getByTestId('grow-verdict-open').click();
+    await page.waitForFunction(() => (0, eval)('tab') === 'Run' && !!(0, eval)('ui').run);
+    const run = (await page.locator('#main').textContent())!;
+    expect(run).toContain(words);
+    expect(run).not.toMatch(/expected 1 call, got 2/);
+    await page.close();
+  });
+});
+
 describe('The verdict', () => {
   it('is Not ready when a check failed, naming the first failure in plain words with its promise', () => {
     const s = plotline();
