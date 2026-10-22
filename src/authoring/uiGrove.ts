@@ -338,6 +338,12 @@ export const GROVE_JS = String.raw`
 const GW=${CONST};
 const gw={el:null,svg:null,B:null,M:null,seen:new Set(),state:null,view:null,events:0,id:null,busy:false,error:null,log:null,tree:'grove',pinned:null,hov:null,open:{},refocus:null,preview:null,selCrit:null,onlyGaps:false,base:'',prove:true,agent:true,t0:0,raf:0};
 try{const v=localStorage.getItem('gw-tree');if(v==='outline'||v==='grove')gw.tree=v}catch(e){}
+/* The selection lives in the address, so a link can bring it back: #grow/<id> is what is selected (a scenario, a journey or a
+   part), and #grow/<scenario>/happened/step-<n> is the run that scenario made, open in the Run tab at step n. */
+const gwHASH=/^#grow\/([A-Za-z0-9_.-]+)(\/happened(?:\/step-(\d+))?)?$/;
+function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;gw.want={id:m[1],happened:!!m[2],step:m[3]?Math.max(0,Number(m[3])-1):null};return true}
+if(gwWant())tab='Discover';
+window.addEventListener('hashchange',()=>{if(!gwWant())return;if(tab!=='Discover'){tab='Discover';render()}else growPaint()});
 function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
  const branch=ui.source||state.git.current||'';if(!gw.busy&&!gw.state&&state.git.isRepo&&branch&&gw.lastFor!==branch){gw.lastFor=branch;growLast(branch)}
  growPaint();return gw.el}
@@ -638,10 +644,45 @@ function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&
    "0 need you": it is the one that says nothing waits on the reader. */
 function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
  return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved'+['agent','part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
+/* ---------- From a scenario to its run ---------- */
+/* A scenario that ran opens the Run tab at its own run and flow, the ones the grow recorded for it (never "the latest run"), at
+   the step that broke, or at its first step when it passed: the way History opens a run. */
+const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'))};
+async function gwOpenRun(sid,at){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];
+ if(!x||!gwRan(x)){toast('No run was recorded for this scenario.');return false}
+ const flow=r.flow||x.flow;let run;
+ try{run=await api('/api/runs/'+encodeURIComponent(r.run))}catch(e){toast('The run '+r.run+' is not saved in this folder any more.');return false}
+ const c=(run.cases||[]).find(k=>k.caseId===flow)||((run.cases||[]).length===1?run.cases[0]:null);
+ if(!c){toast('The run '+r.run+' has no record of '+(flow||'this scenario')+'.');return false}
+ const steps=c.steps.filter(k=>k.declared!==false);const bad=k=>k&&(k.result==='failed'||k.result==='cancelled'||(k.checks==='fail'&&k.result==='completed'));
+ let i=c.failure?steps.findIndex(k=>k.name===c.failure.step||k.id===c.failure.step):-1;if(i<0||!bad(steps[i]))i=steps.findIndex(bad);
+ if(typeof at==='number'&&at>=0&&at<steps.length)i=at;
+ ui.runName=r.run;ui.run=run;ui.sel=c.caseId;ui.step=Math.max(0,i);gw.happened={sid:sid,run:r.run,flow:c.caseId};gw.pinned='s:'+sid;
+ /* the list of runs the Run tab offers may predate this grow */
+ try{state=await api('/api/overview')}catch(e){}
+ openTab('Run');return true}
+/* "Open the runs" opens the first failure's run at its failing step; with no failure, the latest run this grow made. */
+function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
+ const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x));if(fail)return gwOpenRun(fail.id);
+ const ran=s.scenarios.filter(gwRan).sort((a,b)=>String(s.run[a.id].run).localeCompare(String(s.run[b.id].run)));
+ if(ran.length)return gwOpenRun(ran[ran.length-1].id);openTab('Run')}
+/* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. */
+function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap',type:'button','data-hap':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwOpenRun(x.id)}}},'See what happened ›'):null}
+/* The address follows the selection: the run a scenario opened while the Run tab still shows it, else what is selected here. */
+function gwSyncHash(){if(gw.want)return;const hp=gw.happened;let want='';
+ if(tab==='Run'&&hp&&ui.runName===hp.run&&ui.sel===hp.flow)want='#grow/'+hp.sid+'/happened/step-'+((ui.step||0)+1);
+ else if(tab==='Discover'&&gw.state&&gw.pinned&&/^[sju]:/.test(gw.pinned))want='#grow/'+gw.pinned.slice(2);
+ const cur=location.hash;if(want===cur||(!want&&!/^#grow\//.test(cur)))return;
+ const url=new URL(location.href);url.hash=want;history.replaceState(null,'',url.href)}
+/* An address that names a selection brings it back once the grow it belongs to is on the page. */
+function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.want=null;
+ const k=s.scenarios.some(x=>x.id===w.id)?'s:'+w.id:(s.journeys||[]).some(j=>j.id===w.id)?'j:'+w.id:s.units.some(u=>u.id===w.id)?'u:'+w.id:null;
+ if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
+ if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step)}
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
  return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},gwClauses(t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun())),sub),
-  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm',on:{click:()=>openTab('Run')}},'Open the runs')))}
+  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm','data-testid':'grow-open-runs',on:{click:()=>gwOpenRuns()}},'Open the runs')))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
  if(!s.modeBy||s.phase<5){const n=s.scenarios.length;return s.phase>=4&&n?box(n+' scenario'+(n===1?'':'s')+' drafted','Nothing has run yet.'):box('Growing the tree','Now: '+String(GW.phases[s.phase]||GW.phases[0]).toLowerCase()+'.')}
@@ -779,7 +820,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  const fa=document.activeElement,held=fa&&fa!==document.body&&gw.el.contains(fa)?(fa.getAttribute('data-ol')||(fa.getAttribute('data-testid')?'t:'+fa.getAttribute('data-testid'):null)):null;
  if(!s){gwSet(S.start,gwStartCard(),gw.busy?h('p',{class:'row muted',style:'margin-top:12px'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading the branch'):null,gw.error?blocked(gw.error):null);
   for(const k of ['head','verdict','rail','agents','two','error'])S[k].replaceChildren();S.tree.hidden=true;return}
- S.start.replaceChildren();S.tree.hidden=false;
+ S.start.replaceChildren();S.tree.hidden=false;gwRestore();
  const v=gw.view;const c=s.change;
  gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
    h('div',{class:'sub'},c?gwFacts([c.pr?'#'+c.pr:null,c.files+' files','+'+c.adds+' −'+c.dels,c.untraced?c.untraced+' small parts not traced':null,s.spec?['spec: '+s.spec.source]:null]):'')),
@@ -827,6 +868,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  if(!gw.refocus&&held&&!gw.el.contains(document.activeElement))gw.refocus=held;
  if(gw.refocus){const k=gw.refocus;gw.refocus=null;const el=find(k);if(el)el.focus({preventScroll:true})}
  /* switching to the Outline with something pinned brings its row into view */
- if(gw.reveal){const el=find(gw.reveal);gw.reveal=null;if(el)el.scrollIntoView({block:'nearest'})}}
+ if(gw.reveal){const el=find(gw.reveal);gw.reveal=null;if(el)el.scrollIntoView({block:'nearest'})}
+ gwSyncHash()}
 ${BONSAI_JS}
 `;

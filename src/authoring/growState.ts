@@ -82,7 +82,8 @@ export type GrowJourney = Omit<Of<'journey.found'>, 'kind' | 'v' | 'seq' | 'jour
 export type GrowAgent = { id: string; brief: string; by: Tracer; model: string | null; units: string[]; unit: string | null; note: string; done: boolean; ok: boolean; said: string[] };
 export type GrowScenario = Omit<Of<'scenario.drafted'>, 'kind' | 'v' | 'seq' | 'scenario'> & { id: string };
 /** A failed run's hop: the route whose step broke, or (after) the last route called before a failed check on other evidence. */
-export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null; hop?: string; after?: boolean };
+/** `flow` is the flow the grow ran for the scenario (from scenario.running), so its run opens at the right case. */
+export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null; hop?: string; after?: boolean; flow?: string };
 export type GrowState = {
   phase: number; phaseAt: Record<number, number>; ms: number;
   change: Of<'change.read'> | null; files: Array<Of<'file.changed'>>;
@@ -107,6 +108,8 @@ export function freshGrow(): GrowState {
     flows: null, run: {}, real: {}, done: null, blocked: null, last: 0 };
 }
 
+/** The flow a scenario was started with, kept when its result lands. */
+const ranFlow = (s: GrowState, id: string) => (s.run[id]?.flow ? { flow: s.run[id]!.flow } : {});
 const strip = <T extends { kind: string; v?: string; seq?: number }>(e: T) => { const { kind: _k, v: _v, seq: _s, ...rest } = e; return rest; };
 
 /** Fold one event into the state. Pure apart from mutating `s`, so every view gets the same answer. */
@@ -151,10 +154,10 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'mode.asked': s.asked = true; s.counts = e.counts; break;
     case 'mode.chosen': s.asked = false; s.mode = e.mode; s.modeBy = e.by; break;
     case 'flows.checked': s.flows = e; break;
-    case 'scenario.running': s.run[e.scenario] = { st: 'run' }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run }; break;
-    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why }; break;
+    case 'scenario.running': s.run[e.scenario] = { st: 'run', ...(e.flow ? { flow: e.flow } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run, ...ranFlow(s, e.scenario) }; break;
+    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}), ...ranFlow(s, e.scenario) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why, ...ranFlow(s, e.scenario) }; break;
     case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
     case 'variant.not_applicable': s.real[e.scenario] = { st: 'not_run', note: e.note, na: true }; break;
@@ -223,3 +226,4 @@ export function growView(s: GrowState) {
   };
 }
 export type GrowView = ReturnType<typeof growView>;
+

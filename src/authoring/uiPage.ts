@@ -548,6 +548,6 @@ function readinessTab(){const r=ui.ready;if(!r||ui.readyLoading){if(!r&&!ui.read
     c.assessment==='supported'?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'rejected')}},'Reject'):null,
     h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'challenged')}},'Challenge check'),
     h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=c.caseId;ui.step=null;render()}}},'Open scenario'))))]}
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());gwSyncHash();if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;
