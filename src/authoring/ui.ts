@@ -65,6 +65,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   let growPick: { id: string; done: (mode: Mode | null) => void } | null = null;
   // What each grow's first failure recorded, read once per run for the verdict (runs never change once saved).
   const growFacts = new Map<string, VerdictFacts>();
+  const growWords = new Map<string, string | null>();
   let closing = false;
   let closePromise: Promise<void> | null = null;
   const pendingBodies = new Map<IncomingMessage, ServerResponse>();
@@ -291,7 +292,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/grow/last') {
         const branch = url.searchParams.get('branch') || gitInfo(dir).current;
         let last = null; try { last = branch ? lastGrow(dir, safeRef(branch)) : null; } catch { last = null; }
-        return send(200, last ? { ...last, view: growViewAt(last.state, dir, growFacts) } : null);
+        return send(200, last ? { ...last, view: growViewAt(last.state, dir, growFacts, growWords) } : null);
       }
       if (req.method === 'POST' && url.pathname === '/api/grow') {
         // Live discovery of a change, streamed as server-sent events over a token-guarded POST:
@@ -307,7 +308,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         res.on('close', () => { if (!res.writableFinished) operation.controller.abort(); });
         sse('session', { id: operation.id });
         let snapshot: GrowState | null = null; let last = 0; let timer: ReturnType<typeof setTimeout> | null = null;
-        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growViewAt(snapshot, dir, growFacts) }); };
+        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growViewAt(snapshot, dir, growFacts, growWords) }); };
         const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, proveOn: 'Grow again with “Prove with real flows” on', agent: { off: !body.agent }, signal: operation.controller.signal,
           ...(body.mode ? {} : { chooseMode: () => new Promise<Mode | null>((done) => { growPick = { id: operation.id, done }; operation.controller.signal.addEventListener('abort', () => done(null), { once: true }); }) }) },
         (event, state) => { sse('event', event); snapshot = state; if (Date.now() - last >= 100) flush(); else timer ??= setTimeout(flush, 100); });

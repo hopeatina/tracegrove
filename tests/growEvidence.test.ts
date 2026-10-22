@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { grow } from '../src/authoring/grow.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
-import { growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
+import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { configRunsRoot } from '../src/authoring/runLocation.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
@@ -426,6 +426,27 @@ describe('One failure, worded one way everywhere', () => {
     const run = (await page.locator('#main').textContent())!;
     expect(run).toContain(words);
     expect(run).not.toMatch(/expected 1 call, got 2/);
+    await page.close();
+  });
+
+  it('says each failure on the page in its run’s recorded words, even for a grow saved before its runs said them so', async () => {
+    // The server reads how each failure broke from its run, once per saved run.
+    const words = new Map<string, string | null>();
+    expect(failureWords(state, dir, words)).toEqual({ [failed]: 'expected 1 charge, got 2' });
+    expect(words.size).toBe(1);
+    const last = await (await fetch(new URL(`/api/grow/last?branch=seat-fee`, server.url))).json() as { view: { said: Record<string, string> } };
+    expect(last.view.said).toEqual({ [failed]: 'expected 1 charge, got 2' });
+    // A grow whose recorded reason said "calls", as one saved before this wording did: its rows read as its verdict does.
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    await page.getByTestId('grow-result').waitFor();
+    await page.getByTestId('grow-view-outline').click();
+    await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.run[id].why = 'the card was charged the Team price once: expected 1 call, got 2'; w.growPaint(); }, failed);
+    const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
+    expect(row.startsWith('Broke at check “the card was charged the Team price once”: expected 1 charge, got 2')).toBe(true);
+    // With no run to read, the recorded reason stands.
+    expect(failureWords(state, mkdtempSync(join(tmpdir(), 'tracegrove-norun-')))).toEqual({});
     await page.close();
   });
 

@@ -428,13 +428,16 @@ function gwHops(labels,cls){return [h('ol',{class:'gw-hops gw-hp'},labels.map((l
 /* A failure in the run's own words, one sentence wherever it is said (a card, a row, the Outline, the tree's card):
    "Broke at check “<check>”: <message>", the check's name in bold between quotes, so a check that reads as a sentence never
    reads as broken English, and the closing quote and colon held to its last word so no line starts with them; then, when the
-   run names the hop, "On the route: at|after <hop>" on a line of its own. */
-function gwBroke(r,max){const w=String(r&&r.why||'').trim();const i=w.indexOf(': ');const cut=t=>max?gwCut(t,max):t;
+   run names the hop, "On the route: at|after <hop>" on a line of its own. When the scenario's run (sid) recorded the check that
+   broke, the message is what that check expected and got, in the verdict's words (view.said, from the server): a grow saved
+   before its runs said it that way reads the same as the verdict above it. */
+function gwBroke(r,max,sid){const w=String(r&&r.why||'').trim();const i=w.indexOf(': ');const cut=t=>max?gwCut(t,max):t;
+ const said=sid&&gw.view&&gw.view.said&&gw.view.said[sid]||null;
  const route=r&&r.hop?h('span',{class:'gw-onroute'},'On the route: '+(r.after?'after ':'at '),...gwCodeText(r.hop)):null;
- if(!w)return [h('b',{},'Failed'),', with no reason recorded',route];
- if(i<=0)return [h('span',{class:'k'},'Broke: '),cut(w),route];
+ if(!w&&!said)return [h('b',{},'Failed'),', with no reason recorded',route];
+ if(i<=0)return [h('span',{class:'k'},'Broke: '),cut(said||w),route];
  const step=w.slice(0,i),sp=step.lastIndexOf(' ');
- return [h('span',{class:'k'},'Broke at check '),sp>0?h('b',{},'“'+step.slice(0,sp+1)):null,h('span',{class:'nw'},h('b',{},(sp>0?'':'“')+step.slice(sp+1)+'”'),':'),' '+cut(w.slice(i+2)),route]}
+ return [h('span',{class:'k'},'Broke at check '),sp>0?h('b',{},'“'+step.slice(0,sp+1)):null,h('span',{class:'nw'},h('b',{},(sp>0?'':'“')+step.slice(sp+1)+'”'),':'),' '+cut(said||w.slice(i+2)),route]}
 /* What a scenario claims, said as what the run did with it: proved once it passed, checked while it runs or after it broke,
    and only to be checked before it runs. */
 const gwClaim=x=>{const r=gw.state.run[x.id];return r&&r.st==='pass'?'What it proved':r&&(r.st==='fail'||r.st==='run')?'What it checks':'What it will check'};

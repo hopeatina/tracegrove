@@ -110,8 +110,31 @@ export function verdictFacts(s: GrowState, dir: string, cache?: Map<string, Verd
   if (read.failure.saved) cache?.set(key, facts);
   return facts;
 }
-/** The page's view of a grow, with the verdict saying how its first failure broke. */
-export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>) => growView(s, verdictFacts(s, dir, cache));
+/**
+ * How each failure in the mode broke, from the check its run recorded, in the verdict's words ("expected 2 charges, got 3"),
+ * so the page's rows and cards say it as the verdict does, even for a grow saved before its runs' own messages did. A failure
+ * whose run recorded no check to compare is left out: its recorded reason stands. Runs never change once saved, so a `cache`
+ * reads each one once.
+ */
+export function failureWords(s: GrowState, dir: string, cache?: Map<string, string | null>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const x of s.scenarios) {
+    const run = inMode(s, x) && s.run[x.id]?.st === 'fail' ? s.run[x.id]!.run : null;
+    if (!run) continue;
+    const key = `${x.id} ${run}`;
+    let said = cache?.get(key);
+    if (said === undefined) {
+      const { failure: f } = readFailure(s, dir, x.id);
+      said = f.check ? expGot({ check: f.check, expected: f.expected, got: f.got }) : null;
+      if (f.saved) cache?.set(key, said);
+    }
+    if (said) out[x.id] = said.charAt(0).toLowerCase() + said.slice(1);
+  }
+  return out;
+}
+/** The page's view of a grow, with the verdict saying how its first failure broke, and how each failure broke (`said`). */
+export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>, words?: Map<string, string | null>) =>
+  ({ ...growView(s, verdictFacts(s, dir, cache)), said: failureWords(s, dir, words) });
 
 /** The summary `grow --json` prints beside the log and the state. */
 export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven?: boolean; mode?: Mode | null } = {}): GrowJsonSummary {
