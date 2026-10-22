@@ -1440,11 +1440,39 @@ describe('Grow page', () => {
       expect(ins).toEqual({ h: 'What each mode proves', total: 'In all', first: 'Scenarios' });
       await page.close();
       // a mode that cut a shoot keys the scar it leaves, when the tree shows one
+      // (here Minimum was chosen before any shoot grew, so nothing was cut: the tree shows no scar and the key names none;
+      // a shoot that really grew and was then cut is keyed in the next test)
       const pl = await growPage(browser, server.url, folded('plotline-seats.jsonl'), 1440);
       await pl.waitForTimeout(2500);
       const scar = await pl.evaluate(() => ({ shown: Array.from(document.querySelectorAll('svg.gb .shscar')).some((e) => (e as HTMLElement).style.display !== 'none' && e.getBoundingClientRect().width > 0), keyed: Array.from(document.querySelectorAll('.gw-legend .gw-li')).some((e) => e.textContent === 'where a shoot was cut') }));
+      expect(scar.shown).toBe(false);
       expect(scar.keyed).toBe(scar.shown);
       await pl.close();
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('keys where a shoot was cut once a chosen mode has really cut shoots that grew, and only then', async () => {
+    const { dir, state } = await grownBushy();
+    withMax(state);
+    // Max chosen, and grown; then Min chosen after it: the shoots Max grew are really cut, and heal beside their knots
+    const max = { ...state, asked: false, modeBy: 'you' as const, mode: 'max' as const }, min = { ...max, mode: 'min' as const };
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    const scars = () => ({ shown: Array.from(document.querySelectorAll('svg.gb .shscar')).some((e) => (e as HTMLElement).style.display !== 'none' && e.getBoundingClientRect().width > 0), keyed: Array.from(document.querySelectorAll('.gw-legend .gw-li')).some((e) => e.textContent === 'where a shoot was cut') });
+    try {
+      const page = await treePage(browser, server.url, max, { width: 1440 });
+      await settled(page);
+      // grown in Max, nothing is cut yet: no scar, and none keyed
+      const grown = await page.evaluate(scars);
+      expect(grown.shown).toBe(false);
+      expect(grown.keyed).toBe(grown.shown);
+      await paintState(page, min);
+      await settled(page);
+      const cut = await page.evaluate(scars);
+      expect(cut.shown).toBe(true);
+      expect(cut.keyed).toBe(true);
+      expect(cut.keyed).toBe(cut.shown);
+      await page.close();
     } finally { await browser.close(); }
   }, 90000);
 
