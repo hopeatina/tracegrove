@@ -346,6 +346,8 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-call .gw-vc{flex:none;display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:nowrap}
 .gw-call .gw-vm{flex:none;font-size:13px;color:var(--ink3);white-space:nowrap}
 .gw-call .gw-vgo{flex:none;margin-left:auto}
+/* a verdict with its next action beside it: the line keeps its own look, and the action sits at its right end */
+.gw-callrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 14px;min-width:0}.gw-callrow>.gw-call{margin:0;flex:1 1 320px}.gw-callrow>.gw-vgo{flex:none}
 @media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}/* What happened: a scenario's run, step by step, in the panel beside the tree, which widens for it; under 1060 px a sheet */
 @media (min-width:1061px){.gw-stage.wide{grid-template-columns:minmax(0,1fr) min(640px,46vw)}}
 .gw-hap+.gw-dre{margin-left:14px}.gw-dre+.gw-wr{margin-left:12px}
@@ -420,10 +422,10 @@ function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow 
 /* A saved grow of this branch comes back on reload, marked as saved, instead of an empty start card. */
 async function growLast(branch){try{const r=await fetch('/api/grow/last?branch='+encodeURIComponent(branch));const d=r.ok?await r.json():null;
  if(d&&!gw.busy&&!gw.state){gw.state=d.state;gw.view=d.view;gw.log=d.log;gw.saved=d.at;growPaint()}}catch(e){}}
-async function growStart(){
+async function growStart(mode){mode=typeof mode==='string'?mode:null;
  if(gw.busy)return;gw.busy=true;gw.picking=null;gw.saved=null;gw.error=null;gw.state=null;gw.view=null;gw.events=0;gw.id=null;gw.log=null;gw.pinned=null;gw.hov=null;gw.selCrit=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.t0=Date.now();growPaint();growTick();
  try{
-  const r=await fetch('/api/grow',{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify({branch:ui.source||null,base:gw.base||null,prove:gw.prove,agent:gw.agent})});
+  const r=await fetch('/api/grow',{method:'POST',headers:{'content-type':'application/json','x-tracegrove-token':TOKEN},body:JSON.stringify({branch:ui.source||null,base:gw.base||null,prove:gw.prove,agent:gw.agent,...(mode?{mode:mode}:{})})});
   if(!r.ok){gw.error=await r.json().catch(()=>({error:'Could not start'}));return}
   const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
   for(;;){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
@@ -711,8 +713,10 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
 /* A verdict's counts each stay whole on a line ("1 failed", never "1" ending one line and "failed" starting the next); the
    words are the same, so its text reads as before. */
 const gwClauses=t=>String(t).split(', ').flatMap((c,i)=>i?[', ',h('span',{class:'nw'},c)]:[c]);
-function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length,rest=nr.length-nf;
- return (nf?', '+nf+' with no flow yet':'')+(rest?', '+rest+' to prove':'')}
+function gwNotRun(){const s=gw.state;const nr=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='not_run');const nf=nr.filter(x=>!x.flow).length;
+ /* a scenario whose run never reached its checks is not still to prove: it could not run, as the verdict and grow --json say */
+ const cr=nr.filter(x=>x.flow&&s.run[x.id].run).length,rest=nr.length-nf-cr;
+ return (nf?', '+nf+' with no flow yet':'')+(cr?', '+cr+' could not run':'')+(rest?', '+rest+' to prove':'')}
 /* The spec's line in the verdict counts each criterion once, in the spec panel's words. A count of none is left out, except
    "0 need you": it is the one that says nothing waits on the reader. */
 function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to check against. ';const B=Object.fromEntries(gwBuckets());
@@ -925,6 +929,21 @@ function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.wan
 function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)return null;
  if(!s.done)return h('div',{class:'gw-call wait','data-testid':'grow-verdict'},h('span',{class:'gw-vp'},'◌ No verdict yet'),h('span',{class:'gw-vt'},'It comes once the scenarios have run.'));
  const f=V.first,tone=V.verdict==='not ready'?'bad':V.verdict==='ready'?'ok':'open';
+ const line=gwVerdict(V,f,tone),next=V.verdict==='not proven yet'?gwNext():null;
+ /* Not proven yet has one next action beside its line, from why its scenarios are not tested yet */
+ return next?h('div',{class:'gw-callrow'},line,next):line}
+/* What to do about a grow that is not proven yet, from why its scenarios in the mode are not tested yet: a run that never reached
+   its checks says why in the drawer; a flow that did not run is proved by growing again with proving on, in the same mode (as
+   the start card's "Prove with real flows" does); a scenario no flow proves gets its flow written. */
+function gwNext(){const s=gw.state;const open=s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail')));
+ const ran=open.find(x=>gwRan(x)&&gwDrCan(x)),flow=open.find(x=>x.flow),none=open.find(x=>!x.flow&&s.done);
+ const b=(label,aria,go,off)=>h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-next','aria-label':aria,disabled:!!off,on:{click:go}},label);
+ if(ran){const could=/^Could not run/.test(String(s.run[ran.id].why||''));const T=gwPlain(gwVia(ran.title).title);
+  return b(could?'See why it could not run ›':'See why it is not proven ›',(could?'See why it could not run: ':'See why it is not proven: ')+T,()=>{gwDrOpen(ran.id);if(gw.dr)gw.dr.from='t:grow-verdict-next'})}
+ if(flow)return b('Prove it','Prove it: grow again with “Prove with real flows” on, in '+gwML(s.mode),()=>{gw.prove=true;if(!gw.base&&s.change&&s.change.base)gw.base=s.change.base;growStart(s.modeBy?s.mode:null)},gw.busy);
+ if(none)return b('Write this flow','Write this flow: '+gwPlain(gwVia(none.title).title),()=>gwDrWrite(none));
+ return null}
+function gwVerdict(V,f,tone){
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
   h('span',{class:'gw-vt'},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
   f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
@@ -936,7 +955,9 @@ function gwResultSteps(){const V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwSc
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
  return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},gwClauses(t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun())),sub),
-  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,gwResultSteps(),h('button',{class:'btn ghost sm','data-testid':'grow-open-runs',on:{click:()=>gwOpenRuns()}},'Open the runs')))}
+  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,gwResultSteps(),
+   /* a grow that ran nothing has no run to open, so it offers none */
+   s.scenarios.some(gwRan)?h('button',{class:'btn ghost sm','data-testid':'grow-open-runs',on:{click:()=>gwOpenRuns()}},'Open the runs'):null))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
  if(!s.modeBy||s.phase<5){const n=s.scenarios.length;return s.phase>=4&&n?box(n+' scenario'+(n===1?'':'s')+' drafted','Nothing has run yet.'):box('Growing the tree','Now: '+String(GW.phases[s.phase]||GW.phases[0]).toLowerCase()+'.')}

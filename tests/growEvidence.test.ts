@@ -8,7 +8,7 @@ import { grow, writtenFlowResult } from '../src/authoring/grow.ts';
 import { draftWithAgent } from '../src/authoring/workspace.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
-import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
+import { applyGrow, freshGrow, growVerdict, growView, inMode, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { configRunsRoot } from '../src/authoring/runLocation.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
@@ -311,6 +311,55 @@ describe('From a grown scenario to its run', () => {
     await page.close();
   });
 
+  it('offers one next action beside Not proven yet that works where nothing failed: why a run could not run, Prove it, or Write this flow', async () => {
+    const show = (page: Page, st: GrowState) => page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: st, v: growView(st) });
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const next = page.getByTestId('grow-verdict-next');
+    // s10's run never reached its checks: the drawer says why, and the band counts it as could not run, not as one to prove
+    const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed',
+      why: 'Could not run: the app did not start (application exited before becoming ready)' } as GrowEvent : e));
+    await show(page, crashed);
+    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toMatch(/^◌ Not proven yet/);
+    await expect(next.count()).resolves.toBe(1);
+    // beside the verdict line, never inside it
+    expect(await next.evaluate((b) => !b.closest('[data-testid="grow-verdict"]'))).toBe(true);
+    await expect(next.textContent()).resolves.toBe('See why it could not run ›');
+    await expect(page.getByTestId('grow-result').locator('.big').textContent()).resolves.toContain(', 1 could not run');
+    await expect(page.getByTestId('grow-result').locator('.big').textContent()).resolves.not.toContain('to prove');
+    await next.click();
+    await page.locator('.gw-drerr').or(page.getByTestId('grow-happened-oneline')).waitFor();
+    expect(await page.evaluate(() => (0, eval)('gw').dr.sid)).toBe('s10');
+    await page.close();
+    // a flow that has not run: grow again with proving on, in the mode it was grown in
+    const prove = await open();
+    await prove.getByTestId('grow-result').waitFor();
+    const posted: unknown[] = [];
+    await prove.route('**/api/grow', (r) => { if (r.request().method() !== 'POST') return r.fallback(); posted.push(r.request().postDataJSON()); return r.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'held by the test' }) }); });
+    await show(prove, plotline(noFailure));
+    await expect(prove.getByTestId('grow-verdict-next').textContent()).resolves.toBe('Prove it');
+    await prove.getByTestId('grow-verdict-next').click();
+    await expect.poll(() => posted.length).toBe(1);
+    expect(posted[0]).toMatchObject({ prove: true, mode: 'min', base: 'main' });
+    await prove.close();
+    // nothing left with a flow: write the first scenario's flow, its claim in the Intent box
+    const write = await open();
+    await write.getByTestId('grow-result').waitFor();
+    const noFlow = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.passed', scenario: e.scenario, took: 5, run: e.run } as GrowEvent : e));
+    await show(write, noFlow);
+    await expect(write.getByTestId('grow-verdict-next').textContent()).resolves.toBe('Write this flow');
+    await write.getByTestId('grow-verdict-next').click();
+    await write.waitForFunction(() => document.activeElement?.id === 'intent');
+    const first = noFlow.scenarios.find((x) => inMode(noFlow, x) && !x.flow)!;
+    expect(await write.evaluate(() => (document.getElementById('intent') as HTMLTextAreaElement).value)).toBe((first.proves ?? first.title).replaceAll('`', ''));
+    // nothing ran: there is no run to open, so the band offers none, and the next action still works
+    const idle = plotline((e) => (e.kind === 'scenario.failed' || e.kind === 'scenario.passed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, why: 'Stopped before it ran' } as GrowEvent : e));
+    await show(write, idle);
+    await expect(write.getByTestId('grow-open-runs').count()).resolves.toBe(0);
+    await expect(write.getByTestId('grow-verdict-next').textContent()).resolves.toBe('Prove it');
+    await expect(write.getByTestId('grow-verdict-next').isDisabled()).resolves.toBe(false);
+    await write.close();
+  });
 });
 
 describe('A grow whose config is in a subfolder', () => {
