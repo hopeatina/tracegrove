@@ -2302,6 +2302,36 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 120000);
 
+  /** A grow folded from a recorded discovery log: plotline-seats (two journeys, one scenario failed, Minimum) and tracegrove
+   *  itself (two journeys through twelve parts, Max, nothing run yet). */
+  const recordedGrow = (name: string) => {
+    const s = freshGrow();
+    for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', name), 'utf8').split('\n')) if (line.trim()) applyGrow(s, JSON.parse(line) as GrowEvent);
+    return s;
+  };
+
+  it('heads each journey once: the branch of what it refuses hangs on its journey unnumbered, so the eyebrows number the journeys and no more', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const file of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) {
+        const page = await treePage(browser, server.url, recordedGrow(file), { width: 1440, reduce: true });
+        const h = await page.evaluate(() => {
+          const w = (0, eval)('gw'), B = w.B, pads = Object.keys(B.lbl).filter((id) => !B.lbl[id].badge);
+          return { js: w.M.J.length as number, eb: pads.map((id) => [B.lbl[id].eb.textContent as string, !!(B.pad[id] && B.pad[id].pol)] as const) };
+        });
+        const nums = h.eb.map(([t]) => t.match(/^JOURNEY (\d+)/)?.[1]).filter(Boolean);
+        expect(nums.length, file + ' ' + JSON.stringify(h.eb)).toBe(h.js);
+        expect([...new Set(nums)].sort(), file).toEqual(Array.from({ length: h.js }, (_, i) => String(i + 1)));
+        // (the tree has a branch of its own for what a journey refuses, and its eyebrow says only that)
+        const pol = h.eb.filter(([, p]) => p).map(([t]) => t);
+        expect(pol.length, file).toBeGreaterThan(0);
+        for (const t of pol) expect(t, file).toMatch(/^(WHAT IT REFUSES|HOW IT FAILS)$/);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   it('cuts what grew in a chosen mode at its collar, lets it fall in the preview’s grey, and heals each cut with a callus in the bark’s tones beside its knot', async () => {
     const { dir, state } = await grownBushy();
     withMax(state);

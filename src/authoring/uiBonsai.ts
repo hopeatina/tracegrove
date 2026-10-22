@@ -1520,9 +1520,10 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    if(E){const was=E.stub.classList.contains('on');E.stub.classList.toggle('on',cut&&!back&&pfell);for(const e of E.on||[])e.style.display=cut&&!back?'none':'';if(cut&&!was&&!quiet&&E.stub.animate)E.stub.animate([{opacity:0},{opacity:1}],{duration:300,delay:350,fill:'backwards'});
     E.cutmk.classList.toggle('on',willCut);E.cuttag.classList.toggle('on',willCut);if(willCut)E.cuttag.textContent='cut · '+list.length}
    P.pruned=pruned;P.cut=cut;if(!P.pol&&cut)mainCut=true}
-  /* each label speaks for its own pad: the journey's name or its riskiest guard or failure, then their state, one colour per word */
+  /* each label speaks for its own pad: the journey's name or its riskiest guard or failure, then their state, one colour per word;
+     a journey is headed once, so the branch of what it refuses or how it fails, which hangs on that journey, says only which it is */
   for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(lb&&lb.pid){const inm=P.leaves.filter(inMode);lb.el.setAttribute('class','badge pol'+(inm.some(x=>s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(inm.length?'':' pruned')+(gw.pinned==='j:'+j.id?' sel':''))}if(!lb||lb.badge)continue;const list=P.leaves;
-   lb.eb.textContent=(P.pol&&M.J.length===1?'':'JOURNEY '+n+' · ')+(P.pol==='guard'?'WHAT IT REFUSES':P.pol==='failure'?'HOW IT FAILS':(gbSURFW[j.surface]||'START'));
+   lb.eb.textContent=(P.pol?'':'JOURNEY '+n+' · ')+(P.pol==='guard'?'WHAT IT REFUSES':P.pol==='failure'?'HOW IT FAILS':(gbSURFW[j.surface]||'START'));
    /* the state fills one line as wide as the name above it, then a second */
    const tk=gbTok(list,j,vis,inMode),room=Math.max(20,Math.floor((lb.w-18)/6.7));const l1=[],l2=[];let used=0;
    for(const t of tk){const add=(l1.length?3:0)+t[0].length;if(!l2.length&&(used+add<=room||!l1.length)){l1.push(t);used+=add}else l2.push(t)}
