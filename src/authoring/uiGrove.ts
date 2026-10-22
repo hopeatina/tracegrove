@@ -834,9 +834,10 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  const hist=D.historyLine||null;
  /* each step, and under it what it recorded: the answer the run contradicts, the stand-in calls made while it ran (placed by
     their own timestamps), and for a watch step what it expected and got, and how long it waited */
- const ol=h('ol',{class:'gw-drs','aria-label':'Steps'},steps.map((q,i)=>{const k=q.checks==='fail'&&q.result==='completed'?'fail':kind(q.result);const con=!!D.contradicts&&D.contradicts.at===i;const sx=[];
-  if(q.answer&&(con||k==='fail'&&q.method!=='STANDIN'))sx.push(['answered '+gwCut(q.answer,200),'']);
-  for(const c of all)if(c.during===q.id)sx.push([c.standIn+' ← '+(c.amount!=null?c.amount:c.method+' '+c.path),con?'bad':'']);
+ const ol=h('ol',{class:'gw-drs','aria-label':'Steps'},steps.map((q,i)=>{const k=q.checks==='fail'&&q.result==='completed'?'fail':kind(q.result);const con=!!D.contradicts&&D.contradicts.at===i,ext=con||D.extraAt===i;const sx=[];
+  /* the step the extra call came in shows its answer and the call; only an answer the records contradict is marked so */
+  if(q.answer&&(ext||k==='fail'&&q.method!=='STANDIN'))sx.push(['answered '+gwCut(q.answer,200),'']);
+  for(const c of all)if(c.during===q.id)sx.push([c.standIn+' ← '+(c.amount!=null?c.amount:c.method+' '+c.path),ext?'bad':'']);
   if(con)sx.push(['◀ contradicts its answer','bad']);
   if(q.method==='STANDIN'||q.watch){for(const c of q.checked||[])sx.push([c.says,c.held===false?'bad':'']);
    if(q.watch&&q.durationMs!=null)sx.push(['waited '+q.durationMs+' ms of its '+q.watch.deadlineMs+' ms deadline'+(q.watch.everyMs!=null?', polling every '+q.watch.everyMs+' ms':'')+(q.method==='STANDIN'?' (not app time)':''),''])}

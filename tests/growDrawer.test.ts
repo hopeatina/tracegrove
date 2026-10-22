@@ -6,7 +6,8 @@ import { basename, join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { checksOf } from '../src/authoring/checkCompare.ts';
 import { grow } from '../src/authoring/grow.ts';
-import { happenedIn, historyLine } from '../src/authoring/happened.ts';
+import { extraCall, happenedIn, historyLine } from '../src/authoring/happened.ts';
+import type { StepReport } from '../src/authoring/runReport.ts';
 import { couldNotRun, growVerdict, type GrowState } from '../src/authoring/growState.ts';
 import { runTests } from '../src/authoring/run.ts';
 import type { PredicateT } from '../src/protocol/index.ts';
@@ -39,6 +40,31 @@ describe('Every comparison a check made', () => {
   });
   it('has nothing to say for a check the run never evaluated', () => {
     expect(checksOf({ kind: 'status_equals', value: 200 }, { result: 'not_evaluated', reasonCode: null, actual: null }, http)).toEqual([]);
+  });
+});
+
+/* A failed stand-in count: payments expected 2 charges and got 3, the third during the step that removed a seat. Whether that
+   step's answer is contradicted depends on what the answer said and what the run checked of it, never on a name's first letters. */
+describe('The answer an extra stand-in call contradicts', () => {
+  const call = (n: number, during: string) => ({ standIn: 'payments', method: 'POST', path: '/v1/charges', status: 200, at: `2026-10-22T19:12:19.9${n}0Z`, key: `k${n}`, repeat: false,
+    faulted: false, amount: 900, currency: 'usd', description: null, during });
+  const step = (id: string, extra: Partial<StepReport> = {}): StepReport => ({ id, name: id.replaceAll('_', ' '), method: 'POST', path: '/seats', result: 'completed', status: 200, durationMs: 5, reason: null, ...extra });
+  const run = (answer: string, checked: StepReport['checked'] = []) => {
+    const watch = step('only_two_were_charged', { method: 'STANDIN', path: 'payments POST /v1/charges', checks: 'fail', compared: { check: 'payments POST /v1/charges call count', expected: 2, got: 3 },
+      calls: [call(1, 'owner_moves_to_team'), call(2, 'owner_adds_a_seat'), call(3, 'owner_removes_it_again')] });
+    const steps = [step('owner_moves_to_team'), step('owner_adds_a_seat'), step('owner_removes_it_again', { answer, checked }), watch];
+    return extraCall(steps, watch)!;
+  };
+  it('reads "charged": 0 as saying nothing was charged, as its own name says, or as the step’s held check compared it', () => {
+    expect(run('{"seats":1,"charged":0}')).toMatchObject({ at: 2, field: 'charged', nth: 3 });
+    const held = [{ check: 'body.chargeCount', expected: 0, got: 0, held: true, says: 'Expected body.chargeCount 0, got 0' }];
+    expect(run('{"seats":1,"chargeCount":0}', held)).toMatchObject({ at: 2, field: 'chargeCount' });
+  });
+  it('does not read a field that only starts like the counted word as a contradiction, and still places the call on its step', () => {
+    for (const answer of ['{"seats":1,"chargesPending":0}', '{"seats":1,"chargeable":false}', '{"seats":1,"chargeCount":0}']) expect(run(answer), answer).toMatchObject({ at: 2, field: null });
+    // a check on the field that did not hold, or compared another value, is no ground either
+    expect(run('{"seats":1,"chargeCount":0}', [{ check: 'body.chargeCount', expected: 1, got: 0, held: false, says: 'Expected body.chargeCount 1, got 0' }])).toMatchObject({ field: null });
+    expect(run('{"seats":1,"chargeCount":0}', [{ check: 'body.seats', expected: 1, got: 1, held: true, says: 'Expected body.seats 1, got 1' }])).toMatchObject({ field: null });
   });
 });
 
@@ -168,6 +194,18 @@ describe('What happened, step by step', () => {
     expect(chips).toContain('payments stand-in'); expect(chips).toContain('email stand-in · calls not recorded');
     expect(chips.join(' ')).not.toMatch(/all real/);
     expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-4`);
+    await page.close();
+  });
+
+  it('shows the answer and the extra call on the step it came in, and marks the answer contradicted only when the run says so', async () => {
+    const page = await open(`#grow/${failed}/steps`);
+    await opened(page);
+    expect(await page.evaluate(() => { const d = (0, eval)('gw').dr.data; return [d.extraAt, d.contradicts]; })).toEqual([2, { at: 2, field: 'charged' }]);
+    // the same run read with no contradiction: the step keeps its answer and the call, without the verdict
+    await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.dr.data.contradicts = null; w.growPaint(); });
+    const three = (await page.getByTestId('grow-happened-step-3').textContent())!;
+    expect(three).toContain('answered {"seats":1,"charged":0}payments ← 900');
+    expect(three).not.toContain('contradicts');
     await page.close();
   });
 

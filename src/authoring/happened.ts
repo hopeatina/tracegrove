@@ -30,6 +30,8 @@ export type Happened = {
   at: number;
   /** the step whose answer the run's own records contradict, counted from 0, and with what */
   contradicts: { at: number; field: string | null } | null;
+  /** the step a failed stand-in count's extra call came in, counted from 0, whether or not its answer is contradicted */
+  extraAt: number | null;
   oneLine: string; chips: HappenedChip[];
   /** what the run did not record, in plain sentences */
   foot: string[];
@@ -65,10 +67,12 @@ const bad = (x: StepReport) => x.result === 'failed' || x.result === 'cancelled'
 
 /**
  * The step a failed stand-in count says the app got wrong, from the calls the watch step recorded: the first call past the count
- * it expected, on the step whose recorded start and finish hold that call's timestamp. When that step's answer has a field named
- * for what was counted ("charged" for charges) that says none happened (0, false or null), the run contradicts the answer.
+ * it expected, on the step whose recorded start and finish hold that call's timestamp. The run contradicts that step's answer
+ * only when a field of it, named for what was counted, says none happened (0, false or null), and either the step's own recorded
+ * check compared that field and held, or the field is named for it exactly, in the past tense ("charged" for charges). A field
+ * that only starts the same way ("chargesPending", "chargeable") is not read as a claim that nothing was charged.
  */
-function extraCall(steps: StepReport[], failing: StepReport) {
+export function extraCall(steps: StepReport[], failing: StepReport) {
   const c = failing.compared;
   if (!c || !/ call count$/.test(c.check) || typeof c.expected !== 'number' || typeof c.got !== 'number' || c.got <= c.expected) return null;
   const calls = [...(failing.calls ?? [])].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
@@ -81,7 +85,10 @@ function extraCall(steps: StepReport[], failing: StepReport) {
     const answer = steps[at]!.answer ? JSON.parse(steps[at]!.answer!) as unknown : null;
     const stem = one.length >= 4 && one !== 'call' ? one.replace(/e$/, '') : null;
     if (stem && answer && typeof answer === 'object' && !Array.isArray(answer)) {
-      field = Object.entries(answer as Record<string, unknown>).find(([k, v]) => k.toLowerCase().startsWith(stem) && (v === 0 || v === false || v === null))?.[0] ?? null;
+      const past = one.endsWith('e') ? `${one}d` : `${one}ed`;
+      const held = (k: string, v: unknown) => (steps[at]!.checked ?? []).some((q) => q.held === true && q.check === `body.${k}` && Object.is(q.got, v));
+      field = Object.entries(answer as Record<string, unknown>).find(([k, v]) => k.toLowerCase().startsWith(stem) && (v === 0 || v === false || v === null)
+        && (held(k, v) || k.toLowerCase() === past))?.[0] ?? null;
     }
   } catch { field = null; }
   return { call, at, field, one, nth: c.expected + 1, expected: c.expected, answer: steps[at]!.answer ?? null };
@@ -297,13 +304,14 @@ export function happenedIn(root: string, name: string, caseId: string, opts: { b
   const { history, unfinished, base } = historyOf(root, caseId, name, tree);
   const onBase = base ?? (opts.base ? { branch: opts.base, runs: 0, passed: 0, failed: 0, notReached: 0 } : null);
   const said = { history, unfinished, base: onBase, historyLine: historyLine(history, unfinished, onBase) };
-  if (!c) return verified ? null : { run: name, verified, source: null, startedAt: r.startedAt, caseId, title: caseId, outcome: r.outcome, ms: 0, steps: [], at: 0, contradicts: null,
+  if (!c) return verified ? null : { run: name, verified, source: null, startedAt: r.startedAt, caseId, title: caseId, outcome: r.outcome, ms: 0, steps: [], at: 0, contradicts: null, extraAt: null,
     oneLine: 'This run’s evidence could not be verified, so its steps are not shown.', chips: [{ t: `run ${name}`, tone: '' }, { t: 'not verified', tone: 'bad' }], foot: [], ...said };
   const names = declaredNames(dir, c.caseId);
   const steps = c.steps.filter((x) => x.declared !== false).map((x) => ({ ...x, name: names.get(x.id) ?? x.name }));
   const name1 = (x: StepReport) => x.name;
   const { line, contradicts } = oneLineOf(c, steps, name1, () => sealedCause(dir, c.caseId));
   const at = Math.max(0, steps.findIndex(bad));
+  const broke = steps.findIndex(bad), extra = broke >= 0 && c.outcome !== 'passed' ? extraCall(steps, steps[broke]!) : null;
   return { run: name, verified, source: verified ? r.sourceDigest.slice(0, 6) : null, startedAt: r.startedAt, caseId: c.caseId, title: c.title, outcome: c.outcome, ms: c.durationMs,
-    steps, at, contradicts, oneLine: line, chips: chipsOf(r, c, name), foot: footOf(c, steps), ...said };
+    steps, at, contradicts, extraAt: extra ? extra.at : null, oneLine: line, chips: chipsOf(r, c, name), foot: footOf(c, steps), ...said };
 }
