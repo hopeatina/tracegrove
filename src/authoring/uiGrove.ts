@@ -556,10 +556,10 @@ function gwPartCard(id,inline,live){const s=gw.state,v=gw.view;const M=gw.M||gbM
    few?rows.slice(from,from+3):rows,
    live&&rows.length>3?h('button',{class:'gw-dpmore','data-ol':'dp:more','aria-expanded':String(!few),on:{click:()=>{gw.depthAll=!gw.depthAll;gw.refocus='dp:more';growPaint()}}},few?'Show all '+rows.length+' looks':'Show only the latest 3'):null),
   (s.cells[id]||[]).length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'How each layer is proved'),h('div',{class:'gw-lay'},(s.cells[id]||[]).flatMap(c=>[h('span',{class:'gw-chip '+c.status},GW.layers[c.layer]),h('span',{},...gwNote(c.reason),h('small',{},c.adapter==='none'?'no adapter':'adapter: '+c.adapter))]))):null,
-  /* the rows this mode runs, under their kind when the part has both; then what a bigger mode adds, in the one line the tree's
-     card and the Outline print for this part */
-  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},gwOwnHead(own)),['own','reg'].map(k=>{const g=ownIn.filter(x=>gwOwnKind(x)===k);return g.length?[new Set(ownIn.map(gwOwnKind)).size>1?h('div',{class:'gb-sub'},gwOwnHead(g)):null,
-    g.map(x=>gbItem(x,{class:'gb-ols',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},[gwBadge(x)]))]:null}),
+  /* the rows this mode runs, under their kind when the part has both (one flat list, as h flattens its children only once);
+     then what a bigger mode adds, in the one line the tree's card and the Outline print for this part */
+  own.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},gwOwnHead(own)),['own','reg'].flatMap(k=>{const g=ownIn.filter(x=>gwOwnKind(x)===k);return g.length?[new Set(ownIn.map(gwOwnKind)).size>1?h('div',{class:'gb-sub'},gwOwnHead(g)):null,
+    ...g.map(x=>gbItem(x,{class:'gb-ols',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},[gwBadge(x)]))]:[]}),
    ownOut.length?h('p',{class:'small muted gw-one','data-testid':'grow-own-line'},gwFacts(gwOwnFacts(ownOut))):null):null]}
 function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{class:'gw-badge'},x.mode==='max'?'max':'standard');
  if(!r)return h('span',{class:'gw-badge'},'drafted');if(r.st==='run')return h('span',{class:'gw-badge run'},'running');if(r.st==='pass')return h('span',{class:'gw-badge pass'},'passed '+gwDur(r.ms));
