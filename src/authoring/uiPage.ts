@@ -165,7 +165,10 @@ async function load(){state=await api('/api/overview');try{ui.envs=await api('/a
 /* A grow whose config is in a subfolder saved its runs beside that config: the run it opened (ui.runAt) is read from there */
 function runAtQuery(name){const a=ui.runAt;return a&&a.name===name&&a.config?'config='+encodeURIComponent(a.config):''}
 function runApi(name){const q=runAtQuery(name);return '/api/runs/'+encodeURIComponent(name)+(q?'?'+q:'')}
-function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
+/* The grow panel is the same element across a redraw: whatever in it had focus keeps it once it is placed again */
+function page(...nodes){const fa=document.activeElement,keep=fa&&fa!==document.body&&gw.el&&gw.el.contains(fa)?fa:null;
+ document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false));
+ if(keep&&keep.isConnected&&document.activeElement!==keep)keep.focus({preventScroll:true})}
 
 ${SOURCE_CONTROLS_JS}
 ${COMPARISON_JS}

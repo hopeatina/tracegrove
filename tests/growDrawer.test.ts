@@ -81,6 +81,11 @@ describe('What happened, step by step', () => {
     return page;
   }
   const drawer = (page: Page) => page.getByTestId('grow-happened');
+  /** whether the drawer's head, and the step it is on (with no run, its buttons), are inside the window */
+  const inView = (page: Page) => page.evaluate(() => {
+    const whole = (sel: string) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; };
+    return { head: whole('[data-testid="grow-happened"] .gw-drh'), step: whole('[data-testid="grow-happened"] .gw-drs [aria-pressed=true]') ?? whole('[data-testid="grow-happened"] .gw-dra') };
+  });
   const opened = async (page: Page) => { await page.getByTestId('grow-happened-oneline').or(page.getByTestId('grow-happened-none')).waitFor(); return drawer(page); };
 
   it('reads the failing run from its verified bundle, each stand-in call on the step its own timestamp falls in', () => {
@@ -207,6 +212,9 @@ describe('What happened, step by step', () => {
     expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-2`);
     await page.reload(); await page.getByTestId('grow-result').waitFor(); await opened(page);
     await expect(page.getByTestId('grow-happened-step-2').getAttribute('aria-pressed')).resolves.toBe('true');
+    // brought back from the address, it takes focus on its heading and shows its head and that step
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    expect(await inView(page)).toEqual({ head: true, step: true });
     // (the pointer is moved off the tree first: a card it points at docks in the panel and takes its place)
     await page.mouse.move(1, 1);
     await page.getByTestId('grow-happened-step-2').focus();
@@ -216,6 +224,33 @@ describe('What happened, step by step', () => {
     // the panel is back, with focus on the link that opens the drawer again
     await expect(page.getByTestId('grow-inspector').count()).resolves.toBe(1);
     expect(await page.evaluate(() => document.activeElement?.getAttribute('data-dr'))).toBe(failed);
+    await page.close();
+  });
+
+  it('opened from a link at 1440 × 900, comes into view on its step with focus on its heading, and Escape closes it from the page body', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(`${server.url}#grow/${failed}/steps/step-4`);
+    await opened(page);
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
+    expect(await inView(page)).toEqual({ head: true, step: true });
+    // it keeps focus when the page redraws around it later
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('grow-happened-title');
+    expect(await inView(page)).toEqual({ head: true, step: true });
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(drawer(page).count()).resolves.toBe(0);
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}`);
+    // one with no run, opened from its panel, shows its head and its Write this flow button
+    await page.evaluate((id) => { location.hash = `#grow/${id}`; }, none);
+    await page.locator(`.gw-insw [data-dr="${none}"]`).click();
+    await page.getByTestId('grow-happened-none').waitFor();
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    await page.waitForTimeout(100);
+    expect(await inView(page)).toEqual({ head: true, step: true });
     await page.close();
   });
 

@@ -764,6 +764,20 @@ async function gwDrLoad(d){const s=gw.state,r=s.run[d.sid],x=gwScen(d.sid);const
  if(tab==='Discover')growPaint()}
 /* Close returns to the panel, and focus to the link that opened the drawer */
 function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus='d:'+d.sid;growPaint()}
+/* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used
+   is left alone */
+document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
+/* The drawer's head and the step it opened on (with no run, its buttons) both come into view: the page scrolls as little as it
+   can, and the panel beside the tree, or the sheet under its head, scrolls inside itself */
+function gwDrReveal(){const S=gw.slots,box=S&&S.ins,el=box&&box.querySelector('.gw-dr');if(!el||!el.isConnected)return;const m=8;
+ const hd=el.querySelector('.gw-drh'),st=el.querySelector('.gw-drs [aria-pressed=true]')||el.querySelector('.gw-dra')||hd;const sheet=getComputedStyle(box).position==='fixed';
+ if(box.scrollHeight>box.clientHeight+1){const r=box.getBoundingClientRect(),a=hd.getBoundingClientRect(),b=st.getBoundingClientRect();let dy=0;
+  if(sheet){if(b.top<a.bottom)dy=b.top-a.bottom-m;else if(b.bottom>r.bottom-m)dy=Math.min(b.bottom-(r.bottom-m),b.top-a.bottom-m)}
+  else if(a.top<r.top)dy=a.top-r.top;else if(b.bottom>r.bottom-m)dy=Math.min(b.bottom-(r.bottom-m),a.top-r.top);
+  if(dy)box.scrollTop+=dy}
+ if(sheet)return;const a=hd.getBoundingClientRect(),b=st.getBoundingClientRect(),vh=innerHeight;let wy=0;
+ if(a.top<m)wy=a.top-m;else if(b.bottom>vh-m)wy=Math.min(b.bottom-(vh-m),a.top-m);
+ if(wy)window.scrollBy({top:wy,behavior:'instant'})}
 function gwDrCopy(){const url=location.href;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>toast('Copied the link to this step.'),()=>toast('Link: '+url));return}}catch(e){}toast('Link: '+url)}
 /* "Write this flow" puts the scenario's claim in the Intent box below the tree, where drafting writes flows */
 function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=null;render();const box=document.getElementById('intent');
@@ -1064,10 +1078,13 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  const find=k=>k.startsWith('d:')?gw.el.querySelector('[data-dr="'+k.slice(2).replace(/["\\]/g,'')+'"]'):k.startsWith('t:')?gw.el.querySelector('[data-testid="'+k.slice(2).replace(/["\\]/g,'')+'"]'):[...gw.el.querySelectorAll('[data-ol]')].find(e=>e.getAttribute('data-ol')===k)||(gw.tree==='grove'&&gw.svg?[...gw.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k):null);
  if(!gw.refocus&&held&&!gw.el.contains(document.activeElement))gw.refocus=held;
  if(gw.refocus){const k=gw.refocus;gw.refocus=null;const el=find(k);if(el)el.focus({preventScroll:true})}
- /* an opened drawer takes focus on its heading, once it is on the page */
- if(drOn&&gw.dr.focus&&S.ins.isConnected){const t=S.ins.querySelector('#gw-dr-title');if(t){gw.dr.focus=false;t.focus({preventScroll:true})}}
- /* a drawer opened from far down the page comes into view */
- if(gw.drScroll){gw.drScroll=false;const r=S.ins.getBoundingClientRect();if(drOn&&(r.top<0||r.top>innerHeight-120))S.ins.scrollIntoView({block:'start'})}
+ /* an opened drawer takes focus on its heading, and keeps asking for it until its run is read and the heading is on the page
+    (a page drawn before the grow panel is placed has it a frame later) */
+ if(drOn&&gw.dr.focus){const d=gw.dr,t=S.ins.querySelector('#gw-dr-title');if(t&&t.isConnected){t.focus({preventScroll:true});if(!d.loading)d.focus=false}
+  else if(!d.loading)requestAnimationFrame(()=>{const u=gw.dr===d&&d.focus&&gw.slots.ins.querySelector('#gw-dr-title');if(u&&u.isConnected){d.focus=false;u.focus({preventScroll:true})}})}
+ /* once its run is read, an opened drawer comes into view: its head and the step it opened on */
+ if(gw.drScroll&&!drOn)gw.drScroll=false;
+ if(gw.drScroll&&!gw.dr.loading){gw.drScroll=false;const d=gw.dr;requestAnimationFrame(()=>{if(gw.dr===d)gwDrReveal()})}
  /* switching to the Outline with something pinned brings its row into view */
  if(gw.reveal){const el=find(gw.reveal);gw.reveal=null;if(el)el.scrollIntoView({block:'nearest'})}
  gwSyncHash()}
