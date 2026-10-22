@@ -658,8 +658,9 @@ function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to 
  return 'Spec: '+(B.proved||0)+' of '+gw.view.criteria.length+' criteria proved'+['agent','part','run','toprove','code','wait','open','failed'].map(b=>B[b]?', '+B[b]+' '+gwCBL(b,B[b]):'').join('')+', '+(B.needs||0)+' '+gwCBL('needs',B.needs||0)+'. '}
 /* ---------- From a scenario to its run ---------- */
 /* A scenario that ran opens the Run tab at its own run and flow, the ones the grow recorded for it (never "the latest run"), at
-   the step that broke, or at its first step when it passed: the way History opens a run. */
-const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'))};
+   the step that broke, or at its first step when it passed: the way History opens a run. One whose run never reached its
+   checks (the app did not start, say) is not tested yet, and opens that run too, to show why. */
+const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'||r.st==='not_run'))};
 async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];const say=t=>{if(!quiet)toast(t)};
  if(!x||!gwRan(x)){say('No run was recorded for this scenario.');return false}
  const flow=r.flow||x.flow;let run;

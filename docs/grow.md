@@ -14,7 +14,7 @@ tracegrove grow --json                   # the log, the state and a summary: the
 One verdict, computed once from the grow's counts (`growVerdict`), is what the Discover tab shows on its own line above the tree, what the terminal prints last, and what `--json` puts in its `summary`:
 
 - **Not ready** when a check failed. It names the promise that failed and how, from the first failure's run: “Removing a seat never charges the card” failed: expected 2 charges, got 3 (a stand-in's call count is counted in its route's own word; any other check is named, as in expected body.count 0, got 1). When the run is not here it says the reason the grow recorded. **See what happened ›** opens its run at the failing step.
-- **Not proven yet** when nothing failed but a scenario in the chosen mode has no result, or when the mode holds no scenario at all (a change to only its docs, say): then it says nothing in this change was traced to a scenario.
+- **Not proven yet** when nothing failed but a scenario in the chosen mode has no result, or when the mode holds no scenario at all (a change to only its docs, say): then it says nothing in this change was traced to a scenario. A run that never reached its checks is not a failed check: when the app did not start, a fixture could not be set up, or the run was blocked or cancelled, its scenario is not tested yet, with the reason (Could not run: the app did not start (application exited before becoming ready)) and the run that says so.
 - **Ready** when at least one scenario in the mode passed and every one did.
 
 The exit code follows it: `1` not ready (fix), `3` not proven yet (prove more), `0` ready. `--allow-unproven` turns `3` into `0`. A grow that stopped exits `2`, and one that was cancelled exits `4`. Every other command keeps `3` for an infrastructure failure, and a grow that crashes exits `3` as well: with `--json`, a finished grow prints its `summary` (`exitMeaning: "prove more"`), while a crash prints a `tracegrove.cli-error/v1` report instead, so read the output, not only the code.
@@ -51,4 +51,4 @@ The page reads top down: the verdict, the phases, the tracers, the tree with its
 
 ## Exit codes
 
-`0` everything that ran passed, `1` a scenario failed, `2` blocked (not a repo, no base, nothing changed), `4` cancelled.
+The verdict's: `0` ready, `1` not ready (a check failed), `2` stopped (not a repo, no base, nothing changed), `3` not proven yet (a scenario in the mode has no result, as when its run never reached its checks; `--allow-unproven` exits `0`), `4` cancelled. See [the verdict](#the-verdict).

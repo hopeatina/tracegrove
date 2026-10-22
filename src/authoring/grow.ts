@@ -25,7 +25,7 @@ import { draftWithAgent, latestObservedRun } from './workspace.ts';
 import { PROVIDERS, findSpec, git, grepAt, harnessOf, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, routesOf, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import { journeysOf, reachGraph, words } from './growReach.ts';
 import {
-  GROW_EVENT_VERSION, MODE_RANK, applyGrow, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
+  GROW_EVENT_VERSION, MODE_RANK, applyGrow, couldNotRun, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
   type GrowJourney, type GrowState, type Layer, type Mode, type Polarity, type ScenarioKind, type ScenarioLevel, type Tracer,
 } from './growState.ts';
 
@@ -771,7 +771,11 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[state.mode]);
   if (!config) { for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: 'No tracegrove.config.yaml found; run tracegrove init, or pass --config' }); return; }
   const flows = loadFlows(config);
-  const results = new Map<string, { ok: boolean; ms: number; run: string | null; why: string; hop?: string; after?: boolean }>();
+  /* `checked` is true when a check ran and did not hold: only that fails a scenario. A run that never reached its checks (the
+     app did not start, a fixture could not be set up, it was blocked or cancelled), or whose evidence did not verify, proves
+     nothing either way, and `why` says why it is not tested yet. */
+  type Ran = { ok: boolean; checked: boolean; ms: number; run: string | null; why: string; outcome?: string; hop?: string; after?: boolean };
+  const results = new Map<string, Ran>();
   /* Where a failed run broke, so the tree can mark that hop: the route whose step failed, or, when a check on other evidence
      failed (a stand-in's calls, say), the last route the flow called before it. */
   const hopOf = (c: TestRunReport['cases'][number]): { hop?: string; after?: boolean } => {
@@ -787,16 +791,18 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     const cached = results.get(caseId); if (cached) return cached;
     const flow = flows.find((f) => f.caseId === caseId);
     const t = Date.now();
-    let result: { ok: boolean; ms: number; run: string | null; why: string; hop?: string; after?: boolean };
+    let result: Ran;
     try {
       const { report } = await runTests({ configPath: config, grep: flow?.file ?? caseId, ...(ctx.signal ? { signal: ctx.signal } : {}) });
       const c = report.cases.find((x) => x.caseId === caseId);
       const ok = !!c && c.outcome === 'passed' && report.bundleVerified === true;
-      result = { ok, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir),
-        why: ok ? '' : c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.bundleVerified === false ? 'the run evidence did not verify' : report.blockers[0]?.detail ?? 'the flow did not run',
-        ...(ok || !c ? {} : hopOf(c)) };
+      const checked = !ok && c?.outcome === 'assertion_failed';
+      const said = c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.blockers[0]?.detail ?? 'the run recorded no result for this flow';
+      result = { ok, checked, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir), outcome: c?.outcome ?? report.outcome,
+        why: ok ? '' : checked ? said : c?.outcome === 'passed' || (!c && report.bundleVerified === false) ? 'Not proven: the run evidence did not verify' : couldNotRun(said),
+        ...(checked ? hopOf(c) : {}) };
     } catch (error) {
-      result = { ok: false, ms: Date.now() - t, run: null, why: (error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400) };
+      result = { ok: false, checked: false, ms: Date.now() - t, run: null, why: couldNotRun((error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400)) };
     }
     results.set(caseId, result); return result;
   };
@@ -812,7 +818,8 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     emit({ kind: 'scenario.running', scenario: s.id, flow: s.flow! });
     const r = await runFlow(s.flow!);
     if (r.ok) { emit({ kind: 'scenario.passed', scenario: s.id, took: r.ms, run: r.run }); real(s); }
-    else emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why, ...(r.hop ? { hop: r.hop, after: !!r.after } : {}) });
+    else if (r.checked) emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why, ...(r.hop ? { hop: r.hop, after: !!r.after } : {}), outcome: 'assertion_failed' });
+    else emit({ kind: 'scenario.not_run', scenario: s.id, why: r.why, ...(r.run ? { run: r.run } : {}), ...(r.outcome ? { outcome: r.outcome } : {}) });
   }
   // Scenarios no flow proves: an agent may write flows for them, which tracegrove then runs.
   let open = inRun.filter((s) => !s.flow && !state.run[s.id]);

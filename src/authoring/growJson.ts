@@ -22,7 +22,10 @@ export type GrowJsonSummary = {
   /** the mode the grow chose; before it chose, the one asked for with --mode; else null */
   mode: string | null;
   counts: { passed: number; failed: number; notTestedYet: number }; promises: { hold: number; of: number };
-  failures: GrowFailure[]; unproven: Array<{ scenario: string; title: string; reason: string }>;
+  failures: GrowFailure[];
+  /** each scenario not tested yet, with its reason; `run` names the run of one that never reached its checks (the app did not
+   *  start, say), which is not a failure */
+  unproven: Array<{ scenario: string; title: string; reason: string; run?: string }>;
   /** why a grow stopped, and what to do: null unless it stopped or was cancelled */
   stopped: { code: string; detail: string; action: string } | null;
 };

@@ -348,7 +348,12 @@ export function plainLine(s: GrowState, e: GrowEvent): string | null {
     case 'unit.found': { const u = s.units.at(-1)!; return `${u.root ? 'root  ' : 'branch'} ${String(s.units.length).padStart(2)} ${u.label} (${u.unitKind}, ${u.loc})`; }
     case 'agent.done': { const a = s.agents.filter((x) => x.done).at(-1)!; return `traced ${a.brief} (${a.by}): ${a.note}`; }
     case 'mode.chosen': return `mode: ${s.mode} (${s.modeBy}) · ${modeCount(s, s.mode)} scenarios of ${s.scenarios.length} drafted`;
-    case 'scenario.passed': case 'scenario.failed': { const x = s.scenarios.find((y) => y.id === e.scenario)!; return `${e.kind === 'scenario.passed' ? 'passed' : 'FAILED'} ${x.title} (${x.flow ?? 'agent-written flow'})${e.kind === 'scenario.failed' ? `: ${e.why}` : ''}`; }
+    case 'scenario.passed': case 'scenario.failed': case 'scenario.not_run': {
+      // A run that never reached its checks is said as not run, with why, as the state folds it; a scenario with no run says nothing here.
+      const x = s.scenarios.find((y) => y.id === e.scenario)!; const r = s.run[e.scenario];
+      if (r?.st === 'not_run') return r.run ? `not run ${x.title} (${x.flow ?? 'agent-written flow'}): ${r.why}` : null;
+      return `${e.kind === 'scenario.passed' ? 'passed' : 'FAILED'} ${x.title} (${x.flow ?? 'agent-written flow'})${e.kind === 'scenario.failed' ? `: ${e.why}` : ''}`;
+    }
     case 'discovery.finished': return `done: ${e.passed}/${e.ran + e.notRun} proved, ${e.failed} failed, ${e.notRun} not run`;
     case 'discovery.blocked': return `blocked: ${s.blocked!.code}: ${s.blocked!.detail}. Fix: ${s.blocked!.action}`;
     default: return null;

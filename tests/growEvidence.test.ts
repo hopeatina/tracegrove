@@ -11,6 +11,7 @@ import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
+import { plainLine } from '../src/cli/renderGrove.ts';
 
 /* The notes sample on main, and a branch, checked out, that adds GET /notes/count with two flows that prove it and three
    criteria in its commit. With `buggy`, the count forgets to filter by owner, so "another user counts none" fails at step 3. */
@@ -139,6 +140,19 @@ describe('From a grown scenario to its run', () => {
     await page.evaluate(() => { (0, eval)('tab="Discover";render()'); });
     await page.locator(`.gb-ols[data-sid="${passed}"]`).first().click();
     await page.locator(`.gb-olin [data-hap="${passed}"]`).click();
+    expect(await landed(page)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0, hash: `#grow/${passed}/happened/step-1` });
+    await page.close();
+  });
+
+  it('opens the run of a scenario that never reached its checks from its card, to show why it is not tested yet', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    await page.evaluate(({ id, run }) => {
+      const w = (0, eval)('({ gw, growPaint })');
+      w.gw.state.run[id] = { st: 'not_run', why: 'Could not run: the app did not start (application exited before becoming ready)', run, flow: 'notes.count-anonymous' };
+      w.gw.pinned = 's:' + id; w.growPaint();
+    }, { id: passed, run: passRun });
+    await page.locator(`.gw-insw [data-hap="${passed}"]`).click();
     expect(await landed(page)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0, hash: `#grow/${passed}/happened/step-1` });
     await page.close();
   });
@@ -274,8 +288,8 @@ describe('The verdict', () => {
     const silent = plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why: '' } : e));
     expect(growVerdict(silent).text).toBe('“Removing a seat never charges the card” failed, with no reason recorded');
     // Only the first line of a long reason.
-    const long = plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why: '(app startup): application exited before becoming ready\n    at ModuleLoader.resolve' } : e));
-    expect(growVerdict(long).text).toBe('“Removing a seat never charges the card” failed: application exited before becoming ready');
+    const long = plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why: 'only the Team upgrade and the added seat were charged: expected 2 calls, got 3\n    at waitForCalls (stand-in)' } : e));
+    expect(growVerdict(long).text).toBe('“Removing a seat never charges the card” failed: expected 2 calls, got 3');
   });
 
   it('words every expected and got one way: a stand-in count in its route’s word, any other check by its name', () => {
@@ -338,10 +352,39 @@ describe('The verdict', () => {
 
   it('says a run that could not start in one line, at its stage, never as a failed check or a stack trace', () => {
     const why = "(app startup): application exited before becoming ready; last app output:\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:1)\n  code: 'ERR_MODULE_NOT_FOUND'";
+    // A log saved before grow recorded the run's outcome says only the stage it broke at: it is read the same way.
     const s = plotline((e) => { if (e.kind !== 'scenario.failed') return e; const { hop: _h, after: _a, ...rest } = e; return { ...rest, why }; });
-    const [f] = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-norun-'))).failures;
-    expect(f!.says).toBe('Broke at app startup: application exited before becoming ready.');
-    expect(growVerdict(s).text).toBe('“Removing a seat never charges the card” failed: application exited before becoming ready');
+    const reason = 'Could not run: the app did not start (application exited before becoming ready)';
+    expect(s.run.s10).toMatchObject({ st: 'not_run', why: reason, run: '2026-10-22T01-39-03Z_fail_504bf8', flow: 'seats.remove-seat' });
+    const summary = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-norun-')));
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 3, failed: 0, notTestedYet: 4 }, failures: [] });
+    expect(summary.unproven.find((x) => x.scenario === 's10')).toEqual({ scenario: 's10', title: 'Removing a seat never charges the card', reason, run: '2026-10-22T01-39-03Z_fail_504bf8' });
+    expect(growVerdict(s).line).toBe('◌ Not proven yet: 4 of 7 scenarios in Minimum not tested yet');
+  });
+
+  it('never counts a run that did not reach its checks as a failed check: it is not tested yet, with the reason it could not run', () => {
+    const as = (outcome: string, why: string) => plotline((e) => (e.kind === 'scenario.failed' ? { ...e, why, outcome } : e));
+    const cases: Array<[string, string, string]> = [
+      ['infrastructure_failed', '(app startup): application exited before becoming ready', 'Could not run: the app did not start (application exited before becoming ready)'],
+      ['blocked', '(before steps): persona_unavailable: no token for persona owner', 'Could not run: it was stopped before its first step (persona_unavailable: no token for persona owner)'],
+      ['blocked', '(fixture seats): fixture_failed: seed refused', 'Could not run: fixture seats could not be set up (fixture_failed: seed refused)'],
+      ['inconclusive', '(case): step_not_run', 'Could not run: step_not_run'],
+      ['cancelled', 'the run was cancelled', 'Could not run: the run was cancelled'],
+    ];
+    for (const [outcome, why, reason] of cases) {
+      const s = as(outcome, why);
+      expect(s.run.s10).toMatchObject({ st: 'not_run', why: reason, run: '2026-10-22T01-39-03Z_fail_504bf8' });
+      expect(growVerdict(s)).toMatchObject({ verdict: 'not proven yet', exitCode: 3, counts: { failed: 0, notTestedYet: 4 }, first: null });
+      expect(growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-norun-'))).failures).toEqual([]);
+    }
+    // A check that did not hold stays a failure, whatever its step is named.
+    const real = as('assertion_failed', '(setup): expected 2 calls, got 3');
+    expect(real.run.s10).toMatchObject({ st: 'fail', why: '(setup): expected 2 calls, got 3' });
+    expect(growVerdict(real)).toMatchObject({ verdict: 'not ready', exitCode: 1, counts: { failed: 1 } });
+    // A run that never reached its checks is said as not run in the plain progress lines, and still names its run.
+    const s = as('infrastructure_failed', '(app startup): application exited before becoming ready');
+    const e = { v: 'tracegrove.discovery-event/v1', seq: 1, ms: 1, kind: 'scenario.not_run', scenario: 's10', why: 'Could not run: the app did not start (application exited before becoming ready)', run: s.run.s10!.run, outcome: 'infrastructure_failed' } as GrowEvent;
+    expect(plainLine(applyGrow(s, e), e)).toBe('not run Removing a seat never charges the card (seats.remove-seat): Could not run: the app did not start (application exited before becoming ready)');
   });
 });
 
@@ -416,6 +459,33 @@ describe('grow --json and the exit code', () => {
     expect(said.trimEnd().split('\n').at(-1)).toBe(`◌ Not proven yet: ${min.length} of ${min.length} scenarios in Minimum not tested yet`);
     expect((await growCommand({ ...flags(dir), 'no-prove': true, 'allow-unproven': true, json: true }, () => {})).summary).toMatchObject({ verdict: 'not proven yet', exitCode: 0, exitMeaning: 'prove more' });
   }, 60_000);
+
+  it('exits 3, never 1, when the app did not start: no check ran, so each scenario is not tested yet and names the run that says why', async () => {
+    const dir = notesCount(false);
+    const app = join(dir, 'app', 'app.mjs');
+    writeFileSync(app, `import './settings.mjs';\n${readFileSync(app, 'utf8')}`);
+    git(dir, 'commit', '-qam', 'Load the settings');
+    let out = '';
+    const { code, state, events } = await growCommand(flags(dir), (t) => { out += t; });
+    const min = state.scenarios.filter((x) => x.mode === 'min' && x.flow);
+    expect(min.length).toBeGreaterThan(0);
+    expect(code).toBe(3);
+    // The events say it: not run, with the outcome the run recorded, never a failed scenario.
+    expect(events.filter((e) => e.kind === 'scenario.failed')).toEqual([]);
+    const notRun = events.filter((e): e is Extract<GrowEvent, { kind: 'scenario.not_run' }> => e.kind === 'scenario.not_run');
+    expect(notRun.filter((e) => e.run).map((e) => [e.scenario, e.outcome])).toEqual(min.map((x) => [x.id, 'infrastructure_failed']));
+    expect(out.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: \d+ of \d+ scenarios in Minimum not tested yet$/);
+    const { summary } = await growCommand({ ...flags(dir), json: true }, () => {});
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0 }, failures: [] });
+    for (const x of min) {
+      const u = summary!.unproven.find((y) => y.scenario === x.id)!;
+      expect(u.reason).toMatch(/^Could not run: the app did not start \(.+\)$/);
+      // Its run is saved, and records that it never reached its checks.
+      const saved = JSON.parse(readFileSync(join(dir, '.tracegrove', 'runs', u.run!, 'summary.json'), 'utf8')) as { outcome: string; cases: Array<{ outcome: string; failure: { step: string } | null }> };
+      expect(saved.outcome).toBe('infrastructure_failed');
+      expect(saved.cases.map((c) => [c.outcome, c.failure?.step])).toEqual([['infrastructure_failed', '(app startup)']]);
+    }
+  }, 90_000);
 
   it('exits 3 and says Not proven yet when the change grows no scenario, as a change to only its docs does', async () => {
     const dir = notesCount(false);

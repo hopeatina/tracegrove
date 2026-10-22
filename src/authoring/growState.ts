@@ -67,8 +67,10 @@ export type GrowEventBody =
   | E<'flows.checked', { scenarios: number; runnable: number; config: string | null }>
   | E<'scenario.running', { scenario: string; flow: string }>
   | E<'scenario.passed', { scenario: string; took: number; run: string | null }>
-  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string; hop?: string; after?: boolean }>
-  | E<'scenario.not_run', { scenario: string; why: string }>
+  /* `outcome` is the case outcome the run recorded: assertion_failed for a check that did not hold. A run that never reached its
+     checks (infrastructure_failed, blocked, inconclusive, cancelled) is a scenario.not_run that names its run. */
+  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string; hop?: string; after?: boolean; outcome?: string }>
+  | E<'scenario.not_run', { scenario: string; why: string; run?: string | null; outcome?: string }>
   | E<'variant.passed', { scenario: string; took: number; note: string }>
   | E<'variant.skipped', { scenario: string; note: string }>
   | E<'variant.not_applicable', { scenario: string; note: string }>
@@ -160,8 +162,11 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'flows.checked': s.flows = e; break;
     case 'scenario.running': s.run[e.scenario] = { st: 'run', ...(e.flow ? { flow: e.flow } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
     case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run, ...ranFlow(s, e.scenario) }; break;
-    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}), ...ranFlow(s, e.scenario) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: runnable(e.why), ...ranFlow(s, e.scenario) }; break;
+    case 'scenario.failed':
+      // A run that never reached its checks is not a failed check: it proved nothing, so its scenario is not tested yet.
+      if (neverChecked(e)) { s.run[e.scenario] = { st: 'not_run', why: couldNotRun(e.why), ...(e.run ? { run: e.run } : {}), ...ranFlow(s, e.scenario) }; break; }
+      s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}), ...ranFlow(s, e.scenario) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: runnable(e.why), ...(e.run ? { run: e.run } : {}), ...ranFlow(s, e.scenario) }; break;
     case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
     case 'variant.not_applicable': s.real[e.scenario] = { st: 'not_run', note: e.note, na: true }; break;
@@ -259,6 +264,27 @@ export function failReason(why: string | undefined): { where: string | null; sai
   const said = (i > 0 ? w.slice(i + 2) : w).split('\n')[0]!.trim().replace(/;[^;]*:$/, '').trim();
   return { where: i > 0 ? w.slice(0, i) : null, said };
 }
+/** The stages a run names (src/authoring/run.ts) when it broke before any check compared anything: the app did not start, it
+ *  was stopped before its first step, a fixture could not be set up, or the case ended with no step or check failing. */
+const STAGE = /^\((app startup|before steps|fixture[^)]*|case)\)$/;
+/** A failed result that never reached its checks. A log says so with the run's `outcome`; one saved before it did, only by the
+ *  stage its reason names, such as "(app startup): application exited before becoming ready". */
+function neverChecked(e: { why: string; outcome?: string }): boolean {
+  return e.outcome ? e.outcome !== 'assertion_failed' : STAGE.test(failReason(e.why).where ?? '');
+}
+/**
+ * Why a run that never reached its checks proves nothing, in words: "Could not run: the app did not start (application exited
+ * before becoming ready)". Only the first line of what it said, as for a failure.
+ */
+export function couldNotRun(why: string): string {
+  const { where, said } = failReason(why);
+  const stage = STAGE.exec(where ?? '')?.[1] ?? null;
+  const what = stage === 'app startup' ? 'the app did not start' : stage === 'before steps' ? 'it was stopped before its first step'
+    : stage?.startsWith('fixture') ? `${stage} could not be set up` : null;
+  const line = what || stage ? said : String(why ?? '').trim().split('\n')[0]!.trim().replace(/;[^;]*:$/, '').trim();
+  if (!line) return what ? `Could not run: ${what}` : 'Could not run, with no reason recorded';
+  return what ? `Could not run: ${what} (${line})` : `Could not run: ${line}`;
+}
 /** How a failure broke, in words: what its check expected and got when the run recorded it, else the reason its result gave. */
 function howItBroke(r: RunState | undefined, broke: VerdictFacts | null | undefined): string | null {
   if (broke?.check) { const t = expGot({ check: broke.check, expected: broke.expected, got: broke.got }); return t.charAt(0).toLowerCase() + t.slice(1); }
@@ -302,7 +328,8 @@ export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke
     first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null,
       step: opts.broke?.step ?? null, check: opts.broke?.check ?? null, expected: opts.broke?.check ? opts.broke.expected : null, got: opts.broke?.check ? opts.broke.got : null } : null,
     failed: failed.map((x) => x.id), more: Math.max(0, failed.length - 1),
-    unproven: open.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: reasonOf(x) })),
+    /** each scenario not tested yet, with its reason; one whose run never reached its checks names that run */
+    unproven: open.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: reasonOf(x), ...(s.run[x.id]?.run ? { run: s.run[x.id]!.run! } : {}) })),
     /** What the page says beside the mark and the word; `detail` adds the promise and how many more failed, and with the mark
      *  and the word it is the line the terminal prints. */
     text, detail, line: `${VERDICT_MARK[kind]} ${VERDICT_WORD[kind]}: ${detail}`,
