@@ -19,11 +19,11 @@
 export const BONSAI_CSS = String.raw`
 .gb-wrap{position:relative;min-width:0}
 .gw-svg.gb{display:block;width:100%;height:auto;overflow:visible;-webkit-tap-highlight-color:transparent;
- --wood:#6E5E50;--wood-lit:#8F7D6B;--wood-shade:#4C4037;--wood-old:color-mix(in srgb,#6E5E50 68%,var(--muted));--knot:#57493E;--knot-lit:#9C8975;--cut:#DCC8A6;--cutc:color-mix(in srgb,var(--verm) 55%,var(--wood));--shoot:color-mix(in srgb,#9BBF5A 82%,var(--wood));
+ --wood:#6E5E50;--wood-lit:#8F7D6B;--wood-shade:#4C4037;--wood-old:color-mix(in srgb,#6E5E50 68%,var(--muted));--knot:#57493E;--knot-lit:#9C8975;--cut:#DCC8A6;--cutc:color-mix(in srgb,var(--ink3) 82%,var(--paper));--shoot:color-mix(in srgb,#9BBF5A 82%,var(--wood));
  --pad:color-mix(in srgb,var(--moss) 44%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 30%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 70%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 16%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 34%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 62%,var(--paper));
  --pot:color-mix(in srgb,var(--ochre) 26%,var(--line2));--pot-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#3A2A20);--pot-lit:color-mix(in srgb,var(--pot) 78%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 80%,#3A2A20);--soil-c:color-mix(in srgb,#6B4A32 72%,var(--soil));--soil-lit:color-mix(in srgb,#8A6A4C 60%,var(--soil));--pebble:color-mix(in srgb,var(--line2) 70%,var(--paper));--rt-cut:var(--wood);--rt-ext:var(--wood);--stake:#B09676;--moss-rim:color-mix(in srgb,var(--pad) 55%,var(--pad-lit))}
-@media (prefers-color-scheme:dark){.gw-svg.gb{--wood:#6E5F50;--wood-lit:#8A7864;--wood-shade:#4A3F35;--wood-old:#5E574E;--knot:#4E4238;--knot-lit:#93826E;--cut:#B9A684;--cutc:color-mix(in srgb,var(--verm) 70%,#fff);--shoot:#A9CF72;
+@media (prefers-color-scheme:dark){.gw-svg.gb{--wood:#6E5F50;--wood-lit:#8A7864;--wood-shade:#4A3F35;--wood-old:#5E574E;--knot:#4E4238;--knot-lit:#93826E;--cut:#B9A684;--cutc:color-mix(in srgb,var(--ink3) 82%,var(--paper));--shoot:#A9CF72;
  --pad:color-mix(in srgb,var(--moss) 50%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 66%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 30%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 22%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 40%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 38%,var(--paper));
  --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468;--moss-rim:#7FA36F}}
@@ -53,7 +53,7 @@ export const BONSAI_CSS = String.raw`
 /* dimming never thins the wood or makes foliage see-through: what is not lit turns pale, opaque, so nothing shows through a pad */
 .gb.dim .jg:not(.hl) .pfill{fill:var(--pad-dim)}.gb.dim .jg:not(.hl) .pband{opacity:.15}.gb.dim .jg:not(.hl) .gb-lf{opacity:.32}.gb.dim .kn:not(.on):is(:not(.wound),.wmute){opacity:.55}.gb.lfdim .jg.hl .gb-lf:not(.hl):not(.sel){opacity:.45}
 .gb .stub{display:none}.gb .stub.on{display:inline}.gb .stub .sw{fill:var(--wood)}.gb .cutf{fill:var(--cut);stroke:var(--wood-shade);stroke-width:.7}.gb .mlbl{font:600 10.5px var(--mono);fill:var(--muted)}
-.gb .cutmk{display:none;fill:none;stroke:var(--verm);stroke-width:1.6;stroke-dasharray:3 2.5;stroke-linecap:round}.gb .cuttag{display:none;font:600 10.5px var(--mono);fill:var(--verm-ink)}.gb .cutmk.on,.gb .cuttag.on{display:inline}
+.gb .cutmk{display:none;fill:none;stroke:var(--cutc);stroke-width:1.6;stroke-dasharray:3 2.5;stroke-linecap:round}.gb .cuttag{display:none;font:600 10.5px var(--mono);fill:var(--cutc)}.gb .cutmk.on,.gb .cuttag.on{display:inline}
 .gb .tw{fill:var(--wood)}.gb .tw.shoot{fill:var(--shoot)}.gb .bud .bpet{fill:none;stroke:var(--shoot);stroke-width:.9;stroke-linecap:round}.gb .budg .cutk{display:none;fill:none;stroke:var(--cutc);stroke-width:1.3;stroke-linecap:round}
 /* a shoot a mode would cut is grey with the tick across its foot; one it would add is a ghost, stem and all */
 .gb .budg.pre>.tw.shoot,.gb .budg.pv-out>.tw.shoot{fill:color-mix(in srgb,var(--ink3) 40%,var(--paper))}.gb .budg.pre>path.tipbud,.gb .budg.pv-out>path.tipbud{fill:var(--paper);stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper))}.gb .budg.pre .bpet,.gb .budg.pv-out .bpet{stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper))}
@@ -95,7 +95,7 @@ export const BONSAI_CSS = String.raw`
 .gb.dim .bud:not(.hl),.gb.dim .lbl:not(.hl),.gb.dim .bmore{opacity:.3}
 /* a previewed mode's ghosts are not part of what is pinned: they stay readable over the dimming */
 .gb.dim .gb-lf.bud.pv-add,.gb.dim .jg:not(.hl) .gb-lf.pv-add{opacity:1}.gb .shscar{fill:color-mix(in srgb,var(--wood-lit) 70%,var(--cut));stroke:var(--wood-shade);stroke-width:.6;pointer-events:none}
-/* one cut mark everywhere, asked, previewed or being pruned: the red-brown tick */
+/* one cut mark everywhere, asked, previewed or being pruned: a tick in neutral ink, never red (red is failed and broken) */
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
 .gb .shscar .cal{fill:color-mix(in srgb,var(--wood-lit) 80%,#fff);stroke:var(--wood-shade);stroke-width:.5}.gb .shscar .face{fill:var(--cut);stroke:color-mix(in srgb,var(--wood-shade) 60%,transparent);stroke-width:.4}
 /* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib */
@@ -142,18 +142,20 @@ export const BONSAI_CSS = String.raw`
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
-.gb .sap.rest{stroke:#d4d4d4;stroke-width:3.2;stroke-dasharray:0 5;stroke-linecap:round;opacity:1;animation:none}.gb .sap.resto{stroke:#2e2620;stroke-width:4.8;stroke-dasharray:0 5;stroke-linecap:round;opacity:.85;animation:none}
-@media (prefers-color-scheme:dark){.gb .sap.rest{stroke:#7b8086}.gb .sap.resto{stroke:#101214;opacity:.95}}
-.gb .kn.unreached .halo,.gb .kn.unreached:hover .halo{opacity:0}.gb .kn.unreached .k1{fill:color-mix(in srgb,var(--muted) 60%,var(--wood))}.gb .kn.unreached .k2{fill:var(--muted);opacity:.5}.gb.dim .kn.unreached{opacity:1}
-.gb .klbl.unreached{fill:var(--muted)}
+/* where the route never ran: small round mid-grey dots with no ring, quieter than the gold route and the red break, and
+   under the faint knots past the break (gbBuild cuts them out round each knot). The key's swatch is drawn the same way */
+.gb .sap.rest,.gw-sw .rdots{fill:none;stroke:#9a948a;stroke-width:3;stroke-dasharray:0 7;stroke-linecap:round;opacity:.8;animation:none}.gb .sap.resto{display:none}.gw-sw .rdots{stroke-width:2.1;stroke-dasharray:0 4.8}
+@media (prefers-color-scheme:dark){.gb .sap.rest,.gw-sw .rdots{stroke:#a39e93;opacity:.7}}
+.gb .kn.unreached .halo,.gb .kn.unreached:hover .halo{opacity:0}.gb .kn.unreached .k1{fill:color-mix(in srgb,var(--muted) 60%,var(--wood))}.gb .kn.unreached .k2{fill:var(--muted);opacity:.5}.gb .kn.unreached,.gb.dim .kn.unreached:not(.on){opacity:.4}
+.gb .klbl.unreached{fill:var(--muted)}.gb .klbl.rest:not(.wound):not(.brk){fill:var(--ink3)}
 .gb .klbl.nofit,.gb .klbl.nofit+.kld{display:none}
 .gb .tiplead{fill:none;stroke:var(--ink3);stroke-width:.9;pointer-events:none;paint-order:stroke}
 .gb .bead{fill:var(--gold);stroke:var(--paper);stroke-width:1.5}.gb .halo{fill:var(--gold);opacity:.22}
 .gb .note{font:11.5px var(--mono);fill:var(--muted)}
 .gb-tip{position:absolute;z-index:3;width:max-content;max-width:300px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font-size:13px;line-height:18px;color:var(--ink)}
-.gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.gb-tip.below{max-width:none;width:auto;right:0;box-shadow:none}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-wrap:balance}
 .gb-tip .st{font:12px/17px var(--mono);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
-.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px}.gb-tip .hop{white-space:nowrap}
+.gb-tip .path{font:11.5px/16px var(--mono);color:var(--ink3);margin-top:4px}.gb-tip .hop{white-space:nowrap}.gb-tip .path .gw-hop.hit .hl{color:var(--ink)}.gb-tip .path .gw-hop.un .hl{color:var(--muted);opacity:.75}
 .gb-tip .st b{display:inline;font-weight:600}.gb-tip .st .k{font:inherit;text-transform:none;letter-spacing:0;color:inherit}.gb-tip.dock{max-width:none;box-shadow:none;border-color:var(--line)}.gb-docked>*{visibility:hidden}
 .gb-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 6px;font:12px/18px var(--sans);color:var(--ink3)}
 .gb-key i,i.gb-g{display:inline-block;flex:none;width:11px;height:7px;border-radius:7px 1px;vertical-align:0;margin-right:5px;border:1.2px solid var(--moss);background:var(--moss)}
@@ -199,7 +201,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
 .gb-loose{font-size:13px;line-height:19px;color:var(--ink3);padding:10px 4px 2px}
 .gb-path{display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;font:12px/18px var(--mono);color:var(--ink3)}
 .gb-path button{border:0;background:none;padding:0 2px;font:inherit;color:var(--ink2);text-decoration:underline dotted;text-underline-offset:3px;cursor:pointer;min-height:24px}
-.gb-path .sep{color:var(--muted)}.gb-path .rootp{color:var(--ink3);text-decoration-style:dashed}.gb-path .bad{color:var(--verm-ink);font-weight:600}
+.gb-path .sep{color:var(--muted)}.gb-path .hop.un button{color:var(--muted);text-decoration-color:color-mix(in srgb,var(--muted) 50%,transparent)}.gb-path .rootp{color:var(--ink3);text-decoration-style:dashed}.gb-path .bad{color:var(--verm-ink);font-weight:600}
 @media (max-width:640px){.gb-hd{grid-template-columns:22px minmax(0,1fr)}.gb-hd .st{grid-row:auto;grid-column:2;justify-items:start}.gb-olx{padding-left:4px}.gb-olx>.gb-path{margin-left:calc(36px - var(--sw))}
  /* a row's chips stack on its right edge, so a second chip never squeezes the title into a sliver */
  .gb-ols .bx{flex-direction:column;align-items:flex-end;gap:4px}}
@@ -971,7 +973,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
     sv('circle',{cx:gbF(p[0]),cy:gbF(p[1]),r:Math.max(9,ra+3),class:'hitc'}));
    g.__ids=kn.ids;(kn.bid?JG[kn.bid]:gKn).append(g);for(const id of kn.ids){B.knot[id]=g;B.pos[id]=p0}B.nav.push('u:'+kn.id);B.navEl['u:'+kn.id]=g;g.__n=n;g.__w=kn.w;g.__on=kn.on;
    /* a knot shows once the growing wood has reached it: on a branch, where along the branch it sits */const kb=kn.on==='t'?null:T.br.find(x=>'b'+x.i===kn.on);let kt=at(kn.on==='t'?kn.t:kb?kb.h:0)+200;if(kb&&kb.acc){let ii=0,bd=1e9;kb.pts.forEach((q,i2)=>{const dd=Math.hypot(q[0]+X-p0[0],q[1]-p0[1]);if(dd<bd){bd=dd;ii=i2}});const f=kb.acc[ii]/(kb.acc[kb.acc.length-1]||1);kt=at(kb.h)+(380+1.5*kb.len)*(1-Math.pow(1-Math.min(1,f+.03),1/2.2))+60}anim('kn:'+kn.id+gk,g,kt,300,'fade');(B.kgk=B.kgk||{})[kn.id]=gk;
-   if(u){const txt=gwCut(u.label,many?16:24)+(many?' +'+(kn.ids.length-1)+(kn.ids.length>2?' parts':' part'):'');
+   if(u){const txt=gbKnotTxt(M,kn.ids,kn.id);
     /* A name goes on open ground beside its knot; every name on the tree is placed in one pass once everything it must
        keep clear of is known (gbKnotNames, after the pads, names and numbers are drawn) */
     (B.klq=B.klq||[]).push({id:kn.id,tree:ti,p,p0,n,tg,ra,rb,txt,w:kn.w,bid:kn.bid})}});
@@ -1042,6 +1044,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;const L=gbLayout(M,width,sap)
  svg.addEventListener('focusout',e=>{if(!svg.contains(e.relatedTarget))gbHover(null)});
  svg.addEventListener('click',e=>{let k=keyOf(e);if(!k)k=gbNearLeaf(e);if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
  svg.addEventListener('keydown',gbKeys);
+ /* the grey dots where a route never ran go under the knots they pass, which stand faint over them: each knot cuts them */
+ {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
+  for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
  B.tip=h('div',{class:'gb-tip',hidden:true,role:'status'});B.width=width;
  /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots) and the foliage it climbs into */
  {const rc=sv('clipPath',{id:'gb-rc'+N});for(const c of clip.children)rc.append(c.cloneNode());
@@ -1227,6 +1232,19 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  gbLight();if(!gw.hov)gbPinTip()}
 function gbWidth(){const S=gw.slots;const w=(S&&S.scroll&&S.scroll.clientWidth)||(gw.el&&gw.el.clientWidth)||window.innerWidth-48;return Math.max(320,Math.min(1240,Math.floor(w/40)*40))}
 
+/* a knot's name: its file's, or for a burl the file in it that is lit (else its first) and how many more grew into it */
+const gbKnotTxt=(M,ids,lead)=>{const u=M.U[lead]||{};return gwCut(u.label||lead,ids.length>1?16:24)+(ids.length>1?' +'+(ids.length-1)+(ids.length>2?' parts':' part'):'')};
+/* At rest a tree carries a few names, so it is never anonymous: every knot when there are three or fewer, else the three
+   most journeys cross (then the most scenarios), and every burl; each only where there is room */
+function gbRestK(B,M){const Q=B.klq||[];if(Q.length<=3)return new Set(Q.map(e=>e.id));const s=gw.state;
+ const sc=e=>{const ids=B.knot[e.id]?B.knot[e.id].__ids:[e.id],js=M.J.filter(j=>ids.some(id=>j.units.includes(id)));return [js.length,s.scenarios.filter(x=>ids.includes(x.unit)).length+js.reduce((t,j)=>t+(M.leaves[j.id]||[]).length,0)]};
+ const top=Q.map(e=>({e,v:sc(e)})).sort((a,b)=>b.v[0]-a.v[0]||b.v[1]-a.v[1]).slice(0,3).map(o=>o.e.id);return new Set([...top,...Q.filter(e=>(B.knot[e.id]?B.knot[e.id].__ids:[]).length>1).map(e=>e.id)])}
+/* Place the names that show (gbKnotNames) and set them: o carries a card and its hairline, which the names keep clear of */
+function gbPlaceNames(B,o){const [want,txt]=B.kwant||[new Map(),new Map()];const got=new Map();for(const run of B.kplace||[])for(const [id,g] of run(want,{txt,...(o||{})}))got.set(id,g);
+ for(const id in B.klbl){const kl=B.klbl[id],g=got.get(id);kl.__fit=!!g;kl.classList.toggle('nofit',!g);
+  if(g){kl.setAttribute('x',gbF(g.x));kl.setAttribute('y',gbF(g.yb));kl.setAttribute('text-anchor',g.anc);kl.__r=g.r;if(kl.__ld)kl.__ld.setAttribute('d','M'+g.pts.map(gbP).join(' L'))}
+  kl.classList.toggle('on',!!g&&!!(kl.__want||kl.__rest));kl.classList.toggle('rest',!!g&&!!kl.__rest)}
+ return got}
 /* What hover, focus, a pin or a chosen criterion lights: a leaf lights its journey's path to the roots, a pad its whole
    journey, a knot every journey through it, a criterion the leaves that prove it. Everything else dims. */
 function gbLit(){const s=gw.state,M=gw.M,B=gw.B;const k=gw.hov||gw.pinned||null;const out={leaves:new Set(),js:new Set(),units:new Set(),leaf:null,part:null,pad:null};
@@ -1259,16 +1277,18 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  for(const el of new Set(Object.values(B.knot)))el.classList.toggle('wmute',mute(el.__ids));
  for(const id in B.klbl)B.klbl[id].classList.toggle('wmute',mute(B.knot[id]?B.knot[id].__ids:[id]));for(const id in B.root)B.root[id].classList.toggle('wmute',mute([id]));
  const rootPart=L.part&&B.root[L.part]?gw.M.U[L.part]:null;
- const hk=gw.hov&&gw.hov.startsWith('u:')?gw.hov.slice(2):null;
- /* the names that show are placed together now (gbKnotNames): the knot pointed at, the leaf's own hop and a break first;
-    one with no clear place stays off, and the card names the whole path */
- const want=new Map();for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];
-  const lit=on&&(ids.includes(hk)||(rootPart?ids.includes(rootPart.parent):ids.some(q=>litU.has(q)||unU.has(q)))),brk=(kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute');
-  kl.__want=lit;if(lit||brk)want.set(id,ids.includes(hk)||brk||(!!L.leaf&&ids.includes(L.leaf.unit))?0:1)}
- const got=new Map();for(const run of B.kplace||[])for(const [id,g] of run(want))got.set(id,g);
- for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id],g=got.get(id);kl.__fit=!!g;kl.classList.toggle('nofit',!g);
-  if(g){kl.setAttribute('x',gbF(g.x));kl.setAttribute('y',gbF(g.yb));kl.setAttribute('text-anchor',g.anc);kl.__r=g.r;if(kl.__ld)kl.__ld.setAttribute('d','M'+gbP(g.A)+' L'+gbP(g.R))}
-  kl.classList.toggle('on',!!g&&kl.__want);kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)))}
+ const kp=gw.hov||gw.pinned||'',hk=kp.startsWith('u:')?kp.slice(2):null;
+ /* the names that show are placed together now (gbKnotNames): every knot that glows is named, and where it broke; the knot
+    pointed at, the leaf's own hop and a break first, then the rest of the lit route, then the hops it never reached: every
+    hop of the route keeps its name. At rest a few names (gbRestK), only where there is room. A burl is named after the file
+    in it that is pointed at or lit */
+ const rest=on?null:gbRestK(B,gw.M),want=new Map(),txt=new Map();
+ for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];
+  const lit=on&&ids.some(q=>q===hk||litU.has(q)||(!!rootPart&&q===rootPart.parent)),un=on&&!lit&&ids.some(q=>unU.has(q)),brk=(kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute');
+  kl.__want=lit||un;kl.__rest=!!rest&&!brk&&rest.has(id);if(lit||brk)want.set(id,ids.includes(hk)||brk||(!!L.leaf&&ids.includes(L.leaf.unit))?0:1);else if(un||kl.__rest)want.set(id,un?1.5:3);
+  if(ids.length>1){const lead=ids.find(q=>q===hk)||(L.leaf?ids.find(q=>q===L.leaf.unit):null)||(on?ids.find(q=>litU.has(q))||ids.find(q=>unU.has(q)):null)||id,t=gbKnotTxt(gw.M,ids,lead);txt.set(id,t);if(kl.textContent!==t)kl.textContent=t}
+  kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)))}
+ B.kwant=[want,txt];gbPlaceNames(B);
  for(const id in B.root){B.root[id].classList.toggle('hl',litU.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route (gbRoute) for a leaf; for a root, the sap it sends up the trunk to each journey it feeds */
  let d='',dx='',dw='',df='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
@@ -1279,8 +1299,8 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  /* where a failing scenario broke stays red at rest, and for whatever is lit that holds it; a passing leaf's route, or a
     journey that does not hold the failure, shows no red */
  if(!x)for(const e of B.fails||[])if(woundOn(e)){const R=gbRoute(e.x);if(R&&R.dw)dw+=(dw?' ':'')+R.dw}
- /* the glow runs only where the sap ran: it ends at the break. Past it the route is round grey dots, each ringed dark so it
-    reads on bark; the part of the journey a leaf's own scenario does not run is drawn faint */
+ /* the glow runs only where the sap ran: it ends at the break, or at the hop a leaf's own scenario checks. Past it the route
+    is small grey dots, under the faint knots it never reached */
  if(!B.sapF){B.sapF=sv('path',{class:'sap faint',d:''});B.sapXo=sv('path',{class:'sap resto',d:''});B.sapX.before(B.sapF,B.sapXo)}
  B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);B.sapU.setAttribute('d',d);
  B.sap.setAttribute('d',d)}
@@ -1316,17 +1336,18 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
   const i0=Math.min(...J.map(o=>o.iJ));main=pts.slice(0,i0+1);
   rts=J.map(o=>({id:o.rr.id,pts:[...pts.slice(i0,o.iJ),...o.out]}))}
  const all=()=>line(main)+rts.map(q=>' '+line(q.pts)).join('');
- /* which hops are the scenario's own: a happy path runs the whole journey; any other scenario runs from the journey's start
-    to the hop it checks, and the rest of the journey is not its route */
+ /* which hops are the scenario's own (gbReach): a happy path runs the whole journey; any other scenario runs from the
+    journey's start to the hop it checks, and the rest of the journey is not its route */
  const ix=j.units.indexOf(x.unit),hop=ix>=0?{i:ix+1,n:j.units.length,label:(M.U[x.unit]||{}).label||x.unit}:null;
- const own=x.scenarioKind!=='happy'&&ix>=0&&ix<j.units.length-1?j.units.slice(0,ix+1):null;
+ const own=gbReach(M,j,x).own?j.units.slice(0,ix+1):null;
  const nearI=(path,id)=>{const p=B.pos[id];if(!p)return -1;let ci=-1,bd=20;path.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});return ci};
  const whole={d:all(),dx:'',dw:'',df:'',lit:new Set(j.units),un:new Set(),hop};
- if(!w){if(!own)return whole;
-  if(B.root[x.unit])return {d:line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),df:rts.filter(t=>t.id!==x.unit).map(t=>line(t.pts)).join(' '),dx:'',dw:'',lit:new Set(own),un:new Set(),hop};
+ /* past the hop it checks, the journey is drawn as never reached, as past a break: grey dots, its knots faint */
+ if(!w){if(!own)return whole;const un=new Set(j.units.filter(id=>!own.includes(id)));
+  if(B.root[x.unit])return {d:line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),dx:rts.filter(t=>t.id!==x.unit).map(t=>line(t.pts)).join(' '),df:'',dw:'',lit:new Set(own),un,hop};
   let ci=-1;for(const id of own)if(!B.root[id])ci=Math.max(ci,nearI(main,id));if(ci<0)return whole;
   const acc=gbLen(main);let i1=acc.findIndex(v=>v>=acc[ci]+9);if(i1<0)i1=main.length-1;
-  return {d:line(main.slice(0,i1+1)),df:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),dx:'',dw:'',lit:new Set(own),un:new Set(),hop}}
+  return {d:line(main.slice(0,i1+1)),dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',dw:'',lit:new Set(own),un,hop}}
  const wi=j.units.indexOf(w),lit=new Set(j.units.slice(0,wi+1)),un=new Set(j.units.slice(wi+1).filter(id=>!B.root[w]||!B.root[id]));
  if(B.root[w]){const q=rts.find(t=>t.id===w);if(!q)return whole;const acc=gbLen(q.pts),ci=acc.findIndex(v=>v>Math.max(24,acc[acc.length-1]*.45));
   return {d:line(main)+rts.filter(t=>t!==q).map(t=>' '+line(t.pts)).join(''),dw:line(q.pts.slice(0,ci<0?q.pts.length:ci+1)),dx:ci<0?'':line(q.pts.slice(ci)),df:'',lit:new Set(j.units),un:new Set(),hop}}
@@ -1334,6 +1355,13 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  let ci=0,bd=1e9;main.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});const acc=gbLen(main);
  const a0=r.after?acc[ci]+4:acc[ci]-9,a1=r.after?acc[ci]+20:acc[ci]+9;let i0=acc.findIndex(v=>v>=a0),i1=acc.findIndex(v=>v>=a1);if(i0<0)i0=main.length-1;if(i1<0)i1=main.length-1;
  return {d:line(main.slice(0,i0+1)),dw:i1>i0?line(main.slice(i0,i1+1)):'',dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',lit,un,hop}}
+/* Which hops a scenario reaches: a failed one up to where it broke (all of them when it broke at a root), a happy path its
+   whole journey, any other the journey from its start to the hop it checks. The rest it never reaches. The tree (gbRoute)
+   and every card that names its path say the same. */
+function gbReach(M,j,x){const r=gw.state.run[x.id],w=r&&r.st==='fail'?gbWound(M,j,x):null,U=j.units,isR=id=>!!(M.U[id]||{}).root;
+ if(w){const wi=U.indexOf(w);return {lit:new Set(isR(w)?U:U.slice(0,wi+1)),un:new Set(isR(w)?[]:U.slice(wi+1))}}
+ const ix=U.indexOf(x.unit);if(x.scenarioKind!=='happy'&&ix>=0&&ix<U.length-1)return {lit:new Set(U.slice(0,ix+1)),un:new Set(U.slice(ix+1)),own:true};
+ return {lit:new Set(U),un:new Set()}}
 /* Where the trunk hands a route to a root: the spine (from the top down) leaves the trunk's centre line above the soil, about
    a root's turn above where the root flares from it, and the way on runs round a fillet onto the root's centre line and out
    along it, keeping to the soil's top inside the pot. Returns that spine index and the way on from it. */
@@ -1345,8 +1373,8 @@ function gbFork(pts,rr){const L=gw.B.L,sy=q=>L.sy?L.sy(q):0,p0=L.potC-L.potL/2,p
    leaves, the knots, the pot and the soil, the plant tags, and every other name and number. A count sits just off its
    shoot's tip. A name tries the eight compass points round its knot at three leader lengths, nearest first, and takes the
    first clear one; its leader runs from the middle of the name's near edge to the knot's rim, never shorter than 10 px, and
-   no two names share a baseline within 24 px. A name with no clear place is left off rather than set far away or on
-   foliage: the card names the whole path. */
+   no two names share a baseline within 24 px. Every hop of the lit route, reached or not, and where it broke are always
+   named (see run); any other name with no clear place is left off rather than set far away or on foliage. */
 function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0]+X,q[1]];
  const caps=[],rects=[V.potBox],labs=[],cush=[],lines=[],bases=[];const cap=(a,b,r,tag,own)=>caps.push({a,b,r,tag,own});
  const chain=(pts,w,pad,tag)=>{for(let i=0;i<pts.length-1;i++)cap(pts[i],pts[i+1],Math.max(w[i]||1,w[i+1]||1)/2+pad,tag||'wood')};
@@ -1370,13 +1398,18 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const cushHit=(c,r,m)=>{if(r[2]<c.x0-m||r[0]>c.x1+m)return false;const xa=Math.max(r[0],c.x0-m),xb=Math.min(r[2],c.x1+m);for(let x=xa;x<=xb+.01;x+=Math.max(1.5,(xb-xa)/12)){const xc=Math.max(c.x0,Math.min(c.x1,x));if(gbAtX(c.top,xc)-m<r[3]&&gbAtX(c.bot,xc)+m>r[1])return true}return false};
  const ovR=(r,q)=>r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1];
  const soil=r=>(L.sy?Math.min(L.sy(r[0]),L.sy(r[2])):-3)-4;
- const clear=r=>{if(r[0]<V.vx+3||r[2]>V.vx+V.W-3||r[1]<V.vy+2||r[3]>soil(r))return false;for(const q of rects)if(ovR(r,q))return false;
-  const rI=[r[0]-12*k,r[1]-6*k,r[2]+12*k,r[3]+6*k];for(const q of labs)if(ovR(rI,q))return false;
-  for(const c of caps)if(dSR(c.a,c.b,r)<c.r)return false;for(const c of cush)if(cushHit(c,r,4))return false;for(const [a,b] of lines)if(dSR(a,b,r)<2)return false;return true};
+ /* what never moves (the edges, the pot, the wood, leaves, shoots, knots and cushions), then the names and hairlines placed so
+    far, with a margin round each name; a hairline of a card that points at a name is no obstacle to that name */
+ const clearS=r=>{if(r[0]<V.vx+3||r[2]>V.vx+V.W-3||r[1]<V.vy+2||r[3]>soil(r))return false;for(const q of rects)if(ovR(r,q))return false;
+  for(const c of caps)if(dSR(c.a,c.b,r)<c.r)return false;for(const c of cush)if(cushHit(c,r,4))return false;return true};
+ const clearL=(r,m,id)=>{m=m===undefined?1:m;const rI=[r[0]-12*k*m,r[1]-6*k*m,r[2]+12*k*m,r[3]+6*k*m];for(const q of labs)if(ovR(rI,q))return false;for(const l of lines)if(l[2]!==id&&dSR(l[0],l[1],r)<2)return false;return true};
+ const clear=(r,m,id)=>clearS(r)&&clearL(r,m,id);
  const segX=(a,b,c,d)=>{const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b)};
- const leadOK=(R,A,id)=>{for(const q of labs)if(dSR(R,A,q)<1)return false;for(const c of caps){if(c.tag==='wood'||c.own===id)continue;if(c.tag==='knot'?dSR(c.a,c.b,[Math.min(R[0],A[0]),Math.min(R[1],A[1]),Math.max(R[0],A[0]),Math.max(R[1],A[1])])<c.r&&dPS(c.a,R,A)<c.r:dPS(c.a,R,A)<c.r-3&&dPS(c.b,R,A)<c.r-3)return false}
-  for(let i=1;i<10;i++){const t=i/10,p=[R[0]+(A[0]-R[0])*t,R[1]+(A[1]-R[1])*t];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2))return false}
-  for(const [a,b] of lines)if(segX(R,A,a,b))return false;return true};
+ /* a hairline never crosses a name, another hairline or another knot; strict, it keeps off leaves, shoots and foliage too */
+ const segS=(R,A,id,soft)=>{for(const c of caps){if(c.tag==='wood'||c.own===id)continue;if(c.tag==='knot'){if(dSR(c.a,c.b,[Math.min(R[0],A[0]),Math.min(R[1],A[1]),Math.max(R[0],A[0]),Math.max(R[1],A[1])])<c.r+3&&dPS(c.a,R,A)<c.r+3)return false}else if(!soft&&dPS(c.a,R,A)<c.r-3&&dPS(c.b,R,A)<c.r-3)return false}
+  if(!soft)for(let i=1;i<10;i++){const t=i/10,p=[R[0]+(A[0]-R[0])*t,R[1]+(A[1]-R[1])*t];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2))return false}return true};
+ const segL=(R,A,id)=>{for(const q of labs)if(dSR(R,A,q)<1)return false;for(const l of lines)if(l[2]!==id&&segX(R,A,l[0],l[1]))return false;return true};
+ const leadS=(pts,id,soft)=>pts.every((p,i)=>i===0||segS(p,pts[i-1],id,soft)),leadOK=(pts,id,soft)=>leadS(pts,id,soft)&&pts.every((p,i)=>i===0||segL(p,pts[i-1],id));
  const baseOK=(r,yb)=>!bases.some(([y2,r2])=>Math.abs(yb-y2)<7*k&&Math.max(r2[0]-r[2],r[0]-r2[2])<24*k);
  /* a shoot's count, just off its tip, on the side away from the wood it leaves */
  const fs2=9.5*k,cw2=.6*fs2;
@@ -1385,23 +1418,44 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   for(const R of [6,12,19,26]){for(const a of [0,-45,45,-90,90,-135,135]){const th=a*Math.PI/180,u=[d[0]*Math.cos(th)-d[1]*Math.sin(th),d[0]*Math.sin(th)+d[1]*Math.cos(th)],A=[q[0]+u[0]*R*k,q[1]+u[1]*R*k];
     const anc=u[0]>.35?'start':u[0]<-.35?'end':'middle',x0=anc==='start'?A[0]:anc==='end'?A[0]-tw:A[0]-tw/2,yb=A[1]+(u[1]>.5?.8*fs2:u[1]<-.5?-.25*fs2:.3*fs2),r=[x0-1,yb-.78*fs2-1,x0+tw+1,yb+.22*fs2+1];
     if(clear(r)&&baseOK(r,yb)){g.cntAt={x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,y:yb,anc};labs.push(r);bases.push([yb,r]);break}}if(g.cntAt)break}}
- /* The names. Only the names of what is lit show, so they are placed when the lighting changes (gbLight calls run), each
-    against everything above and the names placed before it: the knot pointed at, the leaf's own hop and a break first,
-    then the knot with fewest clear places, so a crowded run of knots on one branch shares the open ground. Each tries its
-    places nearest first. */
- const fs=10*k,cw=.62*fs,D8=[[1,0],[.7071,-.7071],[0,-1],[-.7071,-.7071],[-1,0],[-.7071,.7071],[0,1],[.7071,.7071]];
- const places=e=>{const tw=e.txt.length*cw;let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
-  const dirs=D8.slice().sort((a,b)=>(Math.acos(Math.max(-1,Math.min(1,a[0]*v[0]+a[1]*v[1])))-Math.acos(Math.max(-1,Math.min(1,b[0]*v[0]+b[1]*v[1]))))||(Math.abs(b[0])-Math.abs(a[0])));
-  const rr=u=>1/Math.sqrt(Math.pow((u[0]*e.tg[0]+u[1]*e.tg[1])/e.ra,2)+Math.pow((u[0]*e.n[0]+u[1]*e.n[1])/e.rb,2));const out=[];
-  for(const len of [12,24,36])for(const u of dirs){const R0=rr(u),A=[e.p[0]+u[0]*(R0+len*k),e.p[1]+u[1]*(R0+len*k)];let anc,x0,yb;
+ /* The names. Only the names of what is lit show (and at rest a few), so they are placed when the lighting changes (gbLight),
+    each against everything above and the names placed before it: the knot pointed at, the leaf's own hop and a break first,
+    then the rest of the lit route, then what is shown only where there is room; within each, the knot with fewest clear
+    places first, so a crowded run of knots on one branch shares the open ground. Each tries its places nearest first. A hop
+    of the lit route is never left off: it goes further out, then lets its hairline cross leaves and shoots, then takes a
+    place in a column just outside the tree, level with its knot, on a hairline with one elbow. */
+ const fs=10*k,cw=.62*fs,D8=[[1,0],[.7071,-.7071],[0,-1],[-.7071,-.7071],[-1,0],[-.7071,.7071],[0,1],[.7071,.7071]],D16=[...D8,...D8.map((u,i)=>{const v=D8[(i+1)%8],m=Math.hypot(u[0]+v[0],u[1]+v[1]);return [(u[0]+v[0])/m,(u[1]+v[1])/m]})];
+ const rr=(e,u)=>1/Math.sqrt(Math.pow((u[0]*e.tg[0]+u[1]*e.tg[1])/e.ra,2)+Math.pow((u[0]*e.n[0]+u[1]*e.n[1])/e.rb,2));
+ const places=(e,txt,lens,dirs)=>{const tw=txt.length*cw;let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
+  const ds=dirs.slice().sort((a,b)=>(Math.acos(Math.max(-1,Math.min(1,a[0]*v[0]+a[1]*v[1])))-Math.acos(Math.max(-1,Math.min(1,b[0]*v[0]+b[1]*v[1]))))||(Math.abs(b[0])-Math.abs(a[0])));const out=[];
+  for(const len of lens)for(const u of ds){const R0=rr(e,u),A=[e.p[0]+u[0]*(R0+len*k),e.p[1]+u[1]*(R0+len*k)];let anc,x0,yb;
    if(Math.abs(u[0])>.38){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
-   out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5],R:[e.p[0]+u[0]*(R0+1),e.p[1]+u[1]*(R0+1)],A})}return out};
- const base=[labs.slice(),bases.slice(),lines.slice()],free=new Map(Q.map(e=>[e.id,places(e).filter(c=>clear(c.r)&&leadOK(c.R,c.A,e.id))]));
+   const R=[e.p[0]+u[0]*(R0+1),e.p[1]+u[1]*(R0+1)];out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5],R,A,pts:[A,R]})}return out};
+ /* the column beside the tree: just outside everything the tree is made of, on the side nearer the knot first */
+ let gx0=1e9,gx1=-1e9;for(const c of caps)for(const p of [c.a,c.b]){gx0=Math.min(gx0,p[0]-c.r);gx1=Math.max(gx1,p[0]+c.r)}for(const c of cush){gx0=Math.min(gx0,c.x0);gx1=Math.max(gx1,c.x1)}
+ const gut=(e,txt)=>{const tw=txt.length*cw,out=[];for(const sd of [-1,1].sort((a,b)=>Math.abs((a<0?gx0:gx1)-e.p[0])-Math.abs((b<0?gx0:gx1)-e.p[0]))){
+  const xe=sd<0?Math.max(V.vx+4+tw,gx0-8*k):Math.min(V.vx+V.W-4-tw,gx1+8*k),x0=sd<0?xe-tw:xe,R=[e.p[0]+sd*(rr(e,[sd,0])+1),e.p[1]];
+  for(let i=0;i<29;i++){const ym=e.p[1]+(i%2?1:-1)*Math.ceil(i/2)*(fs+4),yb=ym+.28*fs,A=[xe-sd*2,ym],E=[A[0]-sd*Math.min(14*k,Math.abs(A[0]-R[0])*.4),ym];
+   out.push({anc:sd<0?'end':'start',x:xe,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5],R,A,pts:Math.abs(ym-R[1])<.5?[A,R]:[A,E,R]})}}return out};
+ const base=[labs.slice(),bases.slice(),lines.slice()],free=new Map();
+ const freeOf=(e,txt)=>{const key=e.id+'|'+txt;if(!free.has(key))free.set(key,places(e,txt,[12,24,36],D8).filter(c=>clearS(c.r)&&leadS(c.pts,e.id)));return free.get(key)};
  for(const e of Q){const kl=sv('text',{x:0,y:0,class:'klbl nofit'},e.txt),ld=sv('path',{class:'kld',d:''});kl.__fit=false;kl.__ld=ld;V.gKl.append(kl,ld);B.klbl[e.id]=kl}
- const run=want=>{labs.length=0;labs.push(...base[0]);bases.length=0;bases.push(...base[1]);lines.length=0;lines.push(...base[2]);const out=new Map();
-  const P=Q.map((e,i)=>({e,i})).filter(o=>want.has(o.e.id)).sort((a,b)=>(want.get(a.e.id)-want.get(b.e.id))||(free.get(a.e.id).length-free.get(b.e.id).length)||(a.i-b.i));
-  for(const {e} of P){const got=free.get(e.id).find(c=>clear(c.r)&&baseOK(c.r,c.yb)&&leadOK(c.R,c.A,e.id));if(!got)continue;out.set(e.id,got);labs.push(got.r);bases.push([got.yb,got.r]);lines.push([got.R,got.A])}
-  return out};
+ /* want: each knot to name and how much it matters (0 and 1 must show, and 1.5, a hop the route never reached, placed after
+    them; 3, a name at rest, only close by); o: the text a burl shows for what is lit in it, and a card and its hairline to
+    keep clear of. A name that had to go far, or was left off, is tried again first, and the placing that keeps the names
+    nearest their knots wins */
+ const far=new Map(),farOf=(e,t)=>{const key=e.id+'|'+t;if(!far.has(key))far.set(key,places(e,t,[50,66,84],D16).filter(c=>clearS(c.r)&&leadS(c.pts,e.id,true)));return far.get(key)};
+ const run=(want,o)=>{o=o||{};const T=o.txt||new Map(),tx=e=>T.get(e.id)||e.txt;
+  const ok=(c,id,soft,m)=>clear(c.r,m,id)&&baseOK(c.r,c.yb)&&leadOK(c.pts,id,soft);
+  const lay=order=>{labs.length=0;labs.push(...base[0],...(o.rects||[]));bases.length=0;bases.push(...base[1]);lines.length=0;lines.push(...base[2],...(o.segs||[]));const out=new Map(),hard=[];let cost=0;
+   for(const e of order){const t=tx(e),pr=want.get(e.id);let got=null,c0=0;const tryL=(list,soft,c1,step,m)=>{if(got)return;const i=list.findIndex(c=>ok(c,e.id,soft,m));if(i>=0){got=list[i];c0=c1+i*step}};
+    tryL(freeOf(e,t),false,0,.15);if(pr<3){tryL(farOf(e,t),false,6,.05);tryL(freeOf(e,t),true,8,.05)}
+    if(pr<2){tryL(farOf(e,t),true,10,.05);if(!got){const gc=gut(e,t);tryL(gc,true,14,.1,.35);if(!got){c0=40;got=gc.find(c=>clear(c.r,.35,e.id)&&baseOK(c.r,c.yb))||gc.find(c=>clearL(c.r,.2,e.id))||gc[0]}}}
+    if(!got){cost+=pr<3?8:3;hard.push(e);continue}if(c0>=6)hard.push(e);cost+=c0;out.set(e.id,got);labs.push(got.r);bases.push([got.yb,got.r]);for(let k2=1;k2<got.pts.length;k2++)lines.push([got.pts[k2],got.pts[k2-1],e.id])}
+   return {out,cost,hard}};
+  const P=Q.map((e,i)=>({e,i})).filter(q=>want.has(q.e.id)).sort((a,b)=>(want.get(a.e.id)-want.get(b.e.id))||(freeOf(a.e,tx(a.e)).length-freeOf(b.e,tx(b.e)).length)||(a.i-b.i)).map(q=>q.e);
+  let best=lay(P);for(const e of best.hard.slice(0,4)){const pr=want.get(e.id),rest=P.filter(q=>q!==e),at=pr<2?0:rest.findIndex(q=>want.get(q.id)>=pr);const order=[...rest.slice(0,at<0?rest.length:at),e,...rest.slice(at<0?rest.length:at)];const tr=lay(order);if(tr.cost<best.cost-.01)best=tr}
+  return best.out};
  (B.kplace=B.kplace||[]).push(run)}
 /* where a shoot's leaves sit: set alternately along it from just under halfway to near its tip, each a little smaller */
 function gbShootSlots(pts,n){const acc=gbLen(pts),tot=acc[acc.length-1]||1;return Array.from({length:n},(_,i)=>{const t=.42+(.9-.42)*(n===1?0:i/(n-1)),d=t*tot;let k=1;while(k<pts.length-1&&acc[k]<d)k++;
@@ -1420,15 +1474,16 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom=''};
  if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))){hide();return}
  const s=gw.state,M=gw.M;/* a path breaks only between its hops */
- const pathOf=j=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean);return gwHops([...parts.filter(u=>!u.root),...parts.filter(u=>u.root)].map(u=>u.label))};
+ const pathOf=(j,R)=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean),o=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];return gwHops(o.map(u=>u.label),R?o.map(u=>R.lit.has(u.id)?'hit':'un'):null)};
  tip.replaceChildren();
  if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
   gwPut(tip,h('span',{class:'k'},(j?{happy:'happy path',guard:'what it refuses',failure:'how it fails'}[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')+(x.criteria.length?' · '+x.criteria.join(' '):'')),h('b',{},x.title),
    /* a failure says where it broke, in the same words as the list, then where on the route */
    r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140)):h('div',{class:'st '+w.c},w.t),
-   /* the hop it checks comes before the whole path, which is what the tree lights for it */
-   j&&j.units.includes(x.unit)?h('div',{class:'st hopl'},x.scenarioKind==='happy'?'Runs the whole journey, '+j.units.length+' hop'+(j.units.length===1?'':'s'):['Runs through ',h('b',{},(M.U[x.unit]||{}).label||x.unit),', hop '+(j.units.indexOf(x.unit)+1)+' of '+j.units.length]):null,
-   h('div',{class:'path'},j?pathOf(j):((M.U[x.unit]||{}).label||'')+(x.flow&&x.scenarioKind==='regression'?' · '+x.flow:'')))}
+   /* the hop it checks comes before the whole path; the hops it reaches are in ink and the rest faint, as the tree lights
+      them (gbReach) */
+   j&&j.units.includes(x.unit)?h('div',{class:'st hopl'},x.scenarioKind==='happy'?'Runs the whole journey, '+j.units.length+' hop'+(j.units.length===1?'':'s'):['Exercises ',h('b',{},(M.U[x.unit]||{}).label||x.unit),' (hop '+(j.units.indexOf(x.unit)+1)+' of '+j.units.length+')']):null,
+   h('div',{class:'path'},j?pathOf(j,gbReach(M,j,x)):((M.U[x.unit]||{}).label||'')+(x.flow&&x.scenarioKind==='regression'?' · '+x.flow:'')))}
  else if(k.startsWith('j:')){const j=M.J.find(q=>q.id===P.jid);const n=(gw.order||[]).indexOf(P.jid)+1;const vis=s.modeBy?s.mode:null;
   const later=P.leaves.filter(x=>vis&&gbRank[x.mode]>gbRank[vis]);
   gwPut(tip,h('span',{class:'k'},'journey '+n+(P.pol?' · '+(P.pol==='failure'?'how it fails':'what it refuses'):'')),h('b',{},j?j.title:''),
@@ -1444,63 +1499,80 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
    gbOwnSt([id]),stop?h('div',{class:'st'},'Tracing stops here: '+stop.why):null)}
  tip.hidden=false;const wrap=tip.parentNode;if(!wrap)return;
  /* on a phone there is no room beside anything: the card sits under the drawing, full width, and the drawing stays clear */
- const narrow=B.L.narrow||wrap.clientWidth<480;tip.classList.toggle('below',narrow);
+ const narrow=B.L.narrow||wrap.clientWidth<480;tip.classList.toggle('below',narrow);tip.classList.remove('dock');tip.style.maxWidth='';
  if(narrow){const sr=B.svg.getBoundingClientRect(),c0=wrap.getBoundingClientRect();tip.style.left='0px';tip.style.top=gbF(sr.bottom-c0.top+6)+'px';wrap.style.paddingBottom=gbF(tip.offsetHeight+12)+'px';return}
  wrap.style.paddingBottom='';const c=wrap.getBoundingClientRect();const tw=tip.offsetWidth,th=tip.offsetHeight;
- const sr=B.svg.getBoundingClientRect(),vb=B.svg.viewBox.baseVal,f=sr.width/vb.width;const toPx=p=>[sr.left-c.left+(p[0]-vb.x)*f,sr.top-c.top+(p[1]-vb.y)*f];
- /* a root is long and runs off under the pot: the card goes by the point that names it, not by its whole length */
- const rid=k.startsWith('u:')&&B.root[k.slice(2)]?k.slice(2):null;let r=el.getBoundingClientRect();
- if(rid&&B.pos[rid]){const q=toPx(B.pos[rid]);r={left:q[0]+c.left-6,right:q[0]+c.left+6,top:q[1]+c.top-6,bottom:q[1]+c.top+6}}
- const x0=r.left-c.left,y0=r.top-c.top,x1=r.right-c.left,y1=r.bottom-c.top,cx=(x0+x1)/2,cy=(y0+y1)/2;
- /* The card never covers what it explains: the thing pointed at, its name, the route it lights, the names of the files on
-    that route, or (for a root) the whole root, its name and where its trace stops. Those are hard; other names and the pot
-    are soft. It goes beside the thing if it can, else in the nearest clear corner of the drawing, with a hairline back. */
- const box=q=>[q.left-c.left,q.top-c.top,q.right-c.left,q.bottom-c.top];const hard=[[x0-6,y0-6,x1+6,y1+6]],soft=[];
- if(rid)hard.push(box(B.root[rid].getBoundingClientRect()));
- for(const kl of Object.values(B.klbl))if(kl.classList.contains('on')||((kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute'))){const q=kl.getBoundingClientRect();if(q.width)hard.push(box(q))}
- for(const l of Object.values(B.lbl)){const q=l.el.getBoundingClientRect();if(q.width)(l.el.classList.contains('hl')?hard:soft).push(box(q))}
+ const sr=B.svg.getBoundingClientRect(),vb=B.svg.viewBox.baseVal,f=sr.width/vb.width;const toPx=p=>[sr.left-c.left+(p[0]-vb.x)*f,sr.top-c.top+(p[1]-vb.y)*f],toSv=q=>[vb.x+(q[0]-(sr.left-c.left))/f,vb.y+(q[1]-(sr.top-c.top))/f];
+ const box=q=>[q.left-c.left,q.top-c.top,q.right-c.left,q.bottom-c.top];
+ /* A root is long and runs off under the pot: its card points at where it crosses the rim, the spot its name is set by (a
+    store in the pot, at the point its tag stands by). A knot's card points at the knot's name, which has its own hairline
+    to the knot, so no second line runs into the knot. Anything else, at itself. */
+ const rid=k.startsWith('u:')&&B.root[k.slice(2)]?k.slice(2):null,rr=rid?B.L.roots.find(q=>q.id===rid):null,P0=B.L.potC-B.L.potL/2,P1=B.L.potC+B.L.potL/2;
+ const xo=rr&&rr.pts?rr.pts.find(p=>p[0]<P0||p[0]>P1):null,rim=xo?toPx(xo):rid&&B.pos[rid]?toPx(B.pos[rid]):null;
+ const kn=k.startsWith('u:')?B.knot[k.slice(2)]:null,klk=kn?Object.keys(B.klbl).find(q=>B.knot[q]===kn):null,kl=klk?B.klbl[klk]:null,kb=kl&&kl.__fit&&kl.classList.contains('on')?box(kl.getBoundingClientRect()):null;
+ const me=rim?[rim[0]-6,rim[1]-6,rim[0]+6,rim[1]+6]:box(el.getBoundingClientRect()),AB=rim?[rim[0],rim[1],rim[0],rim[1]]:kb||me;
+ const x0=me[0],y0=me[1],x1=me[2],y1=me[3],cx=(x0+x1)/2,cy=(y0+y1)/2;
+ /* The card never covers what it explains: the thing pointed at and its name, the route it lights, the names of the files on
+    that route, or (for a root) the root itself, its name and where its trace stops; nor any name in the ground. Those are
+    hard; other names and the pot are soft. No hairline crosses a name of any kind. */
+ const hard=[[x0-6,y0-6,x1+6,y1+6]],soft=[],nox=[];if(kb)hard.push([kb[0]-4,kb[1]-4,kb[2]+4,kb[3]+4]);
+ /* a root is a long thin line: the card keeps off the line itself, not the whole box it spans, or it could never sit by the pot */
+ const rpx=rr&&rr.pts?rr.pts.map((p,i)=>{const q=toPx(p),r=(rr.w[i]||2)*f/2+5;return [q[0]-r,q[1]-r,q[0]+r,q[1]+r]}):[];
+ for(const t of Object.values(B.klbl))if(t.classList.contains('on')||((t.classList.contains('wound')||t.classList.contains('brk'))&&!t.classList.contains('wmute'))){const q=t.getBoundingClientRect();if(q.width){hard.push(box(q));if(t!==kl)nox.push(box(q))}}
+ for(const t of B.svg.querySelectorAll('.rlbl')){const q=t.getBoundingClientRect();if(q.width){hard.push(box(q));nox.push(box(q))}}
+ for(const l of Object.values(B.lbl)){const q=l.el.getBoundingClientRect();if(q.width){(l.el.classList.contains('hl')?hard:soft).push(box(q));nox.push(box(q))}}
  /* the leaves it lights are what it explains, so it never sits on them; nor on the pot, whose face carries names */
- for(const lf of B.svg.querySelectorAll('.gb-lf.hl,.gb-lf.sel')){const q=lf.getBoundingClientRect();if(q.width)hard.push([q.left-c.left-6,q.top-c.top-6,q.right-c.left+6,q.bottom-c.top+6])}
+ for(const lf of B.svg.querySelectorAll('.gb-lf.hl,.gb-lf.sel')){const q=lf.getBoundingClientRect();if(q.width){const b=[q.left-c.left-6,q.top-c.top-6,q.right-c.left+6,q.bottom-c.top+6];hard.push(b);nox.push(b)}}
  const firm=[];const pot=B.svg.querySelector('.pots');if(pot){const q=pot.getBoundingClientRect();if(q.width)firm.push(box(q))}
- /* and it would rather sit on empty ground than on foliage */
+ /* and it would rather sit on empty ground than on foliage, shoots or the hairlines of names */
  for(const P of Object.values(B.pad)){const q=P.el.getBoundingClientRect();if(q.width)soft.push(box(q))}
+ for(const e of B.svg.querySelectorAll('.budg,.kld,.scar.on')){const q=e.getBoundingClientRect();if(q.width||q.height)soft.push(box(q))}
  /* the route, as points along it */
  const rp=[];for(const pe of [B.sap,B.sapX,B.sapW]){const dd=pe.getAttribute('d')||'';const nums=dd.match(/-?[\d.]+/g)||[];for(let i=0;i+1<nums.length;i+=6)rp.push(toPx([+nums[i],+nums[i+1]]))}
- /* it stays inside the drawing: never over the key below it or past the panel's edge */
- const W2=Math.min(c.width,sr.right-c.left),H2=Math.max(sr.bottom-c.top,th+8);
- /* The card is anchored to what it explains: beside it on the right or the left, or above or below it, 10 or 24 px away,
-    sliding along that side as far as its corners; 40 px off, with a hairline, only when nothing nearer is clear. A root also
-    tries just under the pot in line with the root's end, and just outside the rim where the root crosses it; those cards
-    point at that spot. */
- const cand=[];for(const gp of [10,24,40]){for(let yy=y0-th-gp;yy<=y1+gp;yy+=12)cand.push([x1+gp,yy],[x0-tw-gp,yy]);for(let xx=x0-tw-gp;xx<=x1+gp;xx+=20)cand.push([xx,y0-th-gp],[xx,y1+gp])}
- if(rid){const rr=B.L.roots.find(q=>q.id===rid),pb=firm[0];if(rr&&rr.pts.length){const p0=B.L.potC-B.L.potL/2,p1=B.L.potC+B.L.potL/2,e=toPx(rr.pts[rr.pts.length-1]),xo=rr.pts.find(p=>p[0]<p0||p[0]>p1);
-  if(pb)for(const gp of [10,24])cand.push([e[0]-12,pb[3]+gp,e],[e[0]-tw+12,pb[3]+gp,e]);
-  if(xo){const q=toPx(xo),sd=xo[0]>p1?1:-1;for(const gp of [10,24]){for(const yy of [q[1]-th/2,q[1]-th+8,q[1]-8])cand.push([sd>0?q[0]+gp:q[0]-tw-gp,yy,q]);for(let xx=q[0]-tw;xx<=q[0];xx+=20)cand.push([xx,q[1]-th-gp,q])}}}}
+ /* it stays inside the drawing, never past the panel's edge; only a root's card, whose root lies at the foot of the drawing,
+    may hang below it over the key, and only when nothing near the rim is open (the key costs more than a little distance) */
+ const W2=Math.min(c.width,sr.right-c.left),H0=sr.bottom-c.top;
+ const inB=(p,b)=>p[0]>b[0]&&p[0]<b[2]&&p[1]>b[1]&&p[1]<b[3],ovB=(a,b)=>Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));
+ const hit=(a,b,r)=>{let t0=0,t1=1;const dx=b[0]-a[0],dy=b[1]-a[1];for(const [pp,qq] of [[-dx,a[0]-r[0]],[dx,r[2]-a[0]],[-dy,a[1]-r[1]],[dy,r[3]-a[1]]]){if(pp===0){if(qq<0)return false;continue}const t=qq/pp;if(pp<0){if(t>t1)return false;if(t>t0)t0=t}else{if(t<t0)return false;if(t<t1)t1=t}}return true};
+ /* Where it may go: beside what it explains on the right or the left, or above or below it, 10, 24 or 40 px away, sliding
+    along that side as far as its corners; then further out, to the open ground of the drawing. A root's card tries the
+    ground by the pot: outside the rim its root crosses, then under the pot, then the other side. */
+ const fit=(tw,th)=>{const H2=rid?H0+th+12:Math.max(H0,th+8),key=[0,H0,W2,H2];
+ const cand=[],ring=(b,gaps,dy,dx)=>{for(const gp of gaps){for(let yy=b[1]-th-gp;yy<=b[3]+gp;yy+=dy)cand.push([b[2]+gp,yy],[b[0]-tw-gp,yy]);for(let xx=b[0]-tw-gp;xx<=b[2]+gp;xx+=dx)cand.push([xx,b[1]-th-gp],[xx,b[3]+gp])}};
+ ring(AB,[10,24,40],12,20);if(AB!==me)ring(me,[10,24,40],12,20);ring(AB,[64,100,150,220,300],24,40);
+ if(rim&&firm[0]){const pb=firm[0],sd=xo?(xo[0]>P1?1:-1):(rim[0]<(pb[0]+pb[2])/2?-1:1),side=s2=>{for(const gp of [10,24,40,64,100])for(let yy=Math.min(rim[1],pb[1])-th-gp;yy<=pb[3]+gp;yy+=12)cand.push([s2<0?pb[0]-tw-gp:pb[2]+gp,yy])};
+  side(sd);for(const gp of [10,24,40])for(let xx=pb[0]-tw;xx<=pb[2];xx+=20)cand.push([xx,pb[3]+gp]);side(-sd)}
+ const ov=(x,y,b)=>ovB([x,y,x+tw,y+th],b);
+ /* the nearest points of two boxes, one on each */
+ const near=(a,b)=>{const ax=(lo,hi)=>b[hi]<a[lo]?[a[lo],b[hi]]:b[lo]>a[hi]?[a[hi],b[lo]]:[(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2,(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2];const X=ax(0,2),Y=ax(1,3);return [[X[0],Y[0]],[X[1],Y[1]]]};
+ /* The hairline back to what it explains, when the card is more than 16 px off: straight, or with one elbow (along, then
+    into the card's side) when that keeps it off a name. It never crosses a name, and would rather not cross foliage, the
+    pot or the lit route. */
+ const lead=CB=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0};const opts=[[pa,pc]];
+  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));if(Math.abs(my-pa[1])>4)opts.push([pa,[pa[0],my],[pa[0]<CB[0]?CB[0]:CB[2],my]])}
+  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));if(Math.abs(mx-pa[0])>4)opts.push([pa,[mx,pa[1]],[mx,pa[1]<CB[1]?CB[1]:CB[3]]])}
+  let bestL=null;for(const pts of opts){let pen=pts.length>2?12:0;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    for(const q of nox)if(!inB(pa,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2]))pen+=3000;
+    for(let s2=4;s2<sl;s2+=6){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;if(firm.some(q=>!inB(pa,q)&&inB(p,q)))pen+=300;else if(soft.some(q=>!q[4]&&!inB(pa,q)&&inB(p,q)))pen+=60;if(rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5))pen+=60}}
+   if(!bestL||pen<bestL.pen)bestL={pts,pen}}return bestL};
  let best=null;
- const ov=(x,y,b)=>Math.max(0,Math.min(x+tw,b[2])-Math.max(x,b[0]))*Math.max(0,Math.min(y+th,b[3])-Math.max(y,b[1]));
- /* shoots and the hairlines of names are soft ground too */
- for(const el of B.svg.querySelectorAll('.budg,.kld,.scar.on')){const q=el.getBoundingClientRect();if(q.width||q.height)soft.push(box(q))}
- const inB=(p,b)=>p[0]>b[0]&&p[0]<b[2]&&p[1]>b[1]&&p[1]<b[3],me=[x0-8,y0-8,x1+8,y1+8];
- /* the hairline starts inside the thing itself (a root's whole run, say), so only what it does not start in can be crossed */
- const hardL=hard.filter(b=>!inB([cx,cy],b)),softL=soft.filter(b=>!inB([cx,cy],b));
- for(const q of cand){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4)),a=q[2]||[cx,cy];let sc=0;
-  for(const b of hard){const o=ov(x,y,b);if(o>0)sc+=1e5+o*10}for(const b of firm){const o=ov(x,y,b);if(o>0)sc+=4e4+o*5}for(const b of soft)sc+=ov(x,y,b)*(b[4]||2);
-  for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3)sc+=2e4;
-  const dist=q[2]?Math.hypot(Math.max(x-a[0],a[0]-(x+tw),0),Math.max(y-a[1],a[1]-(y+th),0)):Math.hypot(Math.max(x-x1,x0-(x+tw),0),Math.max(y-y1,y0-(y+th),0));sc+=25*dist+(q[2]?40:0)+Math.abs(x+tw/2-cx)*.05;
-  /* the hairline it would draw must not cross foliage, names or the lit route */
-  const ex=Math.max(x,Math.min(a[0],x+tw)),ey=Math.max(y,Math.min(a[1],y+th));if(Math.hypot(ex-a[0],ey-a[1])>16){for(let i=1;i<12;i++){const t=i/12,p=[a[0]+(ex-a[0])*t,a[1]+(ey-a[1])*t];if(inB(p,me))continue;
-   if(hardL.some(b=>inB(p,b))||firm.some(b=>!inB([cx,cy],b)&&inB(p,b)))sc+=3000;else if(softL.some(b=>!b[4]&&inB(p,b)))sc+=600;if(rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5))sc+=600}}
-  if(!best||sc<best.sc-1)best={x,y,sc,a}}
- /* when the drawing has no clear ground near the thing, the card docks at the head of the side panel, level with it, and
-    draws no line across the tree */
- const ins=wrap.parentNode&&wrap.parentNode.nextElementSibling,ir=ins&&ins.offsetWidth?ins.getBoundingClientRect():null;
- const dock=!!ir&&ir.left>=c.right-8&&best.sc>=4e4;
- if(dock){ins.classList.add('gb-docked');tip.style.width=gbF(ir.width)+'px';best={x:ir.left-c.left,y:ir.top-c.top,sc:0,a:best.a}}
- tip.classList.toggle('dock',dock);tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
- /* a little way from what it explains, a hairline joins them; a docked card draws none, so no line crosses the tree */
- const A=best.a||[cx,cy],ex=Math.max(best.x,Math.min(A[0],best.x+tw)),ey=Math.max(best.y,Math.min(A[1],best.y+th));
- if(!dock&&Math.hypot(ex-A[0],ey-A[1])>16&&B.lead){const toSv=(px,py)=>[vb.x+(px-(sr.left-c.left))/f,vb.y+(py-(sr.top-c.top))/f];const a=toSv(A[0],A[1]),b=toSv(ex,ey),u=Math.hypot(b[0]-a[0],b[1]-a[1])||1,o=best.a?3:9;
-  B.lead.setAttribute('d','M'+gbP([a[0]+(b[0]-a[0])/u*o,a[1]+(b[1]-a[1])/u*o])+' L'+gbP(b))}else if(B.lead)B.lead.setAttribute('d','')}
+ for(const q of cand){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4)),CB=[x,y,x+tw,y+th];let sc=0;
+  for(const b of hard){const o=ov(x,y,b);if(o>0)sc+=1e5+o*10}if(rpx.some(b=>ov(x,y,b)>0))sc+=1e5;for(const b of firm){const o=ov(x,y,b);if(o>0)sc+=4e4+o*5}for(const b of soft)sc+=ov(x,y,b)*(b[4]||2);
+  for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3)sc+=2e4;if(ov(x,y,key)>0)sc+=4000+ov(x,y,key)*.02;
+  const [pa,pc]=near(AB,CB);sc+=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05;if(best&&sc>=best.sc)continue;
+  const L2=lead(CB);sc+=L2.pen;if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB}}
+ return best};
+ /* a card with no open ground near what it explains tries a narrower, taller shape: beside a pot or a crown there is
+    often room for one but not the other */
+ let best=fit(tw,th);if(best.sc>4000)for(const w of [250,215]){if(w>=tw)continue;tip.style.maxWidth=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.sc+=(tw-w)*8;if(b2.sc<best.sc){best=b2;best.mw=w}}
+ tip.style.maxWidth=best.mw?best.mw+'px':'';
+ tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
+ /* the hairline, drawn in the drawing; a rim point's starts just off the point */
+ let lp=null;if(best.pts&&B.lead){lp=best.pts.map(toSv);if(rim){const a=lp[0],b=lp[1],u=Math.hypot(b[0]-a[0],b[1]-a[1])||1;lp[0]=[a[0]+(b[0]-a[0])/u*3,a[1]+(b[1]-a[1])/u*3]}B.lead.setAttribute('d','M'+lp.map(gbP).join(' L'))}else if(B.lead)B.lead.setAttribute('d','');
+ /* the names make way for the card and its hairline: a name it covers, or one its hairline would cross, moves (gbPlaceNames) */
+ const CB=best.CB,segs=best.pts?best.pts.slice(1).map((p,i)=>[best.pts[i],p]):[];
+ const clash=Object.values(B.klbl).some(t=>{if(t===kl||!t.classList.contains('on'))return false;const q=box(t.getBoundingClientRect());return ovB(CB,q)>0||segs.some(([a,b])=>hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2]))});
+ if(clash){const a=toSv([CB[0]-4,CB[1]-4]),b=toSv([CB[2]+4,CB[3]+4]);gbPlaceNames(B,{rects:[[a[0],a[1],b[0],b[1]]],segs:lp?lp.slice(1).map((p,i)=>[lp[i],p,klk]):[]})}}
 function gbRove(el){const B=gw.B;for(const k in B.navEl)B.navEl[k].setAttribute('tabindex','-1');for(const id in B.leaf)B.leaf[id].setAttribute('tabindex','-1');for(const id in B.bud)B.bud[id].setAttribute('tabindex','-1');el.setAttribute('tabindex','0')}
 /* the keys follow the picture: up and down move between pads, knots and roots by height; left and right move along a
    journey's leaves, or a part's own checks, by where they sit */
@@ -1528,8 +1600,8 @@ function gbCursors(now){const B=gw.B,s=gw.state;if(!B||!s||gw.tree!=='grove')ret
    between its method and its path), and each arrow goes with the hop before it, so a line ends on the arrow that leads on and
    never starts with one; a line the path wraps onto starts a little in, under the first hop, as the same path going on (see
    .gw-hp). */
-function gbPathEl(j,wound){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
- return h('div',{class:'gb-path gw-path gw-hp'},order.map((u,i)=>h('span',{class:'hop'},h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))),i<order.length-1?h('span',{class:'sp','aria-hidden':'true'},' › '):null)))}
+function gbPathEl(j,wound,R){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
+ return h('div',{class:'gb-path gw-path gw-hp'},order.map((u,i)=>h('span',{class:'hop'+(R&&!R.lit.has(u.id)?' un':'')},h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))),i<order.length-1?h('span',{class:'sp','aria-hidden':'true'},' › '):null)))}
 /* Where a journey starts: the words, then its entry, kept whole and held to the word before it. */
 const gbStarts=(j,M)=>['starts '+(gbWHERE[j.surface]||'')+' at ',...gwCodeText(gwPlain((M.U[j.entry]||{}).label||''))];
 /* A journey's state in words, each count whole and in its colour, the dot going with the count after it; the dot of a count
@@ -1556,7 +1628,7 @@ function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=
   h('div',{class:'sec'},h('div',{class:'row',style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
    r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},gwBroke(r))):null,
    x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null),
-  j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x))):null,
+  j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x),gbReach(M,j,x))):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},x.flow?h('span',{class:'gw-chip built'},x.flow):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
     x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),x.variants.length?gwLanes(x):null)]}
 

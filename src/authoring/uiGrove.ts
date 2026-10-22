@@ -291,8 +291,6 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw .gw-cmp.key{margin-top:0}.gw .gw-cmp.key th:first-child{width:auto}.gw .gw-cmp.key td{padding-top:4px;padding-bottom:4px}.gw .gw-cmp.key td.n{padding-top:4px;padding-bottom:4px}
 .gw .gw-cmp .is-chosen{color:var(--ink);font-weight:600}.gw .gw-cmp th.is-chosen{box-shadow:inset 0 -2px 0 var(--forest)}
 @container (max-width:520px){.gw .gw-legend .gw-lg{grid-template-columns:minmax(0,1fr);gap:2px}.gw .gw-legend .lgi{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}.gw .gw-legend .gw-lgt{grid-column:1/-1}}
-.gw-sw .rdot{fill:#d4d4d4;stroke:#2e2620;stroke-width:.6}
-@media (prefers-color-scheme:dark){.gw-sw .rdot{fill:#7b8086;stroke:#101214}}
 /* a mode's card counts what it adds off the journeys, as the tree's shoots and the Outline's sections count it */
 .gw .gw-modes button .gw-madd{display:block;margin-top:3px;font:11.5px/16px var(--mono);color:var(--muted)}.gw .gw-modes button .gw-madd span{font:inherit;color:inherit;line-height:inherit}
 .gw .gw-mdesc .gw-madd{display:block;font:11.5px/16px var(--mono);color:var(--muted)}
@@ -474,9 +472,9 @@ function gwSw(k){
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
  /* the route as the tree draws it along the wood, in three marks: the gold dashed route, red on the hop where it broke, and
-    the grey dots, ringed dark so they read on the bark, where it never got */
+    the small grey dots where it never got, drawn as the tree draws them (one stroke of round dots, .rdots with .sap.rest) */
  if(k==='route'||k==='rbad'||k==='rrest')return gwSvg(22,10,sv('path',{d:'M0 2.4 C7.3 2.8 14.7 3.3 22 3.7 L22 6.3 C14.7 6.7 7.3 7.2 0 7.6 Z',class:'wd'}),
-  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'})]:k==='rbad'?[sv('path',{d:'M2 5 L7.6 5',class:'rte'}),sv('path',{d:'M9.6 5 L20 5',class:'rte bad'})]:[3.6,8.6,13.6,18.6].map(x=>sv('circle',{cx:x,cy:5,r:1.45,class:'rdot'})));
+  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'})]:k==='rbad'?[sv('path',{d:'M2 5 L7.6 5',class:'rte'}),sv('path',{d:'M9.6 5 L20 5',class:'rte bad'})]:[sv('path',{d:'M3.4 5 L20 5',class:'rdots'})]);
  /* a knot: a boss on the bark, lit gold from inside when its route is lit, cracked red where a hop broke */
  const kn=(...x)=>gwSvg(20,10,sv('path',{d:'M0 3.1 C7 3.3 13 3.5 20 3.7 L20 6.3 C13 6.5 7 6.7 0 6.9 Z',class:'wd'}),...x,sv('ellipse',{cx:10.5,cy:5.6,rx:4.3,ry:3.1,class:'k0'}),sv('ellipse',{cx:10,cy:5,rx:3.9,ry:2.8,class:'k1'}),sv('ellipse',{cx:9.3,cy:4.2,rx:2.2,ry:1.3,class:'k2'}));
  if(k==='knot')return kn();
