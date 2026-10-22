@@ -13,6 +13,19 @@ describe('What a failed check compared', () => {
     expect(comparedOf(p, { reasonCode: 'body.count differs', actual: [200, 1] }, http)).toEqual({ check: 'body.count', expected: 0, got: 1 });
     expect(comparedOf(p, { reasonCode: 'status 500 != 200', actual: [500, null] }, http)).toEqual({ check: 'status', expected: 200, got: 500 });
   });
+  it('takes the leaf whose own recorded actual gives the recorded reason, never one that held on the same path', () => {
+    const atMost = { kind: 'all' as const, predicates: [{ kind: 'json_path_at_most' as const, path: 'body.n', value: 5 }, { kind: 'json_path_at_most' as const, path: 'body.n', value: 2 }] };
+    expect(comparedOf(atMost, { reasonCode: 'body.n 3 > 2', actual: [3, 3] }, http)).toEqual({ check: 'body.n', expected: { atMost: 2 }, got: 3 });
+    expect(comparedOf(atMost, { reasonCode: 'body.n is not a number', actual: ['x', 'x'] }, http)).toEqual({ check: 'body.n', expected: { atMost: 5 }, got: 'x' });
+    const includes = { kind: 'all' as const, predicates: [{ kind: 'json_path_includes' as const, path: 'body.tags', values: ['a'] }, { kind: 'json_path_includes' as const, path: 'body.tags', values: ['b'] }] };
+    expect(comparedOf(includes, { reasonCode: 'body.tags lacks "b"', actual: [['a'], ['a']] }, http)).toEqual({ check: 'body.tags', expected: ['b'], got: ['a'] });
+    const excludes = { kind: 'all' as const, predicates: [{ kind: 'json_path_excludes' as const, path: 'body.tags', values: ['x'] }, { kind: 'json_path_excludes' as const, path: 'body.tags', values: ['a'] }] };
+    expect(comparedOf(excludes, { reasonCode: 'body.tags contains "a"', actual: [['a'], ['a']] }, http)).toEqual({ check: 'body.tags', expected: { without: ['a'] }, got: ['a'] });
+    const equals = { kind: 'all' as const, predicates: [{ kind: 'json_path_equals' as const, path: 'body.state', value: 'open' }, { kind: 'json_path_equals' as const, path: 'body.state', value: 'closed' }] };
+    expect(comparedOf(equals, { reasonCode: 'body.state differs', actual: ['open', 'open'] }, http)).toEqual({ check: 'body.state', expected: 'closed', got: 'open' });
+    // A reason no leaf gives on its own actual names no check.
+    expect(comparedOf(atMost, { reasonCode: 'body.n 1 > 2', actual: [1, 1] }, http)).toBeNull();
+  });
   it('names a stand-in count by its route, and says nothing when the record names no check of the predicate', () => {
     const p = { kind: 'json_path_equals' as const, path: 'body.count', value: 2 };
     expect(comparedOf(p, { reasonCode: 'body.count differs', actual: 3 }, { method: 'STANDIN', path: 'payments POST /v1/charges' })).toEqual({ check: 'payments POST /v1/charges call count', expected: 2, got: 3 });

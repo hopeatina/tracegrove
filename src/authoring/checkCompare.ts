@@ -3,7 +3,8 @@
  * reducer recorded, named as the Run tab names it, with what it expected and what it got. The Run tab shows it on the step,
  * and grow says it in its verdict and `grow --json`. Nothing is guessed: a record that does not say gives no comparison.
  */
-import type { PredicateT } from '../protocol/index.ts';
+import { textHas } from '../core/reducer.ts';
+import { digestOfValue, type PredicateT } from '../protocol/index.ts';
 
 export type Compared = { check: string; expected: unknown; got: unknown };
 
@@ -14,21 +15,32 @@ function leaves(p: PredicateT, actual: unknown): Leaf[] {
   const list = Array.isArray(actual) ? actual : [];
   return p.predicates.flatMap((q, i) => leaves(q, i < list.length ? list[i] : null));
 }
-/** The leaf whose failure the reducer recorded as `reason` (src/core/reducer.ts says each one this way). */
-function failedLeaf(all: Leaf[], reason: string): Leaf | undefined {
-  return all.find(({ p, actual }) => {
-    switch (p.kind) {
-      case 'status_equals': return reason === `status ${actual ?? 'none'} != ${p.value}`;
-      case 'json_path_equals': return reason === `${p.path} differs` || reason === `${p.path} absent`;
-      case 'json_path_present': return reason === `${p.path} absent`;
-      case 'json_path_absent': return reason === `${p.path} present`;
-      case 'json_path_count': return reason === `count ${actual} != ${p.count}`;
-      case 'json_path_includes': return reason === `${p.path} absent` || reason.startsWith(`${p.path} lacks `);
-      case 'json_path_excludes': return reason.startsWith(`${p.path} contains `);
-      case 'json_path_at_most': return reason.startsWith(`${p.path} `) && (reason.includes(' > ') || reason.endsWith(' is not a number'));
-      case 'step_result': return reason === `step ${actual ?? 'unobserved'} != ${p.value}`;
+const quoted = (values: string[]) => values.map((v) => JSON.stringify(v)).join(', ');
+/**
+ * The reasons the reducer could have recorded for a leaf on its own recorded actual, rebuilt the way src/core/reducer.ts says
+ * each one: none when the leaf held. A recorded actual of null leaves it open whether the path was absent or held null, so
+ * both readings are kept.
+ */
+function reasonsOf({ p, actual }: Leaf): string[] {
+  switch (p.kind) {
+    case 'status_equals': return actual === p.value ? [] : [`status ${actual ?? 'none'} != ${p.value}`];
+    case 'json_path_equals': return actual === null ? [`${p.path} absent`, ...(p.value === null ? [] : [`${p.path} differs`])]
+      : digestOfValue(actual).hex === digestOfValue(p.value).hex ? [] : [`${p.path} differs`];
+    case 'json_path_present': return actual === null ? [`${p.path} absent`] : [];
+    case 'json_path_absent': return [`${p.path} present`];
+    case 'json_path_count': return actual === p.count ? [] : [`count ${actual} != ${p.count}`];
+    case 'json_path_includes': {
+      const missing = p.values.filter((v) => !textHas(actual, v));
+      return [...(actual === null ? [`${p.path} absent`] : []), ...(missing.length ? [`${p.path} lacks ${quoted(missing)}`] : [])];
     }
-  });
+    case 'json_path_excludes': { const found = p.values.filter((v) => textHas(actual, v)); return found.length ? [`${p.path} contains ${quoted(found)}`] : []; }
+    case 'json_path_at_most': return typeof actual !== 'number' ? [`${p.path} is not a number`] : actual <= p.value ? [] : [`${p.path} ${actual} > ${p.value}`];
+    case 'step_result': return actual === p.value ? [] : [`step ${actual ?? 'unobserved'} != ${p.value}`];
+  }
+}
+/** The leaf whose failure the reducer recorded as `reason`: the one whose own recorded actual gives exactly that reason. */
+function failedLeaf(all: Leaf[], reason: string): Leaf | undefined {
+  return all.find((l) => reasonsOf(l).includes(reason));
 }
 /** What a leaf compared, named as the Run tab names it, and what it wanted. */
 function compared(l: Leaf, reason: string, step: { method: string; path: string }): Compared {

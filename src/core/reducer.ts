@@ -40,7 +40,7 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 
 const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
 /** Case- and whitespace-insensitive: substring of a string, or equal to an element of a list. */
-function textHas(haystack: unknown, needle: string): boolean {
+export function textHas(haystack: unknown, needle: string): boolean {
   const want = normalizeText(needle);
   if (typeof haystack === 'string') return normalizeText(haystack).includes(want);
   if (Array.isArray(haystack)) return haystack.some((item) => typeof item === 'string' ? normalizeText(item) === want : textHas(item, needle));
