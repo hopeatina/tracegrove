@@ -21,7 +21,7 @@ import { agentEnv, claudeResult, describeAgentLine, detectAgents, resolveAgentSe
 import { matchesTemplate } from './traffic.ts';
 import { runTests } from './run.ts';
 import type { TestRunReport } from './runReport.ts';
-import { draftWithAgent, latestObservedRun } from './workspace.ts';
+import { draftWithAgent, latestObservedRun, type ProvedFlow } from './workspace.ts';
 import { PROVIDERS, findSpec, git, grepAt, harnessOf, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, routesOf, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import { journeysOf, reachGraph, words } from './growReach.ts';
 import {
@@ -766,6 +766,20 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
 
 /* ---------- prove ---------- */
 
+/**
+ * What a flow an agent wrote proved for its scenario, read as a run of an existing flow is: passed; failed only when a check ran
+ * and did not hold (the case outcome assertion_failed); otherwise not tested yet, with why, and the run that says so. A flow that
+ * did not compile, an app that did not start, a run that was blocked, cancelled or inconclusive, or evidence that did not verify
+ * proves nothing either way.
+ */
+export function writtenFlowResult(scenario: string, flow: Pick<ProvedFlow, 'outcome' | 'detail' | 'run' | 'caseOutcome' | 'failure'>): GrowEventBody {
+  if (flow.outcome === 'proven') return { kind: 'scenario.passed', scenario, took: 0, run: flow.run };
+  if (flow.caseOutcome === 'assertion_failed') return { kind: 'scenario.failed', scenario, took: 0, run: flow.run, why: flow.failure ?? flow.detail ?? flow.outcome, outcome: 'assertion_failed' };
+  const why = flow.caseOutcome === 'passed' && flow.detail === 'the run evidence did not verify' ? 'Not proven: the run evidence did not verify'
+    : couldNotRun(flow.failure ?? flow.detail ?? 'the run recorded no result for this flow');
+  return { kind: 'scenario.not_run', scenario, why, ...(flow.run ? { run: flow.run } : {}), ...(flow.caseOutcome ? { outcome: flow.caseOutcome } : {}) };
+}
+
 async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | null) {
   const { emit, state } = ctx;
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[state.mode]);
@@ -850,8 +864,8 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
         const sc = state.scenarios.find((y) => y.id === target.id)!;
         sc.ext = [...new Set([...sc.ext, ext])];
         emit({ kind: 'scenario.running', scenario: target.id, flow: flow.caseIds[0] ?? file });
-        if (flow.outcome === 'proven') { emit({ kind: 'scenario.passed', scenario: target.id, took: 0, run: flow.run }); emit({ kind: 'extension.proven', ext, by: target.id }); }
-        else emit({ kind: 'scenario.failed', scenario: target.id, took: 0, run: flow.run, why: flow.detail ?? flow.outcome });
+        emit(writtenFlowResult(target.id, flow));
+        if (flow.outcome === 'proven') emit({ kind: 'extension.proven', ext, by: target.id });
       }
       emit({ kind: 'agent.done', agent: 'd1', ok: drafted.agent.exitCode === 0, note: `${drafted.agent.files.length} file${drafted.agent.files.length === 1 ? '' : 's'} written` });
     } catch (error) {

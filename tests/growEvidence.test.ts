@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
-import { grow } from '../src/authoring/grow.ts';
+import { grow, writtenFlowResult } from '../src/authoring/grow.ts';
+import { draftWithAgent } from '../src/authoring/workspace.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
@@ -588,6 +589,62 @@ describe('The verdict', () => {
     const e = { v: 'tracegrove.discovery-event/v1', seq: 1, ms: 1, kind: 'scenario.not_run', scenario: 's10', why: 'Could not run: the app did not start (application exited before becoming ready)', run: s.run.s10!.run, outcome: 'infrastructure_failed' } as GrowEvent;
     expect(plainLine(applyGrow(s, e), e)).toBe('not run Removing a seat never charges the card (seats.remove-seat): Could not run: the app did not start (application exited before becoming ready)');
   });
+});
+
+describe('A flow an agent wrote that never reached its checks', () => {
+  /* The agent proposes, tracegrove proves: a flow the agent writes runs like any other. When it did not compile, or its run never
+     reached its checks (the app did not start), it proves nothing either way: its scenario is not tested yet, never failed. */
+  const path0 = process.env.PATH;
+  afterAll(() => { process.env.PATH = path0; cleanTemps(); });
+  /** A `claude` on PATH that writes one flow file, `body`, where the draft prompt asks for flows. */
+  function writingClaude(body: string): void {
+    const bin = mkdtempSync(join(tmpdir(), 'tracegrove-agentbin-')); temps.push(bin);
+    writeFileSync(join(bin, 'claude'), `#!/bin/sh\nmkdir -p tracegrove/discovered/notes\ncat > tracegrove/discovered/notes/count-anonymous.flow.yaml <<'YAML'\n${body}YAML\necho '{"type":"result","result":"wrote it"}'\n`);
+    chmodSync(join(bin, 'claude'), 0o755);
+    process.env.PATH = `${bin}${delimiter}${path0}`;
+  }
+  const FLOW = ['title: Without a token the count is refused', 'tags: [discovered]', 'steps:', '  - name: anonymous is refused', '    GET: /notes/count', '    as: none', '    expect: 401', ''].join('\n');
+  /** The plotline grow, with s10's run replaced by what the written flow proved. */
+  const asWritten = (flow: Parameters<typeof writtenFlowResult>[1]) => plotline((e) => (e.kind === 'scenario.failed' && e.scenario === 's10' ? { v: e.v, seq: e.seq, ms: e.ms, ...writtenFlowResult('s10', flow) } as GrowEvent : e));
+
+  it('reads an app that did not start as not tested yet, with the reason and the run that says so: exit 3, never 1', async () => {
+    const dir = notesCount(false);
+    const app = join(dir, 'app', 'app.mjs');
+    writeFileSync(app, `import './settings.mjs';\n${readFileSync(app, 'utf8')}`);
+    writingClaude(FLOW);
+    const drafted = await draftWithAgent({ dir, branch: null, intent: 'Without a token the count is refused' });
+    const flow = drafted.prove!.flows[0]!;
+    expect(flow).toMatchObject({ outcome: 'failed', caseOutcome: 'infrastructure_failed', failure: expect.stringMatching(/^\(app startup\): /) });
+    const e = writtenFlowResult('s10', flow);
+    expect(e).toMatchObject({ kind: 'scenario.not_run', scenario: 's10', run: flow.run, outcome: 'infrastructure_failed', why: expect.stringMatching(/^Could not run: the app did not start \(.+\)$/) });
+    const s = asWritten(flow);
+    expect(s.run.s10).toMatchObject({ st: 'not_run', run: flow.run });
+    expect(growVerdict(s)).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { failed: 0, notTestedYet: 4 }, first: null });
+    const summary = growJsonSummary(s, dir);
+    expect(summary.failures).toEqual([]);
+    expect(summary.unproven.find((x) => x.scenario === 's10')).toMatchObject({ reason: (e as { why: string }).why, run: flow.run });
+  }, 120_000);
+
+  it('reads a flow that did not compile as not tested yet, and one whose check did not hold as failed', async () => {
+    const dir = notesCount(false);
+    writingClaude(['title: Without a token the count is refused', 'steps:', '  - name: anonymous is refused', '    FROB: /notes/count', ''].join('\n'));
+    const drafted = await draftWithAgent({ dir, branch: null, intent: 'Without a token the count is refused' });
+    const flow = drafted.prove!.flows[0]!;
+    expect(flow).toMatchObject({ outcome: 'failed', caseOutcome: null, run: null });
+    const e = writtenFlowResult('s10', flow);
+    expect(e).toMatchObject({ kind: 'scenario.not_run', scenario: 's10', why: expect.stringMatching(/^Could not run: /) });
+    expect(e).not.toHaveProperty('run');
+    expect(growVerdict(asWritten(flow))).toMatchObject({ verdict: 'not proven yet', exitCode: 3, counts: { failed: 0 } });
+    // A check that ran and did not hold is a failure, as for any flow; evidence that did not verify proves nothing.
+    writingClaude(FLOW.replace('expect: 401', 'expect: 200'));
+    const wrong = (await draftWithAgent({ dir, branch: null, intent: 'Without a token the count is refused' })).prove!.flows[0]!;
+    expect(wrong).toMatchObject({ caseOutcome: 'assertion_failed', failure: 'anonymous is refused: expected status 200, got 401' });
+    expect(writtenFlowResult('s10', wrong)).toMatchObject({ kind: 'scenario.failed', run: wrong.run, why: 'anonymous is refused: expected status 200, got 401', outcome: 'assertion_failed' });
+    expect(growVerdict(asWritten(wrong))).toMatchObject({ verdict: 'not ready', exitCode: 1, counts: { failed: 1 } });
+    expect(writtenFlowResult('s10', { outcome: 'failed', detail: 'the run evidence did not verify', run: wrong.run, caseOutcome: 'passed', failure: null }))
+      .toEqual({ kind: 'scenario.not_run', scenario: 's10', why: 'Not proven: the run evidence did not verify', run: wrong.run, outcome: 'passed' });
+    expect(writtenFlowResult('s10', { outcome: 'proven', detail: null, run: wrong.run, caseOutcome: 'passed', failure: null })).toEqual({ kind: 'scenario.passed', scenario: 's10', took: 0, run: wrong.run });
+  }, 180_000);
 });
 
 describe('grow --json and the exit code', () => {
