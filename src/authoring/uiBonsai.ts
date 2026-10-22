@@ -531,7 +531,7 @@ const gbPlain=t=>String(t||'').split(gbBT).join('');
    height on the outside of a bend, branches alternating and shortening upward, the apex back over the roots. A branch
    is a journey. When fewer than two journeys branch, the headline journey's own failure and guard paths grow as its
    first branches, so a one-journey change is still a whole tree and every pad stands for something real. */
-function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(j).size:0,nl=j=>(M.leaves[j.id]||[]).length;
+function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j.id]?M.crit(j).size:0,nl=j=>(M.leaves[j.id]||[]).length;
  /* the headline journey is the crown; of the others, the one with the most scenarios grows lowest */
  const big=(a,b)=>nl(b)-nl(a)||nc(b)-nc(a)||M.weight(b)-M.weight(a)||(a.id<b.id?-1:1);
  const apex=js.length===1?js[0]:gbHead(M,js);const A=sap?[]:(M.leaves[apex.id]||[]);
@@ -571,10 +571,12 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
   for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(bare(items[pd.i])+pd.geo.PW)/.62-.6*cpd.geo.PH)}
  /* the wood is sized from the data: the trunk's girth from how many scenarios the tree carries, so a handful of leaves stands
     on a slender trunk, and the trunk at least about twelve girths tall, so a small tree grows tall and light, never squat
-    (from the leaf's own size, not the larger one a phone may give it) */
- const nL=js.reduce((a,j)=>a+nl(j),0),Dd=cpd.geo.L0*Math.max(1,Math.min(3,.42*Math.sqrt(nL)));
- /* (a phone's larger leaves make larger pads than the drawing's height allows for: there the trunk grows as tall as they need) */
- const Ht=Math.max(M.lmin?need:0,Math.min(.92*H,sap?need:Math.max(need,12.5*Dd)));const D=sap?Ht*.05:Dd;
+    (from the leaf's own size, not the larger one a phone may give it). Never under an eighth of its pot's length (dmin, from
+    gbLayout once the pot is chosen), so the pot never dwarfs it */
+ const nL=js.reduce((a,j)=>a+nl(j),0),Dd=Math.max(dmin||0,cpd.geo.L0*Math.max(1,Math.min(3,.45*Math.sqrt(nL))));
+ /* (a phone's larger leaves make larger pads than the drawing's height allows for: there the trunk grows as tall as they need;
+    and a trunk thickened for its pot grows as tall as twelve of its girths, whatever the drawing's height) */
+ const Ht=Math.max(M.lmin?need:0,Math.min(.92*H,sap?need:Math.max(need,12.5*Dd)),sap||!dmin?0:12.1*Dd);const D=sap?Ht*.05:Dd;
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
  else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;items.forEach((it,i)=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
   /* with one or two branches the apex leans a little away from the first, so the tree's mass stays over its roots: the
@@ -589,11 +591,12 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
  /* the trunk tapers in one continuous line from a flared base into the crown, w = w0(1 - .68t)^.85, so the leader still has
     about a third of the base's girth where it enters the crown: never a wire. Each branch takes a little of the girth with it
     (six parts in a hundred, eased over the joint), and the wood swells slightly where it leaves. */
- /* (the foot flares over the bottom tenth, smoothly, so it reads as the trunk spreading into its roots: about two fifths wider
-    where it meets the soil) */
- const Tw=t=>{const tc=Math.min(1,Math.max(0,t));let w=lit?D*(.3+.7*Math.pow(Math.max(0,1-t),1.05)):D*Math.pow(1-.68*tc,.85);
+ /* (the foot flares over the bottom seventh, smoothly, so it reads as the trunk spreading into its roots: where it meets the
+    soil half again as wide as it is one caliper up, the flare's own amount A solved for that from the taper there) */
+ const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},tF=.15,tC=Math.min(.6*tF,D/Ht),sF=Math.pow(1-tC/tF,2),rB=base(tC)/base(0),fA=Math.max(.2,(1.5*rB-1)/(1-1.5*rB*sF));
+ const Tw=t=>{let w=D*base(t);
   if(!lit)for(const h of hs){const u=Math.max(0,Math.min(1,(t-h)/.05));w*=1-.06*u*u*(3-2*u)}
-  for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));if(t<.1)w*=1+.72*Math.pow(1-t/.1,1.9);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};
+  for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));if(t<tF)w*=1+fA*Math.pow(1-Math.max(0,t)/tF,2);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};
  const tw=ty.map(Tw);
  /* A branch leaves the trunk at a third of its width or less, carries its own parts as knots on the bare wood before its
     pad, and runs on under the pad, where three to five branchlets fork up into the foliage they carry. */
@@ -702,7 +705,7 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
   const trunk=tp.slice(0,kTop2+1).map((q,i)=>{const n=gbNorm(tp,i),o=f*tw[i]*.5;return[q[0]+n[0]*o,q[1]+n[1]*o]});
   veins[id]={jid:pads[id].jid,trunk,branch:b?b.pts.slice(b.exit,Math.round(.55*(b.pts.length-1))):[],pad:origin[id]}}
  if(!strict&&!lit){const bx=(pd,o)=>{const g=pd.geo;return pd.crown?[o[0]-g.PW/2-g.L*.6,o[1]-g.PH-6,o[0]+g.PW/2+g.L*.6,o[1]+g.drop+4]:[o[0]-g.PW/2-g.L*.5,o[1]-g.PH-6,o[0]+g.PW/2+g.L*.5,o[1]+g.drop+4]};
-  const c=bx(cpd,origin[apex.id]);if(padList.slice(1).some(pd=>{const q=bx(pd,origin[pd.id]);return Math.min(c[2],q[2])+10>Math.max(c[0],q[0])&&Math.min(c[3],q[3])+10>Math.max(c[1],q[1])}))return gbTree(M,js,H,S,key,sap,true)}
+  const c=bx(cpd,origin[apex.id]);if(padList.slice(1).some(pd=>{const q=bx(pd,origin[pd.id]);return Math.min(c[2],q[2])+10>Math.max(c[0],q[0])&&Math.min(c[3],q[3])+10>Math.max(c[1],q[1])}))return gbTree(M,js,H,S,key,sap,true,dmin)}
  let x0=Infinity,x1=-Infinity,y0=0;const grow=(x,y)=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y)};
  tp.forEach((q,i)=>{grow(q[0]-tw[i]/2,q[1]);grow(q[0]+tw[i]/2,q[1])});for(const b of br)b.pts.forEach(q=>grow(q[0],q[1]-b.b));
  for(const pd of padList){const o=origin[pd.id],g=pd.geo;grow(o[0]-g.PW/2-g.L*.5,o[1]-g.PH-6);grow(o[0]+g.PW/2+g.L*.5,o[1]+g.drop+4)}
@@ -730,9 +733,9 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   if(list){list=gbOrd(list);lines=wrap(list[0].title,30,3)}
   else lines=wrap(title,30,3);
   return {lines,hgt:lines.length*16+32+(n>=3?14:0),w:Math.max(...lines.map(l=>gbW(gbPlain(l),7.1)),150)+18}};
- let L=null;const Hmin=sap?0:Math.min(H0,400);
+ let L=null;const Hmin=sap?0:Math.min(H0,400);let dmin=0,dr=0;
  for(let pass=0;pass<6;pass++){
-  const trees=trees0.map((t,i)=>gbTree(M,t.js,i?H0*Math.max(.5,Math.min(.75,Math.sqrt((t.leaves||1)/Math.max(1,main.leaves||1)))):H0,i%2?-S:S,brn+':'+i,sap));
+  const trees=trees0.map((t,i)=>gbTree(M,t.js,i?H0*Math.max(.5,Math.min(.75,Math.sqrt((t.leaves||1)/Math.max(1,main.leaves||1)))):H0,i%2?-S:S,brn+':'+i,sap,false,i?0:dmin));
   /* label boxes, local to each tree */
   for(const T of trees){T.lbl={};for(const pd of T.padList){const j=T.js.find(q=>q.id===pd.jid);const l=pd.pol?lblOf('',pd.leaves,pd.leaves.length):lblOf(j.title,null,pd.leaves.length);const o=T.origin[pd.id],g=pd.geo,b=pd.b;
     /* on a phone the tree carries numbers, outside the canopy on a short leader */
@@ -749,43 +752,48 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* one CSS pixel in drawing units: a phone's canvas is drawn wider and scaled down whole */
   const kpx=narrow&&!sap?GB_NK:1;
   /* the pot is chosen for the tree as a grower would choose one for an informal upright: about two thirds as long as the
-     tree is tall (up to seven tenths for a tree that spreads wider than it is tall), about as deep as the trunk is thick at
-     its foot, and never shorter than its nebari and its roots need */
+     tree is tall (up to seven tenths for a tree that spreads wider than it is tall), but never so long that the trunk is
+     under an eighth of it, so the pot never dwarfs the trunk; about as deep as the trunk is thick at its foot, and never
+     shorter than its roots need */
   const tall=Math.max(-T0.cy0,T0.Ht,1),spread=T0.cx1-T0.cx0;
-  let potL=lone?Math.max(.4*H0,96):Math.max(narrow?110:150,Math.min(760,tall*(.6+.1*Math.max(0,Math.min(1,spread/tall-1)))));
-  /* the pot sits under the canopy's mass, the trunk off its centre, so a heavy first branch does not hang off one end */
-  let potC=trees.length===1?(lone?0:Math.max(-potL*.2,Math.min(potL*.2,(T0.cx0+T0.cx1)/2*.85))):(Math.min(...xs)+Math.max(...xs))/2;
+  let potL=lone?Math.max(.4*H0,96):Math.max(narrow?110:150,Math.min(760,T0.D/.122,tall*(.6+.1*Math.max(0,Math.min(1,spread/tall-1)))));
+  /* the pot sits under the canopy's mass, the trunk off its centre, so a heavy first branch does not hang off one end; never
+     so far off it that the nebari has no room to spread on its short side */
+  let potC=trees.length===1?(lone?0:Math.max(-potL*.2+12,Math.min(potL*.2-12,(T0.cx0+T0.cx1)/2*.85))):(Math.min(...xs)+Math.max(...xs))/2;
   if(trees.length>1)potL=Math.max(potL,Math.max(...xs)-Math.min(...xs)+.5*H0);
   /* roots: one per thing the change depends on, alternating sides. A store in the repo runs along the soil and sinks into it;
      a third party runs over the rim and down the pot, out of the repo; one that no journey uses lies apart, severed. */
   const deps=[];const taken=new Set();
   trees.forEach((T,i)=>{const ids=[...new Set(T.js.flatMap(j=>(j.units||[]).filter(id=>M.U[id]&&M.U[id].root)))].filter(id=>!taken.has(id));if(!i)for(const u of M.strays)ids.push(u.id);
    ids.slice(0,6).forEach((id,k)=>{taken.add(id);deps.push({id,i,d:k%2?T.S:-T.S,r:Math.floor(k/2),T,ext:M.U[id].layer==='ext',loose:!T.js.some(j=>(j.units||[]).includes(id))})})});
-  /* the nebari: five buttress roots (four on a slender literati) flaring from the trunk's foot, alternately long and short,
-     each leaving the trunk about a third of the foot's girth thick and tapering to nothing within one to one and a half of its
-     diameters, its lower two fifths sunk in the soil; the back ones a little higher, the front ones lower and laid over them.
-     On a side a named root leaves on, the long one stays short, so the named root is the only long root there. Lengths are in
-     the foot's diameters past its surface, thickness in its girth */
+  /* the nebari: five surface roots (four on a slender literati) radiating from the trunk's foot, each leaving it about a third
+     of the foot's girth thick (q.w0) and thinning to a hair, out to six to three quarters of the way to the rim (q.r, of the
+     pot's half-length), undulating a little as it goes; the back ones a little higher, the front ones lower and laid over
+     them. On a side a named root leaves on, they stay at the shortest, so the named root runs on past them */
   const nbSpec=(T,i)=>{const live=new Set(deps.filter(q=>q.i===i&&!q.loose).map(q=>q.d));
-   const sp=T.lit?[[-1,.9,0,.3],[1,.55,0,.28],[1,.75,1,.32],[-1,.42,1,.3]]
-    :[[-1,1.05,0,.32],[1,.7,0,.28],[-T.S,.32,0,.26],[1,.95,1,.34],[-1,.5,1,.32]];
-   return sp.map(([d,len,f,w0])=>({d,len:live.has(d)&&len>.6?.4:len,f,w0}))};
+   const sp=T.lit?[[-1,.72,0,.34,-1],[1,.64,0,.31,-1],[1,.68,1,.36,0],[-1,.61,1,.33,0]]
+    :[[-1,.74,0,.36,-1.2],[1,.68,0,.32,-1],[-T.S,.62,0,.31,1.6],[1,.65,1,.38,0],[-1,.61,1,.34,0]];
+   return sp.map(([d,r,f,w0,ln])=>({d,r:live.has(d)?Math.min(r,.62):r,f,w0,ln}))};
   /* half the foot's width where it meets the soil, from the trunk as drawn */
-  const halfAt=T=>{let k=0;while(k<T.tp.length-1&&T.tp[k][1]>-8)k++;return T.tw[k]/2},nbEnd=(T,q)=>q.d*halfAt(T)*(1+2*q.len*(q.f?.85:1));
+  const halfAt=T=>{let k=0;while(k<T.tp.length-1&&T.tp[k][1]>-8)k++;return T.tw[k]/2};
   const looseLen=Math.max(70,Math.min(90,.22*tall))*kpx,bareW=22*Math.sqrt(kpx);
   /* the pot's ends hold the nebari, a third party's root running out to the rim, a store's root, and an unused store's root
      running out from the nebari with its tag staked in its cut end */
-  {let A=Infinity,Bz=-Infinity;trees.forEach((T,i)=>{const X=xs[i],busyD=d=>deps.some(q=>q.i===i&&q.d===d&&!q.loose);for(const d of [-1,1]){const rch=Math.max(halfAt(T),...nbSpec(T,i).filter(q=>q.d===d).map(q=>d*nbEnd(T,q))),dp=deps.filter(q=>q.i===i&&q.d===d);
+  {let A=Infinity,Bz=-Infinity;trees.forEach((T,i)=>{const X=xs[i],busyD=d=>deps.some(q=>q.i===i&&q.d===d&&!q.loose);for(const d of [-1,1]){const rch=halfAt(T),dp=deps.filter(q=>q.i===i&&q.d===d);
     /* (and on a side no named root runs along, a stretch of bare soil past the nebari) */
     let nd=rch+18*kpx;if(dp.some(q=>q.ext))nd=Math.max(nd,rch+30*kpx);if(dp.some(q=>!q.ext&&!q.loose))nd=Math.max(nd,rch+26*kpx);
     else if(!dp.some(q=>q.ext))nd=Math.max(nd,rch+bareW+22*kpx);
-    /* (an unused store's root on this side: its run past the foot, and half its tag beyond the stake in its cut end) */
-    for(const q of deps)if(q.i===i&&q.loose&&(busyD(q.d)&&!busyD(-q.d)?-q.d:q.d)===d){const tw=gbW(gwCut(M.U[q.id].label,22)+' · unused',8.6*kpx*.61)+10*kpx;nd=Math.max(nd,halfAt(T)+looseLen+Math.max(12*kpx,tw/2-4*kpx))}
+    /* (an unused store's root on this side: its run past the foot and the stake in its cut end, and room for its tag between
+       the trunk and the rim, the tag slid along its stake toward the trunk as far as it stands sixteen pixels clear of it) */
+    for(const q of deps)if(q.i===i&&q.loose&&(busyD(q.d)&&!busyD(-q.d)?-q.d:q.d)===d){const tw=gbW(gwCut(M.U[q.id].label,22)+' · unused',8.6*kpx*.61)+10*kpx;nd=Math.max(nd,halfAt(T)+looseLen+12*kpx,halfAt(T)+16*kpx+tw-10*kpx)}
     if(d<0)A=Math.min(A,X-nd);else Bz=Math.max(Bz,X+nd)}});
    /* (a pot short at one end slides that way first, as far as the other end has room to spare, before it grows) */
-   let a=potC-potL/2,b=potC+potL/2;if(!lone&&(a>A||b<Bz)){if(a>A){const k=Math.min(a-A,Math.max(0,b-Bz));a-=k;b-=k}if(b<Bz){const k=Math.min(Bz-b,Math.max(0,A-a));a+=k;b+=k}a=Math.min(a,A);b=Math.max(b,Bz);potL=b-a;potC=(a+b)/2}}
-  /* as deep as the trunk is thick at its foot, so the pot balances the tree; a lone literati keeps its small round bowl */
-  let D=lone?22:Math.max(22,Math.min(52,.86*T0.D));const fh=lone?3.4:Math.max(4,Math.min(8,.16*D));
+   let a=potC-potL/2,b=potC+potL/2;if(!lone&&(a>A||b<Bz)){if(a>A){const k=Math.min(a-A,Math.max(0,b-Bz));a-=k;b-=k}if(b<Bz){const k=Math.min(Bz-b,Math.max(0,A-a));a+=k;b+=k}a=Math.min(a,A);b=Math.max(b,Bz);potL=b-a;potC=(a+b)/2}
+   /* (and on each side of each trunk, room for its nebari: six tenths of the half-length and ten units more to the rim) */
+   if(!lone)for(let it=0;it<3;it++)for(const X of xs){if(X-a<.3*(b-a)+10)a=(X-.3*b-10)/.7;if(b-X<.3*(b-a)+10)b=(X-.3*a+10)/.7;potL=b-a;potC=(a+b)/2}}
+  /* four fifths as deep as the trunk is thick at its foot, so the pot balances the tree; a lone literati keeps its small round
+     bowl */
+  let D=lone?22:Math.max(22,Math.min(52,.8*T0.D));const fh=lone?3.4:Math.max(4,Math.min(8,.16*D));
   let x0=Math.min(edgeL,potC-potL/2-10),x1=Math.max(edgeR,potC+potL/2+10),y0=Math.min(...trees.map(T=>T.y0));
   /* the soil: a low mound inside the pot, highest at the trunk, that the roots lie in and sink into */
   const pa=potC-potL/2,pb=potC+potL/2;
@@ -797,11 +805,13 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   const tpr=lone?5:Math.max(5,.02*potL),wallX=(dd,y)=>{const k=tpr*Math.max(0,y-2)/Math.max(1,D-2);return dd>0?pb-k:pa+k};
   const roots=[];
   /* the nebari, unnamed, are laid first, back fingers before front ones, so the named roots lie over them */
-  trees.forEach((T,i)=>{const X=xs[i],hb=halfAt(T),G=2*hb;const fs0=[];nbSpec(T,i).forEach((q,k)=>{const n=18,kb=knobs(gbHash('nb'+i+':'+k),n);const a=X+q.d*hb*.45,e=X+nbEnd(T,q);const pts=[],w=[];
-    /* a filled wedge: thick where it leaves the foot, its upper edge climbing the trunk there (a buttress), thinning to nothing;
-       two fifths of it under the soil's surface (the nearer ground for a front one), its tip going under altogether */
-    for(let ii=0;ii<=n;ii++){const t=ii/n,x=a+(e-a)*(1-Math.pow(1-t,1.3)),ww=Math.max(.5,G*q.w0*Math.pow(1-t,.85)*kb[ii][0]+(q.f?.1:.14)*G*Math.pow(1-t,4)),g0=q.f?.48:.55;
-     pts.push([x,(q.f?fy(x):sy(x)+.7)-.1*ww+(t>g0?Math.pow((t-g0)/(1-g0),1.6)*(ww*.6+1.2):0)+kb[ii][1]*.3]);w.push(ww)}
+  trees.forEach((T,i)=>{const X=xs[i],hb=halfAt(T),G=2*hb;const fs0=[];nbSpec(T,i).forEach((q,k)=>{const n=24,kb=knobs(gbHash('nb'+i+':'+k),n);const a=X+q.d*hb*(q.f?.2:.55),rim=q.d>0?pb-X:X-pa,e=X+q.d*Math.max(.6*potL/2,Math.min(q.r*potL/2,rim-10,2.02*G));const pts=[],w=[];
+    /* a root of its own: thick where it leaves the foot, its upper edge climbing the trunk there (a buttress), easing out to a
+       hair (about four hundredths of the girth, never past a pixel and a third); most of it above the soil's surface near the
+       foot (the nearer ground for a front one), sinking as it goes, its tip going under altogether */
+    const tipW=Math.min(1.3,.04*G),g0=q.f?.55:.6;
+    for(let ii=0;ii<=n;ii++){const t=ii/n,x=a+(e-a)*(1-Math.pow(1-t,1.25)),kw=1+(kb[ii][0]-1)*Math.min(1,t/.25),ww=Math.max(tipW,tipW+(G*q.w0-tipW)*Math.pow(1-t,1.15)*kw);
+     pts.push([x,(q.f?fy(x)-.22*ww:sy(x)+.7-.5*ww+q.ln*kpx*Math.sin(Math.PI*Math.min(1,t/.8)))+(t>g0?Math.pow((t-g0)/(1-g0),1.5)*(ww*.85+1.2):0)+kb[ii][1]*.35*Math.min(1,t/.2)]);w.push(ww)}
     fs0.push({id:null,tree:i,d:q.d,pts,w,front:!!q.f})});fs0.sort((a,b)=>a.front-b.front);roots.push(...fs0)});
   for(const q of deps){const {id,i,d,r,T,ext,loose}=q;const X=xs[i],D0=T.D;const rim=d>0?pb:pa;const reach=Math.abs(rim-X);const kb=knobs(gbHash('rt:'+id),30);let pts=null,w=null;
    const wS=.3*D0;
@@ -889,6 +899,9 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
   /* (an unused store's root leaves from under the nebari, so it is drawn first) */
   roots.sort((a,b)=>(b.loose?1:0)-(a.loose?1:0));
   L={trees,xs,potL,potC,D,fh,kpx,fy,roots,rl,fs,sy,wallX,seal,x0,x1,y0:y0-8,y1:Math.max(yb,D+fh+(lone?10:12)+(stopX?10:0)),narrow,S,H0,lone};
+  /* a pot made longer for its roots and tags than its trunk allows: the trunk is drawn again, an eighth of it (a few times at
+     most, at the same size) */
+  if(!lone&&!sap&&T0.D<.121*potL&&dr<3){dmin=.124*potL;dr++;pass--;continue}
   /* too wide: a lower tree has smaller pads and labels, down to the height where its leaves reach their smallest; below
      that only the trunk would shrink and the pads pile into each other, so past it the drawing scales down whole instead */
   const need=L.x1-L.x0+24;if(need<=width||pass===5||H0<=Hmin)break;H0=Math.max(Hmin,H0*Math.max(.55,Math.min(.96,Math.pow((width-24)/need,1.4))));}
@@ -987,6 +1000,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
   /* the collar: the wood swells round the limb where it leaves, half again its girth across */
   const ca=Math.atan2(pts[eo+2][1]-pts[eo][1],pts[eo+2][0]-pts[eo][0])*180/Math.PI,col=sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')',class:cls});
   /* (all that it lays on its parent is kept on it, el.__on: a cut flush at the parent takes it away with the limb) */
+  /* (what it lays on its parent, kept as outlines too, so a shoot and its leaves keep off it: B.lay) */
+  {const lay=B.lay||(B.lay=[]),q2=(a,bb,cc)=>{const m2=[(a[0]+bb[0])/2,(a[1]+bb[1])/2],ct=[cc[0]+(m2[0]-cc[0])*.45,cc[1]+(m2[1]-cc[1])*.45],P=[];for(let t=0;t<=1.001;t+=.125)P.push([(1-t)*(1-t)*a[0]+2*(1-t)*t*ct[0]+t*t*bb[0],(1-t)*(1-t)*a[1]+2*(1-t)*t*ct[1]+t*t*bb[1]]);P.push(pts[Math.min(n0,eo+3)],c);return P};
+   lay.push(q2(edge(gbFwd(pp,k,1.5*b)),bE(eo+3,fw),bE(eo,fw)),q2(edge(gbBack(pp,k,.8*b)),bE(eo+2,-fw),bE(eo,-fw)));const cr=ca*Math.PI/180,E=[];for(let i=0;i<12;i++){const t=i*Math.PI/6,x=.5*b*Math.cos(t),y=.65*b*Math.sin(t);E.push([pts[eo][0]+x*Math.cos(cr)-y*Math.sin(cr),pts[eo][1]+x*Math.sin(cr)+y*Math.cos(cr)])}lay.push(E)}
   const U=gU||fg,on=[col,sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'})];U.append(col);clip.append(on[1]);anim('col:'+id,col,delay+ms*.2,240,'fade');
   for(const f of [fil(edge(gbFwd(pp,k,1.5*b)),bE(eo+3,fw),bE(eo,fw)),fil(edge(gbBack(pp,k,.8*b)),bE(eo+2,-fw),bE(eo,-fw))]){const fp=sv('path',{d:f,class:cls}),fc=sv('path',{d:f});U.append(fp);clip.append(fc);on.push(fp,fc);anim('fil:'+id+f.length,fp,delay+ms*.25,240,'fade');
    /* the crotch sits in the shade of the limb above it, so the parent's lit side does not run on into it as a pale wedge */
@@ -1180,6 +1196,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
    /* (the wood as drawn: each limb's outline with its swell over each boss, and the collar and fillets it lays on its parent) */
    const ribIn=(p,m)=>ribs.some(([P,w,bx])=>{for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1],dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;if(!l2)continue;const t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2;if(t<-.1||t>1.1)continue;
     const j=t<.5?i:i+1,n=gbNorm(P,j),o=(p[0]-a[0])*n[0]+(p[1]-a[1])*n[1],e=bx&&bx[j]||0,h=(w[j]||1)/2;if(o<h+Math.max(e,0)+m&&o>-(h+Math.max(-e,0)+m))return true}return false});
+   const layIn=(p,m)=>(B.lay||[]).some(P=>{let ins=false,dm=1e9;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j],dx=b[0]-a[0],dy=b[1]-a[1];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<dx*(p[1]-a[1])/dy+a[0])ins=!ins;const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));dm=Math.min(dm,Math.hypot(p[0]-a[0]-dx*t,p[1]-a[1]-dy*t))}return ins||dm<m});
    const inWF=p=>ribIn(p,1)||fk.some(([f,pw,lw])=>Math.hypot(p[0]-f[0],p[1]-f[1])<pw/2+.9*(lw||0));
    const grow1=(pl,k0,wd,uids,kid,routeOf,lo,pref,bs,tf,limb,dp)=>{let best=null;const n1=pl.length-1,acc=gbLen(pl),step=acc[n1]/n1,jA=(gbHash('sha:'+kid)-.5)*12,jL=1+(gbHash('shl:'+kid)-.5)*.3;
     const c=uids.reduce((a,id)=>a+own(id).length,0),nl=Math.max(1,Math.min(c,4));
@@ -1195,8 +1212,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
      const sx0=Math.abs(ns[0])>.2?Math.sign(ns[0]):jA<0?-1:1;
      for(const sx of [sx0,-sx0])for(const be of [24,30,17,35,10])for(const lf of [1,.86,.74,.62]){const bb=Math.max(4,Math.min(35,be+jA*.5))*Math.PI/180,al=Math.min(66,be+34)*Math.PI/180,len=30*jL*lf;
       const tip=[b0[0]+sx*Math.sin(bb)*len,b0[1]-Math.cos(bb)*len],c1=[b0[0]+sx*Math.sin(al)*len*.42,b0[1]-Math.cos(al)*len*.42],c2=[tip[0]-sx*Math.sin(bb)*len*.28,tip[1]+Math.cos(bb)*len*.28],pts=gbBez([b0,c1,c2,tip],10);
-      if(pts.some((q,i)=>i&&q[1]>pts[i-1][1]-.05)||pts.slice(3).some(q=>inW(q,.8)))continue;
-      if(gbShootSlots(pts,Math.min(4,Math.max(3,c))).slice(0,nl).some(q=>{const th=q[2]*Math.PI/180,s=q[3]||1;return [4,8,12,15].some(d=>inW([q[0]+Math.cos(th)*d*s,q[1]+Math.sin(th)*d*s],1.2))}))continue;
+      if(pts.some((q,i)=>i&&q[1]>pts[i-1][1]-.05)||pts.slice(3).some(q=>inW(q,.8)||ribIn(q,.8)||layIn(q,.8)))continue;
+      if(gbShootSlots(pts,Math.min(4,Math.max(3,c))).slice(0,nl).some(q=>{const th=q[2]*Math.PI/180,s=q[3]||1;return [4,8,12,15].some(d=>{const p=[q[0]+Math.cos(th)*d*s,q[1]+Math.sin(th)*d*s];return inW(p,1.2)||ribIn(p,1.2)||layIn(p,1.2)})}))continue;
       const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]),r=[Math.min(...xs)-9,Math.min(...ys)-9,Math.max(...xs)+9,Math.max(...ys)+5];
       const sc=hits(r)+out(r)*400+Math.abs(be-24)*.6+(1-lf)*40+Math.abs(off)*2+(sx===sx0?0:30);
       if(!best||sc<best.sc)best={sc,pts,b0,tip,r,kk,ns,o:out(r)}}}
@@ -2104,7 +2121,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const rid=k.startsWith('u:')&&B.root[k.slice(2)]?k.slice(2):null,rr=rid?B.L.roots.find(q=>q.id===rid):null,P0=B.L.potC-B.L.potL/2,P1=B.L.potC+B.L.potL/2;
  const xo=rr&&rr.pts?rr.pts.find(p=>p[0]<P0||p[0]>P1):null,rim=xo?toPx(xo):rid&&B.pos[rid]?toPx(B.pos[rid]):null;
  const kn=k.startsWith('u:')?B.knot[k.slice(2)]:null,klk=kn?Object.keys(B.klbl).find(q=>B.knot[q]===kn):null,kl=klk?B.klbl[klk]:null,kb=kl&&kl.__fit&&kl.classList.contains('on')?gbNameBox(kl,box):null;
- const me=rim?[rim[0]-6,rim[1]-6,rim[0]+6,rim[1]+6]:box(el.getBoundingClientRect()),AB=rim?[rim[0],rim[1],rim[0],rim[1]]:kb||me;
+ const me=rim?[rim[0]-6,rim[1]-6,rim[0]+6,rim[1]+6]:box(el.getBoundingClientRect()),AB=rim?[rim[0],rim[1],rim[0],rim[1]]:kb?box(kl.getBoundingClientRect()):me;
  const x0=me[0],y0=me[1],x1=me[2],y1=me[3],cx=(x0+x1)/2,cy=(y0+y1)/2;
  /* The card never covers what it explains: the thing pointed at and its name, the route it lights or (for a root) the root
     itself. Nor does it cover any name, the faded ones too, any of a journey's words, a root's name, a cushion or a leaf, and

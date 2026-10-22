@@ -764,7 +764,12 @@ describe('Grow page', () => {
     const room = Number(svg.querySelector('.seal')?.getAttribute('data-room'));
     // the soil line, and where a store root that no journey uses lies against it
     const half = (T: { tp: number[][]; tw: number[] }) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -8) k++; return T.tw[k]! / 2; };
-    const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]) }));
+    const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]), half: L.potL / 2 }));
+    // each trunk's foot: how far it flares at the soil against its width one caliper up, and that caliper against the pot
+    const trunk = L.trees.map((T: { tp: number[][]; tw: number[]; D: number }) => {
+      const up = (y: number) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -y) k++; return T.tw[k]!; };
+      return { flare: T.tw[0]! / up(T.D), cal: up(T.D), D: T.D, potL: L.potL, lone: !!L.lone };
+    });
     const lr = L.roots.find((r: { loose: boolean }) => r.loose);
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
     // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
@@ -781,7 +786,30 @@ describe('Grow page', () => {
     const stopOf = (fill: string) => getComputedStyle(svg.querySelector(fill.replace(/^url\("?|"?\)$/g, '') + ' stop:nth-child(2)')!).stopColor;
     const pot = { lipH: Number(lipB.getAttribute('height')), over: (box(body).l - box(lipB).l), taper: across(L.D - 1) / across(3), lipStop: stopOf(lipB.getAttribute('fill')!), bodyStop: stopOf(body.getAttribute('fill')!),
       hi: Number(getComputedStyle(svg.querySelector('.lip-hi')!).opacity), body: box(body), sealBox: svg.querySelector('.seal') ? box(svg.querySelector('.seal')!) : null, sealOp: svg.querySelector('.seal') ? Number(getComputedStyle(svg.querySelector('.seal')!).opacity) : 0 };
-    return { lip, foot, ext, loose, seal, room, nebari, sunk, root, pot, moss: svg.querySelectorAll('.mc, .moss').length, trees: L.trees.length };
+    return { lip, foot, ext, loose, seal, room, nebari, trunk, sunk, root, pot, moss: svg.querySelectorAll('.mc, .moss').length, trees: L.trees.length };
+  };
+  /** A foot a bonsai grower would keep: four to six radial surface roots per tree, each leaving the trunk three tenths
+   *  to forty-five hundredths of its girth thick and thinning to a hair, out to six to nine tenths of the pot's half-length (five
+   *  at most, as before);
+   *  the trunk flared to one and a half times its width one caliper up, and that caliper at least an eighth of the pot. */
+  const footOk = (g: { trees: number; nebari: Array<{ tree: number; G: number; start: number; tip: number; reach: number; half: number }>; trunk: Array<{ flare: number; cal: number; D: number; potL: number; lone: boolean }> }, at: string) => {
+    for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(4); expect(n, at).toBeLessThanOrEqual(5); }
+    for (const q of g.nebari) {
+      expect(q.start / q.G, at + ' root start').toBeGreaterThanOrEqual(.3);
+      expect(q.start / q.G, at + ' root start').toBeLessThanOrEqual(.45);
+      expect(q.tip, at).toBeLessThan(1.5);
+      expect(q.tip / q.G, at + ' root tip').toBeLessThanOrEqual(.12);
+      expect((q.reach - q.G / 2) / q.G, at).toBeLessThanOrEqual(1.6);
+      expect(q.reach / q.half, at + ' root reach').toBeGreaterThanOrEqual(.6);
+      expect(q.reach / q.half, at + ' root reach').toBeLessThanOrEqual(.9);
+    }
+    for (const t of g.trunk) {
+      expect(t.flare, at + ' flare').toBeGreaterThanOrEqual(1.4);
+      expect(t.flare, at + ' flare').toBeLessThanOrEqual(1.6);
+      if (t.lone) continue;
+      expect(t.cal / t.potL, at + ' caliper').toBeGreaterThanOrEqual(.12);
+      expect(t.D / t.potL, at + ' trunk').toBeGreaterThanOrEqual(.12);
+    }
   };
 
   it('roots the tree in its pot: buttress roots that taper into the soil, a service named outside the rim on its side at every width, an unused store sunk with a one-line dashed tag, and the whole repo name on the seal', async () => {
@@ -800,13 +828,9 @@ describe('Grow page', () => {
         await page.waitForTimeout(2500);
         const g = await page.evaluate(ground);
         const at = width + 'px';
-        // 3 to 5 buttress roots per tree, each thick where it leaves the trunk and gone within about one and a half base widths.
-        for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q: { tree: number }) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(3); expect(n, at).toBeLessThanOrEqual(5); }
-        for (const q of g.nebari) {
-          expect(q.start / q.G, at).toBeGreaterThan(.25);
-          expect(q.tip, at).toBeLessThan(1.5);
-          expect((q.reach - q.G / 2) / q.G, at).toBeLessThanOrEqual(1.6);
-        }
+        // 4 or 5 buttress roots per tree, each thick where it leaves the trunk, out to six to nine tenths of the pot's
+        // half-length and never past about one and a half base widths, thinning to a hair; the trunk flared over them.
+        footOk(g, at);
         // The service is named where its root crosses the rim, outside the pot on that side; "trace stops" is a label of its own
         // by the end of the tail.
         expect(g.ext, at).toHaveLength(1);
@@ -917,6 +941,19 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 120000);
+
+  it('stands each recorded tree on a flared foot and radial surface roots, its trunk at least an eighth of its pot', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const name of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, folded(name), width, width < 500);
+        await page.waitForTimeout(400);
+        footOk(await page.evaluate(ground), name + ' ' + width + 'px');
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
 
   /** A grow folded from a recorded discovery log: plotline-billing (two journeys, one scenario failed, Minimum) and tracegrove
    *  itself (two journeys through twelve parts, Max, nothing run yet). */
