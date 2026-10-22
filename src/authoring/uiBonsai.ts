@@ -1241,10 +1241,10 @@ function gbCursors(now){const B=gw.B,s=gw.state;if(!B||!s||gw.tree!=='grove')ret
 
 /* ---------- Journeys: the list the tree draws, and the inspector's cards ---------- */
 /* The path a journey crosses, hop by hop. A hop breaks only where its name may (a long file path after a slash, never a route
-   between its method and its path), and each arrow goes with the hop after it; the arrow of a hop that starts a line is
-   clipped (see .gw-sl), so no line starts or ends on an arrow. */
+   between its method and its path), and each arrow goes with the hop after it, so a line never ends on an arrow and a line the
+   path wraps onto starts with one: it reads as the same path going on, never as a second path (see .gw-slo). */
 function gbPathEl(j,wound){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
- return h('div',{class:'gb-path gw-path gw-sl'},order.map((u,i)=>h('span',{class:'hop'},i?h('span',{class:'sp','aria-hidden':'true'},' › '):null,h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))))))}
+ return h('div',{class:'gb-path gw-path gw-sl gw-slo'},order.map((u,i)=>h('span',{class:'hop'},i?h('span',{class:'sp','aria-hidden':'true'},' › '):null,h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))))))}
 /* Where a journey starts: the words, then its entry, kept whole and held to the word before it. */
 const gbStarts=(j,M)=>['starts '+(gbWHERE[j.surface]||'')+' at ',...gwCodeText(gwPlain((M.U[j.entry]||{}).label||''))];
 /* A journey's state in words, each count whole and in its colour, the dot going with the count after it; the dot of a count
@@ -1351,8 +1351,13 @@ function gbBudFolds(M){const s=gw.state;const own=[],reg=[];for(const u of s.uni
   const sum=[h('b',{class:'pn'},...gwCodeText(gwPlain(u.label||id))),h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)),
    gwFacts([n+' '+(key==='reg'?'flow':'check')+(n===1?'':'s'),...gbTok(list,{surface:'',units:[]},vis,inMode).map(t=>h('span',{class:t[1]},t[0])),[where.charAt(0).toLowerCase()+where.slice(1)]])];
   return gbOlFold('bp:'+key+':'+id,sum,h('div',{class:'gb-bpl'},list.flatMap(x=>gbRow(x,gw.tree==='outline'))),list.some(failed)||list.some(x=>gw.pinned==='s:'+x.id),'gb-bpf')};
- const fold=(key,what,list)=>{if(!list.length)return null;const ids=[...new Set(list.map(x=>x.unit))];
-  return gbOlFold(key,gwFacts([what(list.length),...note(list).map(t=>[t])]),h('div',{class:'gb-olx'},ids.map(id=>part(key,id,list.filter(x=>x.unit===id)))),open)};
+ /* the parts' rows line up as a table: the names in one column as wide as the longest (to a limit, past which a name wraps after
+    a slash), the leaves in one as wide as the most any part has, then the counts and journeys, all starting on the same edges;
+    the part checks and the existing flows share those edges, so the two folds read as one table */
+ const ids=list=>[...new Set(list.map(x=>x.unit))],most=list=>ids(list).map(id=>list.filter(x=>x.unit===id).length);
+ const nw=Math.min(22,Math.max(8,...ids(own.concat(reg)).map(id=>gwPlain((M.U[id]||{}).label||id).length))),lw=Math.min(8,Math.max(1,...most(own),...most(reg)));
+ const fold=(key,what,list)=>{if(!list.length)return null;
+  return gbOlFold(key,gwFacts([what(list.length),...note(list).map(t=>[t])]),h('div',{class:'gb-olx gb-bpx',style:'--bpn:'+(nw+1)+'ch;--bpl:'+(lw*16-3)+'px'},ids(list).map(id=>part(key,id,list.filter(x=>x.unit===id)))),open)};
  return [fold('own',n=>n+' part check'+(n===1?'':'s'),own),fold('reg',n=>n+' existing flow'+(n===1?'':'s')+' the change reaches',reg)]}
 /* A section of the Outline: a plain heading over a rule, what it holds after it in grey. Mono capitals are left to the groups
    inside a section. */
@@ -1360,15 +1365,16 @@ const gbSec=(t,more)=>h('h3',{class:'gb-olh'},t,more?h('span',{class:'sm'},' · 
 /* Journey numbers as words: "1", "1 and 2", "1, 2 and 3". */
 const gbAnd=xs=>xs.length<2?String(xs.length?xs[0]:''):xs.slice(0,-1).join(', ')+' and '+xs[xs.length-1];
 /* Which journeys a root feeds, in one phrasing wherever it is said (the Outline, the inspector, the tree's card), from the
-   journeys' numbers on the tree: "Feeds journeys 1 and 2", "Feeds journey 1", "Feeds no journey". */
-function gbFeeds(nums){const n=(nums||[]).filter(Boolean);return n.length?'Feeds journey'+(n.length===1?' ':'s ')+gbAnd(n):'Feeds no journey'}
+   journeys' numbers on the tree, in their order: "Feeds journeys 1 and 2", "Feeds journey 1"; a root that feeds none is the
+   tree's unused one: "Unused: feeds no journey". */
+function gbFeeds(nums){const n=[...new Set((nums||[]).filter(Boolean))].sort((a,b)=>a-b);return n.length?'Feeds journey'+(n.length===1?' ':'s ')+gbAnd(n):'Unused: feeds no journey'}
 /* What the change depends on, as the tree plants it: services over the rim, the repo's own stores in the soil; each says which
    journeys feed from it, and where tracing could not follow. */
 function gbOlRoots(M,order){const s=gw.state;const roots=s.units.filter(u=>u.root);
  /* a root's row draws it as the legend does, says which journeys it feeds and, in full, where tracing could not follow (the file
     and line once: when the row already names them, the note does not); selected, its card opens under it */
  const row=u=>{const k='u:'+u.id,pin=gw.pinned===k;const feeds=order.map((j,i)=>j.units.includes(u.id)?i+1:0).filter(Boolean);const stop=s.stops.find(x=>x.unit===u.id);const at=stop&&stop.at&&stop.at!==u.loc?stop.at:null;
-  return [h('button',{class:'gb-olr'+(pin?' sel':''),'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k)}},h('span',{class:'gw-g','aria-hidden':'true'},gwSw(u.layer==='ext'?'ext':'root')),
+  return [h('button',{class:'gb-olr'+(pin?' sel':''),'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k)}},h('span',{class:'gw-g','aria-hidden':'true'},u.layer==='ext'?gwSw('ext'):feeds.length?gwSw('root'):gwSw('unused')||gwSw('root')),
    h('span',{class:'t'},u.label,h('small',{},gwFacts([u.unitKind,[gwRef(u.loc)]]))),h('span',{class:'fd'},gbFeeds(feeds)),
    stop?h('span',{class:'gw-stop'},h('b',{},'trace stops'),' · '+stop.why,at?[' ',h('span',{class:'gw-loc gw-ref'},...gwCodeText(at))]:null):null),
    pin?h('div',{class:'gw-olcard'},gwPartCard(u.id,true)):null]};
