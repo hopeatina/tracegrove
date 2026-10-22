@@ -695,4 +695,131 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 60000);
+
+  /** Max's growth on the wood, measured from the tree's own geometry: every limb, knot, shoot, count and graft bud. */
+  const growth = () => {
+    const w = (0, eval)('({ gw, GB_NK })');
+    const B = w.gw.B, L = B.L, kq: number = L.narrow ? w.GB_NK : 1;
+    const out = { limbs: 0, knots: 0, shoots: 0, tags: 0, rings: [] as string[], bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const off = (p: number[], pts: number[][]) => Math.min(...pts.slice(1).map((b, i) => {
+      const a = pts[i]!, vx = b[0]! - a[0]!, vy = b[1]! - a[1]!, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * vx + (p[1]! - a[1]!) * vy) / (vx * vx + vy * vy || 1)));
+      return Math.hypot(p[0]! - a[0]! - vx * t, p[1]! - a[1]! - vy * t);
+    }));
+    // every limb, a crown's shoulder limb as much as a branch, leaves its parent's centre line through a collar
+    for (const e of Array.from(document.querySelectorAll('.gw-svg.gb path.w')) as any[]) {
+      if (!e.__par) continue;
+      out.limbs++;
+      const d = off(e.__pts[0], e.__par);
+      if (d > 1) bad('limb starts off its parent', d);
+      if (!e.__col) bad('limb with no collar');
+    }
+    L.trees.forEach((T: any, ti: number) => {
+      // the leader thins to a hair and forks into twigs inside its crest, never a blunt cap
+      const n = T.tp.length - 1, forks = T.ctw.filter((t: any) => t.fork);
+      if (T.tw[n] > 1.2) bad('leader ends blunt', T.tw[n]);
+      if (forks.length < 2) bad('leader forks into fewer than two twigs', forks.length);
+      for (const t of forks) if (Math.hypot(t.pts[0][0] - T.tp[t.bi][0], t.pts[0][1] - T.tp[t.bi][1]) > 0.01) bad('fork twig off the leader');
+      for (const t of T.ctw.filter((x: any) => x.lb)) if (Math.hypot(t.pts[0][0] - T.tp[t.bi][0], t.pts[0][1] - T.tp[t.bi][1]) > 0.01) bad('crown limb off the leader');
+      // a boss sits a quarter to two fifths of the girth off the centre line, on the outside of the bend wherever the wood bends;
+      // two closer than 1.2 girths are one burl
+      const byWood = new Map<string, any[]>();
+      for (const q of T.knots) {
+        out.knots++;
+        const P = q.on === 't' ? { pts: T.tp } : T.br.find((b: any) => b.id === q.bid), k: number = q.k, m = P.pts.length - 1;
+        const a = P.pts[Math.max(0, k - 6)], c = P.pts[Math.min(m, k + 6)], b = P.pts[k];
+        const cv = (b[0] - (a[0] + c[0]) / 2) * q.n[0] + (b[1] - (a[1] + c[1]) / 2) * q.n[1];
+        if (Math.abs(cv) > 1.2 && Math.sign(cv) !== q.side) bad('boss on the inside of the bend', [ti, q.ids]);
+        const f = (q.off * q.side) / q.w;
+        if (f < 0.24 || f > 0.41) bad('boss off its centre line by', [ti, q.ids, f]);
+        byWood.set(q.on, [...(byWood.get(q.on) ?? []), q]);
+      }
+      for (const qs of byWood.values()) {
+        qs.sort((a, b) => a.k - b.k);
+        for (let i = 1; i < qs.length; i++) { const a = qs[i - 1], b = qs[i]; if (Math.hypot(a.bp[0] - b.bp[0], a.bp[1] - b.bp[1]) < 1.2 * Math.max(a.w, b.w) - 0.01) bad('bosses closer than 1.2 girths, not one burl', [a.ids, b.ids]); }
+      }
+    });
+    // a shoot rises from its own knot's boss, a trunk's on the boss's own side, and none stands within 40 px of another on one side
+    const T0 = L.trees[0], X0: number = L.xs[0], gs: any[] = B.shootGeo ?? [];
+    for (const g of gs) {
+      out.shoots++;
+      if (g.tip[1] >= g.base[1]) bad('shoot does not rise', g.kid);
+      const kn = T0.knots.find((q: any) => q.id === g.kid);
+      if (kn) {
+        if (Math.hypot(g.base[0] - kn.bp[0] - X0, g.base[1] - kn.bp[1]) > kn.rb + 0.5) bad('shoot not from its own knot', g.kid);
+        if (kn.on === 't' && (g.ns[0] * kn.n[0] + g.ns[1] * kn.n[1]) * kn.side <= 0) bad('trunk shoot off its boss side', g.kid);
+      }
+      for (const h of gs) if (h !== g && g.ns[0] * h.ns[0] + g.ns[1] * h.ns[1] > 0 && Math.hypot(g.base[0] - h.base[0], g.base[1] - h.base[1]) < 40 * kq - 0.01) bad('two shoots within 40 px on one side', [g.kid, h.kid]);
+      // its count: a tag tied at its own tip
+      const t = g.g?.querySelector('.shtag');
+      if (!t || getComputedStyle(t).display === 'none') continue;
+      out.tags++;
+      const tie = (t.querySelector('.shtie')?.getAttribute('d') ?? '').match(/[-\d.]+/g)?.map(Number) ?? [], r = t.querySelector('rect').getBBox();
+      if (Math.hypot(tie[0]! - g.tip[0], tie[1]! - g.tip[1]) > 3) bad('count tied off its shoot tip', g.kid);
+      if (tie[2]! < r.x - 1 || tie[2]! > r.x + r.width + 1 || tie[3]! < r.y - 1 || tie[3]! > r.y + r.height + 1) bad('tie ends off its tag', g.kid);
+    }
+    for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
+      const a = gs[i].g?.querySelector('.shtag rect'), b = gs[j].g?.querySelector('.shtag rect');
+      if (!a || !b || getComputedStyle(a.parentNode).display === 'none' || getComputedStyle(b.parentNode).display === 'none') continue;
+      const p = a.getBoundingClientRect(), q = b.getBoundingClientRect();
+      if (p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom) bad('two counts overlap', [gs[i].kid, gs[j].kid]);
+    }
+    // an existing flow is a graft bud at the knot it re-checks: a ring on the bark, off every shoot, nearer its own knot than any other
+    for (const r of B.graftR ?? []) {
+      const own = T0.knots.find((q: any) => q.id === r.kid), d = (q: any) => Math.hypot(r.c[0] - q.bp[0] - X0, r.c[1] - q.bp[1]);
+      if (own && T0.knots.some((q: any) => q !== own && d(q) < d(own))) bad('graft bud nearer another knot', r.kid);
+    }
+    for (const el of Array.from(document.querySelectorAll('.gw-svg.gb .gb-gr'))) {
+      if (el.classList.contains('gone')) continue;
+      out.rings.push(el.getAttribute('aria-label') ?? '');
+      if (el.closest('.budg')) bad('graft bud on a shoot');
+      if (!el.querySelector('circle.gring')) bad('graft bud with no ring');
+    }
+    return out;
+  };
+
+  it('grows Max out of the wood: limbs from their parents, bosses on the bend, shoots apart and tied to their counts, existing flows as graft buds', async () => {
+    const { dir, state } = await grownBushy();
+    // four existing flows that reach one part on the first journey
+    const j1 = state.journeys[0]!, unit = j1.units.find((id) => state.scenarios.some((x) => x.unit === id && x.mode === 'max' && !x.journey)) ?? j1.units[0]!;
+    const src = { ...(state.scenarios.find((x) => x.unit === unit) ?? state.scenarios[0]!) };
+    delete src.level; delete src.polarity;
+    for (let i = 0; i < 4; i++) state.scenarios.push({ ...src, id: 'rg' + i, unit, journey: null, scenarioKind: 'regression', mode: 'max', title: 'An existing flow ' + (i + 1) + ' still holds', flow: 'flow.' + i, criteria: [], modeWhy: 'regression' });
+    // and parts checked on their own, one to three on each part of both journeys
+    state.journeys.flatMap((j) => j.units).forEach((id, i) => {
+      for (let k = 0; k <= i % 3; k++) state.scenarios.push({ ...src, id: 'pc' + i + '-' + k, unit: id, journey: null, level: 'part', scenarioKind: 'happy', mode: 'max', title: 'Part ' + id + ' alone ' + (k + 1), flow: null, criteria: [], modeWhy: 'part on its own' });
+    });
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 }, colorScheme: scheme, reducedMotion: 'reduce' });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
+        await page.getByTestId('grow-view-grove').click();
+        await expect.poll(() => page.evaluate(() => Object.keys((0, eval)('gw').B?.pad ?? {}).length)).toBeGreaterThan(0);
+        const g = await page.evaluate(growth);
+        expect(g.bad, width + 'px').toEqual([]);
+        expect(g.limbs, width + 'px').toBeGreaterThan(2);
+        expect(g.knots, width + 'px').toBeGreaterThan(2);
+        expect(g.shoots, width + 'px').toBeGreaterThan(1);
+        expect(g.rings.length, width + 'px').toBe(4);
+        for (const a of g.rings) expect(a).toMatch(/^Existing flow it re-checks: An existing flow \d still holds, /);
+        // the knot's card counts its part checks and the existing flows that reach it; a graft bud's card says what it is
+        const cards = await page.evaluate((id) => {
+          const w = (0, eval)('gw'), B = w.B, kn = B.knot[id], ring = B.svg.querySelector('.gb-gr:not(.gone)');
+          kn.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+          const knot = B.tip.textContent;
+          ring.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+          return { knot, ring: B.tip.textContent };
+        }, unit);
+        expect(cards.knot).toMatch(/In Max: (\d+ part checks? · )?4 existing flows that reach (it|them)/);
+        expect(cards.ring).toContain('existing flow');
+        expect(cards.ring).toContain('An existing flow');
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
 });
