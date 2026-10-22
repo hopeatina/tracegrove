@@ -115,8 +115,8 @@ ${BONSAI_CSS}
 /* ---------- The page around the tree: after the tree's own styles, so these win where they meet ---------- */
 .gw-code{font:.92em/1 var(--mono);background:var(--code);border-radius:4px;padding:1px 4px}
 /* legend marks: small drawings of what the tree draws, in its wood and leaf colours, light and dark */
-.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-crs:color-mix(in srgb,#9C8975 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3))}
-@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3))}}
+.gw-sw{display:inline-block;flex:none;overflow:visible;vertical-align:-2px;--sw-wood:#6E5E50;--sw-lit:#8F7D6B;--sw-shade:#4C4037;--sw-cut:#DCC8A6;--sw-crs:color-mix(in srgb,#9C8975 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 34%,var(--ink3));--sw-sap:#E9A23B;--sw-core:#FFF3D6;--sw-red:#D63A28}
+@media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--sw-sap:#F2B24C;--sw-core:#FFF6E0;--sw-red:#F05A45}}
 .gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
 /* on a dark page a leaf still to prove is the tree's pale leaf, a lightened cushion green, never the page showing through */
@@ -127,7 +127,7 @@ ${BONSAI_CSS}
 .gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 22%,var(--paper))}.gw-sw .pot{fill:color-mix(in srgb,var(--ochre) 26%,var(--line2))}
 .gw-sw .rt{fill:none;stroke:var(--sw-wood);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-sw .tl{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linecap:round}.gw-sw .te{fill:var(--paper);stroke:var(--muted);stroke-width:1.1}
-.gw-sw .rglow{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;opacity:.38}.gw-sw .rte{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.6;stroke-linecap:round;stroke-dasharray:3 3}.gw-sw .rte.bad{stroke:var(--verm);stroke-width:2.4;stroke-dasharray:none}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
+.gw-sw .rglow{fill:none;stroke:var(--sw-sap);stroke-width:3.6;stroke-linecap:round;opacity:.5;filter:blur(.7px)}.gw-sw .rte{fill:none;stroke:var(--sw-sap);stroke-width:2;stroke-linecap:round}.gw-sw .rcore{fill:none;stroke:var(--sw-core);stroke-width:.6;stroke-linecap:round;opacity:.9}.gw-sw .rte.bad{stroke:url(#gw-swred);stroke-width:2.8;stroke-linecap:butt}.gw-sw .rs{stop-color:var(--sw-red)}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
 .gw-sw .k0{fill:var(--sw-shade);opacity:.5}.gw-sw .k1{fill:var(--sw-wood)}.gw-sw .k2{fill:var(--sw-lit);opacity:.85}.gw-sw .kglow{fill:var(--gold);opacity:.6}.gw-sw .kbad{fill:var(--verm);opacity:.5}
 .gw-sw .stk{fill:none;stroke:var(--sw-shade);stroke-width:.8;stroke-dasharray:1 1.4}.gw-sw .tag{fill:var(--paper);stroke:var(--line2);stroke-width:.8}
 .gw-sw .stk.sd{stroke:color-mix(in srgb,var(--sw-shade) 60%,var(--ochre));stroke-width:1.1;stroke-dasharray:none;stroke-linecap:round}.gw-sw .tag.dsh{stroke:var(--muted);stroke-dasharray:1.8 1.1}.gw-sw .un{opacity:.5}.gw-sw .bed{fill:color-mix(in srgb,var(--sw-wood) 30%,var(--paper))}.gw-sw .rg{fill:none;stroke:var(--sw-shade);stroke-width:.4;opacity:.8}
@@ -473,10 +473,11 @@ function gwSw(k){
   sv('path',{d:'M2.4 10.6 L2.4 4.6',class:'stk sd'}),sv('rect',{x:1.2,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
- /* the route as the tree draws it along the wood, in three marks: the gold dashed route, red on the hop where it broke, and
-    the small grey dots where it never got, drawn as the tree draws them (one stroke of round dots, .rdots with .sap.rest) */
+ /* the route as the tree draws it inside the wood, in three marks: the amber glow with its cream core, the wood turned red
+    just past the hop where it broke (feathered in and out), and the small grey dots where it never got, drawn as the tree
+    draws them (one stroke of round dots, .rdots with .sap.rest) */
  if(k==='route'||k==='rbad'||k==='rrest')return gwSvg(22,10,sv('path',{d:'M0 2.4 C7.3 2.8 14.7 3.3 22 3.7 L22 6.3 C14.7 6.7 7.3 7.2 0 7.6 Z',class:'wd'}),
-  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'})]:k==='rbad'?[sv('path',{d:'M2 5 L7.6 5',class:'rte'}),sv('path',{d:'M9.6 5 L20 5',class:'rte bad'})]:[sv('path',{d:'M3.4 5 L20 5',class:'rdots'})]);
+  k==='route'?[sv('path',{d:'M2 5 L20 5',class:'rglow'}),sv('path',{d:'M2 5 L20 5',class:'rte'}),sv('path',{d:'M2 5 L20 5',class:'rcore'})]:k==='rbad'?[sv('defs',{},sv('linearGradient',{id:'gw-swred',gradientUnits:'userSpaceOnUse',x1:7,y1:0,x2:21,y2:0},...[[0,0],[.3,1],[.7,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})))),sv('path',{d:'M2 5 L7.4 5',class:'rglow'}),sv('path',{d:'M2 5 L7.4 5',class:'rte'}),sv('path',{d:'M7 5 L21 5',class:'rte bad'})]:[sv('path',{d:'M3.4 5 L20 5',class:'rdots'})]);
  /* a knot: a boss on the bark, lit gold from inside when its route is lit, cracked red where a hop broke */
  const kn=(...x)=>gwSvg(20,10,sv('path',{d:'M0 3.1 C7 3.3 13 3.5 20 3.7 L20 6.3 C13 6.5 7 6.7 0 6.9 Z',class:'wd'}),...x,sv('ellipse',{cx:10.5,cy:5.6,rx:4.3,ry:3.1,class:'k0'}),sv('ellipse',{cx:10,cy:5,rx:3.9,ry:2.8,class:'k1'}),sv('ellipse',{cx:9.3,cy:4.2,rx:2.2,ry:1.3,class:'k2'}));
  if(k==='knot')return kn();

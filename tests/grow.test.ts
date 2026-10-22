@@ -979,8 +979,8 @@ describe('Grow page', () => {
           await page.close();
         }
       }
-      // A leaf that checks one hop of a journey says which, and the card and the tree both show the hops after it as never
-      // reached: muted in the card's path, grey dots and faint knots on the tree.
+      // A leaf that checks one hop of a journey says which. The hops after it are not its route: the card mutes them, and on
+      // the tree they stay plain wood, named in muted ink, with no grey dots and no faded knots (those mean a break before them).
       const state = folded('tracegrove-max.jsonl');
       const page = await growPage(browser, server.url, state, 1440);
       await page.waitForTimeout(2500);
@@ -996,6 +996,8 @@ describe('Grow page', () => {
           ink: Array.from(tip.querySelectorAll('.path .gw-hop.hit')).map((e) => e.textContent!.replace(/\s*›\s*$/, '')), muted: tip.querySelectorAll('.path .gw-hop.un').length, n: j.units.length,
           first: label(x.unit), dots: (B.sapX.getAttribute('d') || '').length, faint: faint.length, unreached: faint.filter((k: string) => B.knot[k].classList.contains('unreached')).length,
           opacity: faint.length ? getComputedStyle(B.knot[faint[0]]).opacity : '',
+          oos: faint.filter((k: string) => B.klbl[k].classList.contains('on') && B.klbl[k].classList.contains('oos') && getComputedStyle(B.klbl[k]).fill === getComputedStyle(tip.querySelector('.path .gw-hop.un .hl')!).color).length,
+          named: faint.filter((k: string) => B.klbl[k].classList.contains('on')).length,
         };
         w.gbHover(null);
         return out;
@@ -1003,10 +1005,12 @@ describe('Grow page', () => {
       expect(one.text).toContain(one.want);
       expect(one.ink).toEqual([one.first]);
       expect(one.muted).toBe(one.n - 1);
-      expect(one.dots).toBeGreaterThan(0);
+      expect(one.dots).toBe(0);
       expect(one.faint).toBeGreaterThan(0);
-      expect(one.unreached).toBe(one.faint);
-      expect(Number(one.opacity)).toBeLessThanOrEqual(.45);
+      expect(one.unreached).toBe(0);
+      expect(Number(one.opacity)).toBeGreaterThan(.45);
+      expect(one.named).toBeGreaterThan(0);
+      expect(one.oos).toBe(one.named);
       // At rest a tree of many parts still carries a few names.
       const rest = await page.evaluate(() => document.querySelectorAll('[data-testid="grow"] .klbl.on').length);
       expect(rest).toBeGreaterThanOrEqual(3);
@@ -1026,6 +1030,80 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 240000);
+  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, centred, feathered and short of the next boss', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), 1440);
+      await page.waitForTimeout(2500);
+      const probe = () => {
+        const w = (0, eval)('({ gw, gbHover, gbRoute })'), B = w.gw.B, S = w.gw.state;
+        const wood = Array.from(document.querySelector('#gb-wood' + B.N)!.children) as SVGGeometryElement[], pt = (B.svg as SVGSVGElement).createSVGPoint();
+        const inside = (els: SVGGeometryElement[]) => (x: number, y: number) => { pt.x = x; pt.y = y; return els.some((e) => e.isPointInFill(pt)); };
+        // how far the shape reaches either side of p along the normal n
+        const reach = (f: (x: number, y: number) => boolean, p: number[], n: number[]) => [1, -1].map((s) => { let a = -1; for (let t = 0; t < 40; t += .25) { if (f(p[0]! + s * n[0]! * t, p[1]! + s * n[1]! * t)) a = t; else break; } return a; });
+        const normal = (q: number[][], i: number) => { const a = q[i]!, b = q[i + 1]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!) || 1; return [-(b[1]! - a[1]!) / l, (b[0]! - a[0]!) / l]; };
+        const x = S.scenarios.find((q: { id: string }) => B.leaf[q.id] && S.run[q.id] && S.run[q.id].st === 'fail');
+        w.gbHover('s:' + x.id, B.leaf[x.id]);
+        const R = w.gbRoute(x), reds = Array.from(B.gRed.querySelectorAll('path.sapw')) as SVGGeometryElement[];
+        const red: number[][] = [];
+        for (let i = Math.floor(R.red.length * .3); i <= Math.ceil(R.red.length * .7) && i < R.red.length - 1; i++) {
+          const n = normal(R.red, i), [w1, w2] = reach(inside(wood), R.red[i], n), [r1, r2] = reach(inside(reds), R.red[i], n);
+          red.push([w1! + w2!, r1! + r2!, Math.abs((r1! - r2!) - (w1! - w2!)) / 2, Math.min(w1! - r1!, w2! - r2!)]);
+        }
+        const glow: number[][] = [];
+        for (let i = 0; i < R.main.length - 1; i++) {
+          const n = normal(R.main, i), [w1, w2] = reach(inside(wood), R.main[i], n), [g1, g2] = reach(inside([B.sapR]), R.main[i], n);
+          if (w1! > 0 && w2! > 0 && w1! + w2! >= 8 && w1! + w2! <= 30) glow.push([w1! + w2!, g1! + g2!, Math.min(w1! - g1!, w2! - g2!)]);
+        }
+        // outside a knot's boss by at least d: the boss is an ellipse ra along the grain, rb across it
+        const off = (q: number[], g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }, d: number) => { const u = (q[0]! - g.p[0]!) * g.tg[0]! + (q[1]! - g.p[1]!) * g.tg[1]!, v = (q[0]! - g.p[0]!) * g.n[0]! + (q[1]! - g.p[1]!) * g.n[1]!; return (u / (g.ra + d)) ** 2 + (v / (g.rb + d)) ** 2 >= 1; };
+        const geos = Object.keys(B.knot).map((k) => B.knot[k].__geo).filter(Boolean);
+        const brk = geos.slice().sort((a: { p: number[] }, b: { p: number[] }) => Math.hypot(a.p[0]! - R.red[0][0], a.p[1]! - R.red[0][1]) - Math.hypot(b.p[0]! - R.red[0][0], b.p[1]! - R.red[0][1]))[0];
+        const end = R.red[R.red.length - 1];
+        const stops = reds.map((e) => Array.from(document.querySelector(e.getAttribute('fill')!.slice(4, -1))!.querySelectorAll('stop')).map((q) => Number(q.getAttribute('stop-opacity'))));
+        const cs = (e: Element) => getComputedStyle(e).fill, probeFill = (v: string) => { const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.style.fill = v; B.svg.append(r); const f = getComputedStyle(r).fill; r.remove(); return f; };
+        const out = { red, glow, stops, dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)') };
+        w.gbHover(null);
+        return out;
+      };
+      const lum = (css: string) => {
+        const m = css.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/), n = css.match(/rgba?\((\d+), (\d+), (\d+)/);
+        const c = m ? m.slice(1, 4).map(Number) : n!.slice(1, 4).map((x) => Number(x) / 255);
+        const lin = c.map((x) => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+        return .2126 * lin[0]! + .7152 * lin[1]! + .0722 * lin[2]!;
+      };
+      for (const scheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme: scheme });
+        const r = await page.evaluate(probe);
+        // The red is the limb's own wood: inside its body, about half its girth wide, on the spine.
+        expect(r.red.length, scheme).toBeGreaterThan(0);
+        for (const [wood, red, skew, edge] of r.red) {
+          expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.4);
+          expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.6);
+          expect(skew!, scheme + ' red off the spine').toBeLessThanOrEqual(1.5);
+          expect(edge!, scheme + ' red outside the wood').toBeGreaterThanOrEqual(0);
+        }
+        // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, faded in and out.
+        expect(r.start, scheme).toBe(true);
+        expect(r.clear, scheme).toBe(true);
+        expect(r.stops.length, scheme).toBeGreaterThan(0);
+        for (const s of r.stops) { expect(s[0], scheme).toBe(0); expect(s[s.length - 1], scheme).toBe(0); expect(Math.max(...s), scheme).toBe(1); }
+        // Past the break the route is grey dots.
+        expect(r.dots, scheme).toBeGreaterThan(0);
+        // The glow is a band inside the wood about three tenths of its girth, amber, standing out from the bark.
+        expect(r.glow.length, scheme).toBeGreaterThan(3);
+        for (const [wood, glow, edge] of r.glow) {
+          expect(glow! / wood!, scheme + ' glow/girth ' + wood).toBeGreaterThanOrEqual(.18);
+          expect(glow! / wood!, scheme + ' glow/girth ' + wood).toBeLessThanOrEqual(.42);
+          expect(edge!, scheme + ' glow outside the wood').toBeGreaterThanOrEqual(0);
+        }
+        const [hi, lo] = [lum(r.sap), lum(r.wood)].sort((a, b) => b - a);
+        expect((hi! + .05) / (lo! + .05), scheme + ' ' + r.sap + ' on ' + r.wood).toBeGreaterThanOrEqual(2.5);
+      }
+      await page.close();
+    } finally { await browser.close(); }
+  }, 120000);
   /** The tree's foliage measured as drawn: every leaf, its twig and its cushion, from the SVG's own geometry. */
   const foliage = () => {
     const w = (0, eval)('({ gw, GB_PET })');

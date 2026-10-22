@@ -157,9 +157,15 @@ export const BONSAI_CSS = String.raw`
    carries a brighter rim light along its upper edge, so the ground never sinks into the night) */
 @media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.75}.gb .rt.ext .w{stroke:#4A3F35;stroke-opacity:.9;stroke-width:.5}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}
  .gb .mc1{fill:color-mix(in srgb,var(--moss) 56%,var(--paper))}.gb .mc2{fill:color-mix(in srgb,var(--moss) 43%,var(--paper))}.gb .mc3{fill:color-mix(in srgb,var(--moss) 82%,var(--paper))}.gb .mc0{fill:#0b120d;opacity:.55}}
-.gb .sapu{fill:none;stroke:var(--gold);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;opacity:.38;filter:blur(1.6px);pointer-events:none}
-.gb .sap{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3 4;animation:gbflow .7s linear infinite;pointer-events:none}
-.gb .sap.bad{stroke:var(--verm);stroke-width:2.8;stroke-dasharray:none;animation:none}.gb .sap.rest{stroke:var(--muted);opacity:.75;animation:none;stroke-dasharray:1.5 4}
+ /* the lit route is sap in the wood: an amber band about three tenths of the girth wide with a soft halo round it and a fine
+    cream core along its spine, so it reads as a glow on the bark on a light page and a dark one; where it broke, the wood
+    itself is red (gbRed), feathered in and out */
+.gw-svg.gb{--sap:#E9A23B;--sap-core:#FFF3D6;--sap-red:#D63A28}
+@media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
+.gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.8px);pointer-events:none}
+.gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
+.gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
+.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{filter:blur(.5px);opacity:.92}.gb .rs{stop-color:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
@@ -168,7 +174,7 @@ export const BONSAI_CSS = String.raw`
 .gb .sap.rest,.gw-sw .rdots{fill:none;stroke:#9a948a;stroke-width:3;stroke-dasharray:0 7;stroke-linecap:round;opacity:.8;animation:none}.gb .sap.resto{display:none}.gw-sw .rdots{stroke-width:2.1;stroke-dasharray:0 4.8}
 @media (prefers-color-scheme:dark){.gb .sap.rest,.gw-sw .rdots{stroke:#a39e93;opacity:.7}}
 .gb .kn.unreached .halo,.gb .kn.unreached:hover .halo{opacity:0}.gb .kn.unreached .k1{fill:color-mix(in srgb,var(--muted) 60%,var(--wood))}.gb .kn.unreached .k2{fill:var(--muted);opacity:.5}.gb .kn.unreached,.gb.dim .kn.unreached:not(.on){opacity:.4}
-.gb .klbl.unreached{fill:var(--muted)}.gb .klbl.pt{font-weight:700}.gb .klbl.pt:not(.wound){fill:var(--ink)}.gb .klbl.rest:not(.wound):not(.brk){fill:var(--ink3)}
+.gb .klbl.unreached,.gb .klbl.oos{fill:var(--muted)}.gb .klbl.pt{font-weight:700}.gb .klbl.pt:not(.wound){fill:var(--ink)}.gb .klbl.rest:not(.wound):not(.brk){fill:var(--ink3)}
 .gb .klbl.nofit,.gb .klbl.nofit+.kld{display:none}
 .gb .tiplead{fill:none;stroke:var(--ink3);stroke-width:.9;pointer-events:none;paint-order:stroke}
 .gb .bead{fill:var(--gold);stroke:var(--paper);stroke-width:1.5}.gb .halo{fill:var(--gold);opacity:.22}
@@ -907,7 +913,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  /* the traced route is drawn over the wood, so it is never lost under a branch; inside a pad it shows faintly (the mask),
     as sap under foliage */
  const gFront=lay('front'),gScar=lay('scars'),gSap=sv('g',{class:'sapl',mask:'url(#'+rmId+')'});svg.append(gSap);B.gScar=gScar;const gKn=lay('knots'),gVein=lay('veins'),gLbl=lay('labels'),gKl=lay('klabels'),gCur=lay('cur');
- B.gCur=gCur;B.gBud=gBud;B.gWood=gWood;B.gKn=gKn;B.sapU=sv('path',{class:'sapu',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapX,B.sap,B.sapW);
+ B.gCur=gCur;B.gBud=gBud;B.gWood=gWood;B.gKn=gKn;B.defs=defs;B.N=N;
+ /* the lit route inside the wood: its halo, its amber body, the grey dots past a break, the red wood where it broke, the cream
+    core along its spine; and the red's own spine, unpainted, which a card keeps clear of (gbLight) */
+ B.sapU=sv('path',{class:'sapu',d:''});B.sapR=sv('path',{class:'sapr',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.gRed=sv('g',{class:'sapred'});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapR,B.sapX,B.gRed,B.sap,B.sapW);
  B.lead=sv('path',{class:'tiplead',d:''});gCur.append(B.lead);
  /* an animation that has not finished yet: started at its first build, continued by any rebuild; a piece of wood keeps its
     reveal (gbWood) in el.__r, whose clock everything that grows on it reads */
@@ -1589,7 +1598,7 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  if(L.leaf)for(const el of document.querySelectorAll('[data-sid="'+L.leaf.id.replace(/["\\]/g,'')+'"]'))el.classList.add('hl');
  /* a leaf lights its own scenario's hops (gbRoute): a failed one's up to where it broke, and the files past the break are
     marked as never reached; the rest of its journey stays unlit */
- const R0=L.leaf&&on?gbRoute(L.leaf):null,litU=R0&&R0.lit?R0.lit:L.units,unU=R0&&R0.un?R0.un:new Set();
+ const R0=L.leaf&&on?gbRoute(L.leaf):null,litU=R0&&R0.lit?R0.lit:L.units,unU=R0&&R0.un?R0.un:new Set(),outU=R0&&R0.out?R0.out:new Set();
  for(const el of new Set(Object.values(B.knot))){const lit=el.__ids.some(id=>litU.has(id));el.classList.toggle('on',lit);el.classList.toggle('unreached',!lit&&el.__ids.some(id=>unU.has(id)))}
  /* red is the focused failure's alone: a knot where a scenario broke shows it at rest, and while what is lit holds that
     scenario (the leaf itself, its pad or journey, the knot, a criterion it answers); otherwise it is a plain knot */
@@ -1606,28 +1615,29 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
     in it that is pointed at or lit */
  const rest=on?null:gbRestK(B,gw.M),want=new Map(),txt=new Map();
  for(const id in B.klbl){const kl=B.klbl[id],ids=B.knot[id]?B.knot[id].__ids:[id];
-  const lit=on&&ids.some(q=>q===hk||litU.has(q)||(!!rootPart&&q===rootPart.parent)),un=on&&!lit&&ids.some(q=>unU.has(q)),brk=(kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute');
+  const lit=on&&ids.some(q=>q===hk||litU.has(q)||(!!rootPart&&q===rootPart.parent)),un=on&&!lit&&ids.some(q=>unU.has(q)||outU.has(q)),brk=(kl.classList.contains('wound')||kl.classList.contains('brk'))&&!kl.classList.contains('wmute');
   kl.__want=lit||un;kl.__rest=!!rest&&!brk&&rest.has(id);if(lit||brk)want.set(id,ids.includes(hk)||brk||(!!L.leaf&&ids.includes(L.leaf.unit))?0:1);else if(un||kl.__rest)want.set(id,un?1.5:3);
   if(ids.length>1){const lead=ids.find(q=>q===hk)||(L.leaf?ids.find(q=>q===L.leaf.unit):null)||(on?ids.find(q=>litU.has(q))||ids.find(q=>unU.has(q)):null)||id,t=gbKnotTxt(gw.M,ids,lead);txt.set(id,t);if(kl.textContent!==t)kl.textContent=t}
-  kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)));
+  kl.classList.toggle('unreached',on&&!ids.some(q=>litU.has(q))&&ids.some(q=>unU.has(q)));kl.classList.toggle('oos',on&&!ids.some(q=>litU.has(q)||unU.has(q))&&ids.some(q=>outU.has(q)));
   /* the knot pointed at, or the hop a leaf's scenario checks, stands out as its card's bold name does */
   kl.classList.toggle('pt',on&&ids.some(q=>q===hk||(!!L.leaf&&L.leaf.scenarioKind!=='happy'&&q===L.leaf.unit)))}
  B.kwant=[want,txt];gbPlaceNames(B);
  for(const id in B.root){B.root[id].classList.toggle('hl',litU.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route (gbRoute) for a leaf; for a root, the sap it sends up the trunk to each journey it feeds */
- let d='',dx='',dw='',df='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
- if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||''}}
+ let d='',dx='',dw='',df='',dc='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
+ if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||'';dc=R.dc||''}}
  else if(rootPart){const rr=B.L.roots.find(q=>q.id===L.part);if(rr){const up=rr.pts.slice().reverse();for(const jid of L.js){const pid=(B.padsOf[jid]||[]).find(q=>!B.pad[q].pol)||(B.padsOf[jid]||[])[0];const P=pid&&B.pad[pid];if(!P)continue;
    /* (up the root to where it forks from the trunk above the soil, then up the trunk: no spur down into the ground) */
    const sp=gbSpine(P.rt,P.o),f=gbFork(sp,rr);d+=(d?' ':'')+line(gbSmooth([...sp.slice(0,f.iJ),...f.out].reverse(),1))}if(!d)d=line(up)}}
  /* where a failing scenario broke stays red at rest, and for whatever is lit that holds it; a passing leaf's route, or a
     journey that does not hold the failure, shows no red */
  if(!x)for(const e of B.fails||[])if(woundOn(e)){const R=gbRoute(e.x);if(R&&R.dw)dw+=(dw?' ':'')+R.dw}
- /* the glow runs only where the sap ran: it ends at the break, or at the hop a leaf's own scenario checks. Past it the route
-    is small grey dots, under the faint knots it never reached */
+ /* the glow runs only where the sap ran: it ends at the break, or just past the hop a leaf's own scenario checks. Past a
+    break the route is small grey dots, under the faint knots it never reached; past the hop it checks, plain wood. The glow
+    and the red are bands inside the wood, sized from its girth (gbRibbon, gbRed) */
  if(!B.sapF){B.sapF=sv('path',{class:'sap faint',d:''});B.sapXo=sv('path',{class:'sap resto',d:''});B.sapX.before(B.sapF,B.sapXo)}
- B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);B.sapU.setAttribute('d',d);
- B.sap.setAttribute('d',d)}
+ B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);
+ const rib=d?gbRibbon(B,d,.33,1.4,9):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);gbRed(B,dw)}
 /* The wood a leaf's sap runs through on its way down: from where its stalk meets its cushion, down the twig that carries
    that cushion (or, for the outer cushion, to the branch's end inside it), along the branch's centre line to the trunk
    (round a fillet as wide as the branch, not a corner), and down the trunk's centre line. Without a cushion it joins the
@@ -1640,19 +1650,31 @@ function gbSpine(R,at,id){const T=id!==undefined&&R.lt?R.lt[id]:null;const into=
  const all=[...mid,...R.tp.slice(0,K).reverse()];if(!R.br)return all;const c=mid.length-1,r=Math.max(8,(R.bw||8)*1.1),a0=gbBack(all,c,r),a1=gbFwd(all,c,r);
  return [...all.slice(0,a0),...gbBez([all[a0],all[c],all[c],all[a1]],10),...all.slice(a1+1)]}
 /* A scenario's route: its sap's way down to the last file its journey reaches, then out along every root the journey depends
-   on. A failed scenario's route is gold as far as it ran, red where it broke (on that hop's knot, or just past it when a check
-   after that hop failed, or the start of a root), and grey beyond, where it never ran. When the run does not say where it
-   broke, only the leaf is red. A part check's route is the wood its shoot grows from. */
+   on. A failed scenario's route is amber as far as it ran; red is the wood just past the hop where it broke (from the edge of
+   that hop's boss to short of the next boss), or across the hop's own boss when it broke at the hop, or the start of a root;
+   grey dots beyond, where it never ran. A scenario that checks one hop runs to that hop, and the rest of its journey is just
+   wood, unlit, with no dots: it was never meant to run there. When the run does not say where it broke, only the leaf is red.
+   A part check's route is the wood its shoot grows from. Also returns the route's stretches as points: lf, the leaf's own
+   wood; main, the hops' wood; the red stretch; and out, the hops past what it checks. */
 function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id];if(!el)return null;const line=pts=>'M'+pts.map(gbP).join(' L');
  const j=M.J.find(q=>M.leaves[q.id].includes(x));
  if(!j){if(el.__route)return {d:line(gbSmooth(el.__route,1)),dx:'',dw:'',df:''};const g=el.__base&&B.budG[x.unit];return g?{d:line(gbSmooth(g.route,1)),dx:'',dw:'',df:''}:null}
  const P=B.pad[el.__p];const m=/translate\(([-\d.]+)px,\s*([-\d.]+)px\)(?:\s*rotate\(([-\d.]+)deg\))?/.exec(el.style.transform);if(!m||!P||!P.rt)return null;
  const ra=m[3]?(+m[3])*Math.PI/180:0,k0=P.geo.L/2+GB_PET,at=[+m[1]-Math.cos(ra)*k0,+m[2]-Math.sin(ra)*k0];
  const r=gw.state.run[x.id],w=r&&r.st==='fail'?gbWound(M,j,x):null;
+ const nearI=(path,id)=>{const p=B.pos[id];if(!p)return -1;let ci=-1,bd=20;path.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});return ci};
+ const isK=id=>!!B.knot[id]&&!B.root[id];
  let pts=gbSpine(P.rt,at,x.id);const rr0=j.units.filter(id=>B.root[id]).map(id=>B.L.roots.find(q=>q.id===id)).filter(Boolean);
+ /* A leaf on a guard or failure branch of its own meets the trunk below the files its journey runs through, which sit on the
+    leader under the crown: its route is its own wood down to the trunk (lf, lit whatever happens on the hops), and the
+    journey's hops from the first of them down the leader, the way the crown's own leaves run them */
+ let lf=null;{const P0=(B.padsOf[j.id]||[]).map(q=>B.pad[q]).find(q=>q&&!q.pol);
+  if(P0&&P0!==P&&j.units.some(id=>isK(id)&&nearI(pts,id)<0)){const hp=gbSpine(P0.rt,P0.o),first=j.units.find(id=>isK(id)&&nearI(hp,id)>=0);
+   if(first){const tk=P.rt.tp[P.rt.k];let fi=0,bd=1e9;pts.forEach((q,i)=>{const d=Math.hypot(q[0]-tk[0],q[1]-tk[1]);if(d<bd){bd=d;fi=i}});
+    const a=gbLen(hp),g0=B.knot[first].__geo||{},s0=a[nearI(hp,first)]-(g0.ra||6)-8;lf=pts.slice(0,fi+1);pts=hp.slice(Math.max(0,a.findIndex(v=>v>=s0)))}}}
  /* with no root to run out along, the route ends at the last file it reaches, not in the soil */
- if(!rr0.length){let last=-1;for(const id of j.units){const p=B.pos[id];if(!p||!B.knot[id])continue;let ci=0,bd=1e9;pts.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});if(bd<16)last=Math.max(last,ci)}
-  if(last>=0)pts=pts.slice(0,gbFwd(pts,last,w&&r.after?24:8)+1)}
+ if(!rr0.length){let last=-1;for(const id of j.units){if(!B.knot[id])continue;const ci=nearI(pts,id);if(ci>=0)last=Math.max(last,ci)}
+  if(last>=0)pts=pts.slice(0,gbFwd(pts,last,w&&r.after?48:8)+1)}
  /* The trunk hands the route to a root where the root flares from it on the soil line: the route leaves the trunk's centre
     line above the soil and turns through a fillet onto the root's centre line. It never runs down into the soil, and inside
     the pot it keeps to the soil's top. */
@@ -1660,26 +1682,32 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  if(rr0.length){const J=rr0.map(rr=>({rr,...gbFork(pts,rr)}));
   const i0=Math.min(...J.map(o=>o.iJ));main=pts.slice(0,i0+1);
   rts=J.map(o=>({id:o.rr.id,pts:[...pts.slice(i0,o.iJ),...o.out]}))}
- const all=()=>line(main)+rts.map(q=>' '+line(q.pts)).join('');
+ const L0=lf&&lf.length>1?line(lf)+' ':'',all=()=>L0+line(main)+rts.map(q=>' '+line(q.pts)).join('');
  /* which hops are the scenario's own (gbReach): a happy path runs the whole journey; any other scenario runs from the
     journey's start to the hop it checks, and the rest of the journey is not its route */
  const ix=j.units.indexOf(x.unit),hop=ix>=0?{i:ix+1,n:j.units.length,label:(M.U[x.unit]||{}).label||x.unit}:null;
  const own=gbReach(M,j,x).own?j.units.slice(0,ix+1):null;
- const nearI=(path,id)=>{const p=B.pos[id];if(!p)return -1;let ci=-1,bd=20;path.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});return ci};
- const whole={d:all(),dx:'',dw:'',df:'',lit:new Set(j.units),un:new Set(),hop};
- /* past the hop it checks, the journey is drawn as never reached, as past a break: grey dots, its knots faint */
- if(!w){if(!own)return whole;const un=new Set(j.units.filter(id=>!own.includes(id)));
-  if(B.root[x.unit])return {d:line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),dx:rts.filter(t=>t.id!==x.unit).map(t=>line(t.pts)).join(' '),df:'',dw:'',lit:new Set(own),un,hop};
+ const whole={d:all(),dx:'',dw:'',df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,lf,main};
+ /* past the hop it checks the journey is plain wood: no glow and no dots; its files are named, muted, as the card mutes them */
+ if(!w){if(!own)return whole;const out=new Set(j.units.filter(id=>!own.includes(id)));
+  if(B.root[x.unit])return {d:L0+line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,lf,main};
   let ci=-1;for(const id of own)if(!B.root[id])ci=Math.max(ci,nearI(main,id));if(ci<0)return whole;
-  const acc=gbLen(main);let i1=acc.findIndex(v=>v>=acc[ci]+9);if(i1<0)i1=main.length-1;
-  return {d:line(main.slice(0,i1+1)),dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',dw:'',lit:new Set(own),un,hop}}
+  const acc=gbLen(main),g=(B.knot[j.units[ix]]||{}).__geo||{};let i1=acc.findIndex(v=>v>=acc[ci]+(g.ra||5)+6);if(i1<0)i1=main.length-1;
+  return {d:L0+line(main.slice(0,i1+1)),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,lf,main:main.slice(0,i1+1)}}
  const wi=j.units.indexOf(w),lit=new Set(j.units.slice(0,wi+1)),un=new Set(j.units.slice(wi+1).filter(id=>!B.root[w]||!B.root[id]));
  if(B.root[w]){const q=rts.find(t=>t.id===w);if(!q)return whole;const acc=gbLen(q.pts),ci=acc.findIndex(v=>v>Math.max(24,acc[acc.length-1]*.45));
-  return {d:line(main)+rts.filter(t=>t!==q).map(t=>' '+line(t.pts)).join(''),dw:line(q.pts.slice(0,ci<0?q.pts.length:ci+1)),dx:ci<0?'':line(q.pts.slice(ci)),df:'',lit:new Set(j.units),un:new Set(),hop}}
+  return {d:L0+line(main)+rts.filter(t=>t!==q).map(t=>' '+line(t.pts)).join(''),dw:line(q.pts.slice(0,ci<0?q.pts.length:ci+1)),dx:ci<0?'':line(q.pts.slice(ci)),df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,lf,main,red:q.pts.slice(0,ci<0?q.pts.length:ci+1)}}
  const p=B.pos[w];if(!p)return whole;
  let ci=0,bd=1e9;main.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});const acc=gbLen(main);
- const a0=r.after?acc[ci]+4:acc[ci]-9,a1=r.after?acc[ci]+20:acc[ci]+9;let i0=acc.findIndex(v=>v>=a0),i1=acc.findIndex(v=>v>=a1);if(i0<0)i0=main.length-1;if(i1<0)i1=main.length-1;
- return {d:line(main.slice(0,i0+1)),dw:i1>i0?line(main.slice(i0,i1+1)):'',dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',lit,un,hop}}
+ /* the red: the wood just past the hop's boss, as long as about one and a half girths there and never into the next boss
+    along the route (it stops four pixels short of it); where it broke at the hop, across the hop's own boss */
+ const ga=((B.knot[w]||{}).__geo||{}).ra||5,G=gbGirth(B,main[ci])||8,nx=j.units.slice(wi+1).filter(isK).map(id=>({i:nearI(main,id),ra:((B.knot[id]||{}).__geo||{}).ra||5})).filter(o=>o.i>ci).sort((a,b)=>a.i-b.i)[0];
+ let a0,a1;if(r.after){a0=acc[ci]+ga+1.5;a1=a0+Math.max(14,Math.min(30,1.5*G))}else{a0=acc[ci]-ga-4;a1=acc[ci]+ga+Math.max(6,Math.min(14,.6*G))}
+ if(nx)a1=Math.min(a1,acc[nx.i]-nx.ra-4);a1=Math.max(a1,a0+6);
+ let i0=acc.findIndex(v=>v>=a0),i1=acc.findIndex(v=>v>=a1);if(i0<0)i0=main.length-1;if(i1<0)i1=main.length-1;
+ /* the glow runs on under the red's feathered head, so the amber fades into red with no bare wood between */
+ let iF=acc.findIndex(v=>v>=a0+.28*(a1-a0));if(iF<i0)iF=i0;
+ return {d:L0+line(main.slice(0,iF+1)),dc:L0+line(main.slice(0,i0+1)),dw:i1>i0?line(main.slice(i0,i1+1)):'',dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',lit,un,out:new Set(),hop,lf,main:main.slice(0,i0+1),red:main.slice(i0,i1+1)}}
 /* Which hops a scenario reaches: a failed one up to where it broke (all of them when it broke at a root), a happy path its
    whole journey, any other the journey from its start to the hop it checks. The rest it never reaches. The tree (gbRoute)
    and every card that names its path say the same. */
@@ -1693,6 +1721,28 @@ function gbReach(M,j,x){const r=gw.state.run[x.id],w=r&&r.st==='fail'?gbWound(M,
 function gbFork(pts,rr){const L=gw.B.L,sy=q=>L.sy?L.sy(q):0,p0=L.potC-L.potL/2,p1=L.potC+L.potL/2,inPot=q=>q[0]>p0&&q[0]<p1,at0=pts.length-1,xT=pts[at0][0];
  const k1=gbFwd(rr.pts,0,12),q=rr.pts[k1],lvl=Math.min(q[1],sy(q[0])-1.5),rad=Math.max(6,Math.min(14,Math.abs(q[0]-xT)));let iJ=at0;while(iJ>0&&pts[iJ][1]>lvl-rad)iJ--;
  const a=pts[iJ],c=[a[0],lvl];return {iJ,out:[...gbBez([a,c,c,[q[0],lvl]],8),...rr.pts.slice(k1+1).map(p=>inPot(p)?[p[0],Math.min(p[1],sy(p[0])-1.5)]:p)]}}
+/* How thick the wood is at a point: the widest piece whose body holds it (the trunk where a branch leaves it), else the
+   nearest piece's girth. Read off every piece of wood the layout drew, once per drawing. */
+function gbGirth(B,p){if(!B.wS){const S=B.wS=[],L=B.L,add=(pts,w,X)=>{if(!pts||!w)return;for(let i=0;i<pts.length;i++)S.push([pts[i][0]+(X||0),pts[i][1],w[i]||1])};
+  L.trees.forEach((T,ti)=>{const X=L.xs[ti];add(T.tp,T.tw,X);for(const b of T.br||[]){add(b.pts,b.w,X);for(const t of b.twigs||[])add(t.pts,t.w,X)}for(const t of T.ctw||[])add(t.pts,t.w,X)});for(const r of L.roots||[])add(r.pts,r.w,0)}
+ let best=0,nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2];if(d<nd){nd=d;nw=q[2]}}return best||nw}
+/* a path's runs of points (only M and L, as the route is written) */
+const gbSubs=d=>String(d||'').split('M').map(t=>t.trim()).filter(Boolean).map(t=>t.split(/\s*L\s*/).map(q=>q.trim().split(/\s+/).map(Number))).filter(q=>q.length>1&&q.every(v=>v.length===2&&v.every(isFinite)));
+/* A route drawn inside the wood: a filled band along each run, k of the girth wide (between mn and mx), the width eased along
+   it so it tapers where the wood does, with round ends. */
+function gbRibbon(B,d,k,mn,mx){let out='';for(const run of gbSubs(d)){const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
+  const w0=P.map(q=>Math.max(mn,Math.min(mx,k*gbGirth(B,q)))),w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return s/c});
+  const Lf=[],Rt=[];P.forEach((q,i)=>{const m=gbNorm(P,i),h=w[i]/2;Lf.push([q[0]+m[0]*h,q[1]+m[1]*h]);Rt.push([q[0]-m[0]*h,q[1]-m[1]*h])});
+  const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
+  const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
+  out+=(out?' ':'')+'M'+[...Lf,...cap(e,me,w[n]/2,1),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
+/* Where it broke, the wood itself turns red: half the girth wide on the spine, feathered in and out along its length (a
+   gradient from one end to the other), in the wood's own group, so the bosses on either side stand over it */
+function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
+ for(const run of gbSubs(dw)){const a=run[0],e=run[run.length-1],id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
+  if(!gr){gr=sv('linearGradient',{id,gradientUnits:'userSpaceOnUse'},...[[0,0],[.28,1],[.72,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})));B.defs.append(gr)}
+  for(const [k,v] of [['x1',a[0]],['y1',a[1]],['x2',e[0]],['y2',e[1]]])gr.setAttribute(k,gbF(v));
+  g.append(sv('path',{class:'sapw',d:gbRibbon(B,'M'+run.map(gbP).join(' L'),.5,3,15),fill:'url(#'+id+')'}))}}
 /* Every file's name and every shoot's count, placed in one pass against one set of things to keep clear of: the wood (trunk,
    branches, twigs, roots), every cushion's outline and 4 px round it, every leaf with its stalk, the shoots and their
    leaves, the knots, the pot and the soil, the plant tags, and every other name and number. A count sits just off its
