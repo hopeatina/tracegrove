@@ -120,6 +120,11 @@ describe('What happened, step by step', () => {
     expect((await get(url(failRun, 'case=seats.remove-seat&config=..%2F..%2Fetc%2Ftracegrove.config.yaml'))).status).toBe(400);
     expect((await get(url(failRun, 'case=seats.remove-seat&config=%2Fetc%2Ftracegrove.config.yaml'))).status).toBe(400);
     expect((await get(url('2026-01-01T00-00-00Z_fail_000000'))).status).toBe(404);
+    // the flow is named, never guessed: this run holds one flow, and asking it for another, or for none, is refused
+    expect(happenedIn(dir, failRun, 'billing.card-declined')).toBeNull();
+    const other = await get(url(failRun, 'case=billing.card-declined'));
+    expect(other.status).toBe(404); expect(await other.json()).toEqual({ error: 'the run has no record of that flow' });
+    for (const q of ['case=', '', 'config=tracegrove.config.yaml']) expect((await get(url(failRun, q))).status, q).toBe(400);
     // a run that is a link to a folder elsewhere is refused, not followed
     const outside = mkdtempSync(join(tmpdir(), 'tracegrove-drawer-outside-')); temps.push(outside);
     cpSync(join(dir, '.tracegrove', 'runs', failRun), join(outside, failRun), { recursive: true });
@@ -232,6 +237,16 @@ describe('What happened, step by step', () => {
     await expect(drawer(page).textContent()).resolves.toContain('Where it starts');
     await expect(page.getByTestId('grow-happened-write').textContent()).resolves.toBe('Write this flow');
     expect(await page.evaluate(() => location.hash)).toBe(`#grow/${none}/steps`);
+    await page.close();
+  });
+
+  it('says the run holds no record of the flow the grow recorded, instead of reading the run’s only flow as that one', async () => {
+    const page = await open();
+    await page.evaluate((id) => { (0, eval)('gw').state.run[id].flow = 'billing.card-declined'; location.hash = `#grow/${id}/steps`; }, failed);
+    const err = drawer(page).locator('.gw-drerr');
+    await err.waitFor();
+    await expect(err.textContent()).resolves.toBe(`The run ${failRun} has no record of billing.card-declined.`);
+    await expect(page.getByTestId('grow-happened-oneline').count()).resolves.toBe(0);
     await page.close();
   });
 

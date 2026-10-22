@@ -754,9 +754,11 @@ function gwDrOpen(sid,step,quiet,keep){const s=gw.state,x=s&&gwScen(sid);if(!gwD
  gw.dr.focus=!keep;gw.pinned='s:'+sid;if(!keep)gw.drScroll=true;if(ran)gwDrLoad(gw.dr);if(!quiet)growPaint()}
 async function gwDrLoad(d){const s=gw.state,r=s.run[d.sid],x=gwScen(d.sid);const flow=r.flow||x.flow||'',cfg=s.flows&&s.flows.config||null,sub=cfg&&cfg.lastIndexOf('/')>0?cfg.slice(0,cfg.lastIndexOf('/')):null;
  let out=null,err=null;
- try{const res=await fetch('/api/runs/'+encodeURIComponent(r.run)+'/happened?case='+encodeURIComponent(flow)+(cfg?'&config='+encodeURIComponent(cfg):''),{headers:{'x-tracegrove-token':TOKEN}});
+ /* the run is read for the flow the grow recorded it ran, never for whichever flow the run holds */
+ if(!flow)err='This grow did not record which flow made the run '+r.run+', so it is not read as this scenario.';
+ else try{const res=await fetch('/api/runs/'+encodeURIComponent(r.run)+'/happened?case='+encodeURIComponent(flow)+(cfg?'&config='+encodeURIComponent(cfg):''),{headers:{'x-tracegrove-token':TOKEN}});
   const j=await res.json().catch(()=>null);
-  if(res.ok&&j&&Array.isArray(j.steps))out=j;else err=j&&j.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':'The run '+r.run+' could not be read'+(j&&j.error?': '+j.error:'')+'.'}
+  if(res.ok&&j&&Array.isArray(j.steps))out=j;else err=j&&j.error==='run not found'?'The run '+r.run+' is not saved in '+(sub||'this folder')+' any more.':j&&j.error==='the run has no record of that flow'?'The run '+r.run+' has no record of '+flow+'.':'The run '+r.run+' could not be read'+(j&&j.error?': '+j.error:'')+'.'}
  catch(e){err='The run '+r.run+' could not be read.'}
  if(gw.dr!==d)return;d.loading=false;d.data=out;d.err=err;if(out&&(d.step===null||d.step>=out.steps.length))d.step=out.at;
  if(tab==='Discover')growPaint()}

@@ -149,9 +149,10 @@ function historyOf(root: string, caseId: string, current: string): Happened['his
 export function happenedIn(root: string, name: string, caseId: string): Happened | null {
   const dir = savedRunDirectory(root, name);
   const r = readSavedRun(dir);
-  const c = r.cases.find((q) => q.caseId === caseId) ?? (r.cases.length === 1 ? r.cases[0] : undefined);
+  // Only the flow asked for: a run that holds one other flow is not read as this one.
+  const c = r.cases.find((q) => q.caseId === caseId);
   const verified = r.evidenceStatus === 'verified';
-  const history = historyOf(root, c?.caseId ?? caseId, name);
+  const history = historyOf(root, caseId, name);
   if (!c) return verified ? null : { run: name, verified, source: null, startedAt: r.startedAt, caseId, title: caseId, outcome: r.outcome, ms: 0, steps: [], at: 0, contradicts: null,
     oneLine: 'This run’s evidence could not be verified, so its steps are not shown.', chips: [{ t: `run ${name}`, tone: '' }, { t: 'not verified', tone: 'bad' }], foot: [], history };
   const names = declaredNames(dir, c.caseId);

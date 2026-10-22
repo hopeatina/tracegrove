@@ -369,10 +369,13 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         if (req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
         let name: string; try { name = decodeURIComponent(happened[1]!); } catch { return send(400, { error: 'bad run name' }); }
         if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
+        // The flow is named, never guessed: a run of one flow is not read as another.
+        const caseId = url.searchParams.get('case');
+        if (!caseId) return send(400, { error: 'name the flow: ?case=<flow id>' });
         const root = runRoot(url);
         if (!root) return send(400, { error: 'config must name a file inside this folder' });
         let found: ReturnType<typeof happenedIn>;
-        try { found = happenedIn(root, name, url.searchParams.get('case') ?? ''); } catch { return send(404, { error: 'run not found' }); }
+        try { found = happenedIn(root, name, caseId); } catch { return send(404, { error: 'run not found' }); }
         return found ? send(200, found) : send(404, { error: 'the run has no record of that flow' });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
