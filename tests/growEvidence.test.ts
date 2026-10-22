@@ -147,6 +147,27 @@ describe('From a grown scenario to its run', () => {
     await page.close();
   });
 
+  it('offers each listed row that ran its run before the row is opened, beside the reason a failed one broke', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const list = page.getByTestId('grow-scenarios');
+    // The failed row: its reason, then the way to its run, with nothing opened.
+    const broke = list.locator(`.gb-ols[data-sid="${failed}"] + .err + .gb-hapr [data-hap="${failed}"]`);
+    await expect(broke.textContent()).resolves.toBe('See what happened ›');
+    await expect(list.locator(`.gb-ols[data-sid="${passed}"] + .gb-hapr [data-hap="${passed}"]`).count()).resolves.toBe(1);
+    await broke.click();
+    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2 });
+    await page.close();
+    // Opened in place, the row says it once, in its body.
+    const again = await open();
+    await again.getByTestId('grow-result').waitFor();
+    await again.getByTestId('grow-scenarios').locator(`.gb-ols[data-sid="${passed}"]`).click();
+    await expect(again.getByTestId('grow-scenarios').locator(`[data-hap="${passed}"]`).count()).resolves.toBe(1);
+    await again.getByTestId('grow-scenarios').locator(`.gb-olin [data-hap="${passed}"]`).click();
+    expect(await landed(again)).toMatchObject({ run: passRun, sel: 'notes.count-anonymous', step: 0 });
+    await again.close();
+  });
+
   it('opens the run of a scenario that never reached its checks from its card, to show why it is not tested yet', async () => {
     const page = await open();
     await page.getByTestId('grow-result').waitFor();

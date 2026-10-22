@@ -226,6 +226,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
 .gb-ols.cut{cursor:default;color:var(--ink3);min-height:30px}.gb-ols.cut .t{text-decoration:line-through;text-decoration-color:var(--muted)}
 .gb-olx .err{font:12px/17px var(--mono);color:var(--verm-ink);background:var(--verm-bg);padding:6px 8px;border-radius:6px;overflow-wrap:break-word;margin:0 8px 4px 38px}
 .gb-olin{display:grid;gap:8px;padding:2px 8px 12px 38px;font-size:13px;line-height:19px;color:var(--ink3)}
+.gb-hapr{margin:-4px 8px 6px 38px;line-height:18px}.gb-hapr .gw-lnk{margin-top:0}.gw-ins .gb-hapr{margin:-2px 4px 6px 34px}
 .gb-olf>summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:36px;padding:6px 8px;border-radius:6px;list-style:none;cursor:pointer;font:13px/18px var(--sans);color:var(--ink3)}
 .gb-olf>summary::-webkit-details-marker{display:none}.gb-olf>summary::before{content:'▸';width:10px;color:var(--muted);font-size:11px}.gb-olf[open]>summary::before{content:'▾'}.gb-olf>summary:hover{background:var(--sel)}
 /* the Outline's sections: a plain heading over a rule; mono capitals are kept for the groups inside them */
@@ -2208,7 +2209,9 @@ function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw
  if(s.modeBy&&!gwIn(x))return gbItem(x,{tag:'div',class:'gb-ols cut','data-sid':x.id},[h('span',{class:'gw-badge'},gwML(x.mode)+' grows it')]);
  return [gbItem(x,{class:'gb-ols'+(pin?' sel':'')+(hl?' hl':''),'data-sid':x.id,'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k),mouseenter:()=>gbLit2(k),mouseleave:()=>gbLit2(null)}},
    [x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)]),
-  r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180)):null,open?gbRowBody(x):null]}
+  r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180)):null,
+  /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too */
+  !open&&gwRan(x)?h('div',{class:'gb-hapr'},gwHappened(x)):null,open?gbRowBody(x):null]}
 /* A row opened in place: where it broke first, when it broke; then the claim, said as what the run did with it; then its chips. */
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
  gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r)):null,
