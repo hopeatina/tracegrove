@@ -1976,22 +1976,57 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
-  it('fills a leaf still to prove on a dark page with a pale leaf, never the page showing through', async () => {
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet never a hole', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
+    // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
+    const paint = () => {
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+      const rgba = (c: string) => { if (c === 'none') return null; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return a! < 200 ? null : [r! / 255, g! / 255, b! / 255]; };
+      (window as any).__lab = (c: string) => {
+        const v = rgba(c); if (!v) return null;
+        const lin = v.map((x) => (x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4));
+        const X = (.4124 * lin[0]! + .3576 * lin[1]! + .1805 * lin[2]!) / .95047, Y = .2126 * lin[0]! + .7152 * lin[1]! + .0722 * lin[2]!, Z = (.0193 * lin[0]! + .1192 * lin[1]! + .9505 * lin[2]!) / 1.08883;
+        const f = (t: number) => (t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+        // (lum: the luminance the no-hole check has always read, weighted over the painted values)
+        return { L: 116 * f(Y) - 16, a: 500 * (f(X) - f(Y)), b: 200 * (f(Y) - f(Z)), lum: .2126 * v[0]! + .7152 * v[1]! + .0722 * v[2]! };
+      };
+    };
     try {
       for (const width of [1440, 390]) {
+        // a passed leaf, from the plotline grow
+        const pl = await treePage(browser, server.url, folded('plotline-seats.jsonl'), { width, scheme: 'dark', reduce: true });
+        await pl.evaluate(paint);
+        const pass = await pl.evaluate(() => { const e = document.querySelector('.gw-svg.gb .gb-lf.pass:not(.gone):not(.pv-out) .blade'); return e ? (window as any).__lab(getComputedStyle(e).fill) : null; });
+        expect(pass, width + 'px a passed leaf').not.toBeNull();
+        await pl.close();
         const page = await treePage(browser, server.url, folded('tracegrove-max.jsonl'), { width, scheme: 'dark', reduce: true });
         await page.waitForTimeout(400);
+        await page.evaluate(paint);
         const look = await page.evaluate(() => {
-          // a colour as the page paints it, whatever space it was mixed in: none or clear counts as a hole
-          const ctx = document.createElement('canvas').getContext('2d')!;
-          const lum = (c: string) => { if (c === 'none') return -1; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return a! < 200 ? -1 : (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255; };
-          const bg = lum(getComputedStyle(document.body).backgroundColor);
-          return { bg, leaves: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf:is(.in,.idle,.none):not(.gone):not(.bud) .blade')).map((e) => lum(getComputedStyle(e).fill)) };
+          const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
+          const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { fill: lab(c.fill), stroke: lab(c.stroke), sw: parseFloat(c.strokeWidth), bud: !!e.closest('.bud') }; });
+          return { bg, prove: each('.gw-svg.gb .gb-lf:is(.in,.idle):not(.gone):not(.pv-add):not(.pv-out):not(.pre) .blade'), none: each('.gw-svg.gb .gb-lf.none:not(.gone):not(.bud) .blade') };
         });
-        expect(look.leaves.length, width + 'px').toBeGreaterThan(3);
-        for (const l of look.leaves) expect(l - look.bg, width + 'px pending leaf against the page').toBeGreaterThan(0.3);
+        expect(look.prove.length, width + 'px').toBeGreaterThan(3);
+        const hue = (c: { a: number; b: number }) => Math.atan2(c.b, c.a) * 180 / Math.PI;
+        for (const l of look.prove) {
+          // an opaque neutral fill a step off the page: neither green nor the page, and no hole
+          expect(l.fill, width + 'px a leaf to prove with no fill').not.toBeNull();
+          expect(Math.abs(l.fill!.a), width + 'px fill a*').toBeLessThan(6);
+          expect(Math.abs(l.fill!.b), width + 'px fill b*').toBeLessThan(6);
+          expect(l.fill!.L, width + 'px fill a step off the page').toBeGreaterThanOrEqual(look.bg.L + 3);
+          // rimmed in the passed leaf's green, so it reads as a leaf of the same kind not yet filled
+          expect(l.stroke, width + 'px a leaf to prove with no rim').not.toBeNull();
+          expect(Math.abs(hue(l.stroke!) - hue(pass!)), width + 'px rim hue against a passed leaf').toBeLessThanOrEqual(10);
+          expect(Math.hypot(l.stroke!.a, l.stroke!.b), width + 'px rim chroma').toBeGreaterThan(20);
+          if (!l.bud) expect(l.sw, width + 'px rim width').toBeGreaterThanOrEqual(1.45);
+          // and never read as passed: twenty L* or more from a passed leaf's fill
+          expect(Math.abs(pass!.L - l.fill!.L), width + 'px L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
+        }
+        // a leaf with no flow yet stays a pale leaf, never the page showing through
+        expect(look.none.length, width + 'px').toBeGreaterThan(0);
+        for (const l of look.none) expect((l.fill?.lum ?? -1) - look.bg.lum, width + 'px no-flow leaf against the page').toBeGreaterThan(0.3);
         await page.close();
       }
     } finally { await browser.close(); }

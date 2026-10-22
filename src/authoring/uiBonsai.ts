@@ -29,7 +29,7 @@ export const BONSAI_CSS = String.raw`
  --pad:color-mix(in srgb,var(--moss) 50%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 66%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 30%,var(--paper));
  --fol-hi:color-mix(in srgb,var(--moss) 56%,var(--paper));--fol:color-mix(in srgb,var(--moss) 45%,var(--paper));--fol-lo:color-mix(in srgb,var(--moss) 34%,var(--paper));--fsh-hi:color-mix(in srgb,var(--moss) 45%,var(--paper));--fsh:color-mix(in srgb,var(--moss) 35%,var(--paper));--fsh-lo:color-mix(in srgb,var(--moss) 25%,var(--paper));
  --pad-dim:color-mix(in srgb,var(--moss) 22%,var(--paper));--pad-back:color-mix(in srgb,var(--moss) 40%,var(--paper));--pad-edge:color-mix(in srgb,var(--moss) 38%,var(--paper));
- --leaf-pend:color-mix(in oklab,var(--fol-hi) 84%,#fff);
+ --leaf-pend:color-mix(in oklab,var(--fol-hi) 84%,#fff);--leaf-prove:color-mix(in srgb,var(--paper) 86%,#fff);
  --pot:color-mix(in srgb,var(--ochre) 30%,#6A584B);--pot-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--pot-ft:color-mix(in srgb,var(--pot) 72%,#000);--pot-lit:color-mix(in srgb,var(--pot) 80%,#fff);--pot-dk:color-mix(in srgb,var(--pot) 78%,#000);--soil-c:#3B2F27;--soil-lit:#46382D;--pebble:color-mix(in srgb,var(--line2) 80%,var(--ink3));--rt-cut:#8C7A66;--rt-ext:#968470;--stake:#9A8468}}
 .gb .w{fill:var(--wood)}.gb .w.old{fill:var(--wood-old)}.gb .lt{fill:var(--wood-lit)}.gb .sh{fill:var(--wood-shade)}
 .gb .grain{fill:none;stroke:var(--wood-shade);stroke-width:.8;stroke-linecap:round;opacity:.32}
@@ -90,9 +90,9 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.none .blade{fill:color-mix(in srgb,var(--paper) 70%,transparent);stroke:var(--moss);stroke-width:1.2;stroke-dasharray:2.4 1.6}
 .gb-lf.pre .blade{fill:var(--paper);stroke:var(--line2)}
 .gb-lf.in .rib,.gb-lf.idle .rib,.gb-lf.none .rib,.gb-lf.pre .rib{stroke:var(--moss);opacity:.3}
-/* on a dark page a passed leaf is the bright solid one, so a leaf still to prove is an outline in the pad's own tone: not
-   pale like a passed leaf, and not a dark hole in the pad */
-@media (prefers-color-scheme:dark){.gb-lf.in .blade,.gb-lf.idle .blade,.gb-lf.none .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1.2}.gb-lf.pre .blade{fill:var(--paper);stroke:var(--ink3)}.gb .ptex{opacity:.3}.gb .lip-hi{opacity:.6}
+/* on a dark page a passed leaf is the bright solid one, so a leaf still to prove is an outline: the passed leaf's green as a rim
+   over a neutral fill a step off the page, never pale like a passed leaf and never a hole in the pad */
+@media (prefers-color-scheme:dark){.gb-lf.in .blade,.gb-lf.idle .blade{fill:var(--leaf-prove);stroke:var(--moss);stroke-width:1.5}.gb-lf.none .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1.2}.gb-lf.pre .blade{fill:var(--paper);stroke:var(--ink3)}.gb .ptex{opacity:.3}.gb .lip-hi{opacity:.6}
  .gb-lf.idle .rib,.gb-lf.none .rib{opacity:.5}}
 .gb-lf .gb-lfi{transform-box:fill-box;transform-origin:center}
 /* one preview grammar: what the mode keeps stays as it is, what it cuts fades in place with a nick at its stalk, what it
@@ -125,8 +125,9 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:color-mix(in srgb,var(--moss) 16%,var(--paper));stroke:var(--moss);stroke-width:1.2;stroke-dasharray:none}
 .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.6}.gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .rib{opacity:0}
 @media (prefers-color-scheme:dark){.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{fill:#ef6b5b;stroke:#2a0d0a}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#f2b3a8}.gb-lf.fail:not(.pv-out):not(.pv-add) .nec{stroke:#2a0d0a}
- /* on a dark page a leaf still to prove, drawn or not, is filled with a lightened cushion green: a leaf, never a hole */
- .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1.2;stroke-dasharray:none}
+ /* on a dark page a leaf still to prove stays an outline, a pass-green rim over a neutral fill a step off the page; one with no
+    flow yet is filled with a lightened cushion green: a leaf, never a hole */
+ .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-prove);stroke:var(--moss);stroke-width:1.5;stroke-dasharray:none}
  .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1;stroke-dasharray:2.2 1.6}}
 .gb-lf.hl:not(.pv-out):not(.pv-add):not(.bud) .blade{stroke-width:1.4}
 .gb .lbl text.t{font:400 13px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v{font:400 12.5px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v.out{fill:var(--muted);text-decoration:line-through}.gb .lbl text.st{font:11px var(--mono);fill:var(--muted)}.gb .lbl tspan.x{fill:var(--cutc)}
