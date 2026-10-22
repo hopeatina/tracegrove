@@ -6,6 +6,8 @@
 import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
+import { readBoundedFile } from '../core/boundedFile.ts';
+import { snake } from './compile.ts';
 import { expGot } from './checkCompare.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
 import { MODES, growVerdict, growView, inMode, plainTitle, failReason, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
@@ -41,6 +43,19 @@ export function brokeLine(r: RunState | undefined): string {
   return (!where ? `Broke: ${dot(said)}` : stage ? `Broke at ${stage}: ${dot(said)}` : `Broke at check “${where}”: ${dot(said)}`) + route;
 }
 
+/**
+ * A step's name as its flow declares it ("only the Team upgrade …"), which the run's summary.json recorded, when it is the
+ * name the step's sealed id was made from; else the name the sealed id gives ("only the team upgrade …").
+ */
+function declaredName(runDir: string, caseId: string, step: { id: string; name: string }): string {
+  try {
+    const summary = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(readBoundedFile(join(runDir, 'summary.json'), 16 * 1024 * 1024))) as
+      { cases?: Array<{ caseId?: unknown; steps?: Array<{ id?: unknown; name?: unknown }> }> };
+    const named = summary.cases?.find((c) => c.caseId === caseId)?.steps?.find((x) => x.id === step.id)?.name;
+    return typeof named === 'string' && snake(named) === step.id ? named : step.name;
+  } catch { return step.name; }
+}
+
 /** One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. */
 function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFailure; stepName: string | null } {
   const x = s.scenarios.find((y) => y.id === id)!; const r = s.run[id];
@@ -69,11 +84,11 @@ function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFail
     let i = c.failure ? steps.findIndex((q) => q.name === c.failure!.step || q.id === c.failure!.step) : -1;
     if (i < 0 || !bad(steps[i])) i = steps.findIndex(bad);
     if (i < 0) return found;
-    const at = steps[i]!; out.step = i + 1; found.stepName = at.name;
+    const at = steps[i]!; const name = declaredName(runDir, c.caseId, at); out.step = i + 1; found.stepName = name;
     // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same; and the sentence the page
     // says, from those recorded fields. Without a recorded check, the reason the grow recorded stays.
     if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got,
-      says: `${expGot(at.compared)}. Step ${i + 1} (${at.name}) broke it.` });
+      says: `${expGot(at.compared)}. Step ${i + 1} (${name}) broke it.` });
   } catch { /* evidence that does not verify gives no expected or got */ }
   return found;
 }

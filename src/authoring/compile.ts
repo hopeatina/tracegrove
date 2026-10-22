@@ -121,7 +121,8 @@ export function loadAuthoringConfig(configPath: string): AuthoringConfig {
   return readAuthoring(AuthoringConfig, configPath, dirname(configPath));
 }
 
-function snake(text: string): string {
+/** A step's id, made from its declared name. */
+export function snake(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'step';
 }
 

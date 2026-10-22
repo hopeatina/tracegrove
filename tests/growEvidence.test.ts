@@ -390,7 +390,7 @@ describe('One failure, worded one way everywhere', () => {
     expect(v.first?.scenario).toBe(failed);
     expect(v.text).toBe(`“${plainTitle(state.scenarios.find((x) => x.id === failed)!.title)}” failed: ${words}`);
     const f = growJsonSummary(state, dir).failures.find((x) => x.scenario === failed)!;
-    expect(f.says.startsWith('Expected 1 charge, got 2. Step 2 (')).toBe(true);
+    expect(f.says).toBe('Expected 1 charge, got 2. Step 2 (the card was charged the Team price once) broke it.');
     // The page: the verdict, and the row's "Broke at check" line in the Outline.
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
@@ -406,6 +406,18 @@ describe('One failure, worded one way everywhere', () => {
     expect(run).toContain(words);
     expect(run).not.toMatch(/expected 1 call, got 2/);
     await page.close();
+  });
+
+  it('names the step in grow --json as its flow declares it, and as its sealed id gives it when the saved name is not the one the id was made from', () => {
+    const f = growJsonSummary(state, dir).failures.find((x) => x.scenario === failed)!;
+    // The sealed id is the_card_was_charged_the_team_price_once; the flow, and the summary the run saved, say "Team".
+    expect(f.says).toContain('Step 2 (the card was charged the Team price once)');
+    const file = join(dir, f.evidence[0]!);
+    const saved = readFileSync(file, 'utf8');
+    try {
+      writeFileSync(file, saved.replaceAll('the card was charged the Team price once', 'charged once, renamed after the run'));
+      expect(growJsonSummary(state, dir).failures.find((x) => x.scenario === failed)!.says).toBe('Expected 1 charge, got 2. Step 2 (the card was charged the team price once) broke it.');
+    } finally { writeFileSync(file, saved); }
   });
 });
 
