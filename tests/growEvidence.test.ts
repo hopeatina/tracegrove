@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,6 +10,7 @@ import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
 import { applyGrow, freshGrow, growVerdict, growView, inMode, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { configRunsRoot } from '../src/authoring/runLocation.ts';
+import * as atomicFiles from '../src/core/atomicFiles.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
@@ -765,6 +766,78 @@ describe('A flow an agent wrote that never reached its checks', () => {
     expect(writtenFlowResult('s10', { outcome: 'failed', detail: 'the run evidence did not verify', run: wrong.run, caseOutcome: 'passed', failure: null }))
       .toEqual({ kind: 'scenario.not_run', scenario: 's10', why: 'Not proven: the run evidence did not verify', run: wrong.run, outcome: 'passed' });
     expect(writtenFlowResult('s10', { outcome: 'proven', detail: null, run: wrong.run, caseOutcome: 'passed', failure: null })).toEqual({ kind: 'scenario.passed', scenario: 's10', took: 0, run: wrong.run });
+  }, 180_000);
+
+  /* The same, through a whole grow: the notes branch without its anonymous flow, so "Without a session it is refused" has no flow
+     and the agent writes one. A `claude` that writes only when asked to write flows (its trace answers nothing), so the flow is
+     the one grow's proving asked for. */
+  function draftingClaude(body: string): void {
+    const bin = mkdtempSync(join(tmpdir(), 'tracegrove-agentbin-')); temps.push(bin);
+    writeFileSync(join(bin, 'claude'), `#!/bin/sh\ncase "$*" in *"Write tracegrove flows"*) ;; *) echo '{"type":"result","result":"nothing"}'; exit 0;; esac\nmkdir -p tracegrove/discovered/notes\ncat > tracegrove/discovered/notes/count-anonymous.flow.yaml <<'YAML'\n${body}YAML\necho '{"type":"result","result":"wrote it"}'\n`);
+    chmodSync(join(bin, 'claude'), 0o755);
+    process.env.PATH = `${bin}${delimiter}${path0}`;
+  }
+  const withoutAnonymousFlow = () => {
+    const dir = notesCount(false);
+    git(dir, 'rm', '-q', join('tracegrove', 'notes', 'count-anonymous.flow.yaml')); git(dir, 'commit', '-qm', 'No anonymous flow');
+    return dir;
+  };
+  const grown = (dir: string) => growCommand({ dir, branch: 'notes-count', base: 'main', mode: 'min', 'no-gh': true, json: true }, () => {});
+  const refused = (state: GrowState) => state.scenarios.find((x) => x.mode === 'min' && !x.flow && /refused/i.test(x.title))!;
+
+  it('in a grow, gives the scenario a written flow was for the reason its app did not start, with its run and evidence: exit 3, never 1', async () => {
+    const dir = withoutAnonymousFlow();
+    const app = join(dir, 'app', 'app.mjs');
+    writeFileSync(app, `import './settings.mjs';\n${readFileSync(app, 'utf8')}`);
+    git(dir, 'commit', '-qam', 'Load the settings');
+    draftingClaude(FLOW);
+    const { code, state, events, summary } = await grown(dir);
+    const x = refused(state);
+    expect(x).toBeDefined();
+    // The agent wrote it for that scenario, and grow ran it: the run never reached its checks.
+    expect(events.find((e) => e.kind === 'extension.written' && e.extKind === 'flow')).toMatchObject({ name: 'count-anonymous.flow.yaml', unit: x.unit });
+    expect(events.filter((e) => e.kind === 'scenario.failed')).toEqual([]);
+    expect(state.run[x.id]).toMatchObject({ st: 'not_run', why: expect.stringMatching(/^Could not run: the app did not start \(.+\)$/), run: expect.any(String) });
+    expect(code).toBe(3);
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { failed: 0 }, failures: [] });
+    const u = summary!.unproven.find((y) => y.scenario === x.id)!;
+    expect(u).toMatchObject({ reason: state.run[x.id]!.why, run: state.run[x.id]!.run, saved: true });
+    expect(u.reason).not.toBe('No flow proves this yet');
+    expect(u.evidence![0]).toBe(`.tracegrove/runs/${u.run}/summary.json`);
+    expect(u.evidence!.some((p) => p.endsWith('/receipt.json'))).toBe(true);
+    for (const p of u.evidence!) expect(existsSync(join(dir, p))).toBe(true);
+  }, 180_000);
+
+  it('in a grow, gives the scenario a written flow was for the reason it did not compile, with no run: exit 3', async () => {
+    const dir = withoutAnonymousFlow();
+    draftingClaude(['title: Without a token the count is refused', 'steps:', '  - name: anonymous is refused', '    FROB: /notes/count', ''].join('\n'));
+    const { code, state, summary } = await grown(dir);
+    const x = refused(state);
+    expect(state.run[x.id]).toMatchObject({ st: 'not_run', why: expect.stringMatching(/^Could not run: /) });
+    expect(state.run[x.id]!.why).not.toBe('No flow proves this yet');
+    expect(code).toBe(3);
+    expect(summary!.unproven.find((y) => y.scenario === x.id)).toEqual({ scenario: x.id, title: plainTitle(x.title), reason: state.run[x.id]!.why });
+  }, 180_000);
+
+  it('in a grow, reads a written flow whose check ran but whose evidence did not verify as not tested yet, never failed: exit 3, not 1', async () => {
+    const dir = withoutAnonymousFlow();
+    // Its check does not hold (the app refuses with 401), and the record of its run is spoiled as it is published.
+    draftingClaude(FLOW.replace('expect: 401', 'expect: 200'));
+    const write = atomicFiles.writeExclusiveDurable;
+    const spoil = vi.spyOn(atomicFiles, 'writeExclusiveDurable').mockImplementation((path, bytes) => {
+      write(path, bytes);
+      if (path.includes('.tracegrove-publish-') && path.endsWith('/campaign.json') && Buffer.from(bytes).toString('utf8').includes('discovered.')) writeFileSync(path, '{}\n');
+    });
+    try {
+      const { code, state, events, summary } = await grown(dir);
+      const x = refused(state);
+      expect(events.filter((e) => e.kind === 'scenario.failed')).toEqual([]);
+      expect(state.run[x.id]).toMatchObject({ st: 'not_run', why: 'Not proven: the run evidence did not verify', run: expect.any(String) });
+      expect(code).toBe(3);
+      // The flow that proves the count still passed, on its own verified run.
+      expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, counts: { passed: 1, failed: 0, notTestedYet: 1 }, failures: [] });
+      expect(summary!.unproven).toEqual([{ scenario: x.id, title: plainTitle(x.title), reason: 'Not proven: the run evidence did not verify', run: state.run[x.id]!.run, saved: true, evidence: [`.tracegrove/runs/${state.run[x.id]!.run}/summary.json`] }]);
+    } finally { spoil.mockRestore(); }
   }, 180_000);
 });
 

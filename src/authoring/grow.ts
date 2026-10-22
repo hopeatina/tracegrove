@@ -772,10 +772,13 @@ function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen:
  * did not compile, an app that did not start, a run that was blocked, cancelled or inconclusive, or evidence that did not verify
  * proves nothing either way.
  */
-export function writtenFlowResult(scenario: string, flow: Pick<ProvedFlow, 'outcome' | 'detail' | 'run' | 'caseOutcome' | 'failure'>): GrowEventBody {
+export function writtenFlowResult(scenario: string, flow: Pick<ProvedFlow, 'outcome' | 'detail' | 'run' | 'caseOutcome' | 'failure' | 'verified'>): GrowEventBody {
   if (flow.outcome === 'proven') return { kind: 'scenario.passed', scenario, took: 0, run: flow.run };
-  if (flow.caseOutcome === 'assertion_failed') return { kind: 'scenario.failed', scenario, took: 0, run: flow.run, why: flow.failure ?? flow.detail ?? flow.outcome, outcome: 'assertion_failed' };
-  const why = flow.caseOutcome === 'passed' && flow.detail === 'the run evidence did not verify' ? 'Not proven: the run evidence did not verify'
+  // A run whose evidence did not verify proves nothing either way, and its saved record keeps no case (runReport.ts): it is not
+  // proven, though it ran. One that never ran (verified null) says why it could not run.
+  const unverified = flow.detail === 'the run evidence did not verify' && flow.verified !== null;
+  if (flow.caseOutcome === 'assertion_failed' && !unverified) return { kind: 'scenario.failed', scenario, took: 0, run: flow.run, why: flow.failure ?? flow.detail ?? flow.outcome, outcome: 'assertion_failed' };
+  const why = unverified && (flow.caseOutcome === 'passed' || !flow.caseOutcome) ? 'Not proven: the run evidence did not verify'
     : couldNotRun(flow.failure ?? flow.detail ?? 'the run recorded no result for this flow');
   return { kind: 'scenario.not_run', scenario, why, ...(flow.run ? { run: flow.run } : {}), ...(flow.caseOutcome ? { outcome: flow.caseOutcome } : {}) };
 }
@@ -851,13 +854,16 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
       for (const file of drafted.agent.files) {
         const ext = `x${++x}`;
         const flow = drafted.prove?.flows.find((f) => f.file === file);
-        // A written flow speaks for a scenario only when it reached that scenario's route and says the same thing.
+        // A written flow speaks for a scenario only when it reached that scenario's route and says the same thing. One that served
+        // nothing (it did not compile, its run never reached its checks, or its evidence did not verify, which leaves no request on
+        // record) is the scenario its title says, and is read only as not tested yet, with why: it can neither pass nor fail it.
         const title = (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })();
         const said = termsOf(title);
+        const unreached = !!flow && flow.served.length === 0 && writtenFlowResult('', flow).kind === 'scenario.not_run';
         const target = flow ? draftable.map((s) => { const u = ctx.units.find((y) => y.id === s.unit)!;
           const reached = flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
           const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
-          return { s, score: !state.run[s.id] && reached && shared >= 2 ? shared : 0 }; }).filter((x) => x.score).sort((a, b) => b.score - a.score)[0]?.s : undefined;
+          return { s, score: !state.run[s.id] && (reached || unreached) && shared >= 2 ? shared : 0 }; }).filter((x) => x.score).sort((a, b) => b.score - a.score)[0]?.s : undefined;
         emit({ kind: 'extension.written', ext, extKind: file.endsWith('.action.yaml') ? 'action' : 'flow', name: basename(file), path: relative(ctx.dir, join(root, file)),
           why: 'No existing flow proved this scenario.', state: 'unproven', need: 'Counts once its run passes end to end; review it before relying on it.', unit: target?.unit ?? null });
         if (!flow || !target) continue;

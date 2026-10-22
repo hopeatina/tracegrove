@@ -139,6 +139,8 @@ export type ProvedFlow = {
   /** distinct METHOD path pairs the app served while this file ran */
   served: string[];
   run: string | null;
+  /** whether its run's evidence verified: false when it ran but its record did not verify; null when nothing ran */
+  verified?: boolean | null;
 };
 export type DraftResult = {
   agent: AgentRunResult; check: CheckResult;
@@ -238,7 +240,7 @@ async function proveFile(configPath: string, root: string, file: string, signal?
   const first = failed[0];
   const caseOutcome = first?.outcome ?? (cases.length ? 'passed' : null);
   const failure = first?.failure ? `${first.failure.step}: ${first.failure.message}`.slice(0, 400) : first ? first.outcome : cases.length ? null : blocker?.detail ?? 'no case from this file ran';
-  const flow = { ...base, caseIds: cases.map((c) => c.caseId), served, run: basename(report.runDir), caseOutcome, failure };
+  const flow = { ...base, caseIds: cases.map((c) => c.caseId), served, run: basename(report.runDir), caseOutcome, failure, verified: report.bundleVerified };
   if (report.bundleVerified !== true) return { flow: { ...flow, outcome: 'failed', detail: 'the run evidence did not verify' }, failures: [] };
   if (cases.length > 0 && failed.length === 0) return { flow: { ...flow, outcome: 'proven', detail: null }, failures: [] };
   const failures = failed.map((c) => ({ file, caseId: c.caseId, step: c.failure?.step ?? '(setup)', message: c.failure?.message ?? c.outcome, observed: c.failure?.observed ?? null }));
