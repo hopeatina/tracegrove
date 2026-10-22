@@ -8,7 +8,8 @@ import { join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { snake } from './compile.ts';
-import { expGot } from './checkCompare.ts';
+import { countNoun, expGot } from './checkCompare.ts';
+import { extraCall } from './happened.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
 import { MODES, growVerdict, growView, inMode, plainTitle, failReason, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
 import { configRunsRoot, savedRunDirectory } from './runLocation.ts';
@@ -56,13 +57,23 @@ function declaredName(runDir: string, caseId: string, step: { id: string; name: 
   } catch { return step.name; }
 }
 
-/** One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. */
-function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFailure; stepName: string | null } {
+/** The files of one case's cell in a saved run that say what happened: its receipt, its checks, its stand-ins and its events. */
+const cellEvidence = (runDir: string, cellId: string) => {
+  const cell = join(runDir, 'bundle', 'cells', cellBundleName(cellId));
+  return ['receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl'].map((f) => join(cell, f)).filter((f) => existsSync(f));
+};
+/**
+ * One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. Only the flow
+ * the grow recorded is read: a run that holds no record of it is never read as that flow, even when it holds only one other.
+ * `more` says where a stand-in count's extra call came from, when the run contradicts that step's own answer, as the prototype
+ * words it: "The extra 900 charge came during step 3 (owner removes it again); step 4 counted them."
+ */
+function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFailure; stepName: string | null; more: string | null } {
   const x = s.scenarios.find((y) => y.id === id)!; const r = s.run[id];
   const flow = r?.flow ?? x.flow ?? null; const run = r?.run ?? null;
   const out: GrowFailure = { scenario: id, title: plainTitle(x.title), promise: x.criteria.length ? x.criteria.join(', ') : null, flow, run, saved: false,
     step: null, check: null, expected: null, got: null, says: brokeLine(r), evidence: [] };
-  const found = { failure: out, stepName: null as string | null };
+  const found = { failure: out, stepName: null as string | null, more: null as string | null };
   if (!run) return found;
   let runDir: string;
   // A run that is not saved in this folder leaves `saved` false, and nothing to point at.
@@ -73,10 +84,9 @@ function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFail
   if (existsSync(join(runDir, 'summary.json'))) out.evidence.push(rel(join(runDir, 'summary.json')));
   try {
     const bundle = readVerifiedBundle(join(runDir, 'bundle'));
-    const receipt = bundle.receipts.find((q) => q.caseRef.id === flow) ?? (bundle.receipts.length === 1 ? bundle.receipts[0] : undefined);
+    const receipt = flow ? bundle.receipts.find((q) => q.caseRef.id === flow) : undefined;
     if (!receipt) return found;
-    const cell = join(runDir, 'bundle', 'cells', cellBundleName(receipt.selectionCellId));
-    for (const f of ['receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl']) if (existsSync(join(cell, f))) out.evidence.push(rel(join(cell, f)));
+    out.evidence.push(...cellEvidence(runDir, receipt.selectionCellId).map(rel));
     const c = readSavedRun(runDir).cases.find((q) => q.caseId === receipt.caseRef.id);
     if (!c) return found;
     const steps = c.steps.filter((q) => q.declared !== false);
@@ -87,8 +97,12 @@ function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFail
     const at = steps[i]!; const name = declaredName(runDir, c.caseId, at); out.step = i + 1; found.stepName = name;
     // The Run tab's own reading of the step's recorded check (checkCompare.ts), so both say the same; and the sentence the page
     // says, from those recorded fields. Without a recorded check, the reason the grow recorded stays.
+    // A stand-in count whose extra call came during a step that answered that none happened names that step, and the one that
+    // counted; any other says the step that broke it.
+    const x = at.compared ? extraCall(steps, at) : null;
+    if (x?.field) found.more = `The extra ${x.call.amount !== null ? `${x.call.amount} ` : ''}${countNoun(at.compared!.check, 1)} came during step ${x.at + 1} (${declaredName(runDir, c.caseId, steps[x.at]!)}); step ${i + 1} counted them.`;
     if (at.compared) Object.assign(out, { check: at.compared.check, expected: at.compared.expected, got: at.compared.got,
-      says: `${expGot(at.compared)}. Step ${i + 1} (${name}) broke it.` });
+      says: `${expGot(at.compared)}. ${found.more ?? `Step ${i + 1} (${name}) broke it.`}` });
   } catch { /* evidence that does not verify gives no expected or got */ }
   return found;
 }
@@ -132,9 +146,27 @@ export function failureWords(s: GrowState, dir: string, cache?: Map<string, stri
   }
   return out;
 }
-/** The page's view of a grow, with the verdict saying how its first failure broke, and how each failure broke (`said`). */
-export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>, words?: Map<string, string | null>) =>
-  ({ ...growView(s, verdictFacts(s, dir, cache)), said: failureWords(s, dir, words) });
+/**
+ * Where each failure's extra stand-in call came from, in the words grow --json says it ("The extra 900 charge came during step 3
+ * (owner removes it again); step 4 counted them."), for the failures whose run says so. Runs never change once saved, so a
+ * `cache` reads each one once.
+ */
+export function failureMore(s: GrowState, dir: string, cache?: Map<string, string | null>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const x of s.scenarios) {
+    const run = inMode(s, x) && s.run[x.id]?.st === 'fail' ? s.run[x.id]!.run : null;
+    if (!run) continue;
+    const key = `${x.id} ${run}`;
+    let more = cache?.get(key);
+    if (more === undefined) { const read = readFailure(s, dir, x.id); more = read.more; if (read.failure.saved) cache?.set(key, more); }
+    if (more) out[x.id] = more;
+  }
+  return out;
+}
+/** The page's view of a grow, with the verdict saying how its first failure broke, how each failure broke (`said`), and where a
+ *  failure's extra call came from (`more`). */
+export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>, words?: Map<string, string | null>, more?: Map<string, string | null>) =>
+  ({ ...growView(s, verdictFacts(s, dir, cache)), said: failureWords(s, dir, words), more: failureMore(s, dir, more) });
 
 /** The summary `grow --json` prints beside the log and the state. */
 export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven?: boolean; mode?: Mode | null } = {}): GrowJsonSummary {

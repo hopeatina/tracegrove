@@ -346,6 +346,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 @media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}/* What happened: a scenario's run, step by step, in the panel beside the tree, which widens for it; under 1060 px a sheet */
 @media (min-width:1061px){.gw-stage.wide{grid-template-columns:minmax(0,1fr) min(640px,46vw)}}
 .gw-hap+.gw-dre{margin-left:14px}.gw-dre+.gw-wr{margin-left:12px}
+.gw-more{margin-top:4px;font-size:13.5px;line-height:19px;color:var(--ink)}.gw-flag .gw-more{display:block}
 /* on a phone, the ways into what happened are 44 px tall like every other target */
 @media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}.gw-result .btn,.gw-wr{min-height:44px}}
 .gw-dr{border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;background:var(--paper);min-width:0;margin-bottom:4px}
@@ -810,6 +811,9 @@ function gwDrEntry(x){if(!gwDrCan(x)||gwRan(x))return null;
  return h('button',{class:'gw-lnk gw-dre',type:'button','data-dr':x.id,'aria-label':'Why it is not tested yet: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'Why not tested yet ›')}
 /* A scenario no flow proves offers to write that flow on its card, beside the way into why it is not tested yet */
 function gwWriteEntry(x){const s=gw.state;return x&&!x.flow&&s&&s.done&&gwIn(x)?h('button',{class:'btn sm gw-wr',type:'button','data-testid':'grow-card-write','aria-label':'Write this flow: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow'):null}
+/* Where a failure's extra stand-in call came from, as grow --json says it, under the answer on its card: "The extra 900 charge came
+   during step 3 (owner removes it again); step 4 counted them." Only when its run says so. */
+function gwMore(x){const t=x&&gw.view&&gw.view.more&&gw.view.more[x.id];const r=x&&gw.state.run[x.id];return t&&r&&r.st==='fail'?h('div',{class:'gw-more','data-testid':'grow-card-more'},t):null}
 /* With several failures, the drawer of one pages to the next in the order the verdict counts them: "Failure 1 of 3" */
 function gwDrPager(x){const s=gw.state,f=s.scenarios.filter(q=>gwIn(q)&&s.run[q.id]&&s.run[q.id].st==='fail'&&gwRan(q)),i=f.indexOf(x);if(i<0||f.length<2)return null;
  const go=k=>()=>{if(f[k])gwDrOpen(f[k].id)};

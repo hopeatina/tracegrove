@@ -12,6 +12,7 @@ import { couldNotRun, growVerdict, type GrowState } from '../src/authoring/growS
 import { runTests } from '../src/authoring/run.ts';
 import type { PredicateT } from '../src/protocol/index.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
+import { growJsonSummary } from '../src/authoring/growJson.ts';
 
 /* What a recorded check compared, each comparison with whether it held, worded as the verdict words a failure. */
 describe('Every comparison a check made', () => {
@@ -388,6 +389,7 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+
   it('says the run holds no record of the flow the grow recorded, instead of reading the run’s only flow as that one', async () => {
     const page = await open();
     await page.evaluate((id) => { (0, eval)('gw').state.run[id].flow = 'billing.card-declined'; location.hash = `#grow/${id}/steps`; }, failed);
@@ -397,6 +399,39 @@ describe('What happened, step by step', () => {
     await expect(page.getByTestId('grow-happened-oneline').count()).resolves.toBe(0);
     await page.close();
   });
+
+  it('opens the Run tab from the drawer only at the flow the grow recorded, and grow --json reads no other flow’s step or cell', async () => {
+    const page = await open();
+    await page.evaluate((id) => { (0, eval)('gw').state.run[id].flow = 'billing.card-declined'; location.hash = `#grow/${id}/happened`; }, failed);
+    await drawer(page).locator('.gw-drerr').waitFor();
+    await page.getByTestId('grow-happened-runtab').click();
+    await expect(page.locator('.toast').textContent()).resolves.toBe(`The run ${failRun} has no record of billing.card-declined.`);
+    expect(await page.evaluate(() => (0, eval)('tab'))).toBe('Discover');
+    await page.close();
+    const s = structuredClone(state); s.run[failed]!.flow = 'billing.card-declined';
+    const f = growJsonSummary(s, dir).failures.find((x) => x.scenario === failed)!;
+    expect(f).toMatchObject({ run: failRun, saved: true, step: null, check: null, expected: null, got: null });
+    expect(f.evidence).toEqual([`.tracegrove/runs/${failRun}/summary.json`]);
+  });
+
+  it('says how the failure broke in the same words in grow --json, the verdict, the selected card and the drawer, with where the extra charge came from', async () => {
+    const more = 'The extra 900 charge came during step 3 (owner removes it again); step 4 counted them.';
+    const f = growJsonSummary(state, dir).failures.find((x) => x.scenario === failed)!;
+    expect(f).toMatchObject({ step: 4, check: 'payments POST /v1/charges call count', expected: 2, got: 3, says: `Expected 2 charges, got 3. ${more}` });
+    const last = await (await fetch(new URL('/api/grow/last?branch=seats', server.url))).json() as { view: { more: Record<string, string> } };
+    expect(last.view.more).toEqual({ [failed]: more });
+    const page = await open(`#grow/${failed}`);
+    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain('“Removing a seat never charges the card” failed: expected 2 charges, got 3');
+    const card = page.locator('.gw-insw');
+    await expect(card.locator('.gw-broke > span').first().textContent()).resolves.toContain('were charged”: expected 2 charges, got 3');
+    await expect(card.getByTestId('grow-card-more').textContent()).resolves.toBe(more);
+    await card.locator(`[data-hap="${failed}"]`).click();
+    await opened(page);
+    await expect(page.getByTestId('grow-happened-step-4').textContent()).resolves.toContain('Expected 2 charges, got 3');
+    await page.close();
+  });
+
+
 
   it('as a sheet over the page at 1000 px, is a dialog that keeps Tab inside it, and is not one beside the tree', async () => {
     const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
