@@ -1961,10 +1961,11 @@ function gbShootSlots(pts,n){const acc=gbLen(pts),tot=acc[acc.length-1]||1;retur
 function gbTipOff(B){if(B.tip)B.tip.hidden=true;if(B.lead)B.lead.setAttribute('d','')}
 function gbHover(k,el){gw.hov=k||null;gbLight();gbPadLbl(k,el);if(k)gbTip(k,el);else gbPinTip()}
 /* Pointing at a journey's pad, or focusing it, names its cushions in small words where each fits: "happy path" over the crest,
-   "refuses" off a shoulder's outer edge, "fails" under the leaves that hang. A word is set only where it touches no name, number,
-   cushion, leaf or wood and stays inside the drawing; one with no such place is left to the card and the key. */
+   "refuses" off a shoulder's outer edge, "fails" under the leaves that hang; a journey's guards or failures on a pad of their own
+   (gbPadGeo: one cushion) get theirs off its outer edge or under it, and no "happy path". A word is set only where it touches no
+   name, number, cushion, leaf or wood and stays inside the drawing; one with no such place is left to the card and the key. */
 function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replaceChildren();
- const pid=k&&k.startsWith('j:')&&el&&el.getAttribute?el.getAttribute('data-pad'):null,P=pid?B.pad[pid]:null;if(!P||P.pol||!P.geo||!P.cu)return;
+ const pid=k&&k.startsWith('j:')&&el&&el.getAttribute?el.getAttribute('data-pad'):null,P=pid?B.pad[pid]:null;if(!P||!P.geo||!P.cu)return;
  const m=B.svg.getScreenCTM();if(!m)return;if(!B.gPl){B.gPl=sv('g',{class:'padlbls','aria-hidden':'true'});B.svg.append(B.gPl)}
  const R=e=>e.getBoundingClientRect(),sr=R(B.svg),hf=gbHf(B),keep=[],add=(r,g)=>{if(r&&(r.width||r.height))keep.push([r.left-(g||3),r.top-(g||3),r.right+(g||3),r.bottom+(g||3)])};
  for(const t of B.svg.querySelectorAll('.klbl.on,.kpip.on,.rlbl,.shtag,.mlbl,.note,.kld'))add(R(t),2);
@@ -1976,13 +1977,19 @@ function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replace
  const inv=m.inverse(),put=(word,cands)=>{const t=sv('text',{class:'padlbl','font-size':gbF(10/hf),'stroke-width':gbF(3/hf)},word);B.gPl.append(t);const w=R(t).width,h=10;
   for(const [x,y,al] of cands){const x0=al<0?x-w:al>0?x:x-w/2,b=[x0,y-h/2,x0+w,y+h/2];if(!clear(b))continue;const q=new DOMPoint(x0,y).matrixTransform(inv);t.setAttribute('x',gbF(q.x));t.setAttribute('y',gbF(q.y));keep.push([b[0]-3,b[1]-3,b[2]+3,b[3]+3]);return}t.remove()};
  const cs=P.geo.cs,box=i=>P.cu[i]&&P.cu[i].el?R(P.cu[i].el):null,ci=cs.findIndex(c=>c.role==='crest'),cr=ci>=0?box(ci):null;
+ if(P.pol){if(!cr||!cr.width)return;const out=P.b&&P.b.dir?P.b.dir:1,mx=(cr.left+cr.right)/2,my=(cr.top+cr.bottom)/2,ox=out<0?cr.left-5:cr.right+5,qx=out<0?cr.left+cr.width*.3:cr.right-cr.width*.3;
+  const edge=[[ox,my,out],[ox,cr.top+6,out],[ox,cr.bottom-6,out]],under=[[qx,cr.bottom+9,0],[mx,cr.bottom+9,0]],over=[[qx,cr.top-9,0],[mx,cr.top-9,0]];
+  put(P.pol==='guard'?GB_W.refuses:GB_W.fails,P.pol==='guard'?[...edge,...under,...over]:[...under,...edge,...over]);return}
  if(cr&&cr.width&&cs[ci].ids.length){const mx=(cr.left+cr.right)/2;const my=(cr.top+cr.bottom)/2;put(GB_W.happy,[[mx,cr.top-9,0],[cr.left+4,cr.top-9,1],[cr.right-4,cr.top-9,-1],[cr.left-5,my,-1],[cr.right+5,my,1]])}
  cs.forEach((c,i)=>{if(c.role!=='shoulder'||!c.ids.length)return;const r=box(i);if(!r||!r.width)return;const out=cr?((r.left+r.right)/2<(cr.left+cr.right)/2?-1:1):c.sd,y=(r.top+r.bottom)/2;
   /* at the shoulder's outer edge; where a name or the wood has that, just under or over it, toward the outside */
   const ox=out<0?r.left-5:r.right+5,qx=out<0?r.left+r.width*.3:r.right-r.width*.3;
   put(GB_W.refuses,[[ox,y,out],[ox,r.top+6,out],[ox,r.bottom-6,out],[qx,r.bottom+9,0],[qx,r.top-9,0],[(r.left+r.right)/2,r.bottom+9,0]])});
  const hang=cs.flatMap(c=>c.hang).map(x=>B.leaf[x.id]).filter(e=>e&&!e.classList.contains('gone')&&!e.classList.contains('cut')).map(e=>R(e.querySelector('.blade')||e)).filter(r=>r.width);
- if(hang.length){const l=Math.min(...hang.map(r=>r.left)),r=Math.max(...hang.map(r=>r.right)),bt=Math.max(...hang.map(r=>r.bottom)),mid=(hang[0].top+hang[0].bottom)/2;put(GB_W.fails,[[(l+r)/2,bt+9,0],[l-6,mid,-1],[r+6,mid,1]])}}
+ if(hang.length){const l=Math.min(...hang.map(r=>r.left)),r=Math.max(...hang.map(r=>r.right)),bt=Math.max(...hang.map(r=>r.bottom)),mid=(hang[0].top+hang[0].bottom)/2;
+  /* (where a name, a cushion or the wood has those, close beside a hanging leaf's tip, a little under it on either side) */
+  const near=[];for(const h of hang)for(const dy of [6,9,12,15,18])for(const dx of [2,5,8,11,14]){const gy=Math.max(0,dy-5);if(Math.hypot(dx,gy)<=14)near.push([Math.hypot(dx,gy),[h.right+dx,h.bottom+dy,1]],[Math.hypot(dx,gy),[h.left-dx,h.bottom+dy,-1]])}
+  put(GB_W.fails,[[(l+r)/2,bt+9,0],[l-6,mid,-1],[r+6,mid,1],...near.sort((a,b)=>a[0]-b[0]).map(q=>q[1])])}}
 /* on a phone a tap pins, and the pinned thing keeps its card under the drawing until it is tapped again */
 function gbPinTip(){const B=gw.B;if(!B)return;const k=B.L.narrow&&!gw.hov?gw.pinned:null;const el=k&&[...B.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k);gbTip(el?k:null,el||null)}
 /* a knot's own checks, in the words the inspector and the Outline use for them */
