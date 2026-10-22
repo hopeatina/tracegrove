@@ -338,7 +338,10 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-call.bad{box-shadow:inset 4px 0 0 var(--verm)}.gw-call.open{box-shadow:inset 4px 0 0 var(--ochre)}.gw-call.ok{box-shadow:inset 4px 0 0 var(--moss)}
 .gw-call .gw-vp{flex:none;display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:6px;background:var(--sel);color:var(--ink3);font:600 12px/16px var(--sans);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 .gw-call.bad .gw-vp{background:var(--verm-bg);color:var(--verm-ink)}.gw-call.open .gw-vp{background:var(--ochre-bg);color:var(--ochre-ink)}.gw-call.ok .gw-vp{background:var(--moss-bg);color:var(--ink)}
-.gw-call .gw-vt{flex:0 1 auto;min-width:0;font:300 20px/28px var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* what broke is never cut short: where the line is too narrow for it, it wraps (under 1100 px the promise and the button move to a
+   line of their own first), so the whole sentence is read on the page, never only in a tooltip */
+.gw-call .gw-vt{flex:0 1 auto;min-width:0;font:300 20px/28px var(--serif);overflow-wrap:break-word}
+@media (max-width:1100px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{flex:1 1 360px}}
 .gw-call.wait .gw-vt{font:14px/20px var(--sans);color:var(--ink3)}
 .gw-call .gw-vc{flex:none;display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:nowrap}
 .gw-call .gw-vm{flex:none;font-size:13px;color:var(--ink3);white-space:nowrap}
@@ -923,7 +926,7 @@ function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)r
  if(!s.done)return h('div',{class:'gw-call wait','data-testid':'grow-verdict'},h('span',{class:'gw-vp'},'◌ No verdict yet'),h('span',{class:'gw-vt'},'It comes once the scenarios have run.'));
  const f=V.first,tone=V.verdict==='not ready'?'bad':V.verdict==='ready'?'ok':'open';
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
-  h('span',{class:'gw-vt',title:V.text},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
+  h('span',{class:'gw-vt'},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
   f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}

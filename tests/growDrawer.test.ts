@@ -432,6 +432,20 @@ describe('What happened, step by step', () => {
   });
 
 
+  it('keeps what broke readable in the verdict at 1024 and 768 px: it wraps in words, never cut short to a tooltip', async () => {
+    for (const width of [1024, 768]) {
+      const page = await open('', width);
+      const v = page.getByTestId('grow-verdict');
+      await expect(v.textContent()).resolves.toContain('“Removing a seat never charges the card” failed: expected 2 charges, got 3');
+      const m = await v.evaluate((el) => {
+        const t = el.querySelector('.gw-vt') as HTMLElement, r = el.getBoundingClientRect(), cs = getComputedStyle(t), go = el.querySelector('[data-testid="grow-verdict-open"]')!.getBoundingClientRect();
+        return { whole: t.scrollWidth <= t.clientWidth && t.scrollHeight <= t.clientHeight + 1, cut: cs.textOverflow === 'ellipsis' || cs.whiteSpace === 'nowrap',
+          inside: r.left >= 0 && r.right <= innerWidth && go.right <= innerWidth, page: document.documentElement.scrollWidth <= innerWidth, tooltip: t.hasAttribute('title') || el.hasAttribute('title') };
+      });
+      expect({ width, ...m }).toEqual({ width, whole: true, cut: false, inside: true, page: true, tooltip: false });
+      await page.close();
+    }
+  });
 
   it('as a sheet over the page at 1000 px, is a dialog that keeps Tab inside it, and is not one beside the tree', async () => {
     const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
