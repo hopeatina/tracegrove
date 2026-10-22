@@ -1327,6 +1327,90 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 120000);
+  it('runs a failed leaf’s lit route as one chain in hop order: its own wood, round its collar, then hop to hop, amber as far as it ran, red past the break, grey to the last hop’s knot, inside the wood and with no corner, pointed at or tapped', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const touch = width < 500, page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), width, touch);
+        await page.waitForTimeout(2500);
+        // the failed leaf, pointed at on a desk and tapped on a phone
+        const leaf = await page.evaluate(() => {
+          const B = (0, eval)('gw').B, S = (0, eval)('gw').state, x = S.scenarios.find((q: { id: string }) => B.leaf[q.id] && S.run[q.id] && S.run[q.id].st === 'fail');
+          const c = B.leaf[x.id].querySelector('.hitc') as SVGGraphicsElement; window.scrollBy(0, c.getBoundingClientRect().top - innerHeight / 2);
+          const r = c.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { id: x.id as string, x: r.left + r.width / 2, y: r.top + r.height / 2, top: t ? t.outerHTML.slice(0, 120) : '' };
+        });
+        if (touch) await page.touchscreen.tap(leaf.x, leaf.y); else await page.mouse.move(leaf.x, leaf.y, { steps: 4 });
+        await page.waitForTimeout(400);
+        const r = await page.evaluate((sid) => {
+          const w = (0, eval)('({ gw, gbSubs, gbReach })'), B = w.gw.B, M = w.gw.M, S = w.gw.state, L = B.L;
+          const x = S.scenarios.find((q: { id: string }) => q.id === sid), j = M.J.find((q: { id: string }) => M.leaves[q.id].includes(x));
+          const runs = (el: Element | null | undefined) => (el ? w.gbSubs(el.getAttribute('d')) : []) as number[][][];
+          // the chain as drawn: the amber's centre line, then the red's, then the grey dots', each run of each in turn
+          const pieces = [...runs(B.sap).map((p) => ({ k: 'amber', p })), ...runs(B.sapW).map((p) => ({ k: 'red', p })), ...runs(B.sapX).map((p) => ({ k: 'grey', p }))];
+          const chain: number[][] = [], at: number[] = [], kind: string[] = [], gaps: number[] = [];
+          for (const q of pieces) {
+            if (chain.length) gaps.push(Math.hypot(q.p[0]![0]! - chain[chain.length - 1]![0]!, q.p[0]![1]! - chain[chain.length - 1]![1]!));
+            for (const pt of q.p) { at.push(chain.length ? at[at.length - 1]! + Math.hypot(pt[0]! - chain[chain.length - 1]![0]!, pt[1]! - chain[chain.length - 1]![1]!) : 0); chain.push(pt); kind.push(q.k); }
+          }
+          // where a point falls along the chain: the arc length of the nearest point on it, and how far off it lies
+          const along = (p: number[]) => { let best = [1e9, 0]; for (let i = 1; i < chain.length; i++) { const a = chain[i - 1]!, b = chain[i]!, dx = b[0]! - a[0]!, dy = b[1]! - a[1]!, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * dx + (p[1]! - a[1]!) * dy) / l)), d = Math.hypot(p[0]! - a[0]! - t * dx, p[1]! - a[1]! - t * dy); if (d < best[0]!) best = [d, at[i - 1]! + t * Math.sqrt(l)]; } return best as [number, number]; };
+          // the turn where one piece hands on to the next, and round the collar where the leaf's wood meets the leader: over three
+          // pixels either side, so a corner turns its whole angle in that span
+          const dirAt = (s0: number, s1: number) => { const p = (s: number) => { let i = at.findIndex((v) => v >= s); if (i <= 0) i = Math.max(1, i < 0 ? chain.length - 1 : 1); const f = (s - at[i - 1]!) / ((at[i]! - at[i - 1]!) || 1); return [chain[i - 1]![0]! + (chain[i]![0]! - chain[i - 1]![0]!) * f, chain[i - 1]![1]! + (chain[i]![1]! - chain[i - 1]![1]!) * f]; }; const a = p(s0), b = p(s1); return Math.atan2(b[1]! - a[1]!, b[0]! - a[0]!); };
+          const total = at[at.length - 1]!, turnAt = (s: number) => { let d = Math.abs(dirAt(s, s + 3) - dirAt(s - 3, s)) * 180 / Math.PI; if (d > 180) d = 360 - d; return d; };
+          const T = L.trees.find((t: { tp: number[][] }, ti: number) => t.tp.some((q) => Math.hypot(q[0]! + L.xs[ti]! - B.pos[j.units[0]][0], q[1]! - B.pos[j.units[0]][1]) < 2)) || L.trees[0], X = L.xs[L.trees.indexOf(T)]!;
+          const lead = (p: number[]) => Math.min(...T.tp.map((q: number[]) => Math.hypot(q[0]! + X - p[0]!, q[1]! - p[1]!)));
+          let ci = chain.findIndex((p) => lead(p) < 1); if (ci < 0) ci = 0;
+          const joins: number[] = []; { let n = 0; for (const q of pieces.slice(0, -1)) { n += q.p.length; joins.push(at[n - 1]!); } }
+          const spots = [...joins, ...Array.from({ length: 33 }, (_, i) => at[ci]! - 14 + i * .625)].filter((v) => v >= 3 && v <= total - 3);
+          let turn = 0, turnWhere = 0; for (const v of spots) { const d = turnAt(v); if (d > turn) { turn = d; turnWhere = v; } }
+          // the hops the chain passes, in the order it passes them
+          const hops = j.units.filter((id: string) => B.knot[id] && !B.root[id]).map((id: string) => { const g = B.knot[id].__geo, [d, s] = along(B.pos[id]); return { id, d, s, ra: g.ra, i: j.units.indexOf(id) }; }).filter((h: { d: number; ra: number }) => h.d <= h.ra + 3);
+          const reach = w.gbReach(M, j, x), red0 = pieces.find((q) => q.k === 'red'), brk = red0 ? along(red0.p[0]!)[1] : Infinity;
+          // every amber point, centre line and band, along the chain
+          const pts = (el: SVGGeometryElement) => { const o: number[][] = []; if (!el.getAttribute('d')) return o; const n = el.getTotalLength(); for (let s = 0; s <= n; s += .5) { const q = el.getPointAtLength(s); o.push([q.x, q.y]); } return o; };
+          const amber = [B.sap, B.sapR, B.sapU].flatMap((e: SVGGeometryElement) => pts(e)), amberPast = amber.filter((p) => along(p)[1] > brk + .5).length;
+          // inside the wood: the bark the drawing clips to, the twigs, and above the soil
+          const wood = [...Array.from(document.querySelector('#gb-wood' + B.N)!.children), ...Array.from(B.svg.querySelectorAll('path.tw'))] as SVGGeometryElement[];
+          const inWood = (p: number[]) => wood.some((e) => e.isPointInFill(new DOMPoint(p[0], p[1])));
+          const drawn = (Array.from(B.svg.querySelectorAll('.sap, .sapr, .sapu')) as SVGGeometryElement[]).filter((e) => getComputedStyle(e).display !== 'none').flatMap((e) => pts(e).map((p) => [p, e.getAttribute('class')] as const));
+          const out = drawn.filter(([p]) => !inWood(p)).map(([p, c]) => c + ' ' + p.map((v) => v.toFixed(1)).join(',')), sunk = drawn.filter(([p]) => p[1]! >= L.sy(p[0]!)).length;
+          const first = hops.slice().sort((a: { s: number }, b: { s: number }) => a.s - b.s)[0], last = hops.slice().sort((a: { s: number }, b: { s: number }) => b.s - a.s)[0];
+          const before = first ? pieces.filter((q) => q.k !== 'amber' && along(q.p[0]!)[1] < first.s - .5).length : -1;
+          const amberTo = first ? Math.max(...pieces.filter((q) => q.k === 'amber').map((q) => along(q.p[q.p.length - 1]!)[1])) : 0;
+          const greyEnd = pieces.filter((q) => q.k === 'grey').map((q) => along(q.p[q.p.length - 1]!)[1]);
+          return { lit: String(w.gw.hov || w.gw.pinned), kinds: pieces.map((q) => q.k), gaps, turn, turnWhere, collar: at[ci]!, total, hops: hops.map((h: { id: string; s: number; i: number }) => [h.i, h.s]), brk, amberPast, out: out.slice(0, 8), nOut: out.length, nDrawn: drawn.length, sunk,
+            hand: first ? { reached: reach.lit.has(first.id), s: first.s, before, amberTo } : null, last: last ? last.s + last.ra + 3 : 0, lastId: last ? last.id : '', greyEnd };
+        }, leaf.id);
+        const at = width + 'px';
+        // one chain: amber, then red, then grey, each run starting within 2 px of where the one before it ended
+        expect(r.lit, at + ' ' + leaf.top).toBe('s:' + leaf.id);
+        expect(r.kinds.length, at).toBeGreaterThanOrEqual(3);
+        expect(r.kinds.join(' '), at).toMatch(/^(amber )+(red )+(grey ?)+$/);
+        for (const g of r.gaps) expect(g, at + ' gap between pieces').toBeLessThanOrEqual(2);
+        // the hops it passes are passed in the journey's order, and the grey stops at the last hop's knot, not in the nebari
+        expect(r.hops.length, at).toBeGreaterThanOrEqual(2);
+        for (let i = 1; i < r.hops.length; i++) { expect(r.hops[i]![0], at).toBeGreaterThan(r.hops[i - 1]![0]!); expect(r.hops[i]![1], at + ' hop order').toBeGreaterThan(r.hops[i - 1]![1]!); }
+        for (const e of r.greyEnd) expect(e, at + ' grey past ' + r.lastId).toBeLessThanOrEqual(r.last);
+        // no amber past the break
+        expect(isFinite(r.brk), at).toBe(true);
+        expect(r.amberPast, at + ' amber points past the break').toBe(0);
+        // the leaf's own wood is amber as its collar hop was reached, and runs into the leader with nothing grey or red between
+        expect(r.hand, at).not.toBeNull();
+        expect(r.hand!.reached, at).toBe(true);
+        expect(r.hand!.before, at + ' grey or red before the collar').toBe(0);
+        expect(r.hand!.amberTo, at + ' amber to the collar').toBeGreaterThanOrEqual(r.hand!.s);
+        // all of it in the wood, above the soil, with no corner where one piece hands on to the next or round the collar
+        expect(r.nDrawn, at).toBeGreaterThan(50);
+        expect(r.out, at + ' route outside the wood (' + r.nOut + ')').toEqual([]);
+        expect(r.sunk, at + ' route under the soil').toBe(0);
+        expect(r.collar, at + ' the route reaches the leader').toBeGreaterThan(10);
+        expect(r.turn, at + ' turn at ' + r.turnWhere.toFixed(1) + ' of ' + r.total.toFixed(1) + ' (collar ' + r.collar.toFixed(1) + ')').toBeLessThanOrEqual(35);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 120000);
   /** The tree's foliage measured as drawn: every leaf, its twig and its cushion, from the SVG's own geometry. */
   const foliage = () => {
     const w = (0, eval)('({ gw, GB_PET })');

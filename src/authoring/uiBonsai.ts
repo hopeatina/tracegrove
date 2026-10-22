@@ -162,7 +162,7 @@ export const BONSAI_CSS = String.raw`
     itself is red (gbRed), feathered in and out */
 .gw-svg.gb{--sap:#E9A23B;--sap-core:#FFF3D6;--sap-red:#D63A28}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
-.gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.8px);pointer-events:none}
+.gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.5px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
 .gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{opacity:.92}.gb .rs{stop-color:var(--sap-red)}
@@ -805,10 +805,11 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const bx=tp.map(()=>0);for(const b of br)b.bx=b.pts.map(()=>0);
  for(const q of knots){const P=wood(q),arr=q.on==='t'?bx:br.find(x=>x.id===q.bid).bx,amp=Math.max(1.2+q.rb*.3,Math.abs(q.off)+q.rb*.92-q.w/2+1),sg=q.ra*1.15;
   for(let j=0;j<arr.length;j++)arr[j]+=q.side*amp*Math.exp(-Math.pow((P.acc[j]-P.acc[q.k])/sg,2))}
- /* Veins: each pad's strand in its own lane up the trunk, peeling off into its branch, so strands never cross. */
+ /* Veins: each pad's strand up the trunk's centre line, peeling off into its branch, so a running journey shows one stroke
+    in the middle of its wood, never strands side by side */
  const lanes=[...br.filter(b=>b.dir<0).sort((a,b)=>a.h-b.h).map(b=>b.id),apex.id,...br.filter(b=>b.dir>0).sort((a,b)=>b.h-a.h).map(b=>b.id)];
- const veins={};for(const id of lanes){const f=lanes.length===1?0:(lanes.indexOf(id)-(lanes.length-1)/2)/lanes.length*1.1;const b=br.find(x=>x.id===id);const kTop2=b?b.k:tp.length-1;
-  const trunk=tp.slice(0,kTop2+1).map((q,i)=>{const n=gbNorm(tp,i),o=f*tw[i]*.5;return[q[0]+n[0]*o,q[1]+n[1]*o]});
+ const veins={};for(const id of lanes){const b=br.find(x=>x.id===id);const kTop2=b?b.k:tp.length-1;
+  const trunk=tp.slice(0,kTop2+1);
   veins[id]={jid:pads[id].jid,trunk,branch:b?b.pts.slice(b.exit,Math.round(.55*(b.pts.length-1))):[],pad:origin[id]}}
  if(!strict&&!lit){const bx=(pd,o)=>{const g=pd.geo;return pd.crown?[o[0]-g.PW/2-g.L*.6,o[1]-g.PH-6,o[0]+g.PW/2+g.L*.6,o[1]+g.drop+4]:[o[0]-g.PW/2-g.L*.5,o[1]-g.PH-6,o[0]+g.PW/2+g.L*.5,o[1]+g.drop+4]};
   const c=bx(cpd,origin[apex.id]);if(padList.slice(1).some(pd=>{const q=bx(pd,origin[pd.id]);return Math.min(c[2],q[2])+10>Math.max(c[0],q[0])&&Math.min(c[3],q[3])+10>Math.max(c[1],q[1])}))return gbTree(M,js,H,S,key,sap,true,dmin)}
@@ -1510,10 +1511,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
   for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
  B.tip=h('div',{class:'gb-tip',hidden:true,role:'status'});B.width=width;
- /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots) and the foliage it climbs into */
+ /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots, twigs), never out over the foliage */
  {const rc=sv('clipPath',{id:'gb-rc'+N});for(const c of clip.children)rc.append(c.cloneNode());
   for(const el of svg.querySelectorAll('path.tw'))rc.append(sv('path',{d:el.getAttribute('d')}));
-  for(const id in B.pad){const P=B.pad[id];P.rcp=sv('path',{d:P.mk.getAttribute('d')});rc.append(P.rcp)}defs.append(rc);gSap.setAttribute('clip-path','url(#gb-rc'+N+')');B.rclip=rc}
+  defs.append(rc);gSap.setAttribute('clip-path','url(#gb-rc'+N+')');B.rclip=rc}
  gw.B=B;gw.svg=svg;
  
  /* queued against the clock the build began on, and started on it, never late by however long the build took */
@@ -1859,8 +1860,8 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  gbPlaceNames(B);
  for(const id in B.root){B.root[id].classList.toggle('hl',litU.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route (gbRoute) for a leaf; for a root, the sap it sends up the trunk to each journey it feeds */
- let d='',dx='',dw='',df='',dc='';const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
- if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||'';dc=R.dc||''}}
+ let d='',dx='',dw='',df='',dc='',sq=false;const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
+ if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||'';dc=R.dc||'';sq=!!R.sq}}
  else if(rootPart){const rr=B.L.roots.find(q=>q.id===L.part);if(rr){const up=rr.pts.slice().reverse();for(const jid of L.js){const pid=(B.padsOf[jid]||[]).find(q=>!B.pad[q].pol)||(B.padsOf[jid]||[])[0];const P=pid&&B.pad[pid];if(!P)continue;
    /* (up the root to where it forks from the trunk above the soil, then up the trunk: no spur down into the ground) */
    const sp=gbSpine(P.rt,P.o),f=gbFork(sp,rr);d+=(d?' ':'')+line(gbSmooth([...sp.slice(0,f.iJ),...f.out].reverse(),1))}if(!d)d=line(up)}}
@@ -1871,25 +1872,40 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
     and the red are bands inside the wood, sized from its girth (gbRibbon, gbRed) */
  if(!B.sapF){B.sapF=sv('path',{class:'sap faint',d:''});B.sapXo=sv('path',{class:'sap resto',d:''});B.sapX.before(B.sapF,B.sapXo)}
  B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);
- const rib=d?gbRibbon(B,d,.33,1.4,9):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);gbRed(B,dw)}
+ const rib=d?gbRibbon(B,d,.33,1.4,9,sq):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);gbRed(B,dw)}
 /* The wood a leaf's sap runs through on its way down: from where its stalk meets its cushion, down the twig that carries
    that cushion (or, for the outer cushion, to the branch's end inside it), along the branch's centre line to the trunk
    (round a fillet as wide as the branch, not a corner), and down the trunk's centre line. Without a cushion it joins the
    branch straight below. */
 function gbSpine(R,at,id){const T=id!==undefined&&R.lt?R.lt[id]:null;const into=(p,q)=>gbSmooth([p,[p[0]+(q[0]-p[0])*.2,(p[1]+q[1])/2],q],2);let mid,K=R.k;
- /* down the leaf's own twig, then the riser or branchlet it forks from, then its branch, or straight into the leader */
- if(T){mid=[at,...T.pts.slice(0,-1).reverse()];if(T.c){mid.push(...T.c.pts.slice(0,T.bi).reverse());if(R.br)mid.push(...R.br.slice(0,T.c.bi).reverse());else K=T.c.bi}else if(R.br)mid.push(...R.br.slice(0,T.bi).reverse());else K=T.bi}
- else if(R.br){let bi=R.br.length-1,bd=1e9;for(let i=R.exit;i<R.br.length;i++){const dd=Math.abs(R.br[i][0]-at[0]);if(dd<bd){bd=dd;bi=i}}mid=[...into(at,R.br[bi]),...R.br.slice(0,bi).reverse()]}
+ /* down the leaf's own twig, then the riser or branchlet it forks from, then its branch, or straight into the leader; each
+    place it passes from one piece of wood to the next is a join, rounded off as the wood there allows */
+ const J=[],cr=Math.max(8,(R.bw||8)*1.1),tr=2,join=r=>J.push([mid.length-1,r]);
+ if(T){mid=[at,...T.pts.slice(0,-1).reverse()];if(T.c){join(tr);mid.push(...T.c.pts.slice(0,T.bi).reverse());if(R.br){join(tr);mid.push(...R.br.slice(0,T.c.bi).reverse())}else K=T.c.bi}else if(R.br){join(tr);mid.push(...R.br.slice(0,T.bi).reverse())}else K=T.bi}
+ else if(R.br){let bi=R.br.length-1,bd=1e9;for(let i=R.exit;i<R.br.length;i++){const dd=Math.abs(R.br[i][0]-at[0]);if(dd<bd){bd=dd;bi=i}}mid=into(at,R.br[bi]);join(tr);mid.push(...R.br.slice(0,bi).reverse())}
  else mid=into(at,R.tp[R.k]);
- const all=[...mid,...R.tp.slice(0,K).reverse()];if(!R.br)return all;const c=mid.length-1,r=Math.max(8,(R.bw||8)*1.1),a0=gbBack(all,c,r),a1=gbFwd(all,c,r);
- return [...all.slice(0,a0),...gbBez([all[a0],all[c],all[c],all[a1]],10),...all.slice(a1+1)]}
-/* A scenario's route: its sap's way down to the last file its journey reaches, then out along every root the journey depends
-   on. A failed scenario's route is amber as far as it ran; red is the wood just past the hop where it broke (from the edge of
-   that hop's boss to short of the next boss), or across the hop's own boss when it broke at the hop, or the start of a root;
-   grey dots beyond, where it never ran. A scenario that checks one hop runs to that hop, and the rest of its journey is just
-   wood, unlit, with no dots: it was never meant to run there. When the run does not say where it broke, only the leaf is red.
-   A part check's route is the wood its shoot grows from. Also returns the route's stretches as points: lf, the leaf's own
-   wood; main, the hops' wood; the red stretch; and out, the hops past what it checks. */
+ join(R.br?cr:tr);const all=[...mid,...R.tp.slice(0,K).reverse()];return gbFillet(all,J)}
+/* A polyline with each join (an index and a radius) rounded off: from about r before the corner to about r after it, a curve
+   close to a circular arc tangent to both legs, so the turn is spread over the arc and never taken at a point. Each round stays
+   between the joins either side of it. lead: where the result is past its last join (for a route, on the leader). */
+function gbFillet(all,J){J=J.filter(([c])=>c>0&&c<all.length-1).sort((a,b)=>a[0]-b[0]);if(!J.length){const o=all.slice();o.lead=0;return o}const out=[];let from=0,lead=0;
+ J.forEach(([c,r],k)=>{const lo=k?Math.ceil((J[k-1][0]+c)/2):0,hi=k<J.length-1?Math.floor((c+J[k+1][0])/2):all.length-1;
+  const a0=Math.max(lo,from,gbBack(all,c,r)),a1=Math.min(hi,gbFwd(all,c,r));if(a0>=c||a1<=c){lead=out.length+c-from;return}
+  const P0=all[a0],C=all[c],P3=all[a1],u=[C[0]-P0[0],C[1]-P0[1]],v=[P3[0]-C[0],P3[1]-C[1]],lu=Math.hypot(u[0],u[1])||1,lv=Math.hypot(v[0],v[1])||1;
+  const ph=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv)))),kk=ph<1e-3?2/3:4/3*Math.tan(ph/4)/Math.tan(ph/2);
+  out.push(...all.slice(from,a0),...gbBez([P0,[P0[0]+kk*u[0],P0[1]+kk*u[1]],[P3[0]-kk*v[0],P3[1]-kk*v[1]],P3],12).slice(0,-1));from=a1;lead=out.length});
+ out.push(...all.slice(from));out.lead=lead;return out}
+/* A scenario's route: one path in the order its sap runs, from the foot of the leaf's stalk down its twig and its branch,
+   round the collar where that branch meets the leader, then hop to hop down the leader's centre line to the last file its
+   journey reaches, then out along every root the journey depends on. A leaf on a branch of its own joins the leader at that
+   branch's collar, so its route runs on from that hop. A failed scenario's route is amber as far as it ran and no further;
+   red is the wood just past the hop where it broke (from the edge of that hop's boss to short of the next boss), or across
+   the hop's own boss when it broke at the hop, or the start of a root; grey dots beyond, where it never ran, to the last
+   hop's knot and no further. A scenario that checks one hop runs to that hop, and the rest of its journey is just wood,
+   unlit, with no dots: it was never meant to run there. When the run does not say where it broke, only the leaf is red. A
+   part check's route is the wood its shoot grows from. Also returns the route's stretches as points: main, the amber's run
+   along the leader, from where the leaf's own wood has joined it, a point to the pixel; the red stretch; and out, the hops
+   past what it checks. sq: the amber ends square where the red begins. */
 function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id];if(!el)return null;const line=pts=>'M'+pts.map(gbP).join(' L');
  const j=M.J.find(q=>M.leaves[q.id].includes(x));
  if(!j){if(el.__route)return {d:line(gbSmooth(el.__route,1)),dx:'',dw:'',df:''};const g=el.__base&&B.budG[x.unit];return g?{d:line(gbSmooth(g.route,1)),dx:'',dw:'',df:''}:null}
@@ -1898,14 +1914,7 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  const r=gw.state.run[x.id],w=r&&r.st==='fail'?gbWound(M,j,x):null;
  const nearI=(path,id)=>{const p=B.pos[id];if(!p)return -1;let ci=-1,bd=20;path.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});return ci};
  const isK=id=>!!B.knot[id]&&!B.root[id];
- let pts=gbSpine(P.rt,at,x.id);const rr0=j.units.filter(id=>B.root[id]).map(id=>B.L.roots.find(q=>q.id===id)).filter(Boolean);
- /* A leaf on a guard or failure branch of its own meets the trunk below the files its journey runs through, which sit on the
-    leader under the crown: its route is its own wood down to the trunk (lf, lit whatever happens on the hops), and the
-    journey's hops from the first of them down the leader, the way the crown's own leaves run them */
- let lf=null;{const P0=(B.padsOf[j.id]||[]).map(q=>B.pad[q]).find(q=>q&&!q.pol);
-  if(P0&&P0!==P&&j.units.some(id=>isK(id)&&nearI(pts,id)<0)){const hp=gbSpine(P0.rt,P0.o),first=j.units.find(id=>isK(id)&&nearI(hp,id)>=0);
-   if(first){const tk=P.rt.tp[P.rt.k];let fi=0,bd=1e9;pts.forEach((q,i)=>{const d=Math.hypot(q[0]-tk[0],q[1]-tk[1]);if(d<bd){bd=d;fi=i}});
-    const a=gbLen(hp),g0=B.knot[first].__geo||{},s0=a[nearI(hp,first)]-(g0.ra||6)-8;lf=pts.slice(0,fi+1);pts=hp.slice(Math.max(0,a.findIndex(v=>v>=s0)))}}}
+ let pts=gbSpine(P.rt,at,x.id);const lead=pts.lead||0,onL=q=>{const o=q.slice(Math.min(lead,Math.max(0,q.length-2))),a=gbLen(o);return gbResample(o,Math.max(1,Math.ceil(a[a.length-1])))};const rr0=j.units.filter(id=>B.root[id]).map(id=>B.L.roots.find(q=>q.id===id)).filter(Boolean);
  /* with no root to run out along, the route ends at the last file it reaches, not in the soil */
  if(!rr0.length){let last=-1;for(const id of j.units){if(!B.knot[id])continue;const ci=nearI(pts,id);if(ci>=0)last=Math.max(last,ci)}
   if(last>=0)pts=pts.slice(0,gbFwd(pts,last,w&&r.after?48:8)+1)}
@@ -1916,27 +1925,21 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  if(rr0.length){const J=rr0.map(rr=>({rr,...gbFork(pts,rr)}));
   const i0=Math.min(...J.map(o=>o.iJ));main=pts.slice(0,i0+1);
   rts=J.map(o=>({id:o.rr.id,pts:[...pts.slice(i0,o.iJ),...o.out]}))}
- /* Where the leaf's own wood meets the leader at a hop the route runs through (a branch grown from the hop where its
-    scenarios break or end), its glow stops just short of the leader's, so each is a band in its own wood and neither spills
-    across the other */
- if(lf&&lf.length>1&&main.length>1){const D=Math.min(9,.33*gbGirth(B,lf[lf.length-1]))+1.5,sd=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};
-  const near=p=>{let m=1e9;for(let i=0;i<main.length-1;i++)m=Math.min(m,sd(p,main[i],main[i+1]));return m},i=lf.findIndex(p=>near(p)<D);
-  if(i>0){let a=lf[i-1],b=lf[i];for(let s=0;s<12;s++){const c=[(a[0]+b[0])/2,(a[1]+b[1])/2];if(near(c)<D)b=c;else a=c}lf=[...lf.slice(0,i),a]}}
- const L0=lf&&lf.length>1?line(lf)+' ':'',all=()=>L0+line(main)+rts.map(q=>' '+line(q.pts)).join('');
+ const all=()=>line(main)+rts.map(q=>' '+line(q.pts)).join('');
  /* which hops are the scenario's own (gbReach): a happy path runs the whole journey; any other scenario runs from the
     journey's start to the hop it checks, and the rest of the journey is not its route */
  const ix=j.units.indexOf(x.unit),hop=ix>=0?{i:ix+1,n:j.units.length,label:(M.U[x.unit]||{}).label||x.unit}:null;
  const own=gbReach(M,j,x).own?j.units.slice(0,ix+1):null;
- const whole={d:all(),dx:'',dw:'',df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,lf,main};
+ const whole={d:all(),dx:'',dw:'',df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,main:onL(main)};
  /* past the hop it checks the journey is plain wood: no glow and no dots; its files are named, muted, as the card mutes them */
  if(!w){if(!own)return whole;const out=new Set(j.units.filter(id=>!own.includes(id)));
-  if(B.root[x.unit])return {d:L0+line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,lf,main};
+  if(B.root[x.unit])return {d:line(main)+rts.filter(t=>t.id===x.unit).map(t=>' '+line(t.pts)).join(''),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,main:onL(main)};
   let ci=-1;for(const id of own)if(!B.root[id])ci=Math.max(ci,nearI(main,id));if(ci<0)return whole;
   const acc=gbLen(main),g=(B.knot[j.units[ix]]||{}).__geo||{};let i1=acc.findIndex(v=>v>=acc[ci]+(g.ra||5)+6);if(i1<0)i1=main.length-1;
-  return {d:L0+line(main.slice(0,i1+1)),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,lf,main:main.slice(0,i1+1)}}
+  return {d:line(main.slice(0,i1+1)),dx:'',df:'',dw:'',lit:new Set(own),un:new Set(),out,hop,main:onL(main.slice(0,i1+1))}}
  const wi=j.units.indexOf(w),lit=new Set(j.units.slice(0,wi+1)),un=new Set(j.units.slice(wi+1).filter(id=>!B.root[w]||!B.root[id]));
  if(B.root[w]){const q=rts.find(t=>t.id===w);if(!q)return whole;const acc=gbLen(q.pts),ci=acc.findIndex(v=>v>Math.max(24,acc[acc.length-1]*.45));
-  return {d:L0+line(main)+rts.filter(t=>t!==q).map(t=>' '+line(t.pts)).join(''),dw:line(q.pts.slice(0,ci<0?q.pts.length:ci+1)),dx:ci<0?'':line(q.pts.slice(ci)),df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,lf,main,red:q.pts.slice(0,ci<0?q.pts.length:ci+1)}}
+  return {d:line(main)+rts.filter(t=>t!==q).map(t=>' '+line(t.pts)).join(''),dw:line(q.pts.slice(0,ci<0?q.pts.length:ci+1)),dx:ci<0?'':line(q.pts.slice(ci)),df:'',lit:new Set(j.units),un:new Set(),out:new Set(),hop,main:onL(main),red:q.pts.slice(0,ci<0?q.pts.length:ci+1)}}
  const p=B.pos[w];if(!p)return whole;
  let ci=0,bd=1e9;main.forEach((q,i)=>{const dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<bd){bd=dd;ci=i}});const acc=gbLen(main);
  /* the red: the wood just past the hop's boss, as long as about one and a half girths there and never into the next boss
@@ -1945,9 +1948,10 @@ function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id]
  let a0,a1;if(r.after){a0=acc[ci]+ga+1.5;a1=a0+Math.max(14,Math.min(30,1.5*G))}else{a0=acc[ci]-ga-4;a1=acc[ci]+ga+Math.max(6,Math.min(14,.6*G))}
  if(nx)a1=Math.min(a1,acc[nx.i]-nx.ra-4);a1=Math.max(a1,a0+6);
  let i0=acc.findIndex(v=>v>=a0),i1=acc.findIndex(v=>v>=a1);if(i0<0)i0=main.length-1;if(i1<0)i1=main.length-1;
- /* the glow runs on under the red's feathered head, so the amber fades into red with no bare wood between */
- let iF=acc.findIndex(v=>v>=a0+.28*(a1-a0));if(iF<i0)iF=i0;
- return {d:L0+line(main.slice(0,iF+1)),dc:L0+line(main.slice(0,i0+1)),dw:i1>i0?line(main.slice(i0,i1+1)):'',dx:[i1<main.length-1?line(main.slice(i1)):'',...rts.map(q=>line(q.pts))].filter(Boolean).join(' '),df:'',lit,un,out:new Set(),hop,lf,main:main.slice(0,i0+1),red:main.slice(i0,i1+1)}}
+ /* the amber runs to where the red begins and ends square there; the grey dots run on from the red's end to the last hop's
+    knot, and no further: not on into the nebari, nor out along a root */
+ let li=-1;for(const id of j.units.slice(wi+1))if(isK(id))li=Math.max(li,nearI(main,id));
+ return {d:line(main.slice(0,i0+1)),dw:i1>i0?line(main.slice(i0,i1+1)):'',dx:li>i1?line(main.slice(i1,li+1)):'',df:'',lit,un,out:new Set(),hop,main:onL(main.slice(0,i0+1)),red:main.slice(i0,i1+1),sq:true}}
 /* Which hops a scenario reaches: a failed one up to where it broke (all of them when it broke at a root), a happy path its
    whole journey, any other the journey from its start to the hop it checks. The rest it never reaches. The tree (gbRoute)
    and every card that names its path say the same. */
@@ -1966,16 +1970,28 @@ function gbFork(pts,rr){const L=gw.B.L,sy=q=>L.sy?L.sy(q):0,p0=L.potC-L.potL/2,p
 function gbGirth(B,p){if(!B.wS){const S=B.wS=[],L=B.L,add=(pts,w,X)=>{if(!pts||!w)return;for(let i=0;i<pts.length;i++)S.push([pts[i][0]+(X||0),pts[i][1],w[i]||1])};
   L.trees.forEach((T,ti)=>{const X=L.xs[ti];add(T.tp,T.tw,X);for(const b of T.br||[]){add(b.pts,b.w,X);for(const t of b.twigs||[])add(t.pts,t.w,X)}for(const t of T.ctw||[])add(t.pts,t.w,X)});for(const r of L.roots||[])add(r.pts,r.w,0)}
  let best=0,nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2];if(d<nd){nd=d;nw=q[2]}}return best||nw}
+/* How far a point is from leaving the wood: the most room round it inside any piece of wood whose body holds it */
+function gbRoom(B,p){if(!B.wS)gbGirth(B,p);let r=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(q[2]/2-d>r)r=q[2]/2-d}return r}
 /* a path's runs of points (only M and L, as the route is written) */
 const gbSubs=d=>String(d||'').split('M').map(t=>t.trim()).filter(Boolean).map(t=>t.split(/\s*L\s*/).map(q=>q.trim().split(/\s+/).map(Number))).filter(q=>q.length>1&&q.every(v=>v.length===2&&v.every(isFinite)));
 /* A route drawn inside the wood: a filled band along each run, k of the girth wide (between mn and mx), the width eased along
-   it so it tapers where the wood does, with round ends. */
-function gbRibbon(B,d,k,mn,mx){let out='';for(const run of gbSubs(d)){const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
-  const w0=P.map(q=>Math.max(mn,Math.min(mx,k*gbGirth(B,q)))),w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return s/c});
-  const Lf=[],Rt=[];P.forEach((q,i)=>{const m=gbNorm(P,i),h=w[i]/2;Lf.push([q[0]+m[0]*h,q[1]+m[1]*h]);Rt.push([q[0]-m[0]*h,q[1]-m[1]*h])});
+   it so it tapers where the wood does (widening at once where it enters thicker wood, narrowing over a few pixels where it
+   leaves it) and never more than seven tenths of the wood it runs in, nor so wide that an edge would leave the wood (at a
+   join, where it cuts the corner), with round ends; with sq, the last run's end is cut square (where the red begins). */
+function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
+  const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g)))),w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return Math.min(wc[i],Math.max(w0[i],s/c))});
+  /* where the wood is thin (a twig, or where a twig meets what carries it) each edge is checked against the wood as drawn,
+     and drawn in toward the centre line until it is inside */
+  const wd=B.wEls||(B.wEls=Array.from(B.svg.querySelectorAll('#gb-wood'+B.N+'>*,path.tw')).map(e=>{let b=null;try{b=e.getBBox()}catch(_){}return {e,b:b&&b.width+b.height>0?[b.x-1,b.y-1,b.x+b.width+1,b.y+b.height+1]:null}}));
+  const inW=q=>{const pt=new DOMPoint(q[0],q[1]);return wd.some(({e,b})=>(!b||(q[0]>=b[0]&&q[0]<=b[2]&&q[1]>=b[1]&&q[1]<=b[3]))&&e.isPointInFill(pt))};
+  const M=P.map((_,i)=>gbNorm(P,i)),H=w.map(v=>v/2),edge=(i,s)=>[P[i][0]+M[i][0]*H[i]*s,P[i][1]+M[i][1]*H[i]*s],thin=i=>wc[i]<2.5;
+  for(let i=0;i<=n;i++)if(thin(i))for(let t=0;t<4&&H[i]>.02;t++){if(inW(edge(i,1))&&inW(edge(i,-1)))break;H[i]*=.5}
+  /* (and between two edge points, where the wood turns a corner the chord between them could cut across) */
+  for(let i=0;i<n;i++)if(thin(i)||thin(i+1))for(let t=0;t<4&&H[i]+H[i+1]>.04;t++){const ok=[1,-1].every(s=>{const a=edge(i,s),b=edge(i+1,s);return [.2,.4,.6,.8].every(f=>inW([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]))});if(ok)break;H[i]*=.5;H[i+1]*=.5}
+  const Lf=P.map((_,i)=>edge(i,1)),Rt=P.map((_,i)=>edge(i,-1));
   const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
   const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
-  out+=(out?' ':'')+'M'+[...Lf,...cap(e,me,w[n]/2,1),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
+  out+=(out?' ':'')+'M'+[...Lf,...(sq&&last?[]:cap(e,me,w[n]/2,1)),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
 /* Where it broke, the limb's own wood turns red: a crisp stroke half the girth wide on its centre line, each end cut square
    across the limb, feathered in and out along its length (each stop set where the path itself reaches that share of its
    length), clipped to the bark, in the wood's own group, so the bosses on either side stand over it */
