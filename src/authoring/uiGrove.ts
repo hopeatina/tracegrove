@@ -128,8 +128,10 @@ ${BONSAI_CSS}
 .gw-sw .rglow{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;opacity:.38}.gw-sw .rte{fill:none;stroke:color-mix(in srgb,var(--gold) 70%,var(--ink));stroke-width:1.6;stroke-linecap:round;stroke-dasharray:3 3}.gw-sw .rte.bad{stroke:var(--verm);stroke-width:2.4;stroke-dasharray:none}.gw-sw .rte.rest{stroke:var(--muted);stroke-width:1.3;stroke-dasharray:1.2 2.4}
 .gw-sw .k0{fill:var(--sw-shade);opacity:.5}.gw-sw .k1{fill:var(--sw-wood)}.gw-sw .k2{fill:var(--sw-lit);opacity:.85}.gw-sw .kglow{fill:var(--gold);opacity:.6}.gw-sw .kbad{fill:var(--verm);opacity:.5}
 .gw-sw .stk{fill:none;stroke:var(--sw-shade);stroke-width:.8;stroke-dasharray:1 1.4}.gw-sw .tag{fill:var(--paper);stroke:var(--line2);stroke-width:.8}
-.gw-sw .stk.sd{stroke:color-mix(in srgb,var(--sw-shade) 60%,var(--ochre));stroke-width:1.1;stroke-dasharray:none;stroke-linecap:round}.gw-sw .un{opacity:.5}.gw-sw .bed{fill:color-mix(in srgb,var(--sw-wood) 30%,var(--paper))}.gw-sw .rg{fill:none;stroke:var(--sw-shade);stroke-width:.4;opacity:.8}
-@media (prefers-color-scheme:dark){.gw-sw .un{opacity:.75}.gw-sw .wd.un{fill:#8C7A66}}
+.gw-sw .stk.sd{stroke:color-mix(in srgb,var(--sw-shade) 60%,var(--ochre));stroke-width:1.1;stroke-dasharray:none;stroke-linecap:round}.gw-sw .tag.dsh{stroke:var(--muted);stroke-dasharray:1.8 1.1}.gw-sw .un{opacity:.5}.gw-sw .bed{fill:color-mix(in srgb,var(--sw-wood) 30%,var(--paper))}.gw-sw .rg{fill:none;stroke:var(--sw-shade);stroke-width:.4;opacity:.8}
+/* (on a dark page the faded bark of an unused store and a pruned stub are lifted and edged with a fine light line, so they
+   never sink into the page) */
+@media (prefers-color-scheme:dark){.gw-sw .un{opacity:.9}.gw-sw .wd.un{fill:#A08C76}.gw-sw .cutg .wd{fill:#9A866F}.gw-sw .wd.un,.gw-sw .cutg .wd{stroke:#D9CBB8;stroke-width:.55;stroke-opacity:.7}.gw-sw .dirt{fill:color-mix(in srgb,var(--sw-wood) 45%,var(--paper))}}
 .gw-sw .ring{fill:none;stroke:var(--ink);stroke-width:1}.gw-sw .crk{fill:none;stroke:var(--verm);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .gw-g{display:inline-flex;flex:none;align-items:center;line-height:0}.gb-gs .gw-sw{vertical-align:0}
 .gw-legend{display:grid;gap:6px;margin:8px 6px 2px;font:12px/17px var(--sans);color:var(--ink3)}
@@ -458,16 +460,17 @@ const gwSvg=(w,hh,...k)=>sv('svg',{class:'gw-sw',width:gwF(w*1.2),height:gwF(hh*
 function gwSw(k){
  if(['pass','fail','run','in','none','pre'].includes(k))return gwSvg(16,12,sv('g',{transform:'translate(8 6) rotate(-24)'},sv('path',{d:gwLeafD(13,6.4,k==='fail'),class:'lf '+k}),sv('path',{d:'M-4.6 0 L4.2 0',class:'rib'+(['pass','fail','run'].includes(k)?'':' o')})));
  if(k==='bud')return gwSvg(16,12,sv('path',{d:'M3 11.5 C4.6 9 6.2 7.4 9.6 4.6',class:'stem'}),sv('g',{transform:'translate(11.8 3.3) rotate(-38)'},sv('path',{d:gwLeafD(5.8,3,false),class:'lf bud'})),sv('g',{transform:'translate(5.6 5.8) rotate(-128)'},sv('path',{d:gwLeafD(5.2,2.8,false),class:'lf bud'})));
- if(k==='cut')return gwSvg(16,12,sv('g',{transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
+ if(k==='cut')return gwSvg(16,12,sv('g',{class:'cutg',transform:'rotate(-16 8 6)'},sv('path',{d:'M1 4.1 L12.2 4.6 L12.2 7.4 L1 7.9 Z',class:'wd'}),sv('ellipse',{cx:12.2,cy:6,rx:1.5,ry:1.9,class:'cf'})));
  /* a store's root as the pot shows it: sunk in the soil with the soil's lip over its lower edge, its name on a small tag
     on a solid stake pushed into the soil beside its tip */
  if(k==='root')return gwSvg(22,14,sv('path',{d:'M.5 6.5 C4.6 6.6 8.8 7.1 13.8 8.3 C14.2 8.5 14 8.9 13.6 9 C8.6 9 4.6 9.2 .5 9.6 Z',class:'wd'}),sv('path',{d:'M16.6 11 L16.6 4.6',class:'stk sd'}),
   sv('rect',{x:0,y:8.6,width:22,height:5.4,class:'dirt'}),sv('path',{d:'M.5 8.6 L21.5 8.6',class:'soil'}),sv('rect',{x:12.6,y:1,width:8,height:3.8,rx:1,class:'tag'}));
- /* a store no journey uses: a severed root laid in the soil, pale bark tapering from its cut face, rings on the cut */
- if(k==='unused')return gwSvg(22,14,sv('path',{d:'M3.4 5.6 C7 5.4 9.6 6.6 12.6 7 C15 7.3 17.4 7.6 19.6 8.7 L19.4 9.2 C16.6 9 14.4 9.4 12.2 9.4 C9.4 9.4 6.8 9.2 3.4 9.4 Z',class:'bed'}),
-  sv('path',{d:'M3.4 5.6 C7 5.4 9.6 6.6 12.6 7 C15 7.3 17.4 7.6 19.6 8.7 L19.4 9.2 C16.6 9 14.4 9.4 12.2 9.4 C9.4 9.4 6.8 9.2 3.4 9.4 Z',class:'wd un'}),
+ /* a store no journey uses as the pot shows it: a short severed root sunk to half its depth in the soil, faded bark tapering
+    from its cut face, and right beside the cut face the stake of its dashed tag */
+ if(k==='unused'){const d='M5 6.1 C9.4 6.3 14 7.3 19.8 8.5 L19.8 9.1 C14 10.3 9.4 11.3 5 11.5 Z';return gwSvg(22,14,sv('path',{d,class:'bed'}),sv('path',{d,class:'wd un'}),
+  sv('ellipse',{cx:5,cy:8.8,rx:1.5,ry:2.7,class:'cf'}),sv('path',{d:'M4.7 7.2 A.8 1.6 0 0 1 4.7 10.4',class:'rg'}),
   sv('rect',{x:0,y:8.8,width:22,height:5.2,class:'dirt'}),sv('path',{d:'M.5 8.8 L21.5 8.8',class:'soil'}),
-  sv('ellipse',{cx:3.4,cy:7.5,rx:1.5,ry:1.95,class:'cf'}),sv('path',{d:'M3.1 6.5 A.9 1.1 0 0 1 3.1 8.5',class:'rg'}),sv('path',{d:'M3.6 6.9 A.45 .6 0 0 1 3.6 8.1',class:'rg'}));
+  sv('path',{d:'M2.4 10.6 L2.4 4.6',class:'stk sd'}),sv('rect',{x:1.2,y:.9,width:10.4,height:3.7,rx:1,class:'tag dsh'}))}
  if(k==='ext')return gwSvg(18,13,sv('path',{d:'M1 8.6 L9.6 8.6 L9 13 L1.6 13 Z',class:'pot'}),sv('rect',{x:.4,y:6.2,width:10,height:2.6,rx:.7,class:'rim'}),sv('path',{d:'M1.6 4.9 L8.6 4.9 Q12.4 4.9 12.4 8.6 L12.4 12.4',class:'rt'}));
  if(k==='stop')return gwSvg(20,10,sv('path',{d:'M1 5 L5 5',class:'tl'}),sv('path',{d:'M7 5 L10 5',class:'tl',opacity:.6}),sv('path',{d:'M12 5 L14 5',class:'tl',opacity:.35}),sv('circle',{cx:17.2,cy:5,r:1.9,class:'te'}));
  /* the route as the tree draws it along the wood, in three marks: the gold dashed route, red on the hop where it broke, and
