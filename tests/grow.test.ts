@@ -576,6 +576,7 @@ describe('Grow page', () => {
   /** Opens the Grow page on a folded state, at a width, optionally as a phone that cannot hover. */
   async function growPage(browser: Awaited<ReturnType<typeof chromium.launch>>, url: string, state: unknown, width: number, touch = false) {
     const page = await browser.newPage({ viewport: { width, height: 1000 }, hasTouch: touch, isMobile: touch });
+    if (process.env.TG_THROTTLE) { const cdp = await page.context().newCDPSession(page); await cdp.send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.TG_THROTTLE) }); }
     await page.goto(url);
     await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
     await page.getByTestId('grow').waitFor();
@@ -714,7 +715,8 @@ describe('Grow page', () => {
       const mouse = await growPage(browser, server.url, state, 1440);
       expect(await mouse.getByTestId('grow-mode-preview').textContent()).toMatch(/^Point at another mode/);
       // The card previewed after the choice looks as the card previewed before it.
-      const ring = async (id: string) => { await mouse.getByTestId('grow-mode-' + id).focus(); await mouse.waitForTimeout(400); return mouse.getByTestId('grow-mode-' + id).evaluate((b) => ({ pv: b.classList.contains('pv'), shadow: getComputedStyle(b).boxShadow, edge: getComputedStyle(b).borderTopStyle + ' ' + getComputedStyle(b).borderTopColor })); };
+      // the look once its transition has run, however late a busy page starts it
+      const ring = async (id: string) => { await mouse.getByTestId('grow-mode-' + id).focus(); await mouse.waitForTimeout(400); return mouse.getByTestId('grow-mode-' + id).evaluate(async (b) => { void getComputedStyle(b).boxShadow; await Promise.all(b.getAnimations().map((a) => a.finished.catch(() => null))); return { pv: b.classList.contains('pv'), shadow: getComputedStyle(b).boxShadow, edge: getComputedStyle(b).borderTopStyle + ' ' + getComputedStyle(b).borderTopColor }; }); };
       const after = await ring('max');
       expect(after.pv).toBe(true);
       await mouse.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.modeBy = null; w.gw.state.asked = true; w.gw.preview = null; w.growPaint(); });
