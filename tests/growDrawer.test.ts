@@ -254,6 +254,28 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('opens on the first failure’s broken step from the result band, above the fold at 1440 × 900, and gives focus back there', async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(server.url);
+    const go = page.getByTestId('grow-result-steps');
+    await go.waitFor();
+    await expect(go.textContent()).resolves.toBe('Step by step ›');
+    expect(await go.evaluate((b) => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
+    // it sits in the band beside Open the runs
+    expect(await go.evaluate((b) => b.closest('[data-testid="grow-result"]')?.contains(document.querySelector('[data-testid="grow-open-runs"]')))).toBe(true);
+    await go.click();
+    await opened(page);
+    await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe('Removing a seat never charges the card');
+    await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
+    expect(await page.evaluate(() => location.hash)).toBe(`#grow/${failed}/steps/step-4`);
+    expect(await inView(page)).toEqual({ head: true, step: true });
+    await page.keyboard.press('Escape');
+    await expect(drawer(page).count()).resolves.toBe(0);
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('grow-result-steps');
+    await page.close();
+  });
+
   it('opens the Run tab at that run and step, where the step lists what it checked and the calls it read', async () => {
     const page = await open(`#grow/${failed}/steps`);
     await opened(page);
@@ -330,6 +352,7 @@ describe('What happened, step by step', () => {
     const before = await open(`#grow/${failed}`, 390);
     const ways = () => before.evaluate(() => Array.from(document.querySelectorAll('[data-dr],[data-hap]')).filter((b) => (b as HTMLElement).offsetParent && b.getBoundingClientRect().width > 0)
       .map((b) => { const q = b.getBoundingClientRect(); return { t: b.textContent, w: q.width, h: q.height }; }));
+    expect(await before.getByTestId('grow-result-steps').evaluate((b) => b.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     const grove = await ways();
     expect(grove.length).toBeGreaterThan(0);
     expect(grove.filter((q) => q.w < 44 || q.h < 44)).toEqual([]);

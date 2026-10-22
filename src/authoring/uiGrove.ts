@@ -347,7 +347,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 @media (min-width:1061px){.gw-stage.wide{grid-template-columns:minmax(0,1fr) min(640px,46vw)}}
 .gw-hap+.gw-dre{margin-left:14px}
 /* on a phone, the ways into what happened are 44 px tall like every other target */
-@media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}}
+@media (max-width:640px){.gw-dre,.gw-hap{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}.gw-result .gw-rsteps{min-height:44px}}
 .gw-dr{border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;background:var(--paper);min-width:0;margin-bottom:4px}
 .gw-drh{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start}
 .gw-drh .mk{font:600 17px/28px var(--mono);text-align:center}.gw-drh .mk.fail{color:var(--verm)}.gw-drh .mk.pass{color:var(--moss)}.gw-drh .mk.none{color:var(--ink3)}
@@ -777,7 +777,7 @@ function gwDrLoop(e,el){const f=[...el.querySelectorAll('button,[href],input,sel
 document.addEventListener('focusin',e=>{if(!gw.dr||tab!=='Discover'||!gw.slots||!gwDrSheet())return;const box=gw.slots.ins,el=box.querySelector('.gw-dr');
  if(!el||!box.isConnected||box.contains(e.target))return;const t=el.querySelector('#gw-dr-title');if(t)t.focus({preventScroll:true})});
 /* Close returns to the panel, and focus to the link that opened the drawer */
-function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus='d:'+d.sid;growPaint()}
+function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus=d.from||'d:'+d.sid;growPaint()}
 /* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used
    is left alone */
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
@@ -905,10 +905,13 @@ function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)r
   f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>gwOpenRun(f.scenario)}},'See what happened ›'):null)}
+/* The first failure's run, step by step, beside the tree: from the result band, above the fold */
+function gwResultSteps(){const V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwScen(f.scenario);if(!x||!gwRan(x)||!gwDrCan(x)||gw.state.run[x.id].st!=='fail')return null;
+ return h('button',{class:'btn ghost sm gw-rsteps',type:'button','data-testid':'grow-result-steps','aria-label':'What happened, step by step: '+gwPlain(gwVia(x.title).title),on:{click:()=>{gwDrOpen(x.id);if(gw.dr)gw.dr.from='t:grow-result-steps'}}},'Step by step ›')}
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
  return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},gwClauses(t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun())),sub),
-  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,h('button',{class:'btn ghost sm','data-testid':'grow-open-runs',on:{click:()=>gwOpenRuns()}},'Open the runs')))}
+  h('div',{class:'row'},fail?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Heal')}},'Heal the failure'):null,gwResultSteps(),h('button',{class:'btn ghost sm','data-testid':'grow-open-runs',on:{click:()=>gwOpenRuns()}},'Open the runs')))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
  if(!s.modeBy||s.phase<5){const n=s.scenarios.length;return s.phase>=4&&n?box(n+' scenario'+(n===1?'':'s')+' drafted','Nothing has run yet.'):box('Growing the tree','Now: '+String(GW.phases[s.phase]||GW.phases[0]).toLowerCase()+'.')}
