@@ -277,6 +277,18 @@ describe('The verdict', () => {
     expect(v.line).toBe('✓ Ready: 7 of 7 scenarios in Minimum passed');
   });
 
+  it('is Not proven yet, never Ready, when the mode holds no scenario: nothing was proved', () => {
+    const none = plotline((e) => (e.kind.startsWith('scenario.') ? [] : [e]));
+    expect(none.scenarios).toEqual([]);
+    const v = growVerdict(none);
+    expect(v).toMatchObject({ verdict: 'not proven yet', mark: '◌', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: 0 }, unproven: [], first: null });
+    expect(v.line).toBe('◌ Not proven yet: nothing in this change was traced to a scenario');
+    // Scenarios only another mode holds do not count for this one.
+    const later = plotline((e) => (e.kind === 'scenario.drafted' ? [{ ...e, mode: 'max' }] : [e]));
+    expect(growVerdict(later).line).toBe('◌ Not proven yet: nothing in this change was traced to a scenario in Minimum');
+    expect(growVerdict(none, { allowUnproven: true }).exitCode).toBe(0);
+  });
+
   it('keeps the codes of a grow that stopped (2) or was cancelled (4), whatever had failed', () => {
     const blocked = plotline(); stop(blocked, 'git_unavailable');
     expect(growVerdict(blocked)).toMatchObject({ verdict: 'stopped', word: 'Stopped', exitCode: 2, exitMeaning: 'blocked' });
@@ -365,6 +377,21 @@ describe('grow --json and the exit code', () => {
     expect(allowed.code).toBe(0);
     expect(said.trimEnd().split('\n').at(-1)).toBe(`◌ Not proven yet: ${min.length} of ${min.length} scenarios in Minimum not tested yet`);
     expect((await growCommand({ ...flags(dir), 'no-prove': true, 'allow-unproven': true, json: true }, () => {})).summary).toMatchObject({ verdict: 'not proven yet', exitCode: 0, exitMeaning: 'prove more' });
+  }, 60_000);
+
+  it('exits 3 and says Not proven yet when the change grows no scenario, as a change to only its docs does', async () => {
+    const dir = notesCount(false);
+    git(dir, 'checkout', '-qb', 'docs-only', 'main');
+    writeFileSync(join(dir, 'README.md'), '# Notes\n\nA small notes API.\n'); writeFileSync(join(dir, 'NOTES.md'), 'Release notes.\n');
+    git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Docs');
+    let out = '';
+    const { code, state } = await growCommand({ ...flags(dir), branch: 'docs-only' }, (t) => { out += t; });
+    expect(state.blocked).toBeNull();
+    expect(state.scenarios.filter((x) => x.mode === 'min')).toEqual([]);
+    expect(code).toBe(3);
+    expect(out.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: nothing in this change was traced to a scenario/);
+    const { summary } = await growCommand({ ...flags(dir), branch: 'docs-only', json: true }, () => {});
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitCode: 3, exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: 0 }, failures: [], unproven: [] });
   }, 60_000);
 
   it('still exits 1 for a failed check with --allow-unproven, and takes the flag from the command line', () => {

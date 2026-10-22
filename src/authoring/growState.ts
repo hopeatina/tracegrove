@@ -246,8 +246,8 @@ const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven 
 
 /**
  * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
- * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result,
- * "Ready" otherwise. Exit codes: 1 fix, 3 prove more (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was
+ * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result or
+ * the mode holds no scenario at all, "Ready" when at least one passed and every one did. Exit codes: 1 fix, 3 prove more (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was
  * cancelled (4) keeps its own code.
  */
 /** What the first failure's run recorded: the step that broke, and the check there with what it expected and got. Null
@@ -266,8 +266,9 @@ export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke
   const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
   const failed = inRun.filter((x) => s.run[x.id]?.st === 'fail');
   const open = inRun.filter((x) => s.run[x.id]?.st !== 'pass' && s.run[x.id]?.st !== 'fail');
+  // Ready needs a scenario that passed: a mode with none proved nothing, which is not the same as nothing failing.
   const kind: VerdictKind = s.blocked ? (s.blocked.code === 'discovery_cancelled' ? 'cancelled' : 'stopped')
-    : failed.length ? 'not ready' : open.length ? 'not proven yet' : 'ready';
+    : failed.length ? 'not ready' : open.length || !passed.length ? 'not proven yet' : 'ready';
   const promise = (x: GrowScenario) => (x.criteria.length ? x.criteria.join(', ') : null);
   const first = failed[0];
   const reasonOf = (x: GrowScenario) => { const r = s.run[x.id]; return r?.st === 'not_run' ? r.why ?? 'No reason was recorded' : r?.st === 'run' ? 'It was still running when the grow stopped' : 'No result was recorded'; };
@@ -278,8 +279,8 @@ export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke
   // expected 2 charges, got 3". The title alone would say the opposite of what happened.
   const how = first ? howItBroke(s.run[first.id], opts.broke) : null;
   const text = kind === 'not ready' ? `“${plainTitle(first!.title)}” failed${how ? `: ${how}` : ', with no reason recorded'}`
-    : kind === 'not proven yet' ? `${open.length} of ${scen(n)} in ${mode} not tested yet`
-    : kind === 'ready' ? (n ? `${passed.length} of ${scen(n)} in ${mode} passed` : `no scenarios in ${mode}`)
+    : kind === 'not proven yet' ? (n ? `${open.length} of ${scen(n)} in ${mode} not tested yet` : `nothing in this change was traced to a scenario${s.scenarios.length ? ` in ${mode}` : ''}`)
+    : kind === 'ready' ? `${passed.length} of ${scen(n)} in ${mode} passed`
     : `${s.blocked!.code}: ${s.blocked!.detail}`;
   const detail = kind === 'not ready' ? `${text}${promiseWords(promise(first!))}${failed.length > 1 ? `, and ${failed.length - 1} more failed` : ''}` : text;
   return {
