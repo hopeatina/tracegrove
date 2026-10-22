@@ -6,8 +6,8 @@ import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { grow } from '../src/authoring/grow.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
-import { growJsonSummary } from '../src/authoring/growJson.ts';
-import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState } from '../src/authoring/growState.ts';
+import { growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
+import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { readSavedRun } from '../src/authoring/runSource.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
@@ -116,6 +116,17 @@ describe('From a grown scenario to its run', () => {
     await expect(detail.getByTestId('step-expected').textContent()).resolves.toBe('Status 200');
     await expect(detail.getByTestId('step-answer').textContent()).resolves.toBe('{"count":1}');
     await page.close();
+  });
+
+  it('reads the first failure’s recorded check once per saved run, and again while its run is not here', () => {
+    const cache = new Map<string, VerdictFacts>();
+    const facts = verdictFacts(state, dir, cache);
+    expect(facts).toMatchObject({ step: 3, stepName: 'another user counts none', check: 'body.count', expected: 0, got: 1 });
+    expect(cache.size).toBe(1);
+    expect(verdictFacts(state, dir, cache)).toBe(facts);
+    const elsewhere = new Map<string, VerdictFacts>();
+    expect(verdictFacts(state, mkdtempSync(join(tmpdir(), 'tracegrove-norun-')), elsewhere)).toMatchObject({ step: null, check: null });
+    expect(elsewhere.size).toBe(0);
   });
 
   it('opens the same run from the Outline row, and a passed scenario at its first step', async () => {

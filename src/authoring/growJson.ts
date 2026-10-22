@@ -86,7 +86,9 @@ export function verdictFacts(s: GrowState, dir: string, cache?: Map<string, Verd
   if (!first || !run) return null;
   const key = `${first.id} ${run}`; const known = cache?.get(key);
   if (known) return known;
-  const facts = factsOf(readFailure(s, dir, first.id)); cache?.set(key, facts);
+  // A run not saved (yet) is read again next time.
+  const read = readFailure(s, dir, first.id); const facts = factsOf(read);
+  if (read.failure.saved) cache?.set(key, facts);
   return facts;
 }
 /** The page's view of a grow, with the verdict saying how its first failure broke. */
