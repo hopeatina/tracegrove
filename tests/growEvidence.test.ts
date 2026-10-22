@@ -1,18 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { grow } from '../src/authoring/grow.ts';
-import type { GrowState } from '../src/authoring/growState.ts';
+import { growJsonSummary } from '../src/authoring/growJson.ts';
+import { applyGrow, freshGrow, growVerdict, growView, plainTitle, type GrowEvent, type GrowState } from '../src/authoring/growState.ts';
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
+import { growCommand } from '../src/cli/grow.ts';
 
 /* The notes sample on main, and a branch, checked out, that adds GET /notes/count with two flows that prove it and three
    criteria in its commit. With `buggy`, the count forgets to filter by owner, so "another user counts none" fails at step 3. */
 const temps: string[] = [];
 const git = (dir: string, ...args: string[]) => execFileSync('git', ['-C', dir, '-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { stdio: 'pipe' }).toString();
-export function notesCount(buggy: boolean): string {
+function notesCount(buggy: boolean): string {
   const dir = mkdtempSync(join(tmpdir(), 'tracegrove-evidence-')); temps.push(dir);
   cpSync(join(import.meta.dirname, '..', 'src', 'samples', 'notes-api'), dir, { recursive: true });
   git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Notes sample');
@@ -37,7 +39,18 @@ export function notesCount(buggy: boolean): string {
   git(dir, 'commit', '-qm', "Count notes\n\n## Acceptance criteria\n- [ ] GET /notes/count returns how many notes the caller owns\n- [ ] Another user's notes are never counted\n- [ ] Without a token the count is refused");
   return dir;
 }
-export const cleanTemps = () => { for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true }); };
+const cleanTemps = () => { for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true }); };
+
+/* The plotline grow, as saved: s10 failed at its stand-in check, three passed, three have no flow. `edit` may swap or drop events. */
+const PLOTLINE = join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl');
+function plotline(edit: (e: GrowEvent) => GrowEvent | GrowEvent[] = (e) => e): GrowState {
+  const s = freshGrow();
+  for (const line of readFileSync(PLOTLINE, 'utf8').split('\n')) if (line.trim()) for (const e of [edit(JSON.parse(line) as GrowEvent)].flat()) applyGrow(s, e);
+  return s;
+}
+const passAll = (e: GrowEvent): GrowEvent => (e.kind === 'scenario.failed' || e.kind === 'scenario.not_run' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.passed', scenario: e.scenario, took: 5, run: `2026-10-22T01-40-00Z_pass_${e.scenario}` } : e);
+const noFailure = (e: GrowEvent): GrowEvent[] => (e.kind === 'scenario.failed' ? [] : [e]);
+const stop = (s: GrowState, code: string) => applyGrow(s, { v: 'tracegrove.discovery-event/v1', seq: s.last + 1, ms: s.ms, kind: 'discovery.blocked', code, detail: 'stopped', action: 'start it again' });
 
 describe('From a grown scenario to its run', () => {
   let dir = '', state: GrowState, server: UiServer, browser: Browser;
@@ -124,4 +137,155 @@ describe('From a grown scenario to its run', () => {
     await pinned.waitForFunction((h) => location.hash === h, `#grow/${failed}`);
     await pinned.close();
   });
+
+  it('says the verdict on its own line above the tree, outside the result band, on one line at 1440 px', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const v = page.getByTestId('grow-verdict');
+    const title = plainTitle(state.scenarios.find((x) => x.id === failed)!.title);
+    await expect(v.textContent()).resolves.toBe(`✗ Not ready${title}promises C1, C2See what happened ›`);
+    const fit = () => page.evaluate(() => {
+      const v = document.querySelector('[data-testid="grow-verdict"]') as HTMLElement, r = v.getBoundingClientRect();
+      const tree = document.querySelector('[data-testid="grow"] .gw-tree')!.getBoundingClientRect();
+      const kids = Array.from(v.children).map((c) => c.getBoundingClientRect());
+      const t = v.querySelector('.gw-vt') as HTMLElement;
+      return { inBand: !!v.closest('[data-testid="grow-result"]') || !!v.querySelector('[data-testid="grow-result"]'), above: r.bottom <= tree.top, height: r.height,
+        oneLine: kids.every((k) => k.top >= r.top && k.bottom <= r.bottom && k.height <= 44), whole: t.scrollWidth <= t.clientWidth };
+    });
+    expect(await fit()).toEqual({ inBand: false, above: true, height: 44, oneLine: true, whole: true });
+    // The plotline grow's verdict fits the same way.
+    const plot = plotline();
+    await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot) });
+    await expect(v.textContent()).resolves.toBe('✗ Not readyRemoving a seat never charges the cardpromise C2See what happened ›');
+    expect(await fit()).toEqual({ inBand: false, above: true, height: 44, oneLine: true, whole: true });
+    await page.close();
+  });
+
+  it('opens the first failure’s run at its failing step from the verdict', async () => {
+    const page = await open();
+    await page.getByTestId('grow-verdict-open').click();
+    expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
+    await page.close();
+  });
+
+  it('keeps the verdict’s place until the scenarios have run, then says Not proven yet or Ready from the same counts', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    const v = page.getByTestId('grow-verdict');
+    const show = (st: GrowState) => page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: st, v: growView(st) });
+    const running = plotline((e) => (e.kind === 'scenario.failed' || e.kind === 'scenario.not_run' || e.kind === 'discovery.finished' ? [] : [e]));
+    await show(running);
+    await expect(v.textContent()).resolves.toBe('◌ No verdict yetIt comes once the scenarios have run.');
+    expect((await v.boundingBox())!.height).toBe(44);
+    await show(plotline(noFailure));
+    await expect(v.textContent()).resolves.toBe('◌ Not proven yet4 of 7 scenarios in Minimum not tested yet');
+    expect(await v.getAttribute('class')).toBe('gw-call open');
+    await show(plotline(passAll));
+    await expect(v.textContent()).resolves.toBe('✓ Ready7 of 7 scenarios in Minimum passed');
+    expect((await v.boundingBox())!.height).toBe(44);
+    // A grow that stopped says so in its band; the verdict line stands aside.
+    const stopped = plotline(); stop(stopped, 'git_unavailable');
+    await show(stopped);
+    expect(await v.count()).toBe(0);
+    await page.close();
+  });
+});
+
+describe('The verdict', () => {
+  it('is Not ready when a check failed, naming the first failure in plain words with its promise', () => {
+    const s = plotline();
+    const v = growVerdict(s);
+    expect(v).toMatchObject({ verdict: 'not ready', word: 'Not ready', mark: '✗', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum',
+      counts: { passed: 3, failed: 1, notTestedYet: 3 }, promises: { hold: 1, of: 5 }, failed: ['s10'], more: 0,
+      first: { scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8' } });
+    expect(v.unproven).toEqual(['s1', 's5', 's6'].map((id) => ({ scenario: id, title: plainTitle(s.scenarios.find((x) => x.id === id)!.title), reason: 'No flow proves this yet' })));
+    expect(v.line).toBe('✗ Not ready: Removing a seat never charges the card (promise C2)');
+    // The page reads the very same answer.
+    expect(growView(s).verdict).toEqual(v);
+  });
+
+  it('is Not proven yet when nothing failed but a scenario in the mode has no result, and says why for each', () => {
+    const v = growVerdict(plotline(noFailure));
+    expect(v).toMatchObject({ verdict: 'not proven yet', word: 'Not proven yet', mark: '◌', exitMeaning: 'prove more', counts: { passed: 3, failed: 0, notTestedYet: 4 }, first: null });
+    expect(v.unproven.map((x) => [x.scenario, x.reason])).toEqual([['s1', 'No flow proves this yet'], ['s5', 'No flow proves this yet'], ['s6', 'No flow proves this yet'], ['s10', 'It was still running when the grow stopped']]);
+    expect(v.line).toBe('◌ Not proven yet: 4 of 7 scenarios in Minimum not tested yet');
+  });
+
+  it('is Ready when every scenario in the mode passed', () => {
+    const v = growVerdict(plotline(passAll));
+    expect(v).toMatchObject({ verdict: 'ready', word: 'Ready', mark: '✓', exitCode: 0, exitMeaning: 'ready', counts: { passed: 7, failed: 0, notTestedYet: 0 }, unproven: [], first: null });
+    expect(v.line).toBe('✓ Ready: 7 of 7 scenarios in Minimum passed');
+  });
+
+  it('keeps the codes of a grow that stopped (2) or was cancelled (4), whatever had failed', () => {
+    const blocked = plotline(); stop(blocked, 'git_unavailable');
+    expect(growVerdict(blocked)).toMatchObject({ verdict: 'stopped', word: 'Stopped', exitCode: 2, exitMeaning: 'blocked' });
+    const cancelled = plotline(); stop(cancelled, 'discovery_cancelled');
+    expect(growVerdict(cancelled)).toMatchObject({ verdict: 'cancelled', word: 'Cancelled', exitCode: 4, exitMeaning: 'cancelled' });
+  });
+
+  it('says titles in plain words: no backticks, and no route a scenario is sent through', () => {
+    expect(plainTitle('POST /api/grow: Reader leaves `mid-grow`')).toBe('Reader leaves mid-grow');
+    expect(plainTitle('GET /notes/count answers with what callers need')).toBe('GET /notes/count answers with what callers need');
+  });
+
+  it('leaves what a run did not record as null in the summary, and lists no evidence for a run that is not here', () => {
+    const summary = growJsonSummary(plotline(), mkdtempSync(join(tmpdir(), 'tracegrove-norun-')));
+    expect(summary.failures).toEqual([{ scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8',
+      step: null, check: null, expected: null, got: null, says: 'Broke at check “only the Team upgrade and the added seat were charged”: expected 2 calls, got 3. On the route: after POST /seats.', evidence: [] }]);
+  });
+});
+
+describe('grow --json and the exit code', () => {
+  afterAll(cleanTemps);
+  const flags = (dir: string) => ({ dir, branch: 'notes-count', base: 'main', mode: 'min', 'no-gh': true, 'no-agent': true }) as const;
+
+  it('exits 1 when a check failed, and the summary names its run, step and check, what it expected and got, and the evidence files', async () => {
+    const dir = notesCount(true);
+    const { code, state, summary } = await growCommand({ ...flags(dir), json: true }, () => {});
+    expect(code).toBe(1);
+    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven']);
+    expect(summary).toMatchObject({ verdict: 'not ready', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum', counts: { passed: 1, failed: 1, notTestedYet: 0 }, promises: { hold: 1, of: 3 }, unproven: [] });
+    const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
+    const f = summary!.failures[0]!;
+    expect(summary!.failures).toHaveLength(1);
+    expect(Object.keys(f)).toEqual(['scenario', 'title', 'promise', 'flow', 'run', 'step', 'check', 'expected', 'got', 'says', 'evidence']);
+    expect(f).toMatchObject({ scenario: x.id, title: plainTitle(x.title), promise: 'C1, C2', flow: 'notes.count', run: state.run[x.id]!.run, step: 3, check: 'body.count', expected: 0, got: 1 });
+    expect(f.says).toBe('Broke at check “another user counts none”: body.count is 1, expected 0. On the route: at GET /notes/count.');
+    expect(f.evidence.map((p) => p.split('/').pop())).toEqual(['summary.json', 'receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl']);
+    for (const p of f.evidence) { expect(p.startsWith(`.tracegrove/runs/${f.run}/`)).toBe(true); expect(existsSync(join(dir, p))).toBe(true); }
+    // What it got is the run's own recorded value: the failing check recorded [status, body.count].
+    const recorded = (JSON.parse(readFileSync(join(dir, f.evidence[2]!), 'utf8')) as Array<{ result: string; reasonCode: string; actual: unknown }>).filter((a) => a.result === 'fail');
+    expect(recorded.map((a) => [a.reasonCode, a.actual])).toEqual([['body.count differs', [200, 1]]]);
+  }, 60_000);
+
+  it('prints the log, the state and the summary with --json from the command line, and exits with the verdict’s code', () => {
+    const dir = notesCount(true);
+    const child = spawnSync(process.execPath, ['--import', resolve('node_modules/tsx/dist/loader.mjs'), resolve('src/cli/main.ts'), 'grow', '--dir', dir, '--branch', 'notes-count', '--base', 'main', '--mode', 'min', '--no-gh', '--no-agent', '--json'],
+      { encoding: 'utf8', timeout: 60_000 });
+    expect(child.status).toBe(1);
+    const printed = JSON.parse(child.stdout) as { log: string; state: GrowState; summary: { verdict: string; exitCode: number; failures: Array<{ step: number }> } };
+    expect(Object.keys(printed)).toEqual(['log', 'state', 'summary']);
+    expect(printed.log).toBe('.tracegrove/discovery/notes-count.jsonl');
+    expect(printed.state.done).toBeTruthy();
+    expect(printed.summary).toMatchObject({ verdict: 'not ready', exitCode: 1, failures: [{ step: 3 }] });
+  }, 90_000);
+
+  it('exits 0 and says Ready when every scenario in the mode passed, and prints the verdict as the last line', async () => {
+    const dir = notesCount(false);
+    let out = '';
+    const { code } = await growCommand(flags(dir), (t) => { out += t; });
+    expect(code).toBe(0);
+    expect(out.trimEnd().split('\n').at(-1)).toBe('✓ Ready: 2 of 2 scenarios in Minimum passed');
+    const { summary } = await growCommand({ ...flags(dir), json: true }, () => {});
+    expect(summary).toMatchObject({ verdict: 'ready', exitCode: 0, exitMeaning: 'ready', counts: { passed: 2, failed: 0, notTestedYet: 0 }, failures: [], unproven: [] });
+  }, 60_000);
+
+  it('says Not proven yet when the scenarios were not run, with the reason for each', async () => {
+    const dir = notesCount(false);
+    const { state, summary } = await growCommand({ ...flags(dir), 'no-prove': true, json: true }, () => {});
+    const min = state.scenarios.filter((x) => x.mode === 'min');
+    expect(summary).toMatchObject({ verdict: 'not proven yet', exitMeaning: 'prove more', counts: { passed: 0, failed: 0, notTestedYet: min.length }, failures: [] });
+    expect(summary!.unproven).toEqual(min.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: `Run with --prove to run ${x.flow}` })));
+  }, 60_000);
 });

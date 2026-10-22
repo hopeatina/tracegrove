@@ -223,7 +223,56 @@ export function growView(s: GrowState) {
     gaps: Object.fromEntries(s.units.map((u) => [u.id, unitHasGap(s, u.id)])),
     counts: { min: modeCount(s, 'min'), std: modeCount(s, 'std'), max: modeCount(s, 'max') },
     summary: growSummary(s),
+    verdict: growVerdict(s),
   };
 }
 export type GrowView = ReturnType<typeof growView>;
 
+/** A scenario's title in plain words: no backticks, and no "METHOD /path: " it is sent through. */
+export function plainTitle(t: string): string {
+  const flat = String(t ?? '').split('`').join('');
+  const m = /^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \S+: (.+)$/s.exec(flat);
+  return m ? m[1]! : flat;
+}
+
+export type VerdictKind = 'not ready' | 'not proven yet' | 'ready' | 'stopped' | 'cancelled';
+/** What each exit code tells a script or an agent to do next. */
+export const EXIT_MEANING: Record<VerdictKind, string> = { 'not ready': 'fix', 'not proven yet': 'prove more', ready: 'ready', stopped: 'blocked', cancelled: 'cancelled' };
+const VERDICT_WORD: Record<VerdictKind, string> = { 'not ready': 'Not ready', 'not proven yet': 'Not proven yet', ready: 'Ready', stopped: 'Stopped', cancelled: 'Cancelled' };
+const VERDICT_MARK: Record<VerdictKind, string> = { 'not ready': '✗', 'not proven yet': '◌', ready: '✓', stopped: '✕', cancelled: '✕' };
+const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven yet': 0, ready: 0, stopped: 2, cancelled: 4 };
+
+/**
+ * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
+ * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result,
+ * "Ready" otherwise. A grow that stopped or was cancelled keeps its own code.
+ */
+export function growVerdict(s: GrowState, _opts: { allowUnproven?: boolean } = {}) {
+  const inRun = s.scenarios.filter((x) => inMode(s, x));
+  const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
+  const failed = inRun.filter((x) => s.run[x.id]?.st === 'fail');
+  const open = inRun.filter((x) => s.run[x.id]?.st !== 'pass' && s.run[x.id]?.st !== 'fail');
+  const kind: VerdictKind = s.blocked ? (s.blocked.code === 'discovery_cancelled' ? 'cancelled' : 'stopped')
+    : failed.length ? 'not ready' : open.length ? 'not proven yet' : 'ready';
+  const promise = (x: GrowScenario) => (x.criteria.length ? x.criteria.join(', ') : null);
+  const first = failed[0];
+  const reasonOf = (x: GrowScenario) => { const r = s.run[x.id]; return r?.st === 'not_run' ? r.why ?? 'No reason was recorded' : r?.st === 'run' ? 'It was still running when the grow stopped' : 'No result was recorded'; };
+  const mode = MODES.find((m) => m.id === s.mode)!.label;
+  const n = inRun.length, scen = (k: number) => `${k} scenario${k === 1 ? '' : 's'}`;
+  const promiseWords = (p: string | null) => (p ? ` (promise${p.includes(',') ? 's' : ''} ${p})` : '');
+  const detail = kind === 'not ready' ? `${plainTitle(first!.title)}${promiseWords(promise(first!))}${failed.length > 1 ? `, and ${failed.length - 1} more failed` : ''}`
+    : kind === 'not proven yet' ? `${open.length} of ${scen(n)} in ${mode} not tested yet`
+    : kind === 'ready' ? (n ? `${passed.length} of ${scen(n)} in ${mode} passed` : `no scenarios in ${mode}`)
+    : `${s.blocked!.code}: ${s.blocked!.detail}`;
+  return {
+    verdict: kind, word: VERDICT_WORD[kind], mark: VERDICT_MARK[kind], exitCode: VERDICT_CODE[kind], exitMeaning: EXIT_MEANING[kind], mode,
+    counts: { passed: passed.length, failed: failed.length, notTestedYet: open.length },
+    promises: { hold: s.criteria.filter((c) => criterionStatus(s, c.id).cls === 'pass').length, of: s.criteria.length },
+    first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null } : null,
+    failed: failed.map((x) => x.id), more: Math.max(0, failed.length - 1),
+    unproven: open.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: reasonOf(x) })),
+    /** What the verdict rests on, in words; with the mark and the word, the line the terminal prints. */
+    detail, line: `${VERDICT_MARK[kind]} ${VERDICT_WORD[kind]}: ${detail}`,
+  };
+}
+export type GrowVerdict = ReturnType<typeof growVerdict>;

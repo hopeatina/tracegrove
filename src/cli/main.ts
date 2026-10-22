@@ -166,7 +166,9 @@ Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
   grow [--branch <b>] [--base <b>] [--spec <file>]     read the change and its spec (PR, linked issue, commits or --spec), grow its tree,
        [--mode minimum|standard|max] [--config <c>]    trace every part five ways (rules, then Claude or Codex per lane), draft happy,
        [--agent claude|codex] [--no-agent]             sad and edge scenarios with mock and real variants, then prove them with real flows;
-       [--no-prove] [--no-gh] [--yes] [--jsonl]        in a terminal, 1/2/3 then Enter picks how much; --jsonl streams the events
+       [--no-prove] [--no-gh] [--yes] [--jsonl]        in a terminal, 1/2/3 then Enter picks how much; --jsonl streams the events;
+       [--json]                                        --json prints the log, the state and a summary: the verdict, each failure's
+                                                       run, step, expected and got with its evidence files, and what is not tested yet
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -495,7 +497,7 @@ async function main(argv: string[]): Promise<number> {
 
     case 'grow': {
       const result = await growCommand(args.flags);
-      if (args.flags.json === true) out(args, { log: result.log, state: result.state }, '');
+      if (args.flags.json === true) out(args, { log: result.log, state: result.state, summary: result.summary }, '');
       return result.code;
     }
 

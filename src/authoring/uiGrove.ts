@@ -331,7 +331,19 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 /* the card previewed looks one way before a choice and after it, whichever card it is: a solid edge with a soft ring round it.
    The recommended card trades its dashed edge for it while previewed and keeps its badge; the chosen card is never previewed */
 .gw .gw-modes button.pv:not([aria-pressed=true]){border-color:var(--ink3);box-shadow:0 0 0 3px color-mix(in srgb,var(--ink3) 32%,transparent)}
-.gw .gw-modes.ask button.rec.pv:not([aria-pressed=true]){border:1px solid var(--ink3);padding:10px 12px}.gw .gw-modes button.pv:not([aria-pressed=true]) b{color:var(--ink)}`;
+.gw .gw-modes.ask button.rec.pv:not([aria-pressed=true]){border:1px solid var(--ink3);padding:10px 12px}.gw .gw-modes button.pv:not([aria-pressed=true]) b{color:var(--ink)}
+/* the verdict: one line of its own above the tree, its mark and word first, then what it rests on, then the way to the evidence.
+   It holds its height from the first paint, so the tree does not move when it lands */
+.gw-call{display:flex;align-items:center;gap:8px 14px;min-height:44px;margin:0 0 14px;padding:4px 0 4px 14px;box-shadow:inset 4px 0 0 var(--line2);min-width:0}
+.gw-call.bad{box-shadow:inset 4px 0 0 var(--verm)}.gw-call.open{box-shadow:inset 4px 0 0 var(--ochre)}.gw-call.ok{box-shadow:inset 4px 0 0 var(--moss)}
+.gw-call .gw-vp{flex:none;display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:6px;background:var(--sel);color:var(--ink3);font:600 12px/16px var(--sans);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.gw-call.bad .gw-vp{background:var(--verm-bg);color:var(--verm-ink)}.gw-call.open .gw-vp{background:var(--ochre-bg);color:var(--ochre-ink)}.gw-call.ok .gw-vp{background:var(--moss-bg);color:var(--ink)}
+.gw-call .gw-vt{flex:0 1 auto;min-width:0;font:300 20px/28px var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gw-call.wait .gw-vt{font:14px/20px var(--sans);color:var(--ink3)}
+.gw-call .gw-vc{flex:none;display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:nowrap}
+.gw-call .gw-vm{flex:none;font-size:13px;color:var(--ink3);white-space:nowrap}
+.gw-call .gw-vgo{flex:none;margin-left:auto}
+@media (max-width:640px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{white-space:normal;flex-basis:100%;order:2;font-size:18px;line-height:24px}.gw-call .gw-vc,.gw-call .gw-vm{order:3}.gw-call .gw-vgo{order:4;margin-left:0;min-height:44px}}`;
 
 export const GROVE_JS = String.raw`
 /* ---------- Grow: the change's tree, live ---------- */
@@ -679,6 +691,17 @@ function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.wan
  const k=s.scenarios.some(x=>x.id===w.id)?'s:'+w.id:(s.journeys||[]).some(j=>j.id===w.id)?'j:'+w.id:s.units.some(u=>u.id===w.id)?'u:'+w.id:null;
  if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
  if(w.happened&&k.startsWith('s:'))gwOpenRun(w.id,w.step)}
+/* The verdict, worked out once on the server (growVerdict) for this page, grow --json and the exit code: its own line above the
+   tree, outside the result band. Its mark and word, then the first failure in plain words with its promise, or what is not
+   tested yet; then the way to what happened. Until the scenarios have run its place is kept, saying so. */
+function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)return null;
+ if(!s.done)return h('div',{class:'gw-call wait','data-testid':'grow-verdict'},h('span',{class:'gw-vp'},'◌ No verdict yet'),h('span',{class:'gw-vt'},'It comes once the scenarios have run.'));
+ const f=V.first,tone=V.verdict==='not ready'?'bad':V.verdict==='ready'?'ok':'open';
+ return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
+  h('span',{class:'gw-vt',title:f?f.title:V.detail},...gwRich(f?f.title:V.detail.charAt(0).toUpperCase()+V.detail.slice(1))),
+  f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
+  f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
+  f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>gwOpenRun(f.scenario)}},'See what happened ›'):null)}
 function gwResult(){const s=gw.state,v=gw.view;const t=v.summary;const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail');const sub=h('div',{class:'sub'});
  gwPut(sub,gwSpecLine(),fail?['First failure: ',gwRich(gwVia(fail.title).title),'. ']:null,(t.toReview?t.toReview+' agent-written piece'+(t.toReview===1?'':'s')+' to review. ':'')+(gw.log?'Log: '+gw.log:''));
  return h('div',{class:'gw-result'+(t.failed||fail?' failed':''),'data-testid':'grow-result'},h('div',{},h('div',{class:'big'},gwClauses(t.passed+' of '+t.scenarios+' scenarios proved'+(t.failed?', '+t.failed+' failed':'')+gwNotRun())),sub),
@@ -805,13 +828,13 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  return [names,h('div',{class:'gw-legend','aria-label':'Legend'},where,leaves,route,knot,ground,cut,cmp),how]}
 /* The page, top down: the verdict once there is one, the phases (quiet when done), the tracers, the tree with its inspector, then the journeys and the spec side by side, then what the agent built.
    Everything paints into fixed slots so the tree's SVG stays where it is between paints: moving a node resets its transitions, and the limbs would snap instead of grow. */
-function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start','head','verdict','rail','agents','tree','two','error'])S[k]=h('div',{});
+function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start','head','call','verdict','rail','agents','tree','two','error'])S[k]=h('div',{});
  S.card=h('section',{class:'card gw-tree','aria-label':'Tree'});S.bar=h('div',{});S.mode=h('div',{class:'gw-modearea'});S.stage=h('div',{class:'gw-stage'});S.left=h('div',{style:'min-width:0'});S.scroll=h('div',{class:'gb-wrap'});S.legend=h('div',{});S.ins=h('div',{class:'gw-insw'});
  /* the tree is drawn for its width: when the space it has changes enough, draw it again */
  try{new ResizeObserver(()=>{if(gw.state&&gw.tree==='grove'&&gw.B&&gbWidth()!==gw.B.width)growPaint()}).observe(S.scroll)}catch(e){}
  S.ins.addEventListener('scroll',gwInsFade,{passive:true});try{new ResizeObserver(gwInsFade).observe(S.ins)}catch(e){}
  S.card.append(S.bar,S.mode,S.stage);S.stage.append(S.left,S.ins);S.left.append(S.scroll,S.legend);S.tree.append(S.card);
- gw.el.append(S.start,S.head,S.verdict,S.rail,S.agents,S.tree,S.two,S.error);return gw.slots=S}
+ gw.el.append(S.start,S.head,S.call,S.verdict,S.rail,S.agents,S.tree,S.two,S.error);return gw.slots=S}
 const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
@@ -819,12 +842,13 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  /* a repaint rebuilds controls; whatever had focus gets it back afterwards, by its key or its test id */
  const fa=document.activeElement,held=fa&&fa!==document.body&&gw.el.contains(fa)?(fa.getAttribute('data-ol')||(fa.getAttribute('data-testid')?'t:'+fa.getAttribute('data-testid'):null)):null;
  if(!s){gwSet(S.start,gwStartCard(),gw.busy?h('p',{class:'row muted',style:'margin-top:12px'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading the branch'):null,gw.error?blocked(gw.error):null);
-  for(const k of ['head','verdict','rail','agents','two','error'])S[k].replaceChildren();S.tree.hidden=true;return}
+  for(const k of ['head','call','verdict','rail','agents','two','error'])S[k].replaceChildren();S.tree.hidden=true;return}
  S.start.replaceChildren();S.tree.hidden=false;gwRestore();
  const v=gw.view;const c=s.change;
  gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
    h('div',{class:'sub'},c?gwFacts([c.pr?'#'+c.pr:null,c.files+' files','+'+c.adds+' −'+c.dels,c.untraced?c.untraced+' small parts not traced':null,s.spec?['spec: '+s.spec.source]:null]):'')),
   h('div',{class:'gw-meta'},h('div',{class:'gw-clock'},gw.saved?gwFacts(['saved '+ago(gw.saved),'took '+gwFmt(s.ms)]):gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',style:'margin-top:6px',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.pinned=null;growPaint()}}},'New grow'):null)));
+ gwSet(S.call,gwCall());
  gwSet(S.verdict,s.blocked?h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))):null,s.done?gwResult():s.blocked?null:gwProving());
  gwSet(S.rail,h('div',{class:'gw-rail'+(s.done?' quiet':''),role:'list','aria-label':'Phases'},GW.phases.map((p,i)=>{const cls=i<s.phase||s.done?'done':i===s.phase?'on':'';const st=s.phaseAt[i],en=s.phaseAt[i+1]??(s.done?s.ms:null);
   return h('div',{class:'ph '+cls,role:'listitem'},h('b',{},p),h('span',{},st===undefined?'waiting':i===4&&s.modeBy?GW.modes.find(m=>m.id===s.mode).label.toLowerCase():en!=null?gwStep(en-st):'now'))})));

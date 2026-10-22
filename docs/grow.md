@@ -6,7 +6,18 @@
 tracegrove grow                          # the checked-out branch against the default branch
 tracegrove grow --branch feature/x --base main --mode std
 tracegrove grow --jsonl > grow.jsonl     # the raw event stream, one JSON object per line
+tracegrove grow --json                   # the log, the state and a summary: the verdict, each failure, what is not tested yet
 ```
+
+## The verdict
+
+One verdict, computed once from the grow's counts (`growVerdict`), is what the Discover tab shows on its own line above the tree, what the terminal prints last, and what `--json` puts in its `summary`:
+
+- **Not ready** when a check failed. The page names the first failure in plain words with its promise, and **See what happened ›** opens its run at the failing step.
+- **Not proven yet** when nothing failed but a scenario in the chosen mode has no result.
+- **Ready** otherwise.
+
+`summary.failures` gives each failure's scenario, title, promise, flow, run, step and check, what the check expected and what it got (from the run's recorded assertion), the sentence the page says, and the paths of its evidence (`summary.json`, and the cell's `receipt.json`, `assertions.json`, `boundaries.json` and `events.jsonl`). What the run did not record is `null`. `summary.unproven` lists each scenario not tested yet with its reason.
 
 ## What it does, in order
 
