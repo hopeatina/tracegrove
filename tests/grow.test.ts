@@ -1177,6 +1177,66 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 240000);
 
+  it('gives each leaf on a phone a target of 44 px, takes a tap to the nearest leaf, and closes its card with a Close of 44 px or a tap outside it', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 390, true);
+        await page.waitForTimeout(2500);
+        await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
+        await page.waitForTimeout(200);
+        const leaves = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), B = w.gw.B;
+          return ([...Object.values(B.leaf), ...Object.values(B.bud)] as Element[]).filter((e) => !e.classList.contains('gone') && !e.classList.contains('cut') && e.getBoundingClientRect().width).map((e) => {
+            const c = e.querySelector('.hitp') as SVGCircleElement | null, m = c ? c.getScreenCTM()! : null, b = c ? c.getBoundingClientRect() : null;
+            return { k: e.getAttribute('data-k')!, d: c && m ? 2 * c.r.baseVal.value * Math.hypot(m.a, m.b) : 0, x: b ? b.left + b.width / 2 : 0, y: b ? b.top + b.height / 2 : 0 };
+          });
+        });
+        expect(leaves.length, name).toBeGreaterThan(3);
+        for (const l of leaves) expect(l.d, name + ' ' + l.k).toBeGreaterThanOrEqual(43.5);
+        const pinned = () => page.evaluate(() => (0, eval)('gw').pinned as string | null);
+        const unpin = () => page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.hov = null; w.growPaint(); });
+        // what a tap there should find: the leaf nearest it, within its 22 px; nothing, if a name or a knot is on top
+        const want = (x: number, y: number) => page.evaluate(([x, y]) => {
+          const t = document.elementFromPoint(x, y), k = t && t.closest('[data-k]'), B = (0, eval)('gw').B;
+          if (!t || !t.closest('svg.gb') || (k && !k.classList.contains('gb-lf') && !k.classList.contains('pad'))) return null;
+          const d = ([...Object.values(B.leaf), ...Object.values(B.bud)] as Element[]).filter((e) => !e.classList.contains('gone') && !e.classList.contains('cut')).map((e) => {
+            const b = e.querySelector('.hitp')!.getBoundingClientRect(); return [Math.hypot(b.left + b.width / 2 - x, b.top + b.height / 2 - y), e.getAttribute('data-k')!] as const;
+          }).filter((q) => q[0] <= 21).sort((a, b) => a[0] - b[0]);
+          return d.length && (d.length === 1 || d[1]![0] - d[0]![0] > 3) ? d[0]![1] : null;
+        }, [x, y] as const);
+        let taps = 0;
+        for (const l of leaves) for (const [dx, dy] of [[0, 0], [14, 0], [-14, 0], [0, 14], [0, -14]] as const) {
+          const k = await want(l.x + dx, l.y + dy);
+          if (!k) continue;
+          await page.touchscreen.tap(l.x + dx, l.y + dy);
+          await page.waitForTimeout(60);
+          expect(await pinned(), name + ': tap at ' + l.k + ' +' + dx + ',' + dy).toBe(k);
+          taps++;
+          await unpin();
+        }
+        expect(taps, name).toBeGreaterThan(leaves.length);
+        // the card a tap opens closes with its own Close of 44 px, or with a tap anywhere outside it
+        const l = leaves.find((q) => q.k.startsWith('s:'))!;
+        await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(l.k);
+        const x = (await page.locator('.gb-tip .gb-x').boundingBox())!;
+        expect(Math.min(x.width, x.height), name).toBeGreaterThanOrEqual(44);
+        await page.locator('.gb-tip .gb-x').tap(); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(null);
+        expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
+        await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
+        await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(l.k);
+        await page.locator('.gw-legend .lh').last().tap(); await page.waitForTimeout(60);
+        expect(await pinned(), name).toBe(null);
+        expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 180000);
+
   it('fits the header’s time and button in its column at every width, with no dot left at a line’s end, and says <0.1 s for a step under 100 ms', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
@@ -1287,6 +1347,50 @@ describe('Grow page', () => {
           for (const o of ol.un) expect(o, name).toBeLessThanOrEqual(.6);
           expect(ol.reached, name).toBeGreaterThan(0);
         }
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('names a pad’s places on hover, the happy path, what it refuses and how it fails, each near its cushion and clear of every name, leaf and the wood', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 1440);
+        await page.waitForTimeout(2500);
+        const seen = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, out: string[] = [], words: string[] = [];
+          const meet = (p: DOMRect, q: DOMRect) => Math.min(p.right, q.right) - Math.max(p.left, q.left) > .5 && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > .5;
+          const svg = B.svg.getBoundingClientRect();
+          for (const g of Array.from(B.svg.querySelectorAll('g.pad[data-k]')) as Element[]) {
+            w.gbHover(g.getAttribute('data-k'), g);
+            const ls = Array.from(B.svg.querySelectorAll('.padlbl')) as SVGTextElement[], rs = ls.map((t) => t.getBoundingClientRect());
+            const names = Array.from(B.svg.querySelectorAll('.klbl.on, .kpip.on, .rlbl, .shtag, .lbl')).map((e) => (e as Element).getBoundingClientRect()).filter((r) => r.width);
+            const blades = Array.from(B.svg.querySelectorAll('.gb-lf:not(.gone) .blade')).map((e) => (e as Element).getBoundingClientRect()).filter((r) => r.width);
+            const cush = Object.values(B.pad).flatMap((P) => ((P as { cu?: Array<{ el?: Element }> }).cu || []).map((c) => c && c.el ? c.el.getBoundingClientRect() : null)).filter(Boolean) as DOMRect[];
+            const own = ((B.pad[g.getAttribute('data-pad')!] as { cu?: Array<{ el?: Element }> }).cu || []).map((c) => c && c.el ? c.el.getBoundingClientRect() : null).filter(Boolean) as DOMRect[];
+            ls.forEach((t, i) => {
+              const r = rs[i]!; words.push(t.textContent ?? '');
+              if (r.left < svg.left || r.right > svg.right || r.top < svg.top || r.bottom > svg.bottom) out.push(t.textContent + ': out of the drawing');
+              rs.forEach((q, j) => { if (j > i && meet(r, q)) out.push(t.textContent + ' meets ' + ls[j]!.textContent); });
+              if (names.some((q) => meet(r, q))) out.push(t.textContent + ' meets a name');
+              if (blades.some((q) => meet(r, q))) out.push(t.textContent + ' meets a leaf');
+              if (cush.some((q) => meet(r, q))) out.push(t.textContent + ' meets a cushion');
+              const near = Math.min(...own.map((q) => Math.hypot(Math.max(q.left - r.right, 0, r.left - q.right), Math.max(q.top - r.bottom, 0, r.top - q.bottom))), ...blades.map((q) => Math.hypot(Math.max(q.left - r.right, 0, r.left - q.right), Math.max(q.top - r.bottom, 0, r.top - q.bottom))));
+              if (near > 16) out.push(t.textContent + ' ' + Math.round(near) + ' px from its pad');
+              for (const e of Array.from(B.svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]) {
+                const mm = e.getScreenCTM()!.inverse();
+                for (const [fx, fy] of [[0, .5], [.5, .5], [1, .5]]) { const p = new DOMPoint(r.left + r.width * fx!, r.top + r.height * fy!).matrixTransform(mm); if (e.isPointInFill(p)) { out.push(t.textContent + ' sits on the wood'); break; } }
+              }
+            });
+            w.gbHover(null);
+            if (B.svg.querySelectorAll('.padlbl').length) out.push('labels stay after the hover');
+          }
+          return { out, words };
+        });
+        expect(seen.out, name).toEqual([]);
+        expect(seen.words, name).toEqual(expect.arrayContaining(['happy path', 'refuses', 'fails']));
         await page.close();
       }
     } finally { await browser.close(); }
