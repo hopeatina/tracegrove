@@ -572,4 +572,161 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 60000);
+
+  /** Opens the Grow page on a folded state, at a width, optionally as a phone that cannot hover. */
+  async function growPage(browser: Awaited<ReturnType<typeof chromium.launch>>, url: string, state: unknown, width: number, touch = false) {
+    const page = await browser.newPage({ viewport: { width, height: 1000 }, hasTouch: touch, isMobile: touch });
+    await page.goto(url);
+    await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+    await page.getByTestId('grow').waitFor();
+    await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.gw.tree = 'grove'; w.growPaint(); }, { s: state, v: growView(state as never) });
+    await page.locator('[data-testid="grow"] svg.gb[role=group]').waitFor();
+    return page;
+  }
+
+  it('says what a part is checked by in one set of words: the inspector, the knot’s card and the Outline agree, and flows are never part checks', async () => {
+    const { dir, state } = await grownWithFailure();
+    // A part on a journey with its own checks and existing flows through it, all grown by Max only.
+    const unit = state.journeys[0]!.units.find((id) => !state.units.find((u) => u.id === id)!.root)!;
+    const own = state.scenarios.filter((x) => x.unit === unit && x.level === 'part' && x.mode === 'max');
+    for (const [i, kind] of (['regression', 'regression', own.length ? null : 'edge'] as const).entries()) {
+      if (!kind) continue;
+      applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'scenario.drafted', scenario: 'extra-' + i, unit, scenarioKind: kind, mode: 'max', title: 'Existing flow ' + i + ' still works', proves: 'it still works', criteria: [], layers: ['api'], flow: null, variants: [], realKey: null, mockOnly: null, by: 'rules', ext: [], journey: null, level: 'part' } as GrowEvent);
+    }
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await growPage(browser, server.url, state, 1440);
+      const counts = await page.evaluate((id) => { const w = (0, eval)('({ gw })'); const list = w.gw.M.buds[id] || []; return { all: list.length, reg: list.filter((x: { scenarioKind: string }) => x.scenarioKind === 'regression').length }; }, unit);
+      expect(counts.reg).toBe(2);
+      expect(counts.all - counts.reg).toBeGreaterThan(0);
+      // The inspector pinned on the part: one line, led by the mode that grows them, each kind counted under its own name.
+      await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 'u:' + id; w.growPaint(); }, unit);
+      const line = (await page.getByTestId('grow-own-line').textContent())!;
+      const own2 = counts.all - counts.reg;
+      expect(line).toBe(`${counts.all} in Max · ${own2} part check${own2 === 1 ? '' : 's'} · 2 existing flows`);
+      expect(await page.getByTestId('grow-inspector').textContent()).not.toContain(`${counts.all} part check`);
+      expect(await page.getByTestId('grow-inspector').textContent()).toContain('Part checks and existing flows');
+      // The knot's card on the tree says the same.
+      const card = await page.evaluate((id) => { const w = (0, eval)('({ gw, gbTip })'); w.gw.pinned = null; w.gbTip('u:' + id, w.gw.B.knot[id]); const st = document.querySelector('.gb-tip .st.own'); return st ? st.textContent : null; }, unit);
+      expect(card).toBe(line);
+      // The Outline's rows for the part, one per kind, use the same words, and add up to the same count.
+      await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.gw.tree = 'outline'; w.gw.open = { own: true, reg: true }; w.growPaint(); });
+      const label = state.units.find((u) => u.id === unit)!.label;
+      const rows = await page.evaluate((name) => Array.from(document.querySelectorAll('[data-testid="grow-outline"] .gb-bpf > summary'))
+        .filter((s) => s.querySelector('.pn')?.textContent === name).map((s) => s.querySelector('.gw-facts .tk')?.textContent ?? ''), label);
+      expect(rows).toEqual([`${own2} part check${own2 === 1 ? '' : 's'}`, '2 existing flows']);
+      expect(line).toBe(`${counts.all} in Max · ` + rows.join(' · '));
+      await page.close();
+    } finally { await browser.close(); }
+  }, 60000);
+
+  it('never starts a line of a wrapped path with an arrow, and hangs its later lines in, in the inspector, the cards and the Outline', async () => {
+    const { dir, state } = await grownWithFailure();
+    // A journey long enough to wrap in the panel and on a phone: its path crosses more parts, one with a long file path.
+    const j = state.journeys[0]!;
+    for (const [i, label] of ['RefundPanel.jsx', 'web/components/refunds/RefundDialog.jsx', 'validate.ts', 'ledger.ts', 'GET /orders/:id', 'refunds.mjs'].entries()) {
+      applyGrow(state, { v: 'tracegrove.discovery-event/v1', seq: state.last + 1, ms: state.ms, kind: 'unit.found', unit: 'hop' + i, label, unitKind: 'module', loc: 'src/' + label + ':1', root: false, layer: 'api', parent: null } as GrowEvent);
+      j.units.splice(1, 0, 'hop' + i);
+    }
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, state, width);
+        const check = async (where: string) => {
+          const paths = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-hp')).filter((p) => (p as HTMLElement).offsetParent !== null).map((p) => {
+            const hops = Array.from(p.children);
+            const first = hops[0]!.getBoundingClientRect();
+            return hops.map((hop, i) => {
+              const sp = hop.querySelector('.sp'), label = sp ? sp.previousElementSibling : null, r = hop.getBoundingClientRect();
+              const lr = label ? Array.from(label.getClientRects()).at(-1)! : null, sr = sp ? sp.getBoundingClientRect() : null;
+              return { i, last: i === hops.length - 1, hasSep: !!sp, sepWithLabel: !sr || !lr || Math.abs(sr.bottom - lr.bottom) < 6, sepAfter: !sr || !lr || sr.left >= lr.right - 1, newLine: i > 0 && r.top > first.top + 4 && r.left < first.left + 40, indent: r.left - first.left, text: hop.textContent };
+            });
+          }));
+          expect(paths.length, where).toBeGreaterThan(0);
+          let wrapped = 0;
+          for (const hops of paths) for (const hop of hops) {
+            // Every hop but the last carries its arrow after it, on its own last line; the last carries none.
+            expect(hop.hasSep, where + ': ' + hop.text).toBe(!hop.last);
+            expect(hop.sepWithLabel && hop.sepAfter, where + ': ' + hop.text).toBe(true);
+            // A hop that starts a later line hangs in from the first.
+            if (hop.newLine) { wrapped++; expect(hop.indent, where + ': ' + hop.text).toBeGreaterThan(8); }
+          }
+          expect(wrapped, where).toBeGreaterThan(0);
+        };
+        // The inspector's journey, and the Journeys card below it.
+        await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 'j:' + id; w.gw.open = { ['j:' + id]: true }; w.growPaint(); }, j.id);
+        await check(width + ' grove');
+        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.tree = 'outline'; w.growPaint(); });
+        await check(width + ' outline');
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('lays the key out as a grid whose columns line up, with a row for where a leaf sits on a one-journey tree too', async () => {
+    const { dir, state } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 768, 390]) {
+        const page = await growPage(browser, server.url, state, width);
+        const rows = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-tree .gw-legend > .gw-lg')).map((row) => ({
+          head: row.querySelector(':scope > .lh')?.textContent ?? '',
+          lefts: Array.from(row.querySelectorAll(':scope > .lgi > *')).map((it) => Math.round(it.getBoundingClientRect().left)),
+        })));
+        expect(rows.map((r) => r.head).slice(0, 5), width + 'px').toEqual(['Where a leaf sits', 'Leaf', 'Route', 'Knot', 'Ground']);
+        // Every item starts on one of the same few edges, whichever row it is in.
+        const edges = [...new Set(rows.flatMap((r) => r.lefts))].sort((a, b) => a - b);
+        const widest = Math.max(...rows.map((r) => new Set(r.lefts).size));
+        expect(edges.length, width + 'px: ' + edges.join(',')).toBeLessThanOrEqual(widest);
+        // The arithmetic sentence is gone: what the mode pruned is a table of the modes.
+        const text = (await page.locator('[data-testid="grow"] .gw-tree').textContent())!;
+        expect(text).not.toMatch(/keeps \d+ of the \d+ drafted\. Pruned by/);
+        expect(await page.locator('[data-testid="grow"] .gw-legend table.gw-cmp th.is-chosen').count()).toBe(1);
+        // Its mode headers fit their columns at every width, so no two run together.
+        const heads = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-legend table.gw-cmp th[data-m]')).map((th) => {
+          const shown = Array.from(th.children).filter((c) => (c as HTMLElement).offsetWidth > 1) as HTMLElement[];
+          return { text: shown.map((c) => c.textContent).join(''), fits: shown.every((c) => c.getBoundingClientRect().right <= th.getBoundingClientRect().right - 2) };
+        }));
+        expect(heads.map((x) => x.text), width + 'px').toEqual(['Min', 'Std', 'Max']);
+        expect(heads.every((x) => x.fits), width + 'px').toBe(true);
+        await page.close();
+      }
+      // A tree of one journey keeps the row, in the words that fit it: its guards and failures grow as branches of their own.
+      const one = structuredClone(state);
+      one.journeys = one.journeys.slice(0, 1);
+      for (const x of one.scenarios) if (x.journey && x.journey !== one.journeys[0]!.id) x.journey = one.journeys[0]!.id;
+      const page = await growPage(browser, server.url, one, 1440);
+      const where = page.locator('[data-testid="grow"] .gw-tree .gw-legend .gw-lg.where');
+      expect(await where.locator('.lh').textContent()).toBe('Where a leaf sits');
+      expect(await where.textContent()).toContain('happy path, on the crown');
+      await page.close();
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('says Tap where a finger works the page and Point at where a mouse does, and previews every mode card alike', async () => {
+    const { dir, state } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const mouse = await growPage(browser, server.url, state, 1440);
+      expect(await mouse.getByTestId('grow-mode-preview').textContent()).toMatch(/^Point at another mode/);
+      // The card previewed after the choice looks as the card previewed before it.
+      const ring = async (id: string) => { await mouse.getByTestId('grow-mode-' + id).focus(); await mouse.waitForTimeout(400); return mouse.getByTestId('grow-mode-' + id).evaluate((b) => ({ pv: b.classList.contains('pv'), shadow: getComputedStyle(b).boxShadow, edge: getComputedStyle(b).borderTopStyle + ' ' + getComputedStyle(b).borderTopColor })); };
+      const after = await ring('max');
+      expect(after.pv).toBe(true);
+      await mouse.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.modeBy = null; w.gw.state.asked = true; w.gw.preview = null; w.growPaint(); });
+      expect(await mouse.getByTestId('grow-mode-hint').textContent()).toBe('Choose how much to prove. Tracing is done; nothing runs until you pick.');
+      expect(await ring('std')).toEqual(after);
+      // the recommended card too, while it is previewed
+      expect(await ring('min')).toEqual(after);
+      await mouse.close();
+      const finger = await growPage(browser, server.url, state, 390, true);
+      expect(await finger.getByTestId('grow-mode-preview').textContent()).toMatch(/^Tap another mode/);
+      expect(await finger.getByTestId('grow').textContent()).not.toContain('Point at');
+      await finger.close();
+    } finally { await browser.close(); }
+  }, 60000);
 });
