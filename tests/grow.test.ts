@@ -945,7 +945,8 @@ describe('Grow page', () => {
                 if (Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5) out.push(k + ': card covers ' + t.textContent);
                 for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
               }
-              // a knot's card hangs off its name, so only one line runs to the knot: the name's own
+              // a knot's card hangs off its name, which stands out, so only one line runs to the knot: the name's own
+              if (kl && kl.classList.contains('on') && !kl.classList.contains('pt')) out.push(k + ': its name does not stand out');
               if (kl && kl.classList.contains('on') && lead.length) {
                 const r = kl.getBoundingClientRect(), a = lead[0]!;
                 if (a[0]! < r.left - 3 || a[0]! > r.right + 3 || a[1]! < r.top - 3 || a[1]! > r.bottom + 3) out.push(k + ': second line to the knot');
