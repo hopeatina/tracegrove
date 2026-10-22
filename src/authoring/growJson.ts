@@ -14,7 +14,8 @@ import { readSavedRun } from './runSource.ts';
 
 export type GrowFailure = {
   scenario: string; title: string; promise: string | null; flow: string | null; run: string | null;
-  step: number | null; check: string | null; expected: unknown; got: unknown; says: string; evidence: string[];
+  /** false when `run` is not saved in this folder (a grow that proved in a worktree of its own): its evidence is not here. */
+  saved: boolean; step: number | null; check: string | null; expected: unknown; got: unknown; says: string; evidence: string[];
 };
 export type GrowJsonSummary = {
   verdict: string; exitCode: number; exitMeaning: string; mode: string;
@@ -35,12 +36,14 @@ export function brokeLine(r: RunState | undefined): string {
 function readFailure(s: GrowState, dir: string, id: string): { failure: GrowFailure; stepName: string | null } {
   const x = s.scenarios.find((y) => y.id === id)!; const r = s.run[id];
   const flow = r?.flow ?? x.flow ?? null; const run = r?.run ?? null;
-  const out: GrowFailure = { scenario: id, title: plainTitle(x.title), promise: x.criteria.length ? x.criteria.join(', ') : null, flow, run,
+  const out: GrowFailure = { scenario: id, title: plainTitle(x.title), promise: x.criteria.length ? x.criteria.join(', ') : null, flow, run, saved: false,
     step: null, check: null, expected: null, got: null, says: brokeLine(r), evidence: [] };
   const found = { failure: out, stepName: null as string | null };
   if (!run) return found;
   let runDir: string;
+  // A run that is not saved in this folder leaves `saved` false, and nothing to point at.
   try { runDir = savedRunDirectory(join(dir, dirname(s.flows?.config ?? '.')), run); } catch { return found; }
+  out.saved = true;
   const rel = (p: string) => relative(dir, p);
   if (existsSync(join(runDir, 'summary.json'))) out.evidence.push(rel(join(runDir, 'summary.json')));
   try {

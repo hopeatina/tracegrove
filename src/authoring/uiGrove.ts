@@ -660,12 +660,12 @@ function gwSpecLine(){const s=gw.state;if(!s.criteria.length)return 'No spec to 
 /* A scenario that ran opens the Run tab at its own run and flow, the ones the grow recorded for it (never "the latest run"), at
    the step that broke, or at its first step when it passed: the way History opens a run. */
 const gwRan=x=>{const r=gw.state&&x&&gw.state.run[x.id];return !!(r&&r.run&&(r.st==='pass'||r.st==='fail'))};
-async function gwOpenRun(sid,at){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];
- if(!x||!gwRan(x)){toast('No run was recorded for this scenario.');return false}
+async function gwOpenRun(sid,at,quiet){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.run[sid];const say=t=>{if(!quiet)toast(t)};
+ if(!x||!gwRan(x)){say('No run was recorded for this scenario.');return false}
  const flow=r.flow||x.flow;let run;
- try{run=await api('/api/runs/'+encodeURIComponent(r.run))}catch(e){toast('The run '+r.run+' is not saved in this folder any more.');return false}
+ try{run=await api('/api/runs/'+encodeURIComponent(r.run))}catch(e){say('The run '+r.run+' is not saved in this folder any more.');return false}
  const c=(run.cases||[]).find(k=>k.caseId===flow)||((run.cases||[]).length===1?run.cases[0]:null);
- if(!c){toast('The run '+r.run+' has no record of '+(flow||'this scenario')+'.');return false}
+ if(!c){say('The run '+r.run+' has no record of '+(flow||'this scenario')+'.');return false}
  const steps=c.steps.filter(k=>k.declared!==false);const bad=k=>k&&(k.result==='failed'||k.result==='cancelled'||(k.checks==='fail'&&k.result==='completed'));
  let i=c.failure?steps.findIndex(k=>k.name===c.failure.step||k.id===c.failure.step):-1;if(i<0||!bad(steps[i]))i=steps.findIndex(bad);
  if(typeof at==='number'&&at>=0&&at<steps.length)i=at;
@@ -673,11 +673,15 @@ async function gwOpenRun(sid,at){const s=gw.state;const x=s&&gwScen(sid),r=s&&s.
  /* the list of runs the Run tab offers may predate this grow */
  try{state=await api('/api/overview')}catch(e){}
  openTab('Run');return true}
-/* "Open the runs" opens the first failure's run at its failing step; with no failure, the latest run this grow made. */
-function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
- const fail=s.scenarios.find(x=>s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x));if(fail)return gwOpenRun(fail.id);
- const ran=s.scenarios.filter(gwRan).sort((a,b)=>String(s.run[a.id].run).localeCompare(String(s.run[b.id].run)));
- if(ran.length)return gwOpenRun(ran[ran.length-1].id);openTab('Run')}
+/* "Open the runs" opens the first failure's run at its failing step; with no failure, the latest run this grow made. It is
+   never a dead end: when that run is not saved here any more (a grow proved in a worktree of its own, say), it says so and
+   tries the next failure's run, then the newest run this grow saved, and at last opens the Run tab as it is. */
+async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
+ const fails=s.scenarios.filter(x=>s.run[x.id]&&s.run[x.id].st==='fail'&&gwRan(x));
+ const ran=s.scenarios.filter(x=>gwRan(x)&&fails.indexOf(x)<0).sort((a,b)=>String(s.run[b.id].run).localeCompare(String(s.run[a.id].run)));
+ const tries=fails.concat(ran);
+ for(let i=0;i<tries.length;i++)if(await gwOpenRun(tries[i].id,undefined,i>0))return;
+ openTab('Run')}
 /* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. */
 function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap',type:'button','data-hap':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwOpenRun(x.id)}}},'See what happened ›'):null}
 /* The address follows the selection: the run a scenario opened while the Run tab still shows it, else what is selected here. */

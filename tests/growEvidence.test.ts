@@ -140,6 +140,24 @@ describe('From a grown scenario to its run', () => {
     await page.close();
   });
 
+  it('"Open the runs" is never a dead end: when the first failure’s run is not saved here it says so and opens the next run this grow saved', async () => {
+    const page = await open();
+    await page.getByTestId('grow-result').waitFor();
+    // The failure's run is gone (a grow that proved in a worktree of its own saves its runs there).
+    await page.evaluate((id) => { const w = (0, eval)('({ gw })'); w.gw.state.run[id].run = '2026-10-22T00-00-00Z_fail_gone00'; }, failed);
+    await page.getByTestId('grow-open-runs').click();
+    expect(await landed(page)).toMatchObject({ tab: 'Run', run: passRun, sel: 'notes.count-anonymous' });
+    await expect(page.locator('.toast').textContent()).resolves.toBe('The run 2026-10-22T00-00-00Z_fail_gone00 is not saved in this folder any more.');
+    await page.close();
+    // With none of its runs here, it still opens the Run tab.
+    const none = await open();
+    await none.getByTestId('grow-result').waitFor();
+    await none.evaluate(() => { const w = (0, eval)('({ gw })'); for (const k in w.gw.state.run) if (w.gw.state.run[k].run) w.gw.state.run[k].run = '2026-10-22T00-00-00Z_pass_gone' + k; });
+    await none.getByTestId('grow-open-runs').click();
+    await none.waitForFunction(() => (0, eval)('tab') === 'Run');
+    await none.close();
+  });
+
   it('keeps the selection in the address and brings it back on load', async () => {
     const page = await open(`#grow/${failed}/happened/step-3`);
     expect(await landed(page)).toMatchObject({ run: failRun, sel: 'notes.count', step: 2, hash: `#grow/${failed}/happened/step-3` });
@@ -303,7 +321,7 @@ describe('The verdict', () => {
 
   it('leaves what a run did not record as null in the summary, and lists no evidence for a run that is not here', () => {
     const summary = growJsonSummary(plotline(), mkdtempSync(join(tmpdir(), 'tracegrove-norun-')));
-    expect(summary.failures).toEqual([{ scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8',
+    expect(summary.failures).toEqual([{ scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8', saved: false,
       step: null, check: null, expected: null, got: null, says: 'Broke at check “only the Team upgrade and the added seat were charged”: expected 2 calls, got 3. On the route: after POST /seats.', evidence: [] }]);
   });
 });
@@ -321,8 +339,8 @@ describe('grow --json and the exit code', () => {
     const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
     const f = summary!.failures[0]!;
     expect(summary!.failures).toHaveLength(1);
-    expect(Object.keys(f)).toEqual(['scenario', 'title', 'promise', 'flow', 'run', 'step', 'check', 'expected', 'got', 'says', 'evidence']);
-    expect(f).toMatchObject({ scenario: x.id, title: plainTitle(x.title), promise: 'C1, C2', flow: 'notes.count', run: state.run[x.id]!.run, step: 3, check: 'body.count', expected: 0, got: 1 });
+    expect(Object.keys(f)).toEqual(['scenario', 'title', 'promise', 'flow', 'run', 'saved', 'step', 'check', 'expected', 'got', 'says', 'evidence']);
+    expect(f).toMatchObject({ scenario: x.id, title: plainTitle(x.title), promise: 'C1, C2', flow: 'notes.count', run: state.run[x.id]!.run, saved: true, step: 3, check: 'body.count', expected: 0, got: 1 });
     // The sentence is built from those recorded fields, in the page's words.
     expect(f.says).toBe('Expected body.count 0, got 1. Step 3 (another user counts none) broke it.');
     expect(f.evidence.map((p) => p.split('/').pop())).toEqual(['summary.json', 'receipt.json', 'assertions.json', 'boundaries.json', 'events.jsonl']);

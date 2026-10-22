@@ -19,7 +19,7 @@ One verdict, computed once from the grow's counts (`growVerdict`), is what the D
 
 The exit code follows it: `1` not ready (fix), `3` not proven yet (prove more), `0` ready. `--allow-unproven` turns `3` into `0`. A grow that stopped exits `2`, and one that was cancelled exits `4`.
 
-`summary.failures` gives each failure's scenario, title, promise, flow, run, step and check, what the check expected and what it got (from the run's recorded assertion), the sentence the page says, and the paths of its evidence (`summary.json`, and the cell's `receipt.json`, `assertions.json`, `boundaries.json` and `events.jsonl`). What the run did not record is `null`. `summary.unproven` lists each scenario not tested yet with its reason.
+`summary.failures` gives each failure's scenario, title, promise, flow, run, whether that run is saved in this folder (`saved`; a grow that proved in a worktree of its own saved it there), step and check, what the check expected and what it got (from the run's recorded assertion), the sentence the page says, and the paths of its evidence (`summary.json`, and the cell's `receipt.json`, `assertions.json`, `boundaries.json` and `events.jsonl`). What the run did not record is `null`, and a run that is not saved here has no evidence listed. `summary.unproven` lists each scenario not tested yet with its reason.
 
 ## What it does, in order
 
