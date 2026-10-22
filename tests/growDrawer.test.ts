@@ -297,6 +297,34 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('as a sheet over the page at 1000 px, is a dialog that keeps Tab inside it, and is not one beside the tree', async () => {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+    page.on('pageerror', (e) => { errors.push(String(e)); });
+    await page.goto(`${server.url}#grow/${failed}/steps`);
+    await opened(page);
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'grow-happened-title');
+    expect(await page.evaluate(() => { const d = document.querySelector('[data-testid="grow-happened"]')!; return [d.getAttribute('role'), d.getAttribute('aria-modal'), getComputedStyle(document.querySelector('.gw-insw')!).position]; }))
+      .toEqual(['dialog', 'true', 'fixed']);
+    const inside = () => page.evaluate(() => { const a = document.activeElement; return !!a && !!a.closest('[data-testid="grow-happened"]') ? a.getAttribute('data-testid') ?? a.textContent : `OUT ${a?.tagName} ${a?.textContent?.slice(0, 20)}`; });
+    const seen: string[] = [];
+    for (let i = 0; i < 30; i++) { await page.keyboard.press('Tab'); seen.push(String(await inside())); }
+    expect(seen.filter((x) => x.startsWith('OUT'))).toEqual([]);
+    // round it goes: past its last control Tab comes back to the first, and Shift+Tab from the first goes to the last
+    expect(seen).toContain('grow-happened-close'); expect(seen).toContain('grow-happened-copy');
+    await page.getByTestId('grow-happened-close').focus();
+    await page.keyboard.press('Shift+Tab');
+    expect(await inside()).toBe('grow-happened-copy');
+    await page.keyboard.press('Tab');
+    expect(await inside()).toBe('grow-happened-close');
+    // focus sent behind the sheet comes back to its heading
+    await page.evaluate(() => (document.querySelector('[data-testid="grow-view-outline"]') as HTMLElement).focus());
+    expect(await inside()).toBe('grow-happened-title');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByTestId('grow-happened-step-1').click();
+    expect(await page.evaluate(() => [document.querySelector('[data-testid="grow-happened"]')!.getAttribute('role'), document.querySelector('[data-testid="grow-happened"]')!.getAttribute('aria-modal')])).toEqual([null, null]);
+    await page.close();
+  });
+
   it('is a full-screen sheet on a phone, every target at least 44 px', async () => {
     const page = await open(`#grow/${failed}/steps`, 390);
     await opened(page);

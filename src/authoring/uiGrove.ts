@@ -762,6 +762,15 @@ async function gwDrLoad(d){const s=gw.state,r=s.run[d.sid],x=gwScen(d.sid);const
  catch(e){err='The run '+r.run+' could not be read.'}
  if(gw.dr!==d)return;d.loading=false;d.data=out;d.err=err;if(out&&(d.step===null||d.step>=out.steps.length))d.step=out.at;
  if(tab==='Discover')growPaint()}
+/* Under 1060 px the drawer is a sheet that covers the page: Tab and Shift+Tab go round its own controls, and focus that lands
+   behind it (on the tree or a row it hides) comes back to its heading */
+const gwDrSheet=()=>{try{return matchMedia('(max-width:1060px)').matches}catch(e){return false}};
+function gwDrLoop(e,el){const f=[...el.querySelectorAll('button,[href],input,select,textarea,[tabindex]')].filter(x=>!x.disabled&&x.getAttribute('tabindex')!=='-1'&&x.offsetParent!==null);
+ if(!f.length)return;const a=document.activeElement,first=f[0],last=f[f.length-1];
+ if(e.shiftKey&&(a===first||!el.contains(a)||f.indexOf(a)<0&&a===el.querySelector('#gw-dr-title'))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&(a===last||!el.contains(a))){e.preventDefault();first.focus()}}
+document.addEventListener('focusin',e=>{if(!gw.dr||tab!=='Discover'||!gw.slots||!gwDrSheet())return;const box=gw.slots.ins,el=box.querySelector('.gw-dr');
+ if(!el||!box.isConnected||box.contains(e.target))return;const t=el.querySelector('#gw-dr-title');if(t)t.focus({preventScroll:true})});
 /* Close returns to the panel, and focus to the link that opened the drawer */
 function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus='d:'+d.sid;growPaint()}
 /* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used
@@ -793,7 +802,9 @@ function gwDrHist(hs){if(!hs||!hs.saved)return null;const s=gw.state,base=s.chan
  return (hs.failed===hs.saved?'Failed in '+all:hs.passed===hs.saved?'Passed in '+all:'Passed '+hs.passed+' of '+hs.saved+' saved runs')+(base?'; no run on '+base+' is recorded.':'.')}
 function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.sid);if(!x)return null;const r=s.run[x.id];const T=gwVia(x.title);
  const j=M.J.find(q=>(M.leaves[q.id]||[]).includes(x)),n=j?(gw.order||[]).indexOf(j.id)+1:0;const st=r&&r.st==='fail'?'fail':r&&r.st==='pass'?'pass':'none';
- const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',on:{keydown:e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gwDrClose()}}}});
+ /* under 1060 px it is a sheet over the page: a dialog that keeps Tab inside it */
+ const sheet=gwDrSheet();
+ const el=h('section',{class:'gw-dr','aria-label':'What happened','data-testid':'grow-happened',role:sheet?'dialog':null,'aria-modal':sheet?'true':null,on:{keydown:e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gwDrClose()}else if(e.key==='Tab'&&gwDrSheet())gwDrLoop(e,el)}}});
  const place=j?(n?'Journey '+n+', ':'')+gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check';
  gwPut(el,h('div',{class:'gw-drh'},h('span',{class:'mk '+st,'aria-hidden':'true'},{fail:'✗',pass:'✓',none:'○'}[st]),
   h('div',{style:'min-width:0'},h('h2',{id:'gw-dr-title',tabindex:'-1','data-testid':'grow-happened-title'},...gwRich(T.title)),
