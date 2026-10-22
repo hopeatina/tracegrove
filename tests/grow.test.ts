@@ -2562,7 +2562,7 @@ describe('Grow page', () => {
       const M = B.svg.getScreenCTM(), sc = Math.hypot(M.a, M.b), P = (q: number[]) => [M.a * q[0]! + M.c * q[1]! + M.e, M.b * q[0]! + M.d * q[1]! + M.f];
       const wood = [...B.svg.querySelectorAll('path.w')].filter(own).map((e: any) => ({ k: e.getAttribute('class') + ':' + e.__pts.length, pts: e.__pts.map(P), hw: e.__w.map((v: number) => v * sc / 2), r: e.__r ? { t0: e.__r.t0, ms: e.__r.ms, f0: e.__r.f0 } : null }));
       const all = (q: string, p: number) => [...B.svg.querySelectorAll(q)].map((e: Element) => box(e.getBoundingClientRect(), p));
-      w.__snaps.push({ N: g.gbN, svg: box(r), wood, ex: all('text, .lbl, .badge, .ptag .tag, .shtag, .tailg, .vein, .heal, .cutmk', 1.5), kn: all('.kn', 2), pads: all('.pad, .gb-lf, .budg', 1), pot: box(B.svg.querySelector('.pots').getBoundingClientRect()) });
+      w.__snaps.push({ N: g.gbN, svg: box(r), wood, ex: all('text, .lbl, .badge, .ptag .tag, .shtag, .tailg, .vein, .heal, .cutmk', 1.5), key: all('.kpip.key:not(.none)', 1.5), kn: all('.kn', 2), pads: all('.pad, .gb-lf, .budg', 1), pot: box(B.svg.querySelector('.pots').getBoundingClientRect()) });
     };
     const revealed = (ts: number) => {
       const g = (0, eval)('gw'), B = g && g.B; if (!B || !B.svg || !B.svg.isConnected) return; let L = 0;
@@ -2599,7 +2599,8 @@ describe('Grow page', () => {
     const dist = (x: number, y: number) => { const o = (y * W + x) * 4; return Math.abs(D[o]! - bk[0]!) + Math.abs(D[o + 1]! - bk[1]!) + Math.abs(D[o + 2]! - bk[2]!); };
     const ink = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ink[y * w + x] = dist(x + x0, y + y0) > 30 ? 1 : 0;
     const inBox = (px: number, py: number, b: number[]) => px >= X(b[0]!) && px <= X(b[2]!) && py >= Y(b[1]!) && py <= Y(b[3]!);
-    for (const b of s.ex) { const a0 = Math.max(x0, X(b[0])), a1 = Math.min(x1, X(b[2])), c0 = Math.max(y0, Y(b[1])), c1 = Math.min(y1, Y(b[3])); for (let y = c0; y < c1; y++) for (let x = a0; x < a1; x++) ink[(y - y0) * w + x - x0] = 0; }
+    // (a pip's row in the key is a label beside the tree, as a journey's badge is; it is tested below never to sit on the wood)
+    for (const b of [...s.ex, ...s.key]) { const a0 = Math.max(x0, X(b[0])), a1 = Math.min(x1, X(b[2])), c0 = Math.max(y0, Y(b[1])), c1 = Math.min(y1, Y(b[3])); for (let y = c0; y < c1; y++) for (let x = a0; x < a1; x++) ink[(y - y0) * w + x - x0] = 0; }
     // a hairline gap of a pixel closed: a dashed or anti-aliased edge is one mark, a knot a body-width off its wood is not
     const dil = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (ink[y * w + x]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < h && xx >= 0 && xx < w) dil[yy * w + xx] = 1; }
@@ -2617,6 +2618,7 @@ describe('Grow page', () => {
     const holes: unknown[] = [];
     for (const p of s.wood) {
       const smp: number[][] = []; for (let i = 1; i < p.pts.length; i++) { const a = p.pts[i - 1], b = p.pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / 3)); for (let k = 0; k < m; k++) smp.push([a[0] + ((b[0] - a[0]) * k) / m, a[1] + ((b[1] - a[1]) * k) / m, p.hw[i - 1]]); }
+      for (const q of smp) if (s.key.some((b: number[]) => q[0]! + q[2]! > b[0]! && q[0]! - q[2]! < b[2]! && q[1]! + q[2]! > b[1]! && q[1]! - q[2]! < b[3]!)) { holes.push({ k: p.k, key: 'a row of the key on the wood', at: q.slice(0, 2).map(Math.round) }); break; }
       const cls = smp.map(([x, y, hw]) => {
         if (hw! < 1.6) return 's'; const px = X(x!), py = Y(y!); if (px < x0 + 1 || py < y0 + 1 || px >= x1 - 1 || py >= y1 - 1) return 's';
         if (s.ex.some((b: number[]) => inBox(px, py, b)) || s.kn.some((b: number[]) => inBox(px, py, b)) || s.pads.some((b: number[]) => inBox(px, py, b))) return 's';

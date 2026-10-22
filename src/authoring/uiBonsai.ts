@@ -669,6 +669,14 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
  const kTop=gbNear(ty,hi);const tk=knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);
  for(let i=1;i<tk.length;i++){let k=tk[i].k;while(k<tp.length-6&&tacc[k]-tacc[tk[i-1].k]<KT(tk[i-1].k))k++;if(k!==tk[i].k){tk[i].k=k;tk[i].p=tp[k];tk[i].n=gbNorm(tp,k);tk[i].w=tw[k]}}
  for(let i=tk.length-1;i>0;i--)if(tk[i].k>kTop+2){tk[i-1].ids.push(...tk[i].ids);knots.splice(knots.indexOf(tk[i]),1)}
+ /* and a trunk past five knots is a ladder of names: two helper files side by side on it grow together into a burl, the
+    nearest pair first, until it holds five or no two helpers stand side by side (a knot that still finds no place for its
+    name is a pip, gbKnotNames); the burl leads with the one that held more, and sits between them, weighted by how many
+    files each held */
+ {const help=q=>gbKTier(M,q.ids)===3,row=()=>knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);let tr=row();
+  while(tr.length>5){let best=null;for(let i=1;i<tr.length;i++){const a=tr[i-1],b=tr[i];if(help(a)&&help(b)&&(!best||b.k-a.k<best.b.k-best.a.k))best={a,b}}
+   if(!best)break;const {a,b}=best,lead=a.ids.length>=b.ids.length?a:b,o=lead===a?b:a,k=Math.round((a.k*a.ids.length+b.k*b.ids.length)/(a.ids.length+b.ids.length));
+   lead.ids.push(...o.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(o),1);tr=row()}}
  for(const b of br){if(b.pol)continue;const own=ownOf(b.j).sort((x,y)=>depth(y)-depth(x));const a0=b.Tk/2+8,a1=Math.max(a0+4,b.inner-4);const fit=Math.min(4,Math.max(1,Math.floor((a1-a0)/KG)+1));
   group(own,fit).forEach((ids,i,a)=>{const d=a.length===1?a0+(a1-a0)*.7:a0+(a1-a0)*i/(a.length-1);const k=gbNear(b.acc,d);knots.push({id:ids[0],ids,on:'b'+b.i,bid:b.id,k,p:b.pts[k],n:gbNorm(b.pts,k),w:b.w[k]})})}
  /* A knot is a boss the wood grew round, not a stud sewn on it: it stands out of the outside of the wood's bend (where the
@@ -682,7 +690,7 @@ function gbTree(M,js,H,S,key,sap,strict){const U=M.U;const nc=j=>M.leaves[j.id]?
   q.side=Math.abs(cv)>1.2?Math.sign(cv):alt;q.p=b;q.n=n;q.w=P.w[k];q.tg=[n[1],-n[0]];q.off=q.side*(.3+.1*gbHash('kn:'+key+':'+q.id))*q.w;q.bp=[b[0]+n[0]*q.off,b[1]+n[1]*q.off];
   q.sz=Math.max(.7,Math.min(1.2,.72+.48*Math.sqrt(q.ids.reduce((s,id)=>s+nScn(id),0)/maxS)))*(q.ids.length>1?1.12:1)*(.93+.14*gbHash('ks:'+key+':'+q.id));q.ra=Math.min(7.5,q.w*.14+3.8,Math.max(2.6,q.w*.6))*q.sz;q.rb=q.ra/1.35};
  for(const on of [...new Set(knots.map(q=>q.on))]){let alt=null;const row=knots.filter(q=>q.on===on).sort((a,b)=>a.k-b.k);
-  for(const q of row){if(alt===null)alt=wood(q).up;boss(q,alt);alt=-q.side}
+  for(const q of row){if(alt===null)alt=q.on==='t'?wood(q).up:-wood(q).up;boss(q,alt);alt=-q.side}
   for(let i=1;i<row.length;i++){const a=row[i-1],b=row[i];if(Math.hypot(a.bp[0]-b.bp[0],a.bp[1]-b.bp[1])<1.2*Math.max(a.w,b.w)){a.ids.push(...b.ids);knots.splice(knots.indexOf(b),1);row.splice(i,1);i--;boss(a,a.side)}}}
  /* the outline swells over the boss on its own side, about as far as the boss stands proud of the wood */
  const bx=tp.map(()=>0);for(const b of br)b.bx=b.pts.map(()=>0);
@@ -1855,15 +1863,18 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
     bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader never
     runs into one, but for its own knot's shoot, which rises off the boss at the leader's foot; so a mode, a preview or a pin
     only ever shows or fades them round names that stay where they are */
- const obs=[],bbx=(ps,own)=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];obs.push({r,own})};
+ const obs=[],bbx=(ps,own,inF)=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];obs.push({r,own,inF})};
+ const inTurned=(c,th,a0,a1,b0,b1)=>p=>{const t=[Math.cos(th),Math.sin(th)],dx=p[0]-c[0],dy=p[1]-c[1],a=dx*t[0]+dy*t[1],b=-dx*t[1]+dy*t[0];return a>a0-.8&&a<a1+.8&&b>b0-.8&&b<b1+.8};
  const turned=(c,th,a0,a1,b0,b1)=>{const t=[Math.cos(th),Math.sin(th)],n=[-t[1],t[0]];return [[a0,b0],[a1,b0],[a1,b1],[a0,b1]].map(([a,b])=>[c[0]+t[0]*a+n[0]*b,c[1]+t[1]*a+n[1]*b])};
- for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6],[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid);
-  for(const q of g.slots){const sc=q[3]||1;bbx(turned([q[0],q[1]],q[2]*Math.PI/180,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid)}}
- for(const g of rest)bbx(turned(g.base,Math.atan2(g.u[1],g.u[0]),-4.3,4.3,-2.4,2.4),g.kid);
- for(const r of B.graftR||[])if(r.tree===ti){const t=r.t||[1,0];bbx(turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4),r.kid);if(r.many&&!r.dup&&r.n){const q=[r.c[0]+r.n[0]*9.5,r.c[1]+r.n[1]*9.5],hw=(String(r.many).length+1)*2.6+1.5;obs.push({r:[q[0]-hw,q[1]-5.5,q[0]+hw,q[1]+4.5],own:r.kid})}}
+ for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid,p=>Math.hypot(p[0]-e[0],p[1]-e[1])<3.8||P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,()=>false);
+  for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,inTurned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc))}}
+ for(const g of rest){const th=Math.atan2(g.u[1],g.u[0]);bbx(turned(g.base,th,-4.3,4.3,-2.4,2.4),g.kid,inTurned(g.base,th,-4.3,4.3,-2.4,2.4))}
+ for(const r of B.graftR||[])if(r.tree===ti){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null);if(r.many&&!r.dup&&r.n){const q=[r.c[0]+r.n[0]*9.5,r.c[1]+r.n[1]*9.5],hw=(String(r.many).length+1)*2.6+1.5;obs.push({r:[q[0]-hw,q[1]-5.5,q[0]+hw,q[1]+4.5],own:null});
+  /* (a bud and its count are one box to a leader: it never runs between them) */
+  bbx([...sw,[q[0]-hw,q[1]-5.5],[q[0]+hw,q[1]+4.5]],null)}}
  for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;bbx(turned([P.o[0]+sl[0],P.o[1]+sl[1]],(sl[2]||0)*Math.PI/180,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null)}}
  const om=3.5/(V.hf||1),clearO=r=>!obs.some(o=>r[0]<o.r[2]+om&&r[2]>o.r[0]-om&&r[1]<o.r[3]+om&&r[3]>o.r[1]-om);
- const intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=1.2){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs)if(p[0]>o.r[0]-.8&&p[0]<o.r[2]+.8&&p[1]>o.r[1]-.8&&p[1]<o.r[3]+.8&&!(o.own===id&&d<5))return true}return false};
+ const fo=Math.min(5,4.8/(V.hf||1)),intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=1.2){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs)if(p[0]>o.r[0]-.8&&p[0]<o.r[2]+.8&&p[1]>o.r[1]-.8&&p[1]<o.r[3]+.8&&!(o.own===id&&(d<fo||o.inF&&!o.inF(p))))return true}return false};
  for(const l of L.rl||[]){if(l.box){labs.push(l.tb||l.box);continue}const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;labs.push([x0-2,l.y-L.fs,x0+w0+2,l.y+3])}
  for(const pid in T.lbl||{}){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;labs.push([a,l.y-29,a+l.w,l.y-29+l.hgt]);if(l.dir)lines.push([[l.ax+X,l.ay],[lx,l.y-29+l.hgt/2]])}
  for(const r of B.badgeR||[])labs.push(r);
@@ -1879,7 +1890,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  /* what never moves (the edges, the pot, the wood, leaves, shoots while they are on, knots and cushions), then the names and
     hairlines placed so far, with a margin round each name */
  const clearS=(r,bud)=>{if(r[0]<V.vx+3||r[2]>V.vx+V.W-3||r[1]<V.vy+2||r[3]>soil(r))return false;for(const q of rects)if(ovR(r,q))return false;
-  for(const c of caps)if((bud||c.tag!=='shoot')&&dSR(c.a,c.b,r)<c.r)return false;for(const c of cush)if(cushHit(c,r,4))return false;return true};
+  for(const c of caps)if(c.tag!=='shoot'&&dSR(c.a,c.b,r)<c.r)return false;for(const c of cush)if(cushHit(c,r,4))return false;return true};
  const clearL=(r,m)=>{const rI=[r[0]-m*k,r[1]-m*k/2,r[2]+m*k,r[3]+m*k/2];for(const q of labs)if(ovR(rI,q))return false;for(const l of lines)if(dSR(l[0],l[1],r)<2)return false;return true};
  const segX=(a,b,c,d)=>{const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b)};
  /* a count's tie never crosses a name, another hairline or another knot; strict, nor leaves, shoots or foliage either */
@@ -1908,26 +1919,34 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  for(const g of [...shoots,...rest])if(g.cntAt)obs.push({r:g.cntAt.r,own:g.kid});
  /* (the counts, and a graft bud's count, go with their shoots) */
  const cnt=[...shoots,...rest].filter(g=>g.cntAt),noBud=[labs.filter(r=>!budL.includes(r)&&!cnt.some(g=>g.cntAt.r===r)),lines.filter(l=>!cnt.some(g=>g.cntAt.tie===l)),[]],withBud=[labs.slice(),lines.slice(),bases.slice()];
- /* The names. A name sits beside its knot on a straight leader from the knot's rim, 8 to 74 long and never past 86 px on
-    the screen, the near places first, turned away from the limb the knot is on. The leader leaves its own limb (straight off
-    the bark) and never goes back onto it, and crosses no other limb, no cushion, leaf, shoot, knot, name or other leader,
-    nor the pot. A burl's place is kept for the longest of its names, set from the same point, so it reads with whichever
-    of its files is lit without moving. */
+ /* The names. A name sits beside its knot on a straight leader from the boss's outer side, 8 to 74 long and never past
+    86 px on the screen, the near places first, turned away from the limb the knot is on. The leader is off its own limb by
+    the boss's radius and never goes back onto it, and crosses no other limb, no cushion, leaf, shoot, bud, knot, name or
+    other leader, nor the pot. A burl's place is kept for the longest of its names, set from the same point, so it reads with
+    whichever of its files is lit without moving. */
  const lens=[...new Set([8,13,19,26,35,46,59,74].map(l=>Math.min(l*k,86/(V.hf||1))))],fs=10*k,cw=.62*fs,D8=[[1,0],[.7071,-.7071],[0,-1],[-.7071,-.7071],[-1,0],[-.7071,.7071],[0,1],[.7071,.7071]],D16=[...D8,...D8.map((u,i)=>{const v=D8[(i+1)%8],m=Math.hypot(u[0]+v[0],u[1]+v[1]);return [(u[0]+v[0])/m,(u[1]+v[1])/m]})];
- const rr=(e,u)=>1/Math.sqrt(Math.pow((u[0]*e.tg[0]+u[1]*e.tg[1])/e.ra,2)+Math.pow((u[0]*e.n[0]+u[1]*e.n[1])/e.rb,2));
  const kIds=e=>B.knot[e.id]?B.knot[e.id].__ids:[e.id],twOf=(e,sh)=>{const ids=kIds(e);return Math.max(...ids.map(id=>gbKnotTxt(M,ids,id,sh).length))*cw};
- const limb=e=>e.bid?'b:'+e.bid:'t',inLimb=(p,lb)=>caps.some(c=>c.lb===lb&&dPS(p,c.a,c.b)<c.r-3);
+ const limb=e=>e.bid?'b:'+e.bid:'t';
+ /* (its own limb as drawn: the wood swells over the boss on the boss's side, about as far as the boss stands proud, gbTree) */
+ const inOwn=(e,lb)=>{const o=Math.hypot(e.p[0]-e.p0[0],e.p[1]-e.p0[1]),amp=Math.max(1.2+.3*e.rb,o+.92*e.rb-e.w/2+1),sg=e.ra*1.15;
+  return p=>caps.some(c=>c.lb===lb&&dPS(p,c.a,c.b)<c.r-3+amp*Math.exp(-Math.pow(((p[0]-e.p0[0])*e.tg[0]+(p[1]-e.p0[1])*e.tg[1])/sg,2)))};
  const leadHard=(e,R,A,u,bud)=>{const lb=limb(e),len=Math.hypot(A[0]-R[0],A[1]-R[1]),R5=[R[0]+u[0]*Math.min(5*k,len/2),R[1]+u[1]*Math.min(5*k,len/2)];
-  for(const c of caps){if(c.tag==='shoot'&&!bud||c.lb===lb||(c.tag==='knot'&&c.own===e.id))continue;if(gbSegD(c.own===e.id?R5:R,A,c.a,c.b)<c.r-(c.tag==='wood'?1:0))return false}
-  let off=false,on=0;for(let d=0;d<=len+.01;d+=1.5){const p=[R[0]+u[0]*d,R[1]+u[1]*d],inn=inLimb(p,lb);if(!inn)off=true;else if(off)return false;else on=d}if(!off)return false;
+  for(const c of caps){if(c.tag==='shoot'||c.lb===lb||(c.tag==='knot'&&c.own===e.id))continue;if(gbSegD(c.own===e.id?R5:R,A,c.a,c.b)<c.r-(c.tag==='wood'?1:0))return false}
+  /* it is off its own limb by the boss's radius from where it leaves it, and never goes back onto it */
+  const inn0=inOwn(e,lb);let off=false,on=0;for(let d=0;d<=len+.01;d+=1){const p=[R[0]+u[0]*d,R[1]+u[1]*d],inn=inn0(p);if(!inn)off=true;else if(off||d>e.ra)return false;else on=d}if(!off)return false;
   for(let d=0;d<=len+.01;d+=2){const p=[R[0]+u[0]*d,R[1]+u[1]*d];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2.5))return false}
   return dSR(R,A,V.potBox)>=1?1+on:0};
  const cands=new Map(),candOf=(e,bud)=>{const key=e.id+'|'+bud;if(cands.has(key))return cands.get(key);const tw=twOf(e),out=[];
   let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
-  for(const len of lens)for(const u of D16){const R0=rr(e,u),A=[e.p[0]+u[0]*(R0+len),e.p[1]+u[1]*(R0+len)],R=[e.p[0]+u[0]*(R0+1),e.p[1]+u[1]*(R0+1)];let anc,x0,yb;
-   if(Math.abs(u[0])>.38){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
-   const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud)||!clearO(r))continue;const lh=leadHard(e,R,A,u,bud);if(!lh||intoO(R,A,e.id))continue;
-   const ang=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r,R,A,pts:[A,R],sc:len/k+14*ang+(anc==='middle'?5:0)+.8*(lh-1)/k})}
+  /* the leader leaves the boss on its outward side, from the knot's centre out along the normal by the boss's radius, and
+     runs out away from the wood, never across it; a stub along the normal ties its foot to the boss's edge */
+  const R=[e.p[0]+v[0]*e.ra,e.p[1]+v[1]*e.ra],S=[e.p[0]+v[0]*(e.rb-.4),e.p[1]+v[1]*(e.rb-.4)];
+  /* (a leader near upright may carry its name beside its end or centred over it) */
+  for(const len of lens)for(const u of D16){if(u[0]*v[0]+u[1]*v[1]<.2)continue;const A=[R[0]+u[0]*len,R[1]+u[1]*len],ux=Math.abs(u[0]),sides=ux>.38?(ux<.4?[1,0]:[1]):[0];let lh=null;
+   for(const sd of sides){let anc,x0,yb;
+    if(sd){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
+    const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud)||!clearO(r))continue;if(lh===null)lh=intoO(R,A,e.id)?0:leadHard(e,R,A,u,bud);if(!lh)break;
+    const ang=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r,R,A,pts:[A,R,S],sc:len/k+14*ang+(anc==='middle'?5:0)+.8*(lh-1)/k})}}
   out.sort((a,b)=>a.sc-b.sc);cands.set(key,out);return out};
  /* who gets open ground first when it runs short: where a journey starts, then its HTTP routes, then its stores and jobs,
     then helper files; within each, the headline journey's hops (the crown's, gbHead: the first failing journey, else the first), then
@@ -1943,8 +1962,9 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
      clock, gbNow, from the wood's own reveal: see gbBuild) */
   const ka=B.anim.find(a=>a[0]===B.knot[e.id]);if(ka&&!V.quiet)B.anim.push([w,ka[1]+ka[2],300,'fade'])}
  const run=(bud,n0)=>{const B0=bud?withBud:noBud;
-  const lay=order=>{labs.length=0;labs.push(...B0[0]);lines.length=0;lines.push(...B0[1]);bases.length=0;bases.push(...B0[2]);const slot=new Map(),miss=[];let cost=0;
-   for(const e of order){const c=candOf(e,bud).find(q=>dyn(q,e.id));if(!c){miss.push(e);cost+=wt(e);continue}slot.set(e.id,c);cost+=c.sc*.0005;labs.push(c.r);bases.push([c.yb,c.r]);lines.push([c.R,c.A,e.id])}
+  const lay=order=>{labs.length=0;labs.push(...B0[0]);lines.length=0;lines.push(...B0[1]);bases.length=0;bases.push(...B0[2]);const slot=new Map(),miss=[];let cost=0,nt=0;
+   /* (five names by the trunk at most: the rest of its knots are pips) */
+   for(const e of order){const c=!e.bid&&nt>=5?null:candOf(e,bud).find(q=>dyn(q,e.id));if(!c){miss.push(e);cost+=wt(e);continue}slot.set(e.id,c);if(!e.bid)nt++;cost+=c.sc*.0005;labs.push(c.r);bases.push([c.yb,c.r]);lines.push([c.R,c.A,e.id])}
    return {slot,miss,cost,order}};
   let best=lay(Q.slice().sort((a,b)=>tier(a)-tier(b)||+onHead(b)-+onHead(a)||nJ(b)-nJ(a)||candOf(a,bud).length-candOf(b,bud).length||a.p[1]-b.p[1]));
   /* a knot left without a place goes first, if that leaves less unplaced (by what matters) and the leaders no longer */

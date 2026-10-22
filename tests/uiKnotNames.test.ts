@@ -158,15 +158,17 @@ describe('the names on the bonsai’s knots', () => {
             if (!vis(t)) continue;
             const r = t.getBoundingClientRect();
             for (const m of marks) if (Math.min(r.right, m.r.right + 2) - Math.max(r.left, m.r.left - 2) > 0 && Math.min(r.bottom, m.r.bottom + 2) - Math.max(r.top, m.r.top - 2) > 0) out.push(name + ' touches ' + m.what);
-            // its leader, from the knot out: only its own knot's shoot may stand at its foot
+            // its leader, from the knot out: only its own knot's shoot may stand at its foot, and past its foot the leader may run
+            // beside that shoot, under its arc, but never into the shoot itself (it leaves the boss where the shoot rises, gbKnotNames)
             const ld = g.querySelector('.kld') as SVGPathElement, v = (ld.getAttribute('d') || '').match(/-?[\d.]+/g)?.map(Number) || [];
             if (v.length < 4) continue;
             const A = scr(ld, [v[0]!, v[1]!]), R = scr(ld, [v[2]!, v[3]!]), len = Math.hypot(A[0]! - R[0]!, A[1]! - R[1]!);
             const mine = new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u] && B.shoots[u].g).filter(Boolean));
+            const inShape = (el: SVGGraphicsElement, q: number[]) => { const m = el.getScreenCTM()!.inverse(); return (el as SVGGeometryElement).isPointInFill(new DOMPoint(m.a * q[0]! + m.c * q[1]! + m.e, m.b * q[0]! + m.d * q[1]! + m.f)); };
             const hit = new Set<string>();
             for (let d = 0; d <= len; d += .5) {
               const q = [R[0]! + (A[0]! - R[0]!) * d / len, R[1]! + (A[1]! - R[1]!) * d / len];
-              for (const m of marks) if (q[0]! > m.r.left && q[0]! < m.r.right && q[1]! > m.r.top && q[1]! < m.r.bottom && !(d < 6 && mine.has(m.e.closest('.budg')))) hit.add(m.what);
+              for (const m of marks) if (q[0]! > m.r.left && q[0]! < m.r.right && q[1]! > m.r.top && q[1]! < m.r.bottom && !(mine.has(m.e.closest('.budg')) && (d < 6 || !inShape(m.e, q)))) hit.add(m.what);
             }
             for (const h of hit) out.push(name + ': its leader runs into ' + h);
           }
@@ -180,7 +182,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('keeps every leader short and clear: off its own limb for good, and across no cushion, leaf, shoot, other limb, name or leader, tested against the shapes drawn', async () => {
+  it('keeps every leader short and clear: off its own limb at the boss and for good, and across no cushion, leaf, shoot, bud, other limb, name or leader, tested against the shapes drawn, with at most five names by the trunk', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -207,7 +209,7 @@ describe('the names on the bonsai’s knots', () => {
             const side = (p: number[], q: number[], r: number[]) => Math.sign((q[0]! - p[0]!) * (r[1]! - p[1]!) - (q[1]! - p[1]!) * (r[0]! - p[0]!));
             const meets = (a: number[], b: number[], c: number[], d: number[]) => side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
             const all = (sel: string) => (Array.from(svg.querySelectorAll(sel)) as SVGGeometryElement[]).filter(vis);
-            const cushions = all('.pfill'), leaves = all('.gb-lf:not(.gone) .blade'), shoots = all('.shf > path.tw, .shf > path.tipbud');
+            const cushions = all('.pfill'), leaves = all('.gb-lf:not(.gone) .blade'), shoots = all('.shf > path.tw, .shf > path.tipbud'), buds = all('.shtag .sbud, .gb-gr:not(.gone) .gsw > ellipse, .gb-gr:not(.gone) .gsw > path');
             const wood = (Array.from(svg.querySelectorAll('path')) as Array<SVGGeometryElement & { __pts?: unknown }>).filter((p) => p.__pts && !p.closest('.stub') && vis(p));
             const lines = all('.kld, .leader, .shtie').map((el) => [el, pts(el)] as const).filter(([, p]) => p.length > 1);
             const boxes = (Array.from(svg.querySelectorAll('text, .shtag rect')) as SVGGraphicsElement[]).filter((e) => (e.tagName !== 'text' || (e.textContent || '').trim()) && vis(e));
@@ -223,24 +225,33 @@ describe('the names on the bonsai’s knots', () => {
               const own = wood.filter((wd) => inside(wd, c));
               const mine = new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u] && B.shoots[u].fl).filter(Boolean));
               if (!own.length) out.push(name + ': its knot is on no wood');
-              let off = false, back = false;
+              let off = false, back = false, inOwn = 0;
               const hit = new Set<string>();
               for (let d = 0; d <= len; d += .5) {
                 const q = [R[0]! + (A[0]! - R[0]!) * d / len, R[1]! + (A[1]! - R[1]!) * d / len];
                 const onOwn = own.some((wd) => inside(wd, q));
-                if (!onOwn) off = true; else if (off) back = true;
+                if (!onOwn) off = true; else { if (off) back = true; inOwn += .5; }
                 for (const wd of wood) if (!own.includes(wd) && inside(wd, q)) hit.add('another limb');
                 for (const s of cushions) if (inside(s, q)) hit.add('a cushion');
                 for (const s of leaves) if (inside(s, q)) hit.add('a leaf');
                 for (const s of shoots) if (inside(s, q) && !(d < 5 && mine.has(s.closest('.shf')))) hit.add('a shoot');
+                for (const s of buds) if (inside(s, q)) hit.add('a bud');
               }
               if (back) out.push(name + ': its leader goes back onto its own limb');
+              // it leaves its own limb at the boss: no more of it on that wood than the boss's own radius and 2 px
+              const m = ld.getScreenCTM()!, ra = e.ra * Math.hypot(m.a, m.b);
+              if (inOwn > ra + 2) out.push(name + ': its leader runs ' + inOwn + ' px inside its own limb, past the boss (' + ra.toFixed(1) + ' px)');
               for (const h of hit) out.push(name + ': its leader crosses ' + h);
               for (const b of boxes) if (b !== t && !g.contains(b) && thru(A, R, b.getBoundingClientRect())) out.push(name + ': its leader crosses "' + (b.textContent || 'a count') + '"');
               for (const [el, q] of lines) if (el !== ld) for (let i = 1; i < q.length; i++) if (meets(A, R, q[i - 1]!, q[i]!)) out.push(name + ': its leader crosses another leader');
             }
-            return { leaders, longest, shapes: [cushions.length, leaves.length, wood.length, boxes.length], shoots: shoots.length, out };
+            // the names that stand by the trunk on leaders, not in the key
+            const trunk = Object.keys(B.klbl).filter((id) => B.knot[id].__on === 't' && B.klbl[id].classList.contains('on') && vis(B.klbl[id]) && (B.klbl[id].parentNode.querySelector('.kld').getAttribute('d') || '').length > 0).length;
+            return { leaders, longest, trunk, shapes: [cushions.length, leaves.length, wood.length, boxes.length], shoots: shoots.length, buds: buds.length, out };
           });
+          // a trunk is never a ladder of names
+          expect(seen.trunk, name + ' ' + width).toBeLessThanOrEqual(5);
+          if (name === 'tracegrove') expect(seen.buds, name + ' ' + width).toBeGreaterThan(0);
           expect(seen.leaders, name + ' ' + width).toBeGreaterThan(3);
           // (the shapes it is tested against are there: cushions, leaves, wood and names, and Max's shoots on tracegrove's tree)
           for (const n of seen.shapes) expect(n, name + ' ' + width).toBeGreaterThan(2);
