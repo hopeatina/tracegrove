@@ -1161,6 +1161,10 @@ describe('Grow page', () => {
     const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, over: [] as number[], halos: 0, stem: 0 };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const on = (el: any) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    // a colour as the page paints it, whatever space it was mixed in, and a token of the tree's own
+    const ctx = document.createElement('canvas').getContext('2d')!, svg = document.querySelector('.gw-svg.gb')!;
+    const rgb = (c: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)); };
+    const tok = (n: string) => getComputedStyle(svg).getPropertyValue(n).trim();
     const pads = Object.values(B.pad) as any[], crown = pads.find((P) => P.crown), T = B.L.trees[crown.tree], mine = pads.filter((P) => P.tree === crown.tree);
     // the crown holds the headline journey: the first in the tree's numbering that failed, else the first
     const fails = (jid: string) => S.scenarios.some((x: any) => x.journey === jid && S.run[x.id]?.st === 'fail');
@@ -1201,11 +1205,13 @@ describe('Grow page', () => {
         const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
         // the tufts at a leaf's foot are drawn behind it, so none covers a leaf
         const tf = B.tuft?.[id]; if (tf && !(tf.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) bad('a tuft drawn over its leaf', id);
-        // a failed leaf carries a soft red halo at rest
+        // a failed leaf carries a soft red halo at rest: as it shows over its cushion it reads red, never brown, and it is
+        // softer than the leaf's own red, nearer the page
         if (el.classList.contains('fail') && !/pv-/.test(el.getAttribute('class') ?? '')) {
-          const cs = getComputedStyle(el.querySelector('.halo')), [r, gg] = (cs.stroke.match(/[\d.]+/g) ?? []).map(Number);
+          const cs = getComputedStyle(el.querySelector('.halo')), so = +cs.strokeOpacity, h = rgb(cs.stroke), fol = rgb(tok('--fol')), pp = rgb(tok('--paper')), vm = rgb(tok('--verm'));
+          const seen = h.map((v, i) => so * v + (1 - so) * fol[i]!), far = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
           out.halos++;
-          if (+cs.opacity < 0.9 || cs.stroke === 'none' || !(r! > gg! + 60) || parseFloat(cs.strokeWidth) < 2 || +cs.strokeOpacity > 0.6) bad('a failed leaf with no soft red halo', [id, cs.opacity, cs.stroke, cs.strokeWidth]);
+          if (+cs.opacity < 0.9 || cs.stroke === 'none' || parseFloat(cs.strokeWidth) < 2 || !(seen[0]! > seen[1]! + 50 && seen[0]! > seen[2]! + 50) || !(far(h, pp) < far(vm, pp))) bad('a failed leaf with no soft red halo', [id, cs.stroke, so, seen.map(Math.round)]);
         }
         if (!sl[4]) continue;
         // a failure on a short stem at thirty to forty-five degrees, out and down (along its branch, or away from the crown's

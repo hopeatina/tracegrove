@@ -117,8 +117,9 @@ export const BONSAI_CSS = String.raw`
 /* where a cut that grew has healed: a small roll of callus in the bark's own tones, a step lighter than the bark, with a thin lit
    crescent on its lip; never a pale disc, and always under the knots, so it never reads as a boss or as one */
 .gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.5}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
-/* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib */
-.gb-lf.fail:not(.pv-out):not(.pv-add) .halo{opacity:1;fill:none;stroke:var(--verm);stroke-opacity:.38;stroke-width:3.2;stroke-linejoin:round}.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{stroke:#5a1a14;stroke-width:1}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#5a1a14;opacity:1;stroke-width:.9}
+/* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib, and round it a soft red halo, the red mixed toward
+   the page rather than made clear, so over green it stays red and never turns brown */
+.gb-lf.fail:not(.pv-out):not(.pv-add) .halo{opacity:1;fill:none;stroke:color-mix(in srgb,var(--verm) 66%,var(--paper));stroke-width:3.2;stroke-linejoin:round}.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{stroke:#5a1a14;stroke-width:1}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#5a1a14;opacity:1;stroke-width:.9}
 /* to prove: a solid outline over a pale fill, with its midrib; no flow yet: a dashed outline round nothing */
 .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:color-mix(in srgb,var(--moss) 16%,var(--paper));stroke:var(--moss);stroke-width:1.2;stroke-dasharray:none}
 .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.6}.gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .rib{opacity:0}
@@ -400,11 +401,12 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,minA,lmin){const z=Math.max(.6,Mat
  const SP=[[.5,0],[-.5,0],[0,.5],[0,-.5],[.25,.45],[.25,-.45],[-.25,.45],[-.25,-.45]];
  const inside=(c,p,th,m)=>{const u=[Math.cos(th),Math.sin(th)];if(c.limf!==null&&p[1]-u[1]*(L/2+GB_PET)>-(c.limf*c.h+1))return false;
   for(const [s,t] of SP){const x=p[0]+u[0]*s*L-u[1]*t*W,y=p[1]+u[1]*s*L+u[0]*t*W,v=x/c.a;if(Math.abs(v)>=.97||y<tY(c,v)+m||y>bY(c,v)-m)return false}return true};
- /* leaves are set out in rows (one row arched with its dome) and then relaxed: each pair pushed apart until they stand a leaf and a tenth apart, blade
-    clear of blade, each drawn back inside its cushion */
+ /* leaves are set out in rows (one row arched with its dome), a row spread to about half its cushion's width so a crown made
+    larger than its leaves need still reads full, and then relaxed: each pair pushed apart until they stand a leaf and a tenth
+    apart, blade clear of blade, each drawn back inside its cushion */
  const place=c=>{const n=c.lv.length;c.pos=[];if(!n)return true;const r=gbRng(gbHash('lv:'+seed+':'+c.role+c.sd));
   const per=Math.max(1,Math.floor((1.7*c.a-L)/(1.15*L))+1),rows=Math.ceil(n/per),P=[];
-  for(let i=0;i<n;i++){const row=Math.floor(i/per),k=i%per,m=Math.min(per,n-row*per),sp=Math.min(1.2*L,1.6*c.a/m);const q=m>1?(k-(m-1)/2)/((m-1)/2):0;P.push([(k-(m-1)/2)*sp+(row%2?sp*.3:0)+(r()-.5)*2,-c.h*(rows===1?(m>2?.48+.18*(1-q*q):.56):.7-.4*row/(rows-1))+(r()-.5)*2])}
+  for(let i=0;i<n;i++){const row=Math.floor(i/per),k=i%per,m=Math.min(per,n-row*per),sp=Math.min(1.6*c.a/m,Math.max(1.2*L,m>1?c.a/(m-1):0));const q=m>1?(k-(m-1)/2)/((m-1)/2):0;P.push([(k-(m-1)/2)*sp+(row%2?sp*.3:0)+(r()-.5)*2,-c.h*(rows===1?(m>2?.48+.18*(1-q*q):.56):.7-.4*row/(rows-1))+(r()-.5)*2])}
   const D=1.1*L,core=[0,-c.h*(c.limf===null?.5:.58)],th=i=>ang(c,P[i][0],c.lv[i].id),seg=i=>{const t=th(i),u=[Math.cos(t)*L/2,Math.sin(t)*L/2];return [[P[i][0]-u[0],P[i][1]-u[1]],[P[i][0]+u[0],P[i][1]+u[1]]]};
   const ok=(i,j)=>{const a=seg(i),b=seg(j);return Math.hypot(P[j][0]-P[i][0],P[j][1]-P[i][1])>=D-.4&&gbSegD(a[0],a[1],b[0],b[1])>=W+1.6};
   for(let it=0;it<90;it++){let moved=false;
