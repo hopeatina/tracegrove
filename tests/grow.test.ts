@@ -1458,6 +1458,44 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 240000);
 
+  it('wraps a pinned card’s proof lanes inside its panel: each chip on one line, each note within its row, nothing past the panel’s edge, pinned and with Max pointed at', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 1024]) {
+        const page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), width);
+        await page.waitForTimeout(2500);
+        // pin the leaf whose proof lane names the provider's sandbox key
+        const sid = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, growPaint })'), B = w.gw.B;
+          const x = w.gw.state.scenarios.find((q: { id: string; realKey: string | null }) => q.realKey && /STRIPE_/.test(q.realKey) && B.leaf[q.id] && !B.leaf[q.id].classList.contains('gone'));
+          w.gw.pinned = 's:' + x.id; w.growPaint(); return x.id as string;
+        });
+        const fit = () => page.evaluate(() => {
+          const out: string[] = [], lanes = Array.from(document.querySelectorAll('.gw-ln')).filter((e) => (e as HTMLElement).offsetParent !== null);
+          for (const ln of lanes) {
+            const pan = ln.closest('aside, .gb-tip, section')!.getBoundingClientRect();
+            for (const c of Array.from(ln.children)) { const r = c.getBoundingClientRect(); if (r.right > pan.right + .5 || r.left < pan.left - .5) out.push('"' + (c.textContent ?? '').slice(0, 30) + '" runs past its panel by ' + Math.round(Math.max(r.right - pan.right, pan.left - r.left))); }
+            for (const chip of Array.from(ln.querySelectorAll('.gw-chip'))) { const rg = document.createRange(); rg.selectNodeContents(chip); const lines = new Set(Array.from(rg.getClientRects()).filter((q) => q.width > .5).map((q) => Math.round(q.top))).size; if (lines !== 1) out.push('chip "' + chip.textContent + '" on ' + lines + ' lines'); }
+            for (const n of Array.from(ln.querySelectorAll('.note')) as HTMLElement[]) { if (n.scrollWidth > n.clientWidth) out.push('note "' + (n.textContent ?? '').slice(0, 30) + '" scrolls by ' + (n.scrollWidth - n.clientWidth)); if (n.getBoundingClientRect().right > pan.right + .5) out.push('note past the panel'); }
+          }
+          return { n: lanes.length, out, stripe: lanes.some((l) => /STRIPE_/.test(l.textContent ?? '')) };
+        });
+        const pinned = await fit();
+        expect(pinned.n, width + 'px ' + sid).toBeGreaterThan(0);
+        expect(pinned.stripe, width + 'px').toBe(true);
+        expect(pinned.out, width + 'px pinned').toEqual([]);
+        // and with Max pointed at while it is pinned
+        await page.getByTestId('grow-mode-max').hover();
+        await page.waitForTimeout(400);
+        const locked = await fit();
+        expect(locked.n, width + 'px').toBeGreaterThan(0);
+        expect(locked.out, width + 'px pinned, Max pointed at').toEqual([]);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   it('gives each leaf on a phone a target of 44 px, takes a tap to the nearest leaf, and closes its card with a Close of 44 px or a tap outside it', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
