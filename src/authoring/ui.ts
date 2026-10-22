@@ -35,6 +35,7 @@ import { runEnvDoctor } from '../environments/doctorCache.ts';
 import { SavedRunName } from './runReport.ts';
 import { configRunsRoot, isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+import { happenedIn } from './happened.ts';
 import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
 import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
 import { projectBenchmark } from './projectBenchmark.ts';
@@ -360,6 +361,19 @@ export async function startUi(options: { dir: string; branch?: string | null; po
           return send(400, { error: 'Select one named baseline and one named candidate.' });
         try { return send(200, compareSavedRuns(dir, pair.data)); }
         catch { return send(409, { error: 'Comparison unavailable. Re-check both retained evidence bundles; no recorded result is available for this comparison.' }); }
+      }
+      // What happened in one scenario's run, for the grow page's drawer: read only from the run's verified bundle under this
+      // folder's .tracegrove (or beside the grow's config in a subfolder), and only with the session token.
+      const happened = /^\/api\/runs\/([^/]+)\/happened$/.exec(url.pathname);
+      if (req.method === 'GET' && happened) {
+        if (req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
+        let name: string; try { name = decodeURIComponent(happened[1]!); } catch { return send(400, { error: 'bad run name' }); }
+        if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
+        let found: ReturnType<typeof happenedIn>;
+        try { found = happenedIn(root, name, url.searchParams.get('case') ?? ''); } catch { return send(404, { error: 'run not found' }); }
+        return found ? send(200, found) : send(404, { error: 'the run has no record of that flow' });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
