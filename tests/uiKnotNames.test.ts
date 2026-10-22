@@ -102,6 +102,84 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
+  it('are placed once over everything Max grows: asked, a mode pointed at, a mode picked, the mode chosen and a leaf pinned under Max’s preview leave every name, leader and pip, the viewBox and the wood where they were, and no name or leader touches a shoot, a ghost leaf, a count or a graft bud', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    // where every name sits (its anchor point and end, its leader, the pip on its boss and its row in the key), the viewBox and every limb
+    const where = () => {
+      const B = (0, eval)('gw').B, o: Record<string, string> = {};
+      for (const id of Object.keys(B.klbl)) {
+        const t = B.klbl[id] as SVGTextElement, g = t.parentNode as SVGGElement, boss = g.querySelector('.kpip:not(.key) circle')!, key = g.querySelector('.kpip.key circle')!;
+        o['name ' + id] = [t.getAttribute('x'), t.getAttribute('y'), t.getAttribute('text-anchor'), g.querySelector('.kld')!.getAttribute('d'), t.classList.contains('nofit'), boss.getAttribute('cx'), boss.getAttribute('cy'), key.getAttribute('cx'), key.getAttribute('cy')].join(' | ');
+      }
+      o.viewBox = B.svg.getAttribute('viewBox');
+      o.wood = (Array.from(B.svg.querySelectorAll('path.w')) as Array<SVGPathElement & { __pts?: unknown }>).filter((p) => p.__pts).map((p) => p.getAttribute('d')).join(' / ');
+      return o;
+    };
+    // until every motion the tree set going has ended and no leaf is still falling
+    const settled = (page: Awaited<ReturnType<typeof treePage>>['page']) => page.waitForFunction(() => document.getAnimations().every((a) => a.playState === 'finished' || a.effect?.getComputedTiming().endTime === Infinity) && !(0, eval)('gw').B.svg.querySelector('.gb-lf.cut'), undefined, { timeout: 30000 });
+    try {
+      for (const [file, width] of [['plotline-seats.jsonl', 1440], ['tracegrove-max.jsonl', 1440], ['tracegrove-max.jsonl', 390]] as const) {
+        const at = file + ' ' + width;
+        const asked = { ...folded(file), asked: true, modeBy: null, mode: 'min' as const };
+        const { page } = await treePage(browser, server.url, asked, width);
+        const seen: Record<string, Record<string, string>> = {};
+        seen.asked = await page.evaluate(where);
+        // Minimum pointed at, then picked
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); });
+        seen.pointed = await page.evaluate(where);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); });
+        await settled(page);
+        seen.picked = await page.evaluate(where);
+        // the choice recorded
+        const chosen = { ...asked, asked: false, modeBy: 'you' as const };
+        await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.picking = null; w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: chosen, v: growView(chosen as never) });
+        await settled(page);
+        seen.chosen = await page.evaluate(where);
+        // a leaf of the second journey pinned while Max is pointed at, its shoots, counts and graft buds there as ghosts
+        await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'), M = w.gw.M, list = M.leaves[w.gw.order[1]]; const x = list.find((q: { mode: string }) => q.mode === 'min') ?? list[0]; w.gw.pinned = 's:' + x.id; w.gw.preview = 'max'; w.growPaint(); });
+        await settled(page);
+        seen.pinned = await page.evaluate(where);
+        expect(Object.keys(seen.asked!).filter((k) => k.startsWith('name ')).length, at).toBeGreaterThan(4);
+        for (const k of ['pointed', 'picked', 'chosen', 'pinned']) {
+          const moved = Object.keys(seen.asked!).filter((n) => seen[k]![n] !== seen.asked![n]).map((n) => n + ': ' + seen.asked![n] + ' -> ' + seen[k]![n]);
+          expect(moved, at + ' ' + k).toEqual([]);
+        }
+        // and with all that Max grows shown, every name and leader keeps 2 px clear of it
+        const clear = await page.evaluate(() => {
+          const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out: string[] = [];
+          const vis = (e: Element) => e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && e.getBoundingClientRect().width > 0;
+          const marks = (Array.from(svg.querySelectorAll('.shf > path.tw, .shf > path.tipbud, .gb-lf.bud:not(.gone) .blade, .gb-lf.pv-add:not(.gone) .blade, .shtag .sbud, .gb-gr:not(.gone) .gsw')) as SVGGraphicsElement[]).filter(vis)
+            .map((e) => ({ e, r: e.getBoundingClientRect(), what: e.closest('.gb-gr') ? 'a graft bud' : e.closest('.shtag') ? 'a count' : e.closest('.gb-lf') ? 'a ghost leaf' : 'a shoot' }));
+          const kinds = new Set(marks.map((m) => m.what));
+          const scr = (el: SVGGraphicsElement, p: number[]) => { const m = el.getScreenCTM()!; return [m.a * p[0]! + m.c * p[1]! + m.e, m.b * p[0]! + m.d * p[1]! + m.f]; };
+          for (const id of Object.keys(B.klbl)) {
+            const t = B.klbl[id] as SVGTextElement, g = t.parentNode as SVGGElement, name = t.textContent;
+            if (!vis(t)) continue;
+            const r = t.getBoundingClientRect();
+            for (const m of marks) if (Math.min(r.right, m.r.right + 2) - Math.max(r.left, m.r.left - 2) > 0 && Math.min(r.bottom, m.r.bottom + 2) - Math.max(r.top, m.r.top - 2) > 0) out.push(name + ' touches ' + m.what);
+            // its leader, from the knot out: only its own knot's shoot may stand at its foot
+            const ld = g.querySelector('.kld') as SVGPathElement, v = (ld.getAttribute('d') || '').match(/-?[\d.]+/g)?.map(Number) || [];
+            if (v.length < 4) continue;
+            const A = scr(ld, [v[0]!, v[1]!]), R = scr(ld, [v[2]!, v[3]!]), len = Math.hypot(A[0]! - R[0]!, A[1]! - R[1]!);
+            const mine = new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u] && B.shoots[u].g).filter(Boolean));
+            const hit = new Set<string>();
+            for (let d = 0; d <= len; d += .5) {
+              const q = [R[0]! + (A[0]! - R[0]!) * d / len, R[1]! + (A[1]! - R[1]!) * d / len];
+              for (const m of marks) if (q[0]! > m.r.left && q[0]! < m.r.right && q[1]! > m.r.top && q[1]! < m.r.bottom && !(d < 6 && mine.has(m.e.closest('.budg')))) hit.add(m.what);
+            }
+            for (const h of hit) out.push(name + ': its leader runs into ' + h);
+          }
+          return { out, kinds: [...kinds].sort() };
+        });
+        // (Max's shoots and their ghost leaves are there to keep clear of)
+        expect(clear.kinds, at).toEqual(expect.arrayContaining(['a ghost leaf', 'a shoot']));
+        expect(clear.out, at).toEqual([]);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 240000);
+
   it('keeps every leader short and clear: off its own limb for good, and across no cushion, leaf, shoot, other limb, name or leader, tested against the shapes drawn', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });

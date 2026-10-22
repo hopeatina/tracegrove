@@ -1643,14 +1643,14 @@ const gbKnotTxt=(M,ids,lead,sh)=>{const u=M.U[lead]||{},n=ids.length,c=[[16,24],
 /* what a knot is, for who gets open ground first when it runs short: 0 where a journey starts, 1 an HTTP route, 2 a store or a
    job, 3 a helper file (a burl, its most important) */
 const gbKTier=(M,ids)=>Math.min(...ids.map(id=>{const u=M.U[id]||{},kd=String(u.unitKind||'');return M.J.some(j=>j.entry===id)?0:kd==='route'||u.layer==='api'?1:/job|table|store|queue|cron|worker/.test(kd)||u.layer==='jobs'||u.layer==='data'?2:3}));
-/* The names, placed once for the drawing (gbKnotNames), kept per whether Max's shoots are on it, the one thing a mode changes
-   that a name keeps clear of; a pip's number counts on from tree to tree, and every file in its knot answers to it */
+/* The names, placed once for the drawing (gbKnotNames) over everything Max grows on it, its shoots, their leaves and counts and
+   the graft buds, whether they show or not, so no mode, preview, pick, prune, pin or hover ever moves one: they only light or
+   fade a name where it stands; a pip's mark counts on from tree to tree, and every file in its knot answers to it */
 function gbPutNames(B,bud){const out={slot:new Map(),pip:new Map(),num:new Map()};let n=0;
  for(const run of B.kplace||[]){const r=run(bud,n);for(const [id,g] of r.slot)out.slot.set(id,g);for(const [id,q] of r.pip){out.pip.set(id,q);for(const u of q.ids)out.num.set(u,q.n)}n+=r.pip.size}return out}
 /* Set each name where it was placed and light it: every file is named at rest; while something is lit its own names show and
    the rest fade, each where it stands, and a pip and its row in the key go with its name */
-function gbPlaceNames(B){const s=gw.state,vis=s.modeBy?s.mode:s.asked&&gw.picking?gw.picking:null,bud=!vis||vis==='max';
- const P=B.knp=(B.kput=B.kput||{})[bud]||(B.kput[bud]=gbPutNames(B,bud));
+function gbPlaceNames(B){const P=B.knp=B.kput||(B.kput=gbPutNames(B,true));
  for(const id in B.klbl){const kl=B.klbl[id],g=P.slot.get(id),q=P.pip.get(id),at=g||q,show=!!(kl.__want||kl.__rest);kl.__fit=!!at;kl.__key=!!q;
   if(at&&kl.__at!==at){kl.__at=at;if(kl.__sh!==(at.sh||0)){kl.__sh=at.sh||0;const t=gbKnotTxt(gw.M,B.knot[id]?B.knot[id].__ids:[id],kl.__lead||id,kl.__sh);if(kl.textContent!==t)kl.textContent=t}kl.setAttribute('x',gbF(at.x));kl.setAttribute('y',gbF(at.yb));kl.setAttribute('text-anchor',at.anc);kl.__r=at.r;kl.__ld.setAttribute('d',g?'M'+g.pts.map(gbP).join(' L'):'');
    for(const el of [kl.__pip,kl.__kp])el.lastChild.textContent=q?String(q.n):'';
@@ -1851,6 +1851,19 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const budL=[];for(const r of B.graftR||[])if(r.tree===ti){cap(r.c,r.c,r.r+3,'shoot');if(r.many&&!r.dup&&r.n){const q=[r.c[0]+r.n[0]*9.5,r.c[1]+r.n[1]*9.5],hw=(String(r.many).length+1)*2.6+1.5,gr=[q[0]-hw,q[1]-5.5,q[0]+hw,q[1]+4.5];labs.push(gr);budL.push(gr)}}
  /* (a root's staked tag keeps a knot's name off itself and its stake by the margin any label does, gbKnotNames' clearL; its
     wider box is the room the tags keep from one another) */
+ /* Everything Max grows, as the box each takes up, whether it shows in this mode or not: a shoot, each of its leaves, a dormant
+    bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader never
+    runs into one, but for its own knot's shoot, which rises off the boss at the leader's foot; so a mode, a preview or a pin
+    only ever shows or fades them round names that stay where they are */
+ const obs=[],bbx=(ps,own)=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];obs.push({r,own})};
+ const turned=(c,th,a0,a1,b0,b1)=>{const t=[Math.cos(th),Math.sin(th)],n=[-t[1],t[0]];return [[a0,b0],[a1,b0],[a1,b1],[a0,b1]].map(([a,b])=>[c[0]+t[0]*a+n[0]*b,c[1]+t[1]*a+n[1]*b])};
+ for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6],[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid);
+  for(const q of g.slots){const sc=q[3]||1;bbx(turned([q[0],q[1]],q[2]*Math.PI/180,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid)}}
+ for(const g of rest)bbx(turned(g.base,Math.atan2(g.u[1],g.u[0]),-4.3,4.3,-2.4,2.4),g.kid);
+ for(const r of B.graftR||[])if(r.tree===ti){const t=r.t||[1,0];bbx(turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4),r.kid);if(r.many&&!r.dup&&r.n){const q=[r.c[0]+r.n[0]*9.5,r.c[1]+r.n[1]*9.5],hw=(String(r.many).length+1)*2.6+1.5;obs.push({r:[q[0]-hw,q[1]-5.5,q[0]+hw,q[1]+4.5],own:r.kid})}}
+ for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;bbx(turned([P.o[0]+sl[0],P.o[1]+sl[1]],(sl[2]||0)*Math.PI/180,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null)}}
+ const om=3.5/(V.hf||1),clearO=r=>!obs.some(o=>r[0]<o.r[2]+om&&r[2]>o.r[0]-om&&r[1]<o.r[3]+om&&r[3]>o.r[1]-om);
+ const intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=1.2){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs)if(p[0]>o.r[0]-.8&&p[0]<o.r[2]+.8&&p[1]>o.r[1]-.8&&p[1]<o.r[3]+.8&&!(o.own===id&&d<5))return true}return false};
  for(const l of L.rl||[]){if(l.box){labs.push(l.tb||l.box);continue}const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;labs.push([x0-2,l.y-L.fs,x0+w0+2,l.y+3])}
  for(const pid in T.lbl||{}){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;labs.push([a,l.y-29,a+l.w,l.y-29+l.hgt]);if(l.dir)lines.push([[l.ax+X,l.ay],[lx,l.y-29+l.hgt/2]])}
  for(const r of B.badgeR||[])labs.push(r);
@@ -1891,6 +1904,8 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
     /* the bud's foot sits on the end of the tie */
     const bd=budD(A,u,hw),r=bd.r,yb=bd.C[1]+.33*fs2;
     if(clearS(r,true)&&clearL(r,12)&&baseOK(r,yb)&&tieW(q,A)&&leadOK([A,[q[0]+u[0]*1.5,q[1]+u[1]*1.5]],g.kid,soft)){g.cntAt={x:bd.C[0],y:yb,anc:'middle',r,bud:bd.d,tie:[[q[0]+u[0]*1.2,q[1]+u[1]*1.2],A]};labs.push(r);bases.push([yb,r]);lines.push(g.cntAt.tie);break}}if(g.cntAt)break}if(g.cntAt)break}}
+ /* (a count, placed, is a box a name keeps clear of as it does a shoot's) */
+ for(const g of [...shoots,...rest])if(g.cntAt)obs.push({r:g.cntAt.r,own:g.kid});
  /* (the counts, and a graft bud's count, go with their shoots) */
  const cnt=[...shoots,...rest].filter(g=>g.cntAt),noBud=[labs.filter(r=>!budL.includes(r)&&!cnt.some(g=>g.cntAt.r===r)),lines.filter(l=>!cnt.some(g=>g.cntAt.tie===l)),[]],withBud=[labs.slice(),lines.slice(),bases.slice()];
  /* The names. A name sits beside its knot on a straight leader from the knot's rim, 8 to 74 long and never past 86 px on
@@ -1911,7 +1926,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
   for(const len of lens)for(const u of D16){const R0=rr(e,u),A=[e.p[0]+u[0]*(R0+len),e.p[1]+u[1]*(R0+len)],R=[e.p[0]+u[0]*(R0+1),e.p[1]+u[1]*(R0+1)];let anc,x0,yb;
    if(Math.abs(u[0])>.38){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
-   const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud))continue;const lh=leadHard(e,R,A,u,bud);if(!lh)continue;
+   const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud)||!clearO(r))continue;const lh=leadHard(e,R,A,u,bud);if(!lh||intoO(R,A,e.id))continue;
    const ang=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r,R,A,pts:[A,R],sc:len/k+14*ang+(anc==='middle'?5:0)+.8*(lh-1)/k})}
   out.sort((a,b)=>a.sc-b.sc);cands.set(key,out);return out};
  /* who gets open ground first when it runs short: where a journey starts, then its HTTP routes, then its stores and jobs,
@@ -1946,7 +1961,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    const cx=miss.reduce((a,e)=>a+e.p[0],0)/miss.length;
    const at=(x0,y0,cols)=>{const per=Math.ceil(rows.length/cols),cw0=[];rows.forEach((q,i)=>{const c=Math.floor(i/per);cw0[c]=Math.max(cw0[c]||0,q.w)});const out=[];let xc=x0;
     for(let c=0;c<cw0.length;c++){for(let i=c*per;i<Math.min(rows.length,(c+1)*per);i++){const yb=y0+(i-c*per+1)*rh-4*k;out.push({q:rows[i],x:xc,yb,r:[xc-1.5,yb-.78*fs-1.5,xc+rows[i].w+1.5,yb+.22*fs+1.5]})}xc+=cw0[c]+14*k}return out};
-   const fits=g=>g.every(o=>{const r=o.r,rI=[r[0]-8*k,r[1]-4*k,r[2]+8*k,r[3]+4*k];return clearS(rI,bud)&&clearL([r[0],r[1]-5*k,r[2],r[3]+5*k],14)});
+   const fits=g=>g.every(o=>{const r=o.r,rI=[r[0]-8*k,r[1]-4*k,r[2]+8*k,r[3]+4*k];return clearS(rI,bud)&&clearO(r)&&clearL([r[0],r[1]-5*k,r[2],r[3]+5*k],14)});
    let tb=[1e9,1e9,-1e9,-1e9];for(const c of caps)if(c.lb!=='r'&&(bud||c.tag!=='shoot'))for(const p of [c.a,c.b])tb=[Math.min(tb[0],p[0]-c.r),Math.min(tb[1],p[1]-c.r),Math.max(tb[2],p[0]+c.r),Math.max(tb[3],p[1]+c.r)];
    for(const c of cush)tb=[Math.min(tb[0],c.x0),Math.min(tb[1],...c.top.map(t=>t[1])),Math.max(tb[2],c.x1),tb[3]];
    let got=null;for(const [cols,out] of [[1,1],[2,1],[1,0],[2,0]]){const g0=at(0,0,cols),bw=Math.max(...g0.map(o=>o.r[2])),bh=Math.max(...g0.map(o=>o.r[3]))-Math.min(...g0.map(o=>o.r[1])),pl=[];
@@ -1955,7 +1970,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    /* (a row with no open ground for its whole name tries it shorter, as gbKnotTxt says it: a burl's "parts" go, then the
       file's name is cut, before the name would sit on the wood or a leaf) */
    if(!got){got=[];for(const q of rows){let o=null;for(let sh=0;sh<3&&!o;sh++){const w=sh?2*pr+gap+twOf(q.e,sh):q.w,pl=[];for(let y0=V.vy+4;y0<0;y0+=4*k)for(let x0=V.vx+6;x0+w<V.vx+V.W-6;x0+=6*k)pl.push([Math.hypot(x0-q.e.p[0],y0-q.e.p[1]),x0,y0]);pl.sort((a,b)=>a[0]-b[0]);
-     for(const [,x0,y0] of pl){const yb=y0+rh-4*k,c={q,sh,x:x0,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+w+1.5,yb+.22*fs+1.5]};if(clearS(c.r,bud)&&clearL(c.r,4)){o=c;break}}}if(o){got.push(o);labs.push(o.r)}}}
+     for(const [,x0,y0] of pl){const yb=y0+rh-4*k,c={q,sh,x:x0,yb,r:[x0-1.5,yb-.78*fs-1.5,x0+w+1.5,yb+.22*fs+1.5]};if(clearS(c.r,bud)&&clearO(c.r)&&clearL(c.r,4)){o=c;break}}}if(o){got.push(o);labs.push(o.r)}}}
    /* (the numbers count 1, 2, 3 … in the key's order, so a row left off leaves no gap) */
    got.forEach((o,i)=>{const r=o.r;labs.push(r);pip.set(o.q.e.id,{n:n0+i+1,sh:o.sh||0,x:o.x+2*pr+gap,yb:o.yb,anc:'start',r,cx:o.x+pr,cy:o.yb-.3*fs,ids:kIds(o.q.e)})})}
   return {slot:best.slot,pip}};
