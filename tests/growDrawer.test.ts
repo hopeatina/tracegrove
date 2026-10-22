@@ -349,6 +349,23 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
+  it('offers Write this flow on the card of a scenario no flow proves, beside why it is not tested yet, and only there', async () => {
+    const page = await open(`#grow/${none}`);
+    const card = page.locator('.gw-insw');
+    await expect(card.locator(`[data-dr="${none}"]`).textContent()).resolves.toBe('Why not tested yet ›');
+    const write = card.getByTestId('grow-card-write');
+    await expect(write.textContent()).resolves.toBe('Write this flow');
+    const claim = state.scenarios.find((x) => x.id === none)!.proves!;
+    await write.click();
+    await page.waitForFunction(() => document.activeElement?.id === 'intent');
+    expect(await page.evaluate(() => (document.getElementById('intent') as HTMLTextAreaElement).value)).toBe(claim.replaceAll('`', ''));
+    // a scenario a flow proves has none
+    await page.evaluate((id) => { location.hash = `#grow/${id}`; }, failed);
+    await page.locator(`.gw-insw [data-dr="${failed}"]`).waitFor();
+    await expect(page.locator('.gw-insw [data-testid="grow-card-write"]').count()).resolves.toBe(0);
+    await page.close();
+  });
+
   it('says the run holds no record of the flow the grow recorded, instead of reading the run’s only flow as that one', async () => {
     const page = await open();
     await page.evaluate((id) => { (0, eval)('gw').state.run[id].flow = 'billing.card-declined'; location.hash = `#grow/${id}/steps`; }, failed);
