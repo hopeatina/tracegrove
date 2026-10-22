@@ -68,7 +68,7 @@ export const BONSAI_CSS = String.raw`
 .gb .gb-gr{cursor:pointer;transition:opacity .3s}.gb .gb-gr.gone{display:none}.gb .gb-gr:focus{outline:none}
 .gb .gb-gr .gring{fill:color-mix(in srgb,var(--moss) 26%,var(--wood-lit));stroke:var(--graft);stroke-width:1.1}.gb .gb-gr .ghalo{fill:none;stroke:var(--wood-shade);stroke-width:2.2;opacity:.35}.gb .gb-gr.none .gring{stroke-dasharray:2 1.3}.gb .gb-gr.pass .gring{fill:color-mix(in srgb,var(--moss) 30%,var(--paper));stroke:var(--moss)}.gb .gb-gr.pass.warn .gring{stroke:var(--gold)}
 .gb .gb-gr.fail .gring{fill:color-mix(in srgb,var(--verm) 24%,var(--paper));stroke:var(--verm)}.gb .gb-gr.run .gring{fill:color-mix(in srgb,var(--gold) 30%,var(--paper));stroke:var(--gold)}
-.gb .gb-gr.pre .gring,.gb .gb-gr.pv-out .gring{stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none}.gb .gb-gr.pv-add .gring{fill:var(--moss);fill-opacity:.28;stroke:var(--moss);stroke-opacity:.6;stroke-dasharray:none}.gb .gb-gr.pv-add .ghalo{opacity:.12}.gb.dim .gb-gr.pv-add{opacity:1}
+.gb .gb-gr.pre .gring,.gb .gb-gr.pv-out .gring{stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none}.gb .gb-gr.pv-add{opacity:.5}.gb .gb-gr.pv-add .gring{fill:color-mix(in srgb,var(--moss) 40%,#fff);stroke:var(--moss);stroke-dasharray:1.6 1.1}.gb .gb-gr.pv-add .ghalo{opacity:.12}.gb.dim .gb-gr.pv-add{opacity:.5}
 .gb .gb-gr.hl .gring{stroke-width:1.7;filter:drop-shadow(0 0 1.5px var(--gold))}.gb .gb-gr:focus-visible .gring{stroke:var(--ink);stroke-width:1.8}.gb.dim .gb-gr:not(.hl):not(.pv-add){opacity:.35}
 .gb .budg.pre .shn,.gb .budg.pv-out .shn{opacity:.5}
 /* its legend swatch (gbGraftSw) */
@@ -96,7 +96,9 @@ export const BONSAI_CSS = String.raw`
    adds appears as a dashed ghost */
 .gb-lf.pv-out .blade,.gb-lf.pre .blade{fill:color-mix(in srgb,var(--ink3) 30%,var(--paper));stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none;stroke-width:.8}.gb-lf.pv-out .rib,.gb-lf.pre .rib{opacity:0}
 .gb-lf.pv-out .bb,.gb-lf.pre .bb,.gb-lf.pv-out .nec,.gb-lf.pre .nec{display:none}.gb-lf.pv-out .bn,.gb-lf.pre .bn{display:inline}.gb-lf.pv-out .nick,.gb-lf.pre .nick{display:inline}
-.gb-lf.pv-add .blade{fill:var(--moss);fill-opacity:.35;stroke:none}.gb-lf.pv-add .rib{opacity:0}
+.gb-lf.pv-add .blade{fill:var(--moss);fill-opacity:.3;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.5}.gb-lf.pv-add .rib{opacity:0}
+/* (a ghost is at half strength: a journey's leaf on its own, a part check with the ghost of its shoot) */
+.gb-lf.pv-add:not(.bud){opacity:.5}.gb .budg:not(.pv-add) .gb-lf.bud.pv-add{opacity:.5}
 /* a leaf being pruned falls with its twig, cut at the wood (gbPaint); the tick at its stalk has done its work */
 .gb-lf.cut .nick{display:none}.gb-lf.cut .hitc{display:none}.gb-lf.gone .gb-lfi{display:none}.gb-lf.gone .hitc{display:none}.gb-lf.bud.gone{display:none}
 .gb-lf.hl .gb-lfi,.gb-lf.sel .gb-lfi{filter:drop-shadow(0 0 1.8px var(--gold)) drop-shadow(0 0 .6px var(--gold))}.gb-lf.hl .blade{stroke-width:1.4}.gb-lf.sel .hitc{stroke:var(--gold);stroke-width:1.5;stroke-opacity:.6}
@@ -107,7 +109,7 @@ export const BONSAI_CSS = String.raw`
 @keyframes gbpulse{50%{transform:scale(1.2)}}
 .gb.dim .bud:not(.hl),.gb.dim .lbl:not(.hl),.gb.dim .bmore{opacity:.3}
 /* a previewed mode's ghosts are not part of what is pinned: they stay readable over the dimming */
-.gb.dim .gb-lf.bud.pv-add,.gb.dim .jg:not(.hl) .gb-lf.pv-add{opacity:1}
+.gb.dim .gb-lf.bud.pv-add{opacity:1}.gb.dim .jg:not(.hl) .gb-lf.pv-add{opacity:.5}
 /* one cut mark everywhere, asked, previewed or being pruned: a tick in neutral ink, never red (red is failed and broken) */
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
 /* where a shoot was cut: its cut face, flat and flush with the bark, a pale cream oval in a thin dark ring, no light or shade, so it
