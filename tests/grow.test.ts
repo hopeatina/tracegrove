@@ -2144,6 +2144,67 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
+  /** The wood a pad sits on, from the drawn page: each branch's girth where it leaves the trunk against the trunk's there, each
+   *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
+   *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
+  const ramify = () => {
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }> };
+    for (const T of L.trees) for (const b of T.br) { out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk); }
+    // a point and the arc length along a polyline, both ways
+    const acc = (p: number[][]) => p.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), a), []);
+    const proj = (p: number[][], q: number[]) => { const A = acc(p); let best = Infinity, s = 0; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, vx = c[0]! - a[0]!, vy = c[1]! - a[1]!, l = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q[0]! - a[0]!) * vx + (q[1]! - a[1]!) * vy) / l)), d = Math.hypot(q[0]! - a[0]! - vx * t, q[1]! - a[1]! - vy * t); if (d < best) { best = d; s = A[i - 1]! + t * Math.sqrt(l); } } return s; };
+    const at = (A: number[], s: number, v: number[]) => { let i = 1; while (i < A.length - 1 && A[i]! < s) i++; const t = Math.max(0, Math.min(1, (s - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))); return v[i - 1]! + (v[i]! - v[i - 1]!) * t; };
+    for (const e of Array.from(svg.querySelectorAll('path.w')) as any[]) {
+      if (!e.__par || !e.__pw || getComputedStyle(e).display === 'none') continue;
+      const pts: number[][] = e.__pts, wd: number[] = e.__w, b = wd[0]!, pp: number[][] = e.__par, Tk: number = e.__pw[e.__pk], A = acc(pts), half = at(A, Tk / 2, wd) / 2, sk = acc(pp)[e.__pk]!;
+      const fills = (e.__on as Element[]).filter((f) => f.tagName === 'path' && f.isConnected && !f.closest('clipPath') && !f.classList.contains('filsh'));
+      const along = fills.map((f) => { const n = (f.getAttribute('d')!.match(/-?[\d.]+/g) ?? []).map(Number), a = [n[0]!, n[1]!], c = [n[4]!, n[5]!]; return [(Math.abs(proj(pp, a) - sk) - half) / b, (proj(pts, c) - Tk / 2) / b]; }).flat();
+      out.fillets.push({ id: e.getAttribute('class') + ' ' + Math.round(pts[0]![0]!) + ',' + Math.round(pts[0]![1]!), along });
+    }
+    // every cushion as drawn, its lowest edge and its span; every twig as drawn, sampled every half pixel
+    const fills = Array.from(svg.querySelectorAll('.jg .pfill')).filter((f) => f.getBoundingClientRect().width > 0 && getComputedStyle(f.closest('.cush') ?? f).display !== 'none') as SVGGeometryElement[];
+    const pt = svg.createSVGPoint(), inFill = (x: number, y: number) => fills.some((f) => { const m = f.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return f.isPointInFill(pt); });
+    const twigs = (Array.from(svg.querySelectorAll('path.tw')) as any[]).filter((t) => t.__pts && t.getBoundingClientRect().width > 0).map((t) => { const p: number[][] = t.__pts, s: number[][] = []; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, n = Math.max(1, Math.ceil(Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) * 2)); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); } return s; });
+    for (const pid in B.pad) {
+      const P = B.pad[pid]; if (getComputedStyle(P.jg).display === 'none') continue;
+      P.cu.forEach((c: any, k: number) => {
+        const f = c.el.querySelector('.pfill') as SVGGraphicsElement; if (!f || f.getBoundingClientRect().width === 0 || getComputedStyle(c.el).display === 'none') return;
+        const bb = f.getBBox(), m = svg.getScreenCTM()!.inverse().multiply(f.getScreenCTM()!), p0 = new DOMPoint(bb.x, bb.y).matrixTransform(m), p1 = new DOMPoint(bb.x + bb.width, bb.y + bb.height).matrixTransform(m);
+        const n = twigs.filter((s) => s.some((q) => q[0]! > p0.x && q[0]! < p1.x && q[1]! >= p1.y + 4 && q[1]! <= p1.y + 8 && !inFill(q[0]!, q[1]!))).length;
+        out.cushions.push({ pid, k, n });
+      });
+    }
+    return out;
+  };
+
+  it('grows each branch about four tenths of its trunk, filleted into it, onto ramified wood: two or more forked twigs under every cushion, showing below its underside', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 1440);
+        await page.waitForTimeout(2500);
+        const r = await page.evaluate(ramify);
+        // a branch leaves at about four tenths of the trunk's girth there, as drawn: never under .36 or over .45 of it
+        expect(r.branches.length, name).toBeGreaterThan(0);
+        for (const q of r.branches) { expect(q, name + ' branch/trunk').toBeGreaterThanOrEqual(.36); expect(q, name + ' branch/trunk').toBeLessThanOrEqual(.45); }
+        // and tapers to about .15 of it in its pad
+        for (const q of r.ends) { expect(q, name + ' branch end/trunk').toBeGreaterThanOrEqual(.12); expect(q, name + ' branch end/trunk').toBeLessThanOrEqual(.18); }
+        // each limb's two fillets are round its collar with a radius of about 1.2 of its base girth, on the parent and on itself
+        // (read back off the drawn outline, so to within an eighth where the parent bends)
+        expect(r.fillets.length, name).toBeGreaterThan(1);
+        for (const f of r.fillets) {
+          expect(f.along.length, name + ' ' + f.id).toBe(4);
+          for (const v of f.along) { expect(v, name + ' fillet ' + f.id).toBeGreaterThanOrEqual(1.05); expect(v, name + ' fillet ' + f.id).toBeLessThanOrEqual(1.35); }
+        }
+        // under every cushion at least two twigs show, four to eight pixels below its lowest edge, clear of every cushion
+        expect(r.cushions.length, name).toBeGreaterThan(2);
+        for (const c of r.cushions) expect(c.n, name + ' twigs under ' + c.pid + ' cushion ' + c.k).toBeGreaterThanOrEqual(2);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   /** The tree's own clocks, read off the motion it set going: when each piece of wood, leaf, cushion, name, shoot and graft
    *  bud first shows, against when the wood that carries it is there. */
   /** Every animation the page's own code starts, kept by its target: what a piece did is still there to read once it is over. */
@@ -2666,7 +2727,7 @@ describe('Grow page', () => {
 
   /** Every branch and branchlet that carries a cushion ends inside it, its round end too, as the cushions stand. */
   const ends = () => {
-    const B = (0, eval)('gw').B, out = { n: 0, bad: [] as string[] };
+    const B = (0, eval)('gw').B, out = { n: 0, forks: 0, off: 0, bad: [] as string[] };
     const chk = (P: any, pid: string, p: number[][], w: number, what: string) => {
       const n = p.length - 1, e = p[n]!, q = p[Math.max(0, n - 2)]!, m = Math.hypot(e[0]! - q[0]!, e[1]! - q[1]!) || 1, t = [(e[0]! - q[0]!) / m, (e[1]! - q[1]!) / m], nr = [-t[1]!, t[0]!], r = w / 2;
       const at = [e, [e[0]! + t[0]! * r, e[1]! + t[1]! * r], [e[0]! + nr[0]! * r, e[1]! + nr[1]! * r], [e[0]! - nr[0]! * r, e[1]! - nr[1]! * r]];
@@ -2676,6 +2737,14 @@ describe('Grow page', () => {
     for (const pid in B.pad) {
       const P = B.pad[pid]; if (P.jg.classList.contains('pruned') || getComputedStyle(P.jg).display === 'none') continue;
       if (P.rt.br) chk(P, pid, P.rt.br, P.b.w[P.b.w.length - 1], 'branch');
+      // the twigs a cushion is lifted on end inside it, and go with it when a mode keeps none of its leaves
+      for (const e of Array.from(P.jg.querySelectorAll('path.tw.fk')) as any[]) {
+        const gone = P.cu[e.__k].el.classList.contains('off');
+        out.forks++; if (gone) out.off++;
+        if (gone !== e.classList.contains('off')) out.bad.push(pid + ' cushion ' + e.__k + (gone ? ' gone, its twig left standing' : ' kept, its twig gone'));
+        else if (gone && ((e.__also ?? []) as Element[]).some((x) => x.isConnected)) out.bad.push(pid + ' cushion ' + e.__k + ' gone, its twig\'s bark left standing');
+        else if (!gone) chk(P, pid, e.__pts, 1, 'twig');
+      }
       const done = new Set<unknown>(); for (const id in P.rt.lt) { const c = P.rt.lt[id].c; if (c && !done.has(c.pts[0] + '')) { done.add(c.pts[0] + ''); chk(P, pid, c.pts, 2.4, 'branchlet'); } }
     }
     return out;
@@ -2687,7 +2756,7 @@ describe('Grow page', () => {
     const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
-      let seen = 0;
+      let seen = 0, forksOff = 0;
       for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
         for (const mode of ['max', 'min'] as const) {
           const page = await treePage(browser, server.url, { ...state, asked: false, modeBy: 'you', mode }, { width, scheme, reduce: true, height: 2400 });
@@ -2696,14 +2765,17 @@ describe('Grow page', () => {
             const e = await page.evaluate(ends), at = width + 'px ' + mode + ' preview ' + pv;
             expect(e.bad, at).toEqual([]);
             expect(e.n, at).toBeGreaterThan(1);
-            // the cushion is opaque to its foot: along each branch where it runs inside its cushion, the page shows foliage,
-            // never the bark seen through it
+            expect(e.forks, at).toBeGreaterThan(1);
+            forksOff += e.off;
+            // the cushion is opaque to its foot: along each branch, and each twig it lifts the cushion on, where it runs inside
+            // its cushion, the page shows foliage, never the bark seen through it
             const spots = await page.evaluate(() => {
               const B = (0, eval)('gw').B, M = B.svg.getScreenCTM(), out: number[][] = [];
               const leaves = (Array.from(B.svg.querySelectorAll('.gb-lf, .gb-gr, .ptag, .lbl, text')) as Element[]).map((e) => e.getBoundingClientRect()).filter((r) => r.width);
               for (const pid in B.pad) {
                 const P = B.pad[pid]; if (!P.rt.br || P.jg.classList.contains('pruned') || getComputedStyle(P.jg).display === 'none') continue;
-                const br = P.rt.br as number[][], along = br.flatMap((a, i) => (i ? [0.25, 0.5, 0.75, 1].map((f) => [br[i - 1]![0]! + (a[0]! - br[i - 1]![0]!) * f, br[i - 1]![1]! + (a[1]! - br[i - 1]![1]!) * f]) : [a]));
+                const tws = (Array.from(P.jg.querySelectorAll('path.tw')) as any[]).filter((t) => t.__pts && getComputedStyle(t).display !== 'none' && getComputedStyle(t).opacity !== '0').map((t) => t.__pts as number[][]);
+                const along = [P.rt.br as number[][], ...tws].flatMap((br) => br.flatMap((a, i) => (i ? [0.25, 0.5, 0.75, 1].map((f) => [br[i - 1]![0]! + (a[0]! - br[i - 1]![0]!) * f, br[i - 1]![1]! + (a[1]! - br[i - 1]![1]!) * f]) : [a])));
                 for (const p of along) {
                   if (![[0, 0], [2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]].every(([dx, dy]) => P.mk.isPointInFill(new DOMPoint(p[0]! + dx!, p[1]! + dy!)))) continue;
                   const x = M.a * p[0]! + M.c * p[1]! + M.e, y = M.b * p[0]! + M.d * p[1]! + M.f;
@@ -2721,6 +2793,7 @@ describe('Grow page', () => {
         }
       }
       expect(seen).toBeGreaterThan(40);
+      expect(forksOff).toBeGreaterThan(0);
     } finally { await browser.close(); }
   }, 120000);
 
