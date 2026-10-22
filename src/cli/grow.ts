@@ -73,5 +73,5 @@ export async function growCommand(flags: GrowFlags, write: (text: string) => voi
   const verdict = growVerdict(s, { ...allow, broke: flags.json || flags.jsonl ? null : verdictFacts(s, dir) });
   // The same verdict the page shows, as its last line.
   if (!flags.json && !flags.jsonl) write(`${verdict.line}\n`);
-  return { code: verdict.exitCode, state: s, events: result.events, log, ...(flags.json ? { summary: growJsonSummary(s, dir, allow) } : {}) };
+  return { code: verdict.exitCode, state: s, events: result.events, log, ...(flags.json ? { summary: growJsonSummary(s, dir, { ...allow, mode }) } : {}) };
 }

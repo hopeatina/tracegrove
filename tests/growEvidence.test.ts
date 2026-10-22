@@ -334,8 +334,8 @@ describe('grow --json and the exit code', () => {
     const dir = notesCount(true);
     const { code, state, summary } = await growCommand({ ...flags(dir), json: true }, () => {});
     expect(code).toBe(1);
-    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven']);
-    expect(summary).toMatchObject({ verdict: 'not ready', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum', counts: { passed: 1, failed: 1, notTestedYet: 0 }, promises: { hold: 1, of: 3 }, unproven: [] });
+    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven', 'stopped']);
+    expect(summary).toMatchObject({ verdict: 'not ready', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum', counts: { passed: 1, failed: 1, notTestedYet: 0 }, promises: { hold: 1, of: 3 }, unproven: [], stopped: null });
     const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
     const f = summary!.failures[0]!;
     expect(summary!.failures).toHaveLength(1);
@@ -433,6 +433,23 @@ describe('grow --json and the exit code', () => {
     const reasons = growVerdict(old).unproven.map((x) => x.reason);
     expect(reasons).toContain('Run grow without --no-prove to run browser.grow');
     expect(reasons.filter((x) => x.includes('--prove ') || x.startsWith('Run with'))).toEqual([]);
+  }, 60_000);
+
+  it('says why a grow stopped and what to do, and the mode asked for, so an agent can act on the summary alone', async () => {
+    const dir = notesCount(false);
+    const { code, summary } = await growCommand({ ...flags(dir), branch: 'main', mode: 'max', json: true }, () => {});
+    expect(code).toBe(2);
+    expect(summary).toMatchObject({ verdict: 'stopped', exitCode: 2, exitMeaning: 'blocked', mode: 'Max', failures: [], unproven: [] });
+    expect(summary!.stopped).toEqual({ code: expect.any(String), detail: expect.any(String), action: expect.any(String) });
+    // Stopped before choosing, with no mode asked for, it names none.
+    const early = plotline((e) => (e.kind === 'mode.chosen' || e.kind === 'discovery.finished' || e.kind.startsWith('scenario.') && e.kind !== 'scenario.drafted' ? [] : [e]));
+    stop(early, 'no_changes');
+    const none = growJsonSummary(early, dir);
+    expect(none).toMatchObject({ verdict: 'stopped', mode: null, stopped: { code: 'no_changes', detail: 'stopped', action: 'start it again' } });
+    expect(growJsonSummary(early, dir, { mode: 'std' }).mode).toBe('Standard');
+    // Once it chose, the mode it chose.
+    const chosen = plotline(); stop(chosen, 'git_unavailable');
+    expect(growJsonSummary(chosen, dir, { mode: 'max' }).mode).toBe('Minimum');
   }, 60_000);
 
   it('still exits 1 for a failed check with --allow-unproven, and takes the flag from the command line', () => {

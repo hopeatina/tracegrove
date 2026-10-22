@@ -275,7 +275,8 @@ export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke
   const promise = (x: GrowScenario) => (x.criteria.length ? x.criteria.join(', ') : null);
   const first = failed[0];
   const reasonOf = (x: GrowScenario) => { const r = s.run[x.id]; return r?.st === 'not_run' ? r.why ?? 'No reason was recorded' : r?.st === 'run' ? 'It was still running when the grow stopped' : 'No result was recorded'; };
-  const mode = MODES.find((m) => m.id === s.mode)!.label;
+  // The mode the grow chose; none yet (null) when it stopped before choosing.
+  const mode = s.modeBy ? MODES.find((m) => m.id === s.mode)!.label : null;
   const n = inRun.length, scen = (k: number) => `${k} scenario${k === 1 ? '' : 's'}`;
   const promiseWords = (p: string | null) => (p ? ` (promise${p.includes(',') ? 's' : ''} ${p})` : '');
   // A failure is named by the promise its scenario makes, then how it broke: "“Removing a seat never charges the card” failed:

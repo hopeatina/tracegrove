@@ -8,7 +8,7 @@ import { dirname, join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { expGot } from './checkCompare.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
-import { growVerdict, growView, inMode, plainTitle, type GrowState, type RunState, type VerdictFacts } from './growState.ts';
+import { MODES, growVerdict, growView, inMode, plainTitle, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
 import { savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
 
@@ -18,9 +18,13 @@ export type GrowFailure = {
   saved: boolean; step: number | null; check: string | null; expected: unknown; got: unknown; says: string; evidence: string[];
 };
 export type GrowJsonSummary = {
-  verdict: string; exitCode: number; exitMeaning: string; mode: string;
+  verdict: string; exitCode: number; exitMeaning: string;
+  /** the mode the grow chose; before it chose, the one asked for with --mode; else null */
+  mode: string | null;
   counts: { passed: number; failed: number; notTestedYet: number }; promises: { hold: number; of: number };
   failures: GrowFailure[]; unproven: Array<{ scenario: string; title: string; reason: string }>;
+  /** why a grow stopped, and what to do: null unless it stopped or was cancelled */
+  stopped: { code: string; detail: string; action: string } | null;
 };
 
 /** A failure in the grow's own words, when its run recorded no check to read: where it broke and its message, then the route. */
@@ -87,12 +91,13 @@ export function verdictFacts(s: GrowState, dir: string, cache?: Map<string, Verd
 export const growViewAt = (s: GrowState, dir: string, cache?: Map<string, VerdictFacts>) => growView(s, verdictFacts(s, dir, cache));
 
 /** The summary `grow --json` prints beside the log and the state. */
-export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven?: boolean } = {}): GrowJsonSummary {
+export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven?: boolean; mode?: Mode | null } = {}): GrowJsonSummary {
   const read = s.scenarios.filter((x) => inMode(s, x) && s.run[x.id]?.st === 'fail').map((x) => readFailure(s, dir, x.id));
   const v = growVerdict(s, { ...opts, broke: read[0] ? factsOf(read[0]) : null });
   return {
-    verdict: v.verdict, exitCode: v.exitCode, exitMeaning: v.exitMeaning, mode: v.mode, counts: v.counts, promises: v.promises,
+    verdict: v.verdict, exitCode: v.exitCode, exitMeaning: v.exitMeaning, mode: v.mode ?? MODES.find((m) => m.id === opts.mode)?.label ?? null, counts: v.counts, promises: v.promises,
     failures: read.map((f) => f.failure),
     unproven: v.unproven,
+    stopped: s.blocked ? { code: s.blocked.code, detail: s.blocked.detail, action: s.blocked.action } : null,
   };
 }
