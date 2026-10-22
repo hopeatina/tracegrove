@@ -844,4 +844,175 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 120000);
+
+  /** A grow folded from a recorded discovery log: plotline-billing (two journeys, one scenario failed, Minimum) and tracegrove
+   *  itself (two journeys through twelve parts, Max, nothing run yet). */
+  const folded = (name: string) => {
+    const s = freshGrow();
+    for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', name), 'utf8').split('\n')) if (line.trim()) applyGrow(s, JSON.parse(line) as GrowEvent);
+    return s;
+  };
+  const recorded = [['plotline-seats.jsonl', 'plotline'], ['tracegrove-max.jsonl', 'tracegrove']] as const;
+
+  it('names every hop of a lit leaf’s route, reached or not, at every width, and leads a burl with the hop the leaf exercises', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const state = folded(file);
+        for (const width of [1440, 768, 390]) {
+          const page = await growPage(browser, server.url, state, width, width < 500);
+          await page.waitForTimeout(2500);
+          const seen = await page.evaluate(() => {
+            const w = (0, eval)('({ gw, gbLight })'), B = w.gw.B, S = w.gw.state;
+            const unit = (id: string) => S.units.find((u: { id: string }) => u.id === id);
+            // a name cut short to fit still starts the way the file's name does
+            const says = (text: string, label: string) => text.startsWith(label) || (text.includes('…') && label.startsWith(text.slice(0, text.indexOf('…'))));
+            const svg = B.svg.getBoundingClientRect(), out: string[] = [];
+            let leaves = 0;
+            for (const id of Object.keys(B.leaf)) {
+              const leaf = B.leaf[id] as SVGElement;
+              if (leaf.classList.contains('gone') || !leaf.getBoundingClientRect().width) continue;
+              const x = S.scenarios.find((q: { id: string }) => q.id === id), j = S.journeys.find((q: { id: string }) => q.id === x.journey);
+              if (!j) continue;
+              leaves++;
+              w.gw.hov = 's:' + id; w.gbLight();
+              for (const u of j.units as string[]) {
+                const part = unit(u);
+                if (part.root) { const t = B.root[u] && B.root[u].querySelector('.rlbl'); if (!t || !t.getBoundingClientRect().width) out.push(id + ': no name for ' + part.label); continue; }
+                const k = Object.keys(B.klbl).find((q) => B.knot[q] && B.knot[q].__ids.includes(u)), t = k ? B.klbl[k] as SVGTextElement : null;
+                const r = t && t.classList.contains('on') ? t.getBoundingClientRect() : null;
+                if (!t || !r || !r.width) { out.push(id + ': no name for ' + part.label); continue; }
+                if (r.left < svg.left - .5 || r.right > svg.right + .5 || r.top < svg.top - .5 || r.bottom > svg.bottom + .5) out.push(id + ': ' + part.label + ' cut off by the edge');
+                if (!says(t.textContent ?? '', B.knot[k!].__ids.length > 1 && u !== x.unit ? (t.textContent ?? '') : part.label)) out.push(id + ': ' + part.label + ' named "' + t.textContent + '"');
+              }
+              // the names on the route never sit on one another
+              const all = Object.values(B.klbl).filter((t) => (t as SVGElement).classList.contains('on')).map((t) => (t as SVGElement).getBoundingClientRect());
+              for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) {
+                const p = all[a]!, q = all[b]!;
+                if (Math.min(p.right, q.right) - Math.max(p.left, q.left) > .5 && Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top) > .5) out.push(id + ': two names overlap');
+              }
+            }
+            w.gw.hov = null; w.gbLight();
+            return { leaves, out };
+          });
+          expect(seen.leaves, name + ' ' + width).toBeGreaterThan(3);
+          expect(seen.out, name + ' ' + width).toEqual([]);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 180000);
+
+  it('sets each card by what it explains, never over a name or with a hairline across one, and has the card and the tree agree on what a leaf runs', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) {
+        const state = folded(file);
+        for (const width of [1440, 768]) {
+          const page = await growPage(browser, server.url, state, width);
+          await page.waitForTimeout(2500);
+          const ins = page.getByTestId('grow-inspector'), inspector = await ins.count() ? await ins.textContent() : null;
+          const seen = await page.evaluate(() => {
+            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, S = w.gw.state, out: string[] = [];
+            const m = (B.svg as SVGSVGElement).getScreenCTM()!, px = (p: number[]) => [m.a * p[0]! + m.c * p[1]! + m.e, m.b * p[0]! + m.d * p[1]! + m.f];
+            // does the segment a-b pass through the box r (Liang-Barsky)?
+            const cross = (a: number[], b: number[], r: DOMRect) => {
+              let t0 = 0, t1 = 1; const dx = b[0]! - a[0]!, dy = b[1]! - a[1]!;
+              for (const [p, q] of [[-dx, a[0]! - r.left], [dx, r.right - a[0]!], [-dy, a[1]! - r.top], [dy, r.bottom - a[1]!]] as const) {
+                if (p === 0) { if (q < 0) return false; continue; }
+                const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+              }
+              return t1 - t0 > .02;
+            };
+            const things: Array<[string, Element]> = [];
+            for (const id of Object.keys(B.leaf)) if (!B.leaf[id].classList.contains('gone') && B.leaf[id].getBoundingClientRect().width) things.push(['s:' + id, B.leaf[id]]);
+            for (const id of Object.keys(B.root)) things.push(['u:' + id, B.root[id]]);
+            for (const k of Object.keys(B.klbl)) if (B.knot[k]) things.push(['u:' + B.knot[k].__ids[0], B.knot[k]]);
+            let cards = 0;
+            for (const [k, el] of things) {
+              w.gbHover(k, el);
+              const tip = B.tip as HTMLElement;
+              if (tip.hidden) { out.push(k + ': no card'); continue; }
+              cards++;
+              if (tip.classList.contains('dock') || !tip.parentElement!.contains(B.svg)) out.push(k + ': card not over the tree');
+              const c = tip.getBoundingClientRect(), d = B.lead.getAttribute('d') || '';
+              const lead = (d.match(/-?[\d.]+/g) || []).map(Number).reduce((a: number[][], v: number, i: number) => { if (i % 2) a[a.length - 1]!.push(v); else a.push([v]); return a; }, []).map(px);
+              const names = [...Object.values(B.klbl) as Element[]].filter((t) => t.classList.contains('on')).concat(Array.from(B.svg.querySelectorAll('.rlbl') as NodeListOf<Element>)).map((t) => [t, t.getBoundingClientRect()] as const).filter(([, r]) => r.width);
+              const kk = k.startsWith('u:') && B.knot[k.slice(2)] ? Object.keys(B.klbl).find((q) => B.knot[q] === B.knot[k.slice(2)]) : undefined, kl: Element | null = kk ? B.klbl[kk] : null;
+              for (const [t, r] of names) {
+                if (Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5) out.push(k + ': card covers ' + t.textContent);
+                for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
+              }
+              // a knot's card hangs off its name, so only one line runs to the knot: the name's own
+              if (kl && kl.classList.contains('on') && lead.length) {
+                const r = kl.getBoundingClientRect(), a = lead[0]!;
+                if (a[0]! < r.left - 3 || a[0]! > r.right + 3 || a[1]! < r.top - 3 || a[1]! > r.bottom + 3) out.push(k + ': second line to the knot');
+              }
+              // a root's card sits by where the root crosses the rim
+              const rr = k.startsWith('u:') && B.root[k.slice(2)] ? L.roots.find((q: { id: string }) => q.id === k.slice(2)) : null;
+              if (rr) {
+                const P0 = L.potC - L.potL / 2, P1 = L.potC + L.potL / 2, rim = px(rr.pts.find((p: number[]) => p[0]! < P0 || p[0]! > P1) || rr.pts[0]);
+                const dx = Math.max(c.left - rim[0]!, 0, rim[0]! - c.right), dy = Math.max(c.top - rim[1]!, 0, rim[1]! - c.bottom);
+                if (Math.hypot(dx, dy) > 90) out.push(k + ': card ' + Math.round(Math.hypot(dx, dy)) + 'px from its rim');
+              }
+            }
+            w.gbHover(null);
+            return { cards, out };
+          });
+          expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
+          expect(seen.out, name + ' ' + width).toEqual([]);
+          // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
+          if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
+          await page.close();
+        }
+      }
+      // A leaf that checks one hop of a journey says which, and the card and the tree both show the hops after it as never
+      // reached: muted in the card's path, grey dots and faint knots on the tree.
+      const state = folded('tracegrove-max.jsonl');
+      const page = await growPage(browser, server.url, state, 1440);
+      await page.waitForTimeout(2500);
+      const one = await page.evaluate(() => {
+        const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, S = w.gw.state;
+        const x = S.scenarios.find((q: { id: string; scenarioKind: string; journey: string | null; unit: string }) => B.leaf[q.id] && !B.leaf[q.id].classList.contains('gone') && q.scenarioKind !== 'happy' && q.journey && S.journeys.find((j: { id: string }) => j.id === q.journey).units.indexOf(q.unit) === 0);
+        const j = S.journeys.find((q: { id: string }) => q.id === x.journey);
+        w.gbHover('s:' + x.id, B.leaf[x.id]);
+        const tip = B.tip as HTMLElement, label = (id: string) => S.units.find((u: { id: string }) => u.id === id).label;
+        const faint = j.units.slice(1).filter((u: string) => !S.units.find((q: { id: string; root: boolean }) => q.id === u).root).map((u: string) => Object.keys(B.klbl).find((k) => B.knot[k] && B.knot[k].__ids.includes(u))).filter((k: string | undefined) => k && !B.knot[k].__ids.includes(x.unit));
+        const out = {
+          text: tip.textContent ?? '', want: 'Exercises ' + label(x.unit) + ' (hop 1 of ' + j.units.length + ')',
+          ink: Array.from(tip.querySelectorAll('.path .gw-hop.hit')).map((e) => e.textContent!.replace(/\s*›\s*$/, '')), muted: tip.querySelectorAll('.path .gw-hop.un').length, n: j.units.length,
+          first: label(x.unit), dots: (B.sapX.getAttribute('d') || '').length, faint: faint.length, unreached: faint.filter((k: string) => B.knot[k].classList.contains('unreached')).length,
+          opacity: faint.length ? getComputedStyle(B.knot[faint[0]]).opacity : '',
+        };
+        w.gbHover(null);
+        return out;
+      });
+      expect(one.text).toContain(one.want);
+      expect(one.ink).toEqual([one.first]);
+      expect(one.muted).toBe(one.n - 1);
+      expect(one.dots).toBeGreaterThan(0);
+      expect(one.faint).toBeGreaterThan(0);
+      expect(one.unreached).toBe(one.faint);
+      expect(Number(one.opacity)).toBeLessThanOrEqual(.45);
+      // At rest a tree of many parts still carries a few names.
+      const rest = await page.evaluate(() => document.querySelectorAll('[data-testid="grow"] .klbl.on').length);
+      expect(rest).toBeGreaterThanOrEqual(3);
+      // Never reached is drawn as small grey dots with no ring, the key's swatch the same; a cut is marked in neutral ink, never
+      // in the red that means failed.
+      const look = await page.evaluate(() => {
+        const w = (0, eval)('({ gw })'), B = w.gw.B, rgb = (c: string) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+        const dots = getComputedStyle(B.sapX), key = document.querySelector('[data-testid="grow"] .gw-legend path.rdots');
+        return { dash: dots.strokeDasharray, cap: dots.strokeLinecap, key: key ? getComputedStyle(key).strokeDasharray : null, cut: Array.from(B.svg.querySelectorAll('.cutmk, .cuttag, .gb-lf .nick') as NodeListOf<Element>).map((e) => rgb(getComputedStyle(e).stroke !== 'none' ? getComputedStyle(e).stroke : getComputedStyle(e).fill)) };
+      });
+      expect(look.dash.replace(/px/g, '').split(/[ ,]+/).map(Number)[0]).toBe(0);
+      expect(look.cap).toBe('round');
+      expect(look.key).not.toBeNull();
+      expect(look.key!.replace(/px/g, '').split(/[ ,]+/).map(Number)[0]).toBe(0);
+      expect(look.cut.length).toBeGreaterThan(0);
+      for (const [r, g, b] of look.cut) expect(Math.max(r!, g!, b!) - Math.min(r!, g!, b!), 'cut ink ' + [r, g, b]).toBeLessThan(30);
+      await page.close();
+    } finally { await browser.close(); }
+  }, 240000);
 });
