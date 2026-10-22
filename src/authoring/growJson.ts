@@ -8,7 +8,7 @@ import { dirname, join, relative } from 'node:path';
 import { readVerifiedBundle } from '../core/bundle.ts';
 import { expGot } from './checkCompare.ts';
 import { cellBundleName } from '../core/bundlePaths.ts';
-import { MODES, growVerdict, growView, inMode, plainTitle, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
+import { MODES, growVerdict, growView, inMode, plainTitle, failReason, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
 import { savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
 
@@ -27,13 +27,15 @@ export type GrowJsonSummary = {
   stopped: { code: string; detail: string; action: string } | null;
 };
 
-/** A failure in the grow's own words, when its run recorded no check to read: where it broke and its message, then the route. */
+/** A failure in the grow's own words, when its run recorded no check to read: where it broke and the first line of its
+ *  message, then the route. A stage in parentheses, such as "(app startup)", is where it broke, not a check. */
 export function brokeLine(r: RunState | undefined): string {
-  const why = String(r?.why ?? '').trim(); const i = why.indexOf(': ');
+  const { where, said } = failReason(r?.why);
   const dot = (t: string) => (/[.!?]$/.test(t) ? t : `${t}.`);
   const route = r?.hop ? ` On the route: ${r.after ? 'after' : 'at'} ${r.hop}.` : '';
-  if (!why) return `Failed, with no reason recorded.${route}`;
-  return (i <= 0 ? `Broke: ${dot(why)}` : `Broke at check “${why.slice(0, i)}”: ${dot(why.slice(i + 2))}`) + route;
+  if (!said) return `Failed, with no reason recorded.${route}`;
+  const stage = where && /^\(.+\)$/.test(where) ? where.slice(1, -1) : null;
+  return (!where ? `Broke: ${dot(said)}` : stage ? `Broke at ${stage}: ${dot(said)}` : `Broke at check “${where}”: ${dot(said)}`) + route;
 }
 
 /** One failure, from the run the grow recorded for it. A run that is gone, or never made, leaves its fields null. */

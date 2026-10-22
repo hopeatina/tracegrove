@@ -256,12 +256,19 @@ const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven 
 /** What the first failure's run recorded: the step that broke, and the check there with what it expected and got. Null
  *  fields were not recorded (the run is gone, or its evidence does not say). */
 export type VerdictFacts = { step: number | null; stepName: string | null; check: string | null; expected: unknown; got: unknown };
+/**
+ * A failed result's reason as a sentence can carry it: where it broke (the check, or a stage such as "(app startup)") and the
+ * first line of what it said, without a trailing "last app output:" whose lines were cut. A stack trace is never a reason.
+ */
+export function failReason(why: string | undefined): { where: string | null; said: string } {
+  const w = String(why ?? '').trim(); const i = w.indexOf(': ');
+  const said = (i > 0 ? w.slice(i + 2) : w).split('\n')[0]!.trim().replace(/;[^;]*:$/, '').trim();
+  return { where: i > 0 ? w.slice(0, i) : null, said };
+}
 /** How a failure broke, in words: what its check expected and got when the run recorded it, else the reason its result gave. */
 function howItBroke(r: RunState | undefined, broke: VerdictFacts | null | undefined): string | null {
   if (broke?.check) { const t = expGot({ check: broke.check, expected: broke.expected, got: broke.got }); return t.charAt(0).toLowerCase() + t.slice(1); }
-  const why = String(r?.why ?? '').trim(); const i = why.indexOf(': ');
-  const said = (i > 0 ? why.slice(i + 2) : why).split('\n')[0]!.trim();
-  return said || null;
+  return failReason(r?.why).said || null;
 }
 
 export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke?: VerdictFacts | null } = {}) {

@@ -324,6 +324,14 @@ describe('The verdict', () => {
     expect(summary.failures).toEqual([{ scenario: 's10', title: 'Removing a seat never charges the card', promise: 'C2', flow: 'seats.remove-seat', run: '2026-10-22T01-39-03Z_fail_504bf8', saved: false,
       step: null, check: null, expected: null, got: null, says: 'Broke at check “only the Team upgrade and the added seat were charged”: expected 2 calls, got 3. On the route: after POST /seats.', evidence: [] }]);
   });
+
+  it('says a run that could not start in one line, at its stage, never as a failed check or a stack trace', () => {
+    const why = "(app startup): application exited before becoming ready; last app output:\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:1)\n  code: 'ERR_MODULE_NOT_FOUND'";
+    const s = plotline((e) => { if (e.kind !== 'scenario.failed') return e; const { hop: _h, after: _a, ...rest } = e; return { ...rest, why }; });
+    const [f] = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-norun-'))).failures;
+    expect(f!.says).toBe('Broke at app startup: application exited before becoming ready.');
+    expect(growVerdict(s).text).toBe('“Removing a seat never charges the card” failed: application exited before becoming ready');
+  });
 });
 
 describe('grow --json and the exit code', () => {
