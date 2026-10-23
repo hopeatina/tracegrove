@@ -158,24 +158,24 @@ describe('the names on the bonsai’s knots', () => {
             if (!vis(t)) continue;
             const r = t.getBoundingClientRect();
             for (const m of marks) if (Math.min(r.right, m.r.right + 2) - Math.max(r.left, m.r.left - 2) > 0 && Math.min(r.bottom, m.r.bottom + 2) - Math.max(r.top, m.r.top - 2) > 0) out.push(name + ' touches ' + m.what);
-            // its leader, from the knot out: only its own knot's shoot may stand at its foot, and past its foot the leader may run
-            // beside that shoot, under its arc, but never into the shoot itself (it leaves the boss where the shoot rises, gbKnotNames)
+            // its leader, from the knot out, keeps 2 px clear of every mark's box as the name does: only its own knot's shoot may
+            // stand at its foot, its first 6 px, where it leaves the boss beside the shoot rising from it (gbKnotNames), and past
+            // its foot the leader keeps clear of that shoot's box too
             const ld = g.querySelector('.kld') as SVGPathElement, v = (ld.getAttribute('d') || '').match(/-?[\d.]+/g)?.map(Number) || [];
             if (v.length < 4) continue;
             const A = scr(ld, [v[0]!, v[1]!]), R = scr(ld, [v[2]!, v[3]!]), len = Math.hypot(A[0]! - R[0]!, A[1]! - R[1]!);
             const mine = new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u] && B.shoots[u].g).filter(Boolean));
-            const inShape = (el: SVGGraphicsElement, q: number[]) => { const m = el.getScreenCTM()!.inverse(); return (el as SVGGeometryElement).isPointInFill(new DOMPoint(m.a * q[0]! + m.c * q[1]! + m.e, m.b * q[0]! + m.d * q[1]! + m.f)); };
             const hit = new Set<string>();
             for (let d = 0; d <= len; d += .5) {
               const q = [R[0]! + (A[0]! - R[0]!) * d / len, R[1]! + (A[1]! - R[1]!) * d / len];
-              for (const m of marks) if (q[0]! > m.r.left && q[0]! < m.r.right && q[1]! > m.r.top && q[1]! < m.r.bottom && !(mine.has(m.e.closest('.budg')) && (d < 6 || !inShape(m.e, q)))) hit.add(m.what);
+              for (const m of marks) if (q[0]! > m.r.left - 2 && q[0]! < m.r.right + 2 && q[1]! > m.r.top - 2 && q[1]! < m.r.bottom + 2 && !(mine.has(m.e.closest('.budg')) && d < 6)) hit.add(m.what);
             }
             for (const h of hit) out.push(name + ': its leader runs into ' + h);
           }
           return { out, kinds: [...kinds].sort() };
         });
-        // (Max's shoots and their ghost leaves are there to keep clear of)
-        expect(clear.kinds, at).toEqual(expect.arrayContaining(['a ghost leaf', 'a shoot']));
+        // (Max's shoots, their ghost leaves, its counts and its graft buds are all there to keep clear of)
+        expect(clear.kinds, at).toEqual(expect.arrayContaining(['a count', 'a ghost leaf', 'a graft bud', 'a shoot']));
         expect(clear.out, at).toEqual([]);
         await page.close();
       }

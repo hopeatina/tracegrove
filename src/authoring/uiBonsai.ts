@@ -2256,25 +2256,25 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  /* (a root's staked tag keeps a knot's name off itself and its stake by the margin any label does, gbKnotNames' clearL; its
     wider box is the room the tags keep from one another) */
  /* Everything Max grows, as the box each takes up, whether it shows in this mode or not: a shoot, each of its leaves, a dormant
-    bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader never
-    runs into one, but for its own knot's shoot, which rises off the boss at the leader's foot; so a mode, a preview or a pin
-    only ever shows or fades them round names that stay where they are */
- const obs=[],aabb=ps=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];return r},bbx=(ps,own,inF)=>obs.push({r:aabb(ps),own,inF}),budB=[];
- const inTurned=(c,th,a0,a1,b0,b1)=>p=>{const t=[Math.cos(th),Math.sin(th)],dx=p[0]-c[0],dy=p[1]-c[1],a=dx*t[0]+dy*t[1],b=-dx*t[1]+dy*t[0];return a>a0-.8&&a<a1+.8&&b>b0-.8&&b<b1+.8};
+    bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader keeps
+    two px clear of the box each is drawn in (t, where the room kept round it is wider than that), but for its own knot's
+    shoot where it rises off the boss at the leader's foot; so a mode, a preview or a pin only ever shows or fades them round
+    names that stay where they are */
+ const obs=[],aabb=ps=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];return r},bbx=(ps,own,tq)=>obs.push({r:aabb(ps),own,t:tq?aabb(tq):null}),budB=[];
  const turned=(c,th,a0,a1,b0,b1)=>{const t=[Math.cos(th),Math.sin(th)],n=[-t[1],t[0]];return [[a0,b0],[a1,b0],[a1,b1],[a0,b1]].map(([a,b])=>[c[0]+t[0]*a+n[0]*b,c[1]+t[1]*a+n[1]*b])};
- for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid,p=>Math.hypot(p[0]-e[0],p[1]-e[1])<3.8||P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,()=>false);
-  for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,inTurned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc))}}
- for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid,p=>P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,()=>false)}
+ for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid);bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,[[P[0][0]-1.3,P[0][1]-1.3],[P[0][0]+1.3,P[0][1]+1.3]]);
+  for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,turned([q[0],q[1]],th,3.5*sc,14.5*sc,-2.65*sc,2.65*sc))}}
+ for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid);bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,[[P[0][0]-1.3,P[0][1]-1.3],[P[0][0]+1.3,P[0][1]+1.3]])}
  /* (a pip keeps as clear of where a shoot leaves its knot, and of the whole shoot up to its count, as of the count itself) */
  for(const g of [...shoots,...rest]){const P=g.pts||[];for(let i=1;i<P.length;i++)budB.push([Math.min(P[i-1][0],P[i][0])-1.3,Math.min(P[i-1][1],P[i][1])-1.3,Math.max(P[i-1][0],P[i][0])+1.3,Math.max(P[i-1][1],P[i][1])+1.3]);if(P.length)budB.push([P[0][0]-3.3,P[0][1]-2.6,P[0][0]+3.3,P[0][1]+2.6])}
- for(const r of B.graftR||[])if(r.tree===ti&&!r.under){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null);budB.push(aabb(sw));
+ for(const r of B.graftR||[])if(r.tree===ti&&!r.under){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null,turned(r.c,Math.atan2(t[1],t[0]),-r.r-.95,r.r+.95,-3.45,3.45));budB.push(aabb(sw));
   /* (a swelling's count is a mark on its crown, its box as a shoot's count's is) */
   if(r.cnt){obs.push({r:r.cnt.r,own:null,cnt:1});budB.push(r.cnt.r)}}
- for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;bbx(turned([P.o[0]+sl[0],P.o[1]+sl[1]],(sl[2]||0)*Math.PI/180,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null)}}
+ for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;const c=[P.o[0]+sl[0],P.o[1]+sl[1]],th=(sl[2]||0)*Math.PI/180;bbx(turned(c,th,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null,turned(c,th,-(g.L/2+.05)*sc,(g.L/2+.05)*sc,-(.47*g.W+.05)*sc,(.47*g.W+.05)*sc))}}
  const om=3.5/(V.hf||1),clearO=r=>!obs.some(o=>r[0]<o.r[2]+om&&r[2]>o.r[0]-om&&r[1]<o.r[3]+om&&r[3]>o.r[1]-om);
  /* (a leader keeps three pixels off the whole box of every count, its own knot's too: a count reads as a mark of its own, never
     as a bud strung on a name's line) */
- const fo=Math.min(5,4.8/(V.hf||1)),cm=Math.max(2.5,3/(V.hf||1)),intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=1.2){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs){const m=o.cnt?cm:.8;if(p[0]>o.r[0]-m&&p[0]<o.r[2]+m&&p[1]>o.r[1]-m&&p[1]<o.r[3]+m&&(o.cnt||!(o.own===id&&(d<fo||o.inF&&!o.inF(p)))))return true}}return false};
+ const fo=5.95/(V.hf||1),cm=Math.max(2.5,3/(V.hf||1)),mo=Math.max(.8,2.05/(V.hf||1)),intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=.5){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs){const m=o.cnt?cm:mo,b=o.t||o.r;if(p[0]>b[0]-m&&p[0]<b[2]+m&&p[1]>b[1]-m&&p[1]<b[3]+m&&(o.cnt||!(o.own===id&&d<fo)))return true}}return false};
  for(const l of L.rl||[]){if(l.box){labs.push(l.tb||l.box);continue}const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;labs.push([x0-2,l.y-L.fs,x0+w0+2,l.y+3])}
  for(const pid in T.lbl||{}){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;labs.push([a,l.y-29,a+l.w,l.y-29+l.hgt]);if(l.dir)lines.push([[l.ax+X,l.ay],[lx,l.y-29+l.hgt/2]])}
  for(const r of B.badgeR||[])labs.push(r);
@@ -2337,7 +2337,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
      the knot's own leaves the boss, the leader leaves it at least 25 degrees round from where that shoot's stalk does, turned
      off the normal the least way that is, so the two never share a foot */
   const st=[...shoots,...rest].filter(g=>g.pts&&g.pts.length&&kIds(e).includes(g.kid)).map(g=>{const q=g.pts.find(t=>Math.hypot(t[0]-e.p[0],t[1]-e.p[1])>=e.ra-.5)||g.pts[g.pts.length-1],m=Math.hypot(q[0]-e.p[0],q[1]-e.p[1])||1;return [(q[0]-e.p[0])/m,(q[1]-e.p[1])/m]});
-  for(const ph of st.length?[0,.61,-.61,.87,-.87,1.13,-1.13]:[0]){const v=[v0[0]*Math.cos(ph)-v0[1]*Math.sin(ph),v0[0]*Math.sin(ph)+v0[1]*Math.cos(ph)];if(st.some(t=>t[0]*v[0]+t[1]*v[1]>.891))continue;
+  for(const ph of st.length?[0,.61,-.61,.87,-.87,1.13,-1.13,1.39,-1.39]:[0]){const v=[v0[0]*Math.cos(ph)-v0[1]*Math.sin(ph),v0[0]*Math.sin(ph)+v0[1]*Math.cos(ph)];if(st.some(t=>t[0]*v[0]+t[1]*v[1]>.891))continue;
   const R=[e.p[0]+v[0]*e.ra,e.p[1]+v[1]*e.ra],S=[e.p[0]+v[0]*(e.rb-.4),e.p[1]+v[1]*(e.rb-.4)];
   /* (a leader near upright may carry its name beside its end or centred over it; a refusals' collar knot's may also leave it
      down and out, under the branch that grows from its boss) */
@@ -2390,8 +2390,13 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    let got=null;const gut=[[V.vx+6,tb[0]-10*k],[tb[2]+10*k,V.vx+V.W-6]].filter(q=>q[1]-q[0]>=bw).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]));
    for(const q of gut){const pl=[];for(let y0=V.vy+4;y0<0;y0+=5*k)for(let x0=q[0];x0+bw<=q[1];x0+=7*k)pl.push([Math.max(0,-(y0+bh))+.6*Math.min(x0-V.vx,V.vx+V.W-x0-bw),x0,y0]);pl.sort((a,b)=>a[0]-b[0]);
     for(const [,x0,y0] of pl){const g=at(x0,y0);if(fits(g)){got=g;break}}if(got)break}
-   /* (under the pot: below everything drawn there, its roots' names too, under the pot's middle and inside the drawing) */
-   if(!got){const y0=L.y1+4*k,x0=Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,L.potC-bw/2));got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
+   /* (under the pot: under its feet and the shadow it casts, as close under them as keeps clear of its roots and their
+      names (else below those names too), under the pot's middle or as near it as that takes, and inside the drawing, so the
+      drawing grows down no more than it must) */
+   if(!got){const xm=L.potC-bw/2,cx=x=>Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,x)),yT=L.D+(L.lone?7:(L.fh||5)+5)+2*k,y1=L.y1+4*k;let y0=y1,x0=cx(xm);
+    const okU=g=>g.every(o=>{const r=o.r;return !caps.some(c=>c.lb==='r'&&dSR(c.a,c.b,r)<c.r+4*k)&&clearL([r[0],r[1]-5*k,r[2],r[3]+5*k],14)});
+    out:for(let y=yT-(rh-4*k-.78*fs-1.5);y<y1;y+=k)for(let i=0;i<=24;i++){const x=cx(xm+(i%2?-1:1)*Math.ceil(i/2)*k);if(okU(at(x,y))){y0=y;x0=x;break out}}
+    got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
    /* a pip keeps 8px from a count bud, a graft bud or a shoot: it moves off the boss along the limb's normal as little as that
       takes, else (where shoots crowd the wood) the least distance any way round; always still on its wood, never adrift
       beside it, and never further in across its limb than the boss stands (where no such place keeps that clear, the one that
