@@ -2632,8 +2632,8 @@ describe('Grow page', () => {
         expect(g.counts.flatMap((c) => c.parts).filter((p) => rolled[p]).sort(), width + 'px').toEqual(Object.keys(rolled).sort());
         await page.close();
       }
-      // On the recorded trees in Max, every count shown is the tip of a shoot that grows from a knot's boss, or for a root's
-      // checks from the trunk above that root's flare: never from the soil, the root, bare trunk or the air, and never tied.
+      // On the recorded trees in Max, every count shown is the tip of a shoot that grows from its own knot's boss, or for a root's
+      // checks, and only those, from the trunk above that root's flare: never from the soil, the root, bare trunk or the air, and never tied.
       for (const [file, name] of recorded) for (const width of [1440, 390]) {
         const page = await growPage(browser, server.url, { ...folded(file), mode: 'max' }, width, width < 500);
         await page.waitForTimeout(2500);
@@ -2655,9 +2655,18 @@ describe('Grow page', () => {
             const end = P[P.length - 1]!, base = P[0]!;
             if (Math.hypot(m.e - end[0]!, m.f - end[1]!) >= 1) bad('count off its shoot’s tip', [g.kid, Math.round(Math.hypot(m.e - end[0]!, m.f - end[1]!))]);
             if (!(m.f < L.sy(m.e) - 24)) bad('count within 24 px of the soil', [g.kid, Math.round(L.sy(m.e) - m.f)]);
-            const atKnot = knots.some((k: any) => Math.hypot(base[0]! - k.p[0], base[1]! - k.p[1]) <= k.ra + 2);
-            const onTrunk = inTrunk(base) && base[1]! < L.sy(base[0]!) - 24;
-            if (!atKnot && !onTrunk) bad('shoot from neither a knot nor the trunk above the flare', [g.kid, base.map(Math.round)]);
+            // a knot's checks (or a loose part's, on the leader's knot it grows from) from that knot's own boss; a root's, and only a
+            // root's, from the trunk, and only above that root's flare: a caliper (the tree's T.D) or more over the soil
+            const r = B.root[g.kid] ? (L.roots as any[]).find((q) => q.id === g.kid) : null;
+            if (r) {
+              const T = L.trees[r.tree ?? 0];
+              if (!inTrunk(base)) bad('a root’s shoot off the trunk', [g.kid, base.map(Math.round)]);
+              if (!(base[1]! < L.sy(base[0]!) - T.D)) bad('a root’s shoot from its flare, under a caliper over the soil', [g.kid, Math.round(L.sy(base[0]!) - base[1]!), +T.D.toFixed(1)]);
+            } else {
+              const own = B.knot[g.kid]?.__geo ?? (g.boss && knots.find((k: any) => Math.hypot(k.p[0] - g.boss.p[0], k.p[1] - g.boss.p[1]) < 0.5));
+              if (!own) bad('shoot of no drawn knot', g.kid);
+              else if (Math.hypot(base[0]! - own.p[0], base[1]! - own.p[1]) > own.ra + 2) bad('shoot off its own knot’s boss', [g.kid, +(Math.hypot(base[0]! - own.p[0], base[1]! - own.p[1]) - own.ra).toFixed(1)]);
+            }
             // no more than 3 px of it under the trunk's bark
             let under = 0;
             for (let i = 1; i < P.length; i++) { const a = P[i - 1]!, b = P[i]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!), n = Math.max(1, Math.ceil(l / .25)); for (let k = 0; k < n; k++) { const f = (k + .5) / n; if (inTrunk([a[0]! + (b[0]! - a[0]!) * f, a[1]! + (b[1]! - a[1]!) * f])) under += l / n; } }
