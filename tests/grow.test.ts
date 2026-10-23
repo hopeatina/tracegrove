@@ -784,7 +784,13 @@ describe('Grow page', () => {
     const room = Number(svg.querySelector('.seal')?.getAttribute('data-room'));
     // the soil line, and where a store root that no journey uses lies against it
     const half = (T: { tp: number[][]; tw: number[] }) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -8) k++; return T.tw[k]! / 2; };
-    const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]) }));
+    const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]), half: L.potL / 2 }));
+    // each trunk's foot, where it shows above the soil and its roots: how far it flares one caliper up against two calipers
+    // up, its girth there against the trunk's height, and its caliper against the pot
+    const trunk = L.trees.map((T: { tp: number[][]; tw: number[]; D: number; Ht: number }, i: number) => {
+      const up = (y: number) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -y) k++; return T.tw[k]!; }, soil = -L.sy(L.xs[i]);
+      return { flare: up(soil + T.D) / up(soil + 2 * T.D), foot: up(soil + T.D), Ht: T.Ht, cal: up(T.D), D: T.D, potL: L.potL, lone: !!L.lone };
+    });
     const lr = L.roots.find((r: { loose: boolean }) => r.loose);
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
     // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
@@ -801,7 +807,33 @@ describe('Grow page', () => {
     const stopOf = (fill: string) => getComputedStyle(svg.querySelector(fill.replace(/^url\("?|"?\)$/g, '') + ' stop:nth-child(2)')!).stopColor;
     const pot = { lipH: Number(lipB.getAttribute('height')), over: (box(body).l - box(lipB).l), taper: across(L.D - 1) / across(3), lipStop: stopOf(lipB.getAttribute('fill')!), bodyStop: stopOf(body.getAttribute('fill')!),
       hi: Number(getComputedStyle(svg.querySelector('.lip-hi')!).opacity), body: box(body), sealBox: svg.querySelector('.seal') ? box(svg.querySelector('.seal')!) : null, sealOp: svg.querySelector('.seal') ? Number(getComputedStyle(svg.querySelector('.seal')!).opacity) : 0 };
-    return { lip, foot, ext, loose, seal, room, nebari, sunk, root, pot, moss: svg.querySelectorAll('.mc, .moss').length, trees: L.trees.length };
+    return { lip, foot, ext, loose, seal, room, nebari, trunk, sunk, root, pot, moss: svg.querySelectorAll('.mc, .moss').length, trees: L.trees.length };
+  };
+  /** A foot a bonsai grower would keep: four to six radial surface roots per tree, each leaving the trunk three tenths
+   *  to forty-five hundredths of its girth thick and thinning to a hair, out to six to nine tenths of the pot's half-length (five
+   *  at most, as before);
+   *  the trunk's foot, where it shows one caliper above the soil, flared to about one and a half times its width a caliper
+   *  higher, and at least a ninth of the trunk's height thick there, so it never reads as a pole; and its caliper at least an
+   *  eighth of the pot. */
+  const footOk = (g: { trees: number; nebari: Array<{ tree: number; G: number; start: number; tip: number; reach: number; half: number }>; trunk: Array<{ flare: number; foot: number; Ht: number; cal: number; D: number; potL: number; lone: boolean }> }, at: string) => {
+    for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(4); expect(n, at).toBeLessThanOrEqual(5); }
+    for (const q of g.nebari) {
+      expect(q.start / q.G, at + ' root start').toBeGreaterThanOrEqual(.3);
+      expect(q.start / q.G, at + ' root start').toBeLessThanOrEqual(.45);
+      expect(q.tip, at).toBeLessThan(1.5);
+      expect(q.tip / q.G, at + ' root tip').toBeLessThanOrEqual(.12);
+      expect((q.reach - q.G / 2) / q.G, at).toBeLessThanOrEqual(1.6);
+      expect(q.reach / q.half, at + ' root reach').toBeGreaterThanOrEqual(.6);
+      expect(q.reach / q.half, at + ' root reach').toBeLessThanOrEqual(.9);
+    }
+    for (const t of g.trunk) {
+      expect(t.flare, at + ' flare').toBeGreaterThanOrEqual(1.4);
+      expect(t.flare, at + ' flare').toBeLessThanOrEqual(1.6);
+      expect(t.Ht / t.foot, at + ' slender').toBeLessThanOrEqual(9);
+      if (t.lone) continue;
+      expect(t.cal / t.potL, at + ' caliper').toBeGreaterThanOrEqual(.12);
+      expect(t.D / t.potL, at + ' trunk').toBeGreaterThanOrEqual(.12);
+    }
   };
 
   it('roots the tree in its pot: buttress roots that taper into the soil, a service named outside the rim on its side at every width, an unused store sunk with a one-line dashed tag, and the whole repo name on the seal', async () => {
@@ -820,13 +852,9 @@ describe('Grow page', () => {
         await page.waitForTimeout(2500);
         const g = await page.evaluate(ground);
         const at = width + 'px';
-        // 3 to 5 buttress roots per tree, each thick where it leaves the trunk and gone within about one and a half base widths.
-        for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q: { tree: number }) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(3); expect(n, at).toBeLessThanOrEqual(5); }
-        for (const q of g.nebari) {
-          expect(q.start / q.G, at).toBeGreaterThan(.25);
-          expect(q.tip, at).toBeLessThan(1.5);
-          expect((q.reach - q.G / 2) / q.G, at).toBeLessThanOrEqual(1.6);
-        }
+        // 4 or 5 buttress roots per tree, each thick where it leaves the trunk, out to six to nine tenths of the pot's
+        // half-length and never past about one and a half base widths, thinning to a hair; the trunk flared over them.
+        footOk(g, at);
         // The service is named where its root crosses the rim, outside the pot on that side; "trace stops" is a label of its own
         // by the end of the tail.
         expect(g.ext, at).toHaveLength(1);
@@ -938,6 +966,62 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 120000);
 
+  it('stands each recorded tree on a flared foot and radial surface roots, its trunk at least an eighth of its pot', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const name of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, folded(name), width, width < 500);
+        await page.waitForTimeout(400);
+        footOk(await page.evaluate(ground), name + ' ' + width + 'px');
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
+  it('grows a small tree as a bonsai: a stout trunk tapering to a third of its foot, three or four radial roots with no store under it, and its canopy 55 to 65 hundredths of its height', async () => {
+    // One journey through its first file only, with one happy path and one guard: the smallest tree with a branch, and no
+    // dependency roots at all.
+    const s = folded('plotline-seats.jsonl'), j = s.journeys[0]!, mine = s.scenarios.filter((x) => x.journey === j.id);
+    s.journeys = [{ ...j, units: j.units.slice(0, 1) }];
+    s.scenarios = [mine.find((x) => x.polarity === 'happy')!, mine.find((x) => x.polarity === 'guard')!];
+    s.units = s.units.filter((u) => u.id === j.units[0]);
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, s, width, width < 500);
+        await page.waitForTimeout(2500);
+        const r = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), L = w.gw.B.L, T = L.trees[0], svg = w.gw.B.svg as SVGSVGElement;
+          // the drawing's own units (the layout's): the cushions as drawn, and the soil at the trunk's foot
+          const toSvg = (el: SVGGraphicsElement, x: number, y: number) => new DOMPoint(x, y).matrixTransform(svg.getScreenCTM()!.inverse().multiply(el.getScreenCTM()!));
+          const ys = Array.from(svg.querySelectorAll('.jg .pfill')).filter((e) => e.getBoundingClientRect().width > 0).flatMap((e) => { const b = (e as SVGGraphicsElement).getBBox(); return [toSvg(e as SVGGraphicsElement, b.x, b.y).y, toSvg(e as SVGGraphicsElement, b.x + b.width, b.y + b.height).y]; });
+          const X = L.xs[0], soil = L.sy(X), top = Math.min(...ys), low = Math.max(...ys);
+          const up = (y: number) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -y) k++; return T.tw[k]!; };
+          const nebari = L.roots.filter((q: { id: string | null; tree: number }) => !q.id && q.tree === 0).map((q: { pts: number[][] }) => Math.abs(q.pts.at(-1)![0]! - X) / (L.potL / 2));
+          return { trees: L.trees.length, deps: L.roots.filter((q: { id: string | null }) => q.id).length, canopy: (low - top) / (soil - top), apex: T.tw.at(-1), foot: T.tw[0], cal: up(T.D), potL: L.potL, nebari };
+        });
+        const at = width + 'px';
+        expect(r.trees, at).toBe(1);
+        expect(r.deps, at).toBe(0);
+        // the canopy, from the crown's top to the lowest cushion's underside, is 55 to 65 hundredths of the tree's height
+        expect(r.canopy, at + ' canopy').toBeGreaterThanOrEqual(.55);
+        expect(r.canopy, at + ' canopy').toBeLessThanOrEqual(.65);
+        // the trunk tapers to a third of its foot or less, and one caliper up it is at least twelve hundredths of the pot
+        expect(r.apex, at + ' apex').toBeLessThanOrEqual(r.foot / 3);
+        expect(r.apex, at + ' apex').toBeLessThanOrEqual(r.cal / 3);
+        expect(r.cal / r.potL, at + ' trunk').toBeGreaterThanOrEqual(.12);
+        // three or four buttress roots though nothing roots under it, each reaching six tenths of the pot's half-length
+        expect(r.nebari.length, at + ' nebari').toBeGreaterThanOrEqual(3);
+        expect(r.nebari.length, at + ' nebari').toBeLessThanOrEqual(4);
+        for (const n of r.nebari) expect(n, at + ' root reach').toBeGreaterThanOrEqual(.6);
+        footOk(await page.evaluate(ground), 'small tree ' + at);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   /** A grow folded from a recorded discovery log: plotline-billing (two journeys, one scenario failed, Minimum) and tracegrove
    *  itself (two journeys through twelve parts, Max, nothing run yet). */
   const folded = (name: string) => {
@@ -997,18 +1081,19 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
-  it('sets each card by what it explains, never over a name or with a hairline across one, and has the card and the tree agree on what a leaf runs', async () => {
+  it('sets each card by what it explains, never over a name or with a hairline across one or, past its first 12 px, across a twig, and has the card and the tree agree on what a leaf runs', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
       for (const [file, name] of recorded) {
         const state = folded(file);
-        for (const width of [1440, 768]) {
+        for (const width of [1440, 1024, 768]) {
           const page = await growPage(browser, server.url, state, width);
           await page.waitForTimeout(2500);
           const ins = page.getByTestId('grow-inspector'), inspector = await ins.count() ? await ins.textContent() : null;
-          const seen = await page.evaluate(() => {
-            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, S = w.gw.state, out: string[] = [];
+          // every leaf, root and knot in turn, and later the same with a leaf pinned; at 1440 a card also keeps off every cushion
+          const cards = () => page.evaluate((wide: boolean) => {
+            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, out: string[] = [];
             const m = (B.svg as SVGSVGElement).getScreenCTM()!, px = (p: number[]) => [m.a * p[0]! + m.c * p[1]! + m.e, m.b * p[0]! + m.d * p[1]! + m.f];
             // does the segment a-b pass through the box r (Liang-Barsky)?
             const cross = (a: number[], b: number[], r: DOMRect) => {
@@ -1023,21 +1108,62 @@ describe('Grow page', () => {
             for (const id of Object.keys(B.leaf)) if (!B.leaf[id].classList.contains('gone') && B.leaf[id].getBoundingClientRect().width) things.push(['s:' + id, B.leaf[id]]);
             for (const id of Object.keys(B.root)) things.push(['u:' + id, B.root[id]]);
             for (const k of Object.keys(B.klbl)) if (B.knot[k]) things.push(['u:' + B.knot[k].__ids[0], B.knot[k]]);
+            const meet = (c: DOMRect, r: DOMRect) => Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5;
             let cards = 0;
+            // a card covers no name, the faded ones included, no word of a journey's and no root's name, and no hairline crosses one
+            const look = (k: string, c: DOMRect, kl: Element | null, lead: number[][]) => {
+              const names = [...Object.values(B.klbl) as Element[]].filter((t) => t.classList.contains('on') || t.classList.contains('kdim')).concat(Array.from(B.svg.querySelectorAll('.rlbl, .lbl text') as NodeListOf<Element>)).map((t) => [t, t.getBoundingClientRect()] as const).filter(([, r]) => r.width);
+              for (const [t, r] of names) {
+                if (meet(c, r)) out.push(k + ': card covers ' + (t.classList.contains('kdim') ? 'the faded ' : '') + t.textContent);
+                for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
+              }
+              // over the tree a card keeps 12 px off every knot's name but the thing's own (less a pixel, for rounding)
+              if (!L.narrow) for (const [t, r] of names) {
+                if (t === kl || !t.classList.contains('klbl')) continue;
+                const d = Math.hypot(Math.max(r.left - c.right, 0, c.left - r.right), Math.max(r.top - c.bottom, 0, c.top - r.bottom));
+                if (d < 11) out.push(k + ': card ' + d.toFixed(1) + ' px from ' + t.textContent);
+              }
+              // and past its first 12 px the hairline keeps 12 px off every word but the thing's own name (less a pixel, for
+              // where the line is rounded)
+              const own = k.startsWith('u:') && B.root[k.slice(2)] ? Array.from(B.root[k.slice(2)].querySelectorAll('.rlbl') as NodeListOf<Element>) : [];
+              for (const [t, r] of names) {
+                if (t === kl || own.includes(t)) continue;
+                let near = Infinity;
+                for (let i = 1; i < lead.length; i++) {
+                  const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                  for (let s = 0; s <= n; s += 1) {
+                    const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                    if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) near = Math.min(near, Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom)));
+                  }
+                }
+                if (near < 11) out.push(k + ': hairline ' + near.toFixed(1) + ' px from ' + t.textContent);
+              }
+              // and past its first 12 px the hairline crosses no twig: it reaches a leaf at its nearest edge, never across the twigs
+              // of the pads it passes
+              const twigs = Array.from(B.svg.querySelectorAll('path.tw') as NodeListOf<SVGGeometryElement>).filter((e) => !e.closest('.budg') && e.getBoundingClientRect().width);
+              const inFill = (e: SVGGeometryElement, x: number, y: number) => { const q = e.getScreenCTM()!.inverse(); return e.isPointInFill(new DOMPoint(q.a * x + q.c * y + q.e, q.b * x + q.d * y + q.f)); };
+              let twig = false;
+              for (let i = 1; i < lead.length && !twig; i++) {
+                const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                for (let s = 0; s <= n && !twig; s += 1) {
+                  const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                  if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) twig = twigs.some((e) => inFill(e, x, y));
+                }
+              }
+              if (twig) out.push(k + ': hairline crosses a twig');
+              if (wide) for (const e of Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<Element>)) { const r = e.getBoundingClientRect(); if (r.width && meet(c, r)) out.push(k + ': card on a cushion of ' + (e.closest('[data-pad]') || e).getAttribute('data-pad')); }
+            };
             for (const [k, el] of things) {
               w.gbHover(k, el);
               const tip = B.tip as HTMLElement;
-              if (tip.hidden) { out.push(k + ': no card'); continue; }
+              // (a pinned thing's card is the inspector beside the tree, where there is one)
+              if (tip.hidden) { if (k !== w.gw.pinned || L.narrow) out.push(k + ': no card'); continue; }
               cards++;
               if (tip.classList.contains('dock') || !tip.parentElement!.contains(B.svg)) out.push(k + ': card not over the tree');
               const c = tip.getBoundingClientRect(), d = B.lead.getAttribute('d') || '';
               const lead = (d.match(/-?[\d.]+/g) || []).map(Number).reduce((a: number[][], v: number, i: number) => { if (i % 2) a[a.length - 1]!.push(v); else a.push([v]); return a; }, []).map(px);
-              const names = [...Object.values(B.klbl) as Element[]].filter((t) => t.classList.contains('on')).concat(Array.from(B.svg.querySelectorAll('.rlbl') as NodeListOf<Element>)).map((t) => [t, t.getBoundingClientRect()] as const).filter(([, r]) => r.width);
               const kk = k.startsWith('u:') && B.knot[k.slice(2)] ? Object.keys(B.klbl).find((q) => B.knot[q] === B.knot[k.slice(2)]) : undefined, kl: Element | null = kk ? B.klbl[kk] : null;
-              for (const [t, r] of names) {
-                if (Math.min(c.right, r.right) - Math.max(c.left, r.left) > .5 && Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top) > .5) out.push(k + ': card covers ' + t.textContent);
-                for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
-              }
+              look(k, c, kl, lead);
               // a knot's card hangs off its name, which stands out, so only one line runs to the knot: the name's own
               if (kl && kl.classList.contains('on') && !kl.classList.contains('pt')) out.push(k + ': its name does not stand out');
               if (kl && kl.classList.contains('on') && lead.length) {
@@ -1053,12 +1179,24 @@ describe('Grow page', () => {
               }
             }
             w.gbHover(null);
+            // on a phone the pinned thing's card stays under the drawing, and covers nothing in it either
+            if (w.gw.pinned && !(B.tip as HTMLElement).hidden) look(w.gw.pinned + ' pinned', B.tip.getBoundingClientRect(), null, []);
             return { cards, out };
-          });
+          }, width >= 1440);
+          const seen = await cards();
           expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
           expect(seen.out, name + ' ' + width).toEqual([]);
           // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
           if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
+          // a leaf pinned as a click pins it, then every card again
+          await page.evaluate(() => {
+            const w = (0, eval)('({ gw, growPaint, gbTipOff })'), B = w.gw.B, id = Object.keys(B.leaf).find((q) => !B.leaf[q].classList.contains('gone') && B.leaf[q].getBoundingClientRect().width);
+            w.gw.pinned = 's:' + id; if (!B.L.narrow) w.gbTipOff(B); w.growPaint();
+          });
+          await page.waitForTimeout(400);
+          const pinned = await cards();
+          expect(pinned.cards, name + ' ' + width + ' pinned').toBeGreaterThan(8);
+          expect(pinned.out, name + ' ' + width + ' pinned').toEqual([]);
           await page.close();
         }
       }
@@ -1113,7 +1251,7 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 240000);
-  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, centred, feathered and short of the next boss', async () => {
+  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, the same band on the same centre line, flat, crisp, round at both ends and short of the next boss, and no red in the wood at rest', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1144,12 +1282,45 @@ describe('Grow page', () => {
         const geos = Object.keys(B.knot).map((k) => B.knot[k].__geo).filter(Boolean);
         const brk = geos.slice().sort((a: { p: number[] }, b: { p: number[] }) => Math.hypot(a.p[0]! - R.red[0][0], a.p[1]! - R.red[0][1]) - Math.hypot(b.p[0]! - R.red[0][0], b.p[1]! - R.red[0][1]))[0];
         const end = R.red[R.red.length - 1];
-        const stops = reds.map((e) => Array.from(document.querySelector(e.getAttribute('fill')!.slice(4, -1))!.querySelectorAll('stop')).map((q) => Number(q.getAttribute('stop-opacity'))));
+        // the red's paint: its fill as written (no gradient) and as shown
+        const fills = reds.map((e) => [e.getAttribute('fill') || '', getComputedStyle(e).fill, getComputedStyle(e).opacity]);
+        // the amber's width over the last few pixels before the red begins (R.main is a point to the pixel)
+        const amberEnd: number[] = [];
+        for (let k = 3; k <= 8 && k < R.main.length - 1; k++) { const i = R.main.length - 1 - k, n = normal(R.main, i), [g1, g2] = reach(inside([B.sapR]), R.main[i], n); if (g1! > 0 && g2! > 0) amberEnd.push(g1! + g2!); }
         const cs = (e: Element) => getComputedStyle(e).fill, probeFill = (v: string) => { const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.style.fill = v; B.svg.append(r); const f = getComputedStyle(r).fill; r.remove(); return f; };
-        const out = { red, glow, stops, dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)') };
-        w.gbHover(null);
+        // the red's outline, walked every half pixel: none of it outside the limb's bark
+        let outline = 0, outside = 0;
+        for (const e of reds as SVGPathElement[]) { const n = e.getTotalLength(); for (let s = 0; s < n; s += .5) { const q = e.getPointAtLength(s); outline++; if (!inside(wood)(q.x, q.y)) outside++; } }
+        // the shape of each end: where the red begins (or ends), at offsets across it, how far back along the limb's own
+        // tangent its outline lies, as an angle off the limb's normal: about 0 for an end cut square, about 20 for a round one
+        const square = (from: 'start' | 'end') => {
+          const q = R.red as number[][], i = from === 'start' ? 0 : q.length - 1, j = from === 'start' ? Math.min(q.length - 1, 3) : Math.max(0, q.length - 4);
+          const a = q[i]!, l = Math.hypot(q[j]![0]! - a[0]!, q[j]![1]! - a[1]!) || 1, t = [(q[j]![0]! - a[0]!) / l, (q[j]![1]! - a[1]!) / l], n = [-t[1]!, t[0]!];
+          const f = inside(reds), c = [a[0]! + t[0]! * 4, a[1]! + t[1]! * 4], [h1, h2] = reach(f, c, n), h = Math.min(h1!, h2!);
+          const first = (v: number) => { for (let u = -12; u <= 12; u += .05) if (f(a[0]! + t[0]! * u + n[0]! * v, a[1]! + t[1]! * u + n[1]! * v)) return u; return NaN; };
+          const u0 = first(0); let worst = 0;
+          for (const k of [-.7, -.35, .35, .7]) worst = Math.max(worst, Math.abs(first(k * h) - u0) / Math.abs(k * h));
+          return h > 0 && isFinite(worst) ? Math.atan(worst) * 180 / Math.PI : 90;
+        };
+        const m = (B.svg as SVGSVGElement).getScreenCTM()!, mid = R.red.slice(Math.floor(R.red.length * .3), Math.ceil(R.red.length * .7) + 1).map((q: number[]) => { const s = new DOMPoint(q[0], q[1]).matrixTransform(m); return [s.x, s.y]; });
+        const out = { red, glow, fills, amberEnd, redTok: probeFill('var(--sap-red)'), dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)'), filters: reds.map((e) => getComputedStyle(e).filter), outline, outside, ends: [square('start'), square('end')], mid };
         return out;
       };
+      // At rest, nothing pointed at and nothing pinned: no red stroke in the wood, and the wood where the scenario broke shows
+      // no red, on its spine or either side of it (the knot's own crack and name stay red; they are not on this stretch)
+      const rest = () => {
+        const w = (0, eval)('({ gw, gbRoute, gbGirth })'), B = w.gw.B, S = w.gw.state;
+        const x = S.scenarios.find((q: { id: string }) => B.leaf[q.id] && S.run[q.id] && S.run[q.id].st === 'fail');
+        const R = w.gbRoute(x), q = R.red as number[][];
+        let m = (B.svg as SVGSVGElement).getScreenCTM()!; const top = new DOMPoint(q[0]![0], q[0]![1]).matrixTransform(m); window.scrollBy(0, top.y - 400); m = (B.svg as SVGSVGElement).getScreenCTM()!;
+        const spots: number[][] = [];
+        for (let i = 0; i < q.length - 1; i++) {
+          const a = q[i]!, b = q[i + 1]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!) || 1, n = [-(b[1]! - a[1]!) / l, (b[0]! - a[0]!) / l], G = w.gbGirth(B, a);
+          for (const k of [-.15, 0, .15]) { const s = new DOMPoint(a[0]! + n[0]! * k * G, a[1]! + n[1]! * k * G).matrixTransform(m); spots.push([s.x, s.y]); }
+        }
+        return { reds: B.gRed.querySelectorAll('path.sapw').length + (B.sapW.getAttribute('d') ? 1 : 0), spots };
+      };
+      const hot = (c: number[]) => c[0]! - Math.max(c[1]!, c[2]!) > 60;
       const lum = (css: string) => {
         const m = css.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/), n = css.match(/rgba?\((\d+), (\d+), (\d+)/);
         const c = m ? m.slice(1, 4).map(Number) : n!.slice(1, 4).map((x) => Number(x) / 255);
@@ -1158,20 +1329,43 @@ describe('Grow page', () => {
       };
       for (const scheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme: scheme });
+        await page.waitForTimeout(300);
+        const at = await page.evaluate(rest);
+        expect(at.reds, scheme + ' a red stroke at rest').toBe(0);
+        const still = await pixels(browser, (await page.screenshot()).toString('base64'), at.spots);
+        expect(still.filter(hot), scheme + ' red in the wood at rest').toEqual([]);
         const r = await page.evaluate(probe);
-        // The red is the limb's own wood: inside its body, about half its girth wide, on the spine.
+        await page.waitForTimeout(300);
+        // (lit, the same look finds the red on its spine: the look at rest above is one that sees red where there is red)
+        const lit = await pixels(browser, (await page.screenshot()).toString('base64'), r.mid);
+        expect(lit.filter(hot).length, scheme + ' red on the spine when lit ' + JSON.stringify(lit)).toBeGreaterThan(0);
+        await page.evaluate(() => (0, eval)('gbHover')(null));
+        // The red is the limb's own wood: inside its body, the same band as the amber (about three tenths of its girth, and
+        // within a pixel and a half of the amber's width where the amber ends) on the same spine, so amber and red read as one
+        // stroke; a crisp flat red with no blur and no gradient feather, every point of its outline inside the bark, and each
+        // end round.
         expect(r.red.length, scheme).toBeGreaterThan(0);
+        expect(r.amberEnd.length, scheme).toBeGreaterThan(2);
+        const aw = r.amberEnd.reduce((a, b) => a + b, 0) / r.amberEnd.length, rw = r.red.reduce((a, q) => a + q[1]!, 0) / r.red.length;
+        expect(Math.abs(rw - aw), scheme + ' red ' + rw.toFixed(1) + ' px wide against the amber\'s ' + aw.toFixed(1)).toBeLessThanOrEqual(1.5);
         for (const [wood, red, skew, edge] of r.red) {
-          expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.4);
-          expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.6);
+          expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.18);
+          expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.42);
           expect(skew!, scheme + ' red off the spine').toBeLessThanOrEqual(1.5);
+          expect(skew! / wood!, scheme + ' red off the spine, of the girth').toBeLessThanOrEqual(.1);
           expect(edge!, scheme + ' red outside the wood').toBeGreaterThanOrEqual(0);
         }
-        // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, faded in and out.
+        expect(r.filters.length, scheme).toBeGreaterThan(0);
+        for (const f of r.filters) expect(f, scheme + ' red blurred').toBe('none');
+        expect(r.outline, scheme).toBeGreaterThan(10);
+        expect(r.outside, scheme + ' red outline outside the bark').toBe(0);
+        for (const a of r.ends) expect(a, scheme + ' red end not round (deg off the limb’s normal)').toBeGreaterThanOrEqual(15);
+        for (const a of r.ends) expect(a, scheme + ' red end not round (deg off the limb’s normal)').toBeLessThanOrEqual(35);
+        // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, flat red all along.
         expect(r.start, scheme).toBe(true);
         expect(r.clear, scheme).toBe(true);
-        expect(r.stops.length, scheme).toBeGreaterThan(0);
-        for (const s of r.stops) { expect(s[0], scheme).toBe(0); expect(s[s.length - 1], scheme).toBe(0); expect(Math.max(...s), scheme).toBe(1); }
+        expect(r.fills.length, scheme).toBeGreaterThan(0);
+        for (const [attr, fill, op] of r.fills) { expect(attr, scheme + ' red painted with a gradient').not.toMatch(/url/); expect(fill, scheme).toBe(r.redTok); expect(op, scheme).toBe('1'); }
         // Past the break the route is grey dots.
         expect(r.dots, scheme).toBeGreaterThan(0);
         // The glow is a band inside the wood about three tenths of its girth, amber, standing out from the bark.
@@ -1187,6 +1381,152 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 120000);
+  it('runs a failed leaf’s lit route as one chain in hop order: its own wood, round its collar, then hop to hop, amber as far as it ran, red past the break, grey to the last hop’s knot, every lit knot on it, inside the wood and with no corner, pointed at or tapped', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const touch = width < 500, page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), width, touch);
+        await page.waitForTimeout(2500);
+        // the failed leaf, pointed at on a desk and tapped on a phone
+        const leaf = await page.evaluate(() => {
+          const B = (0, eval)('gw').B, S = (0, eval)('gw').state, x = S.scenarios.find((q: { id: string }) => B.leaf[q.id] && S.run[q.id] && S.run[q.id].st === 'fail');
+          const c = B.leaf[x.id].querySelector('.hitc') as SVGGraphicsElement; window.scrollBy(0, c.getBoundingClientRect().top - innerHeight / 2);
+          const r = c.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { id: x.id as string, x: r.left + r.width / 2, y: r.top + r.height / 2, top: t ? t.outerHTML.slice(0, 120) : '' };
+        });
+        if (touch) await page.touchscreen.tap(leaf.x, leaf.y); else await page.mouse.move(leaf.x, leaf.y, { steps: 4 });
+        await page.waitForTimeout(400);
+        // a lit knot's ring fades in over .2 s; on a busy runner that fade can still be running here, so measure it once it has run
+        await page.waitForFunction(() => Array.from(document.querySelectorAll('.gb .kn.on .halo')).every((h) => !h.getAnimations().some((a: Animation) => a.playState === 'running')), null, { timeout: 5000 });
+        const r = await page.evaluate((sid) => {
+          const w = (0, eval)('({ gw, gbSubs, gbReach })'), B = w.gw.B, M = w.gw.M, S = w.gw.state, L = B.L;
+          const x = S.scenarios.find((q: { id: string }) => q.id === sid), j = M.J.find((q: { id: string }) => M.leaves[q.id].includes(x));
+          const runs = (el: Element | null | undefined) => (el ? w.gbSubs(el.getAttribute('d')) : []) as number[][][];
+          // the chain as drawn: the amber's centre line, then the red's, then the grey dots', each run of each in turn
+          const pieces = [...runs(B.sap).map((p) => ({ k: 'amber', p })), ...runs(B.sapW).map((p) => ({ k: 'red', p })), ...runs(B.sapX).map((p) => ({ k: 'grey', p }))];
+          const chain: number[][] = [], at: number[] = [], kind: string[] = [], gaps: number[] = [];
+          for (const q of pieces) {
+            if (chain.length) gaps.push(Math.hypot(q.p[0]![0]! - chain[chain.length - 1]![0]!, q.p[0]![1]! - chain[chain.length - 1]![1]!));
+            for (const pt of q.p) { at.push(chain.length ? at[at.length - 1]! + Math.hypot(pt[0]! - chain[chain.length - 1]![0]!, pt[1]! - chain[chain.length - 1]![1]!) : 0); chain.push(pt); kind.push(q.k); }
+          }
+          // where a point falls along the chain: the arc length of the nearest point on it, and how far off it lies
+          const along = (p: number[]) => { let best = [1e9, 0]; for (let i = 1; i < chain.length; i++) { const a = chain[i - 1]!, b = chain[i]!, dx = b[0]! - a[0]!, dy = b[1]! - a[1]!, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * dx + (p[1]! - a[1]!) * dy) / l)), d = Math.hypot(p[0]! - a[0]! - t * dx, p[1]! - a[1]! - t * dy); if (d < best[0]!) best = [d, at[i - 1]! + t * Math.sqrt(l)]; } return best as [number, number]; };
+          // the turn where one piece hands on to the next, and round the collar where the leaf's wood meets the leader: over three
+          // pixels either side, so a corner turns its whole angle in that span
+          const dirAt = (s0: number, s1: number) => { const p = (s: number) => { let i = at.findIndex((v) => v >= s); if (i <= 0) i = Math.max(1, i < 0 ? chain.length - 1 : 1); const f = (s - at[i - 1]!) / ((at[i]! - at[i - 1]!) || 1); return [chain[i - 1]![0]! + (chain[i]![0]! - chain[i - 1]![0]!) * f, chain[i - 1]![1]! + (chain[i]![1]! - chain[i - 1]![1]!) * f]; }; const a = p(s0), b = p(s1); return Math.atan2(b[1]! - a[1]!, b[0]! - a[0]!); };
+          const total = at[at.length - 1]!, turnAt = (s: number) => { let d = Math.abs(dirAt(s, s + 3) - dirAt(s - 3, s)) * 180 / Math.PI; if (d > 180) d = 360 - d; return d; };
+          const T = L.trees.find((t: { tp: number[][] }, ti: number) => t.tp.some((q) => Math.hypot(q[0]! + L.xs[ti]! - B.pos[j.units[0]][0], q[1]! - B.pos[j.units[0]][1]) < 2)) || L.trees[0], X = L.xs[L.trees.indexOf(T)]!;
+          const lead = (p: number[]) => Math.min(...T.tp.map((q: number[]) => Math.hypot(q[0]! + X - p[0]!, q[1]! - p[1]!)));
+          let ci = chain.findIndex((p) => lead(p) < 1); if (ci < 0) ci = 0;
+          const joins: number[] = []; { let n = 0; for (const q of pieces.slice(0, -1)) { n += q.p.length; joins.push(at[n - 1]!); } }
+          const spots = [...joins, ...Array.from({ length: 33 }, (_, i) => at[ci]! - 14 + i * .625)].filter((v) => v >= 3 && v <= total - 3);
+          let turn = 0, turnWhere = 0; for (const v of spots) { const d = turnAt(v); if (d > turn) { turn = d; turnWhere = v; } }
+          // the hops the chain passes, in the order it passes them
+          const hops = j.units.filter((id: string) => B.knot[id] && !B.root[id]).map((id: string) => { const g = B.knot[id].__geo, [d, s] = along(B.pos[id]); return { id, d, s, ra: g.ra, i: j.units.indexOf(id) }; }).filter((h: { d: number; ra: number }) => h.d <= h.ra + 3);
+          const reach = w.gbReach(M, j, x), red0 = pieces.find((q) => q.k === 'red'), brk = red0 ? along(red0.p[0]!)[1] : Infinity;
+          // every amber point, centre line and band, along the chain
+          const pts = (el: SVGGeometryElement) => { const o: number[][] = []; if (!el.getAttribute('d')) return o; const n = el.getTotalLength(); for (let s = 0; s <= n; s += .5) { const q = el.getPointAtLength(s); o.push([q.x, q.y]); } return o; };
+          const amber = [B.sap, B.sapR, B.sapU, B.sapS].filter(Boolean).flatMap((e: SVGGeometryElement) => pts(e)), amberPast = amber.filter((p) => along(p)[1] > brk + .5).length;
+          // a spur up the leader to a reached hop above where the leaf's wood joins it: each ends on the amber, within 2 px
+          const spurs = runs(B.sapS), spurEnds = spurs.map((q) => along(q[q.length - 1]!)[0]);
+          // every hop on the leader the scenario reached is lit; and a lit knot's ring sits inside its boss, never on the bark
+          const unlit = [...reach.lit].filter((id: string) => B.knot[id] && !B.root[id] && B.knot[id].__on === 't' && !B.knot[id].classList.contains('on')).map((id: string) => (M.U[id] || {}).label || id);
+          const rings = [...new Set(Object.values(B.knot))].filter((el: any) => el.classList.contains('on') && el.__geo).map((el: any) => { const h = el.querySelector('.halo') as SVGEllipseElement, cs = getComputedStyle(h), sw = parseFloat(cs.strokeWidth) || 0; return { id: el.__ids[0] as string, fill: cs.fill, sw, op: +cs.opacity, a: +h.getAttribute('rx')! + sw / 2 - el.__geo.ra, b: +h.getAttribute('ry')! + sw / 2 - el.__geo.rb }; });
+          // inside the wood: the bark the drawing clips to, the twigs, and above the soil
+          const wood = [...Array.from(document.querySelector('#gb-wood' + B.N)!.children), ...Array.from(B.svg.querySelectorAll('path.tw'))] as SVGGeometryElement[];
+          const inWood = (p: number[]) => wood.some((e) => e.isPointInFill(new DOMPoint(p[0], p[1])));
+          const drawn = (Array.from(B.svg.querySelectorAll('.sap, .sapr, .sapu')) as SVGGeometryElement[]).filter((e) => getComputedStyle(e).display !== 'none').flatMap((e) => pts(e).map((p) => [p, e.getAttribute('class')] as const));
+          const out = drawn.filter(([p]) => !inWood(p)).map(([p, c]) => c + ' ' + p.map((v) => v.toFixed(1)).join(',')), sunk = drawn.filter(([p]) => p[1]! >= L.sy(p[0]!)).length;
+          const first = hops.slice().sort((a: { s: number }, b: { s: number }) => a.s - b.s)[0], last = hops.slice().sort((a: { s: number }, b: { s: number }) => b.s - a.s)[0];
+          const before = first ? pieces.filter((q) => q.k !== 'amber' && along(q.p[0]!)[1] < first.s - .5).length : -1;
+          const amberTo = first ? Math.max(...pieces.filter((q) => q.k === 'amber').map((q) => along(q.p[q.p.length - 1]!)[1])) : 0;
+          const greyEnd = pieces.filter((q) => q.k === 'grey').map((q) => along(q.p[q.p.length - 1]!)[1]);
+          // every knot that lights is one the amber or the red runs through, within three pixels of its boss
+          const sapRuns = [...pieces.filter((q) => q.k !== 'grey').map((q) => q.p), ...spurs], segP = (p: number[], a: number[], b: number[]) => { const dx = b[0]! - a[0]!, dy = b[1]! - a[1]!, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * dx + (p[1]! - a[1]!) * dy) / l)); return Math.hypot(p[0]! - a[0]! - t * dx, p[1]! - a[1]! - t * dy); };
+          const near = (p: number[]) => Math.min(1e9, ...sapRuns.flatMap((P) => P.slice(1).map((q, i) => segP(p, P[i]!, q))));
+          const litOff = [...new Set(Object.values(B.knot))].filter((el: any) => el.classList.contains('on') && el.__geo && near(B.pos[el.__ids[0]]) > el.__geo.ra + 3).map((el: any) => (el.__ids as string[]).map((id) => (M.U[id] || {}).label || id).join('+'));
+          return { litOff, unlit, rings, spurEnds, lit: String(w.gw.hov || w.gw.pinned), kinds: pieces.map((q) => q.k), gaps, turn, turnWhere, collar: at[ci]!, total, hops: hops.map((h: { id: string; s: number; i: number }) => [h.i, h.s]), brk, amberPast, out: out.slice(0, 8), nOut: out.length, nDrawn: drawn.length, sunk,
+            hand: first ? { reached: reach.lit.has(first.id), s: first.s, before, amberTo } : null, last: last ? last.s + last.ra + 3 : 0, lastId: last ? last.id : '', greyEnd };
+        }, leaf.id);
+        const at = width + 'px';
+        // one chain: amber, then red, then grey, each run starting within 2 px of where the one before it ended
+        expect(r.lit, at + ' ' + leaf.top).toBe('s:' + leaf.id);
+        expect(r.kinds.length, at).toBeGreaterThanOrEqual(3);
+        expect(r.kinds.join(' '), at).toMatch(/^(amber )+(red )+(grey ?)+$/);
+        for (const g of r.gaps) expect(g, at + ' gap between pieces').toBeLessThanOrEqual(2);
+        // the hops it passes are passed in the journey's order, and the grey stops at the last hop's knot, not in the nebari
+        expect(r.hops.length, at).toBeGreaterThanOrEqual(2);
+        for (let i = 1; i < r.hops.length; i++) { expect(r.hops[i]![0], at).toBeGreaterThan(r.hops[i - 1]![0]!); expect(r.hops[i]![1], at + ' hop order').toBeGreaterThan(r.hops[i - 1]![1]!); }
+        for (const e of r.greyEnd) expect(e, at + ' grey past ' + r.lastId).toBeLessThanOrEqual(r.last);
+        // no knot glows that the sap does not run through, and every hop on the leader it reached glows: one above where the
+        // leaf's wood joins the leader is reached by a spur of amber down the leader that ends on the route
+        expect(r.litOff, at + ' a lit knot off the sap').toEqual([]);
+        expect(r.unlit, at + ' a reached hop on the leader not lit').toEqual([]);
+        for (const e of r.spurEnds) expect(e, at + ' a spur ending off the amber').toBeLessThanOrEqual(2);
+        // a lit knot is a fine ring (1.5 px, no fill) just inside its boss: nothing of it on the bark round the boss
+        expect(r.rings.length, at).toBeGreaterThan(0);
+        for (const g of r.rings) { expect(g.fill, at + ' ' + g.id + ' ring filled').toBe('none'); expect(g.sw, at + ' ' + g.id).toBe(1.5); expect(g.op, at + ' ' + g.id).toBe(1); expect(Math.max(g.a, g.b), at + ' ' + g.id + ' ring past its boss').toBeLessThanOrEqual(0); }
+        // no amber past the break
+        expect(isFinite(r.brk), at).toBe(true);
+        expect(r.amberPast, at + ' amber points past the break').toBe(0);
+        // the leaf's own wood is amber as its collar hop was reached, and runs into the leader with nothing grey or red between
+        expect(r.hand, at).not.toBeNull();
+        expect(r.hand!.reached, at).toBe(true);
+        expect(r.hand!.before, at + ' grey or red before the collar').toBe(0);
+        expect(r.hand!.amberTo, at + ' amber to the collar').toBeGreaterThanOrEqual(r.hand!.s);
+        // all of it in the wood, above the soil, with no corner where one piece hands on to the next or round the collar
+        expect(r.nDrawn, at).toBeGreaterThan(50);
+        expect(r.out, at + ' route outside the wood (' + r.nOut + ')').toEqual([]);
+        expect(r.sunk, at + ' route under the soil').toBe(0);
+        expect(r.collar, at + ' the route reaches the leader').toBeGreaterThan(10);
+        expect(r.turn, at + ' turn at ' + r.turnWhere.toFixed(1) + ' of ' + r.total.toFixed(1) + ' (collar ' + r.collar.toFixed(1) + ')').toBeLessThanOrEqual(35);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 120000);
+  it('runs a running journey’s sap up its wood from the soil to where its pad’s foliage begins: never under the soil, over a cushion or out of the wood', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+        const S0 = folded(file), page = await growPage(browser, server.url, S0, width);
+        const js = await page.evaluate(() => { const M = (0, eval)('gw').M; return M.J.map((j: { id: string }) => M.leaves[j.id].map((x: { id: string }) => x.id)) as string[][]; });
+        let seen = 0;
+        for (const ids of js) {
+          if (!ids.length) continue;
+          const s = { ...S0, run: { ...S0.run, ...Object.fromEntries(ids.map((id) => [id, { st: 'run' }])) } };
+          await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s, v: growView(s as never) });
+          await page.waitForTimeout(300);
+          const r = await page.evaluate(() => {
+            const B = (0, eval)('gw').B, L = B.L, svg = B.svg as SVGSVGElement, pt = svg.createSVGPoint();
+            const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => f.getBoundingClientRect().width > 0 && getComputedStyle(f.closest('.cush') ?? f).display !== 'none' && !f.closest('.off, .gone, .cut'));
+            const inEl = (e: SVGGeometryElement, x: number, y: number) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); };
+            const wood = [...Array.from(document.querySelector('#gb-wood' + B.N)!.children), ...Array.from(svg.querySelectorAll('path.tw'))] as SVGGeometryElement[];
+            const out = { n: 0, live: 0, sunk: [] as string[], over: [] as string[], off: [] as string[] };
+            for (const e of Array.from(svg.querySelectorAll('.vein.live')) as SVGPathElement[]) {
+              if (getComputedStyle(e).display === 'none' || !e.getAttribute('d')) continue;
+              out.live++;
+              const n = e.getTotalLength(), at = (q: DOMPoint) => Math.round(q.x) + ',' + Math.round(q.y);
+              for (let l = 0; l <= n; l += 0.5) {
+                const q = e.getPointAtLength(l); out.n++;
+                if (q.y >= L.sy(q.x)) out.sunk.push(at(q));
+                if (fills.some((f) => inEl(f, q.x, q.y))) out.over.push(at(q));
+                if (!wood.some((w) => w.isPointInFill(new DOMPoint(q.x, q.y)))) out.off.push(at(q));
+              }
+            }
+            return { ...out, sunk: out.sunk.slice(0, 6), over: out.over.slice(0, 6), off: out.off.slice(0, 6), nS: out.sunk.length, nO: out.over.length, nW: out.off.length };
+          });
+          const at = name + ' ' + width + 'px ' + ids[0];
+          seen += r.live;
+          expect(r.sunk, at + ' under the soil (' + r.nS + ' of ' + r.n + ')').toEqual([]);
+          expect(r.over, at + ' over a cushion (' + r.nO + ' of ' + r.n + ')').toEqual([]);
+          expect(r.off, at + ' out of the wood (' + r.nW + ' of ' + r.n + ')').toEqual([]);
+        }
+        expect(seen, name + ' ' + width + 'px').toBeGreaterThan(1);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 180000);
   /** The tree's foliage measured as drawn: every leaf, its twig and its cushion, from the SVG's own geometry. */
   const foliage = () => {
     const w = (0, eval)('({ gw, GB_PET })');
@@ -1200,14 +1540,22 @@ describe('Grow page', () => {
       return Math.min(pd(a, c, d), pd(b, c, d), pd(c, a, b), pd(d, a, b));
     };
     const wood = Array.from(document.querySelectorAll('.gw-svg.gb path.w, .gw-svg.gb path.tw:not(.lt)')).filter((e: any) => e.getScreenCTM());
-    const out = { leaves: 0, hung: 0, bad: [] as string[], cush: [] as { tree: string; crown: boolean; role: string; n: number; a: number; h: number }[] };
+    const out = { leaves: 0, hung: 0, bad: [] as string[], cush: [] as { tree: string; pid: string; crown: boolean; role: string; n: number; a: number; h: number }[], pads: [] as { tree: string; pid: string; h: number; PW: number; L: number; n: number; tier: number }[] };
+    // each pad's height on its trunk (the crown's at the top), and the tier that sets its width: 1 at the lowest branch, .7 at
+    // the apex
+    const hOf = (P: any) => (P.crown ? 1 : P.b.h);
+    for (const pid in B.pad) {
+      const P = B.pad[pid], tree = P.el.closest('svg')?.id ?? '', mine = Object.values(B.pad).filter((Q: any) => Q.tree === P.tree) as any[];
+      const lo = Math.min(...mine.map(hOf)), n = P.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0);
+      out.pads.push({ tree: tree + ':' + P.tree, pid, h: hOf(P), PW: P.geo.PW, L: P.geo.L, n, tier: mine.length > 1 ? 1 - 0.3 * (hOf(P) - lo) / ((1 - lo) || 1) : 1 });
+    }
     const bad = (pid: string, what: string, v?: unknown) => out.bad.push(pid + ': ' + what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     for (const pid in B.pad) {
       const P = B.pad[pid], g = P.geo, L: number = g.L, W: number = g.W, kept: [string, number[]][] = [];
       g.cs.forEach((c: any, k: number) => {
         if (c.role === 'shoulder' && !c.ids.length) bad(pid, 'a shoulder with no guard', k);
         if (c.ids.length && L > 0.55 * c.a) bad(pid, 'leaf longer than a quarter of its cushion', [L, c.a]);
-        out.cush.push({ tree: P.el.closest('svg')?.id ?? '', crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
+        out.cush.push({ tree: (P.el.closest('svg')?.id ?? '') + ':' + P.tree, pid, crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
       });
       for (const [id, sl] of g.slot as Map<string, number[]>) {
         const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
@@ -1227,8 +1575,21 @@ describe('Grow page', () => {
         if (!wood.some((e: any) => e !== tw && e.isPointInFill(usr(e, s0)))) bad(pid, 'twig starts off the wood', id);
         const a = pts[pts.length - 2]!, ta = Math.atan2(end[1]! - a[1]!, end[0]! - a[0]!) * 180 / Math.PI, da = Math.abs((((ta - sl[2]!) % 360) + 540) % 360 - 180);
         if (da > 15) bad(pid, 'leaf turned off its twig', [id, da]);
-        // a failure hangs on a short stem; a leaf on a cushion has its foot tucked in and its middle clear, so its state reads
-        if (hang) { const st = Math.hypot(end[0]! - pts[0]![0]!, end[1]! - pts[0]![1]!); if (st > 0.5 * g.Hc + 0.01) bad(pid, 'stem longer than half the crest', [id, st, g.Hc]); }
+        // a failure hangs beneath its cushion from a twig that shows, run out at least four pixels under the cushion's
+        // underside, on a straight stem of ten pixels; where it has no room there it sits on the cushion's lower rim on a short
+        // stem. A leaf on a cushion has its foot tucked in and its middle clear, so its state reads
+        if (hang) {
+          const seated = [[0, 0], [0.45 * L, 0], [-0.45 * L, 0]].some(([x, y]) => fill.isPointInFill(usr(fill, scr(lf, x!, y!))));
+          if (seated) { const st = Math.hypot(end[0]! - pts[0]![0]!, end[1]! - pts[0]![1]!); if (st > 0.5 * g.Hc + 0.01) bad(pid, 'stem longer than half the crest', [id, st, g.Hc]); }
+          else {
+            const A = pts.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - pts[i - 1]![0]!, q[1]! - pts[i - 1]![1]!) : 0), a), []), d = A[A.length - 1]! - 10;
+            let i = 1; while (i < A.length - 1 && A[i]! < d) i++;
+            const f = Math.max(0, Math.min(1, (d - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))), base = [pts[i - 1]![0]! + (pts[i]![0]! - pts[i - 1]![0]!) * f, pts[i - 1]![1]! + (pts[i]![1]! - pts[i - 1]![1]!) * f];
+            const bb = fill.getBBox(), low = usr(tw, scr(fill, bb.x + bb.width / 2, bb.y + bb.height)), hw = (tw.__w[i] ?? 1) / 2;
+            if (Math.hypot(end[0]! - base[0]!, end[1]! - base[1]!) < 9.5) bad(pid, 'hanging stem not straight', id);
+            if (base[1]! - hw - low.y < 4 - 0.01) bad(pid, 'hanging twig closer than four pixels under its cushion', [id, base[1]! - hw - low.y]);
+          }
+        }
         else {
           const tf = B.tuft?.[id];
           if (!on(tf)) bad(pid, 'no tuft', id);
@@ -1341,6 +1702,44 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 240000);
+
+  it('wraps a pinned card’s proof lanes inside its panel: each chip on one line, each note within its row, nothing past the panel’s edge, pinned and with Max pointed at', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 1024]) {
+        const page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), width);
+        await page.waitForTimeout(2500);
+        // pin the leaf whose proof lane names the provider's sandbox key
+        const sid = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, growPaint })'), B = w.gw.B;
+          const x = w.gw.state.scenarios.find((q: { id: string; realKey: string | null }) => q.realKey && /STRIPE_/.test(q.realKey) && B.leaf[q.id] && !B.leaf[q.id].classList.contains('gone'));
+          w.gw.pinned = 's:' + x.id; w.growPaint(); return x.id as string;
+        });
+        const fit = () => page.evaluate(() => {
+          const out: string[] = [], lanes = Array.from(document.querySelectorAll('.gw-ln')).filter((e) => (e as HTMLElement).offsetParent !== null);
+          for (const ln of lanes) {
+            const pan = ln.closest('aside, .gb-tip, section')!.getBoundingClientRect();
+            for (const c of Array.from(ln.children)) { const r = c.getBoundingClientRect(); if (r.right > pan.right + .5 || r.left < pan.left - .5) out.push('"' + (c.textContent ?? '').slice(0, 30) + '" runs past its panel by ' + Math.round(Math.max(r.right - pan.right, pan.left - r.left))); }
+            for (const chip of Array.from(ln.querySelectorAll('.gw-chip'))) { const rg = document.createRange(); rg.selectNodeContents(chip); const lines = new Set(Array.from(rg.getClientRects()).filter((q) => q.width > .5).map((q) => Math.round(q.top))).size; if (lines !== 1) out.push('chip "' + chip.textContent + '" on ' + lines + ' lines'); }
+            for (const n of Array.from(ln.querySelectorAll('.note')) as HTMLElement[]) { if (n.scrollWidth > n.clientWidth) out.push('note "' + (n.textContent ?? '').slice(0, 30) + '" scrolls by ' + (n.scrollWidth - n.clientWidth)); if (n.getBoundingClientRect().right > pan.right + .5) out.push('note past the panel'); }
+          }
+          return { n: lanes.length, out, stripe: lanes.some((l) => /STRIPE_/.test(l.textContent ?? '')) };
+        });
+        const pinned = await fit();
+        expect(pinned.n, width + 'px ' + sid).toBeGreaterThan(0);
+        expect(pinned.stripe, width + 'px').toBe(true);
+        expect(pinned.out, width + 'px pinned').toEqual([]);
+        // and with Max pointed at while it is pinned
+        await page.getByTestId('grow-mode-max').hover();
+        await page.waitForTimeout(400);
+        const locked = await fit();
+        expect(locked.n, width + 'px').toBeGreaterThan(0);
+        expect(locked.out, width + 'px pinned, Max pointed at').toEqual([]);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
 
   it('gives each leaf on a phone a target of 44 px, takes a tap to the nearest leaf, and closes its card with a Close of 44 px or a tap outside it', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
@@ -1614,19 +2013,23 @@ describe('Grow page', () => {
         const f = await page.evaluate(foliage);
         expect(f.leaves, width + 'px').toBeGreaterThan(2);
         expect(f.bad, width + 'px').toEqual([]);
-        // a cushion's area grows with how many leaves it holds, one tree's k for all; the crown's crest at most 15% larger across
-        // by its leaves, and always the largest cushion on the tree: at least 1.15 times across any branch's, raised to exactly
-        // that where it holds fewer leaves than one of them
+        // a cushion's area grows with how many leaves it holds, one k for every cushion on a pad, the crown's crest too; the pads
+        // a scalene triangle: each as wide as its leaves ask, clamp(n x 1.6 leaves, 3.2, 12 leaves), times its tier (1 at the
+        // lowest branch, .7 at the apex) and never narrower than holds them, no pad wider than the one below it, and the crown's
+        // crest at most three quarters across the widest cushion below it
         for (const tree of new Set(f.cush.map((c) => c.tree))) {
           const cs = f.cush.filter((c) => c.tree === tree), per = (c: { a: number; h: number; n: number }) => (c.a * c.h) / (c.n + 0.5);
-          const plain = cs.filter((c) => !(c.crown && c.role === 'crest')), base = Math.min(...plain.map(per));
-          for (const c of plain) expect(per(c) / base, width + 'px ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
-          const brMax = Math.max(0, ...cs.filter((c) => !c.crown).map((c) => c.a));
-          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) {
-            expect(c.a, width + 'px crown crest against the largest branch cushion').toBeGreaterThanOrEqual(1.15 * brMax - 0.01);
-            if (Math.abs(c.a - 1.15 * brMax) > 0.01) expect(Math.sqrt(per(c) / base)).toBeLessThanOrEqual(1.151);
+          for (const pid of new Set(cs.map((c) => c.pid))) {
+            const pc = cs.filter((c) => c.pid === pid), base = Math.min(...pc.map(per));
+            for (const c of pc) expect(per(c) / base, width + 'px ' + pid + ' ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
+            for (const a of pc) for (const b of pc) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
           }
-          for (const a of plain) for (const b of plain) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
+          const pads = f.pads.filter((q) => q.tree === tree).sort((a, b) => a.h - b.h);
+          for (let i = 1; i < pads.length; i++) expect(pads[i]!.PW, width + 'px ' + pads[i]!.pid + ' against the pad below it').toBeLessThanOrEqual(1.05 * pads[i - 1]!.PW);
+          for (const q of pads) expect(q.PW, width + 'px ' + q.pid + ' as wide as its leaves ask at its tier').toBeGreaterThanOrEqual(Math.max(3.2 * q.L, Math.min(12 * q.L, q.n * 1.6 * q.L)) * q.tier - 0.01);
+          const brMax = Math.max(0, ...cs.filter((c) => !c.crown).map((c) => c.a));
+          for (const c of cs.filter((x) => x.crown && x.role === 'crest')) expect(c.a, width + 'px crown crest against the widest cushion below').toBeLessThanOrEqual(0.75 * brMax + 0.01);
+          if (pads.length > 1) expect(pads.at(-1)!.PW, width + 'px the apex against the widest pad below').toBeLessThanOrEqual(0.75 * Math.max(...pads.slice(0, -1).map((q) => q.PW)) + 0.01);
         }
         await page.close();
       }
@@ -1636,7 +2039,7 @@ describe('Grow page', () => {
   /** The tree's form as drawn: which journey the crown holds, how its wood is sized and set, and how its leaves sit. */
   const form = () => {
     const w = (0, eval)('({ gw, gbHf, gbModel, gbOrderOf })'), B = w.gw.B, S = w.gw.state, hf: number = w.gbHf(B);
-    const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, over: [] as number[], halos: 0, stem: 0 };
+    const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, below: 0, over: [] as number[], halos: 0, stem: 0 };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const on = (el: any) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
     // a colour as the page paints it, whatever space it was mixed in, and a token of the tree's own
@@ -1649,9 +2052,27 @@ describe('Grow page', () => {
     const order = w.gbOrderOf(w.gw.M || w.gbModel()) as { id: string; title: string }[], head = order.find((j) => fails(j.id)) ?? order[0]!;
     out.crown = crown.jid; out.head = head.id; out.failing = fails(head.id); out.title = head.title;
     if (S.journeys.some((j: { id: string }) => fails(j.id)) && !fails(crown.jid)) bad('a journey failed and the crown holds one that did not');
-    // its crest the largest cushion on the tree: at least 1.15 times across any branch's
+    // a scalene canopy: its crest at most three quarters across the widest cushion below it, and no pad wider than the one
+    // below it (to 5%), the lowest the widest
     const crest = crown.geo.cs.find((c: any) => c.role === 'crest');
-    for (const P of mine) if (!P.crown) for (const c of P.geo.cs) if (crest.a < 1.15 * c.a - 0.01) bad('the crown crest under 1.15 times a branch cushion', [P.jid, crest.a, c.a]);
+    const lowA = Math.max(0, ...mine.filter((P) => !P.crown).flatMap((P) => P.geo.cs.map((c: any) => c.a)));
+    if (lowA && crest.a > 0.75 * lowA + 0.01) bad('the crown crest over three quarters of the widest cushion below it', [crest.a, lowA]);
+    const lowPW = Math.max(0, ...mine.filter((P) => !P.crown).map((P) => P.geo.PW));
+    if (lowPW && crown.geo.PW > 0.75 * lowPW + 0.01) bad('the crown over three quarters of the widest pad below it', [crown.geo.PW, lowPW]);
+    const up = mine.slice().sort((a, b) => (a.crown ? 1 : a.b.h) - (b.crown ? 1 : b.b.h));
+    for (let i = 1; i < up.length; i++) if (up[i].geo.PW > 1.05 * up[i - 1].geo.PW) bad('a pad wider than the one below it', [up[i].id, up[i].geo.PW, up[i - 1].id, up[i - 1].geo.PW]);
+    // and cushion by cushion: no pad's widest cushion wider than the widest cushion of any pad below it
+    const ca = (P: any) => Math.max(...P.geo.cs.map((c: any) => c.a));
+    if (!B.L.narrow) for (let i = 1; i < up.length; i++) { const lo = Math.max(...up.slice(0, i).map(ca)); if (ca(up[i]) > lo + 0.01) bad('a cushion wider than any of a pad below it', [up[i].id, Math.round(2 * ca(up[i])), Math.round(2 * lo)]); }
+    // the crown in tiers: its crest on its riser above its shoulders, and (beside a desktop tree; on a phone it stays one
+    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each narrower than its crest
+    // where they hold its happy paths
+    const cshs = crown.geo.cs.filter((c: any) => c.role === 'shoulder'), mid = (c: any) => c.b - c.h / 2;
+    for (const c of cshs) if (mid(crest) >= mid(c)) bad('the crown crest not above its shoulder', [mid(crest), mid(c)]);
+    if (!B.L.narrow && crown.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0) >= 3) {
+      if (cshs.length < 1 || cshs.length > 2) bad('a crown of three or more leaves with no tier', cshs.length);
+      for (const c of cshs) if (c.lv.every((x: any) => x.polarity === 'happy') && c.a >= crest.a) bad('a crown shoulder as wide as its crest', [c.a, crest.a]);
+    }
     // the wood sized from the data: the trunk's girth from the leaves the tree carries, and about twelve girths tall
     out.nL = mine.reduce((a, P) => a + P.leaves.length, 0); out.D = T.D; out.Ht = T.Ht;
     if (T.Ht < 12 * T.D - 0.01) bad('a squat trunk', [T.Ht, T.D]);
@@ -1697,19 +2118,29 @@ describe('Grow page', () => {
         out.hung++;
         const pts = B.ltw[id][0].__pts as number[][], E = pts[pts.length - 1]!, S0 = pts[Math.max(0, pts.length - 7)]!, dx = E[0]! - S0[0]!, dy = E[1]! - S0[1]!, st = Math.hypot(dx, dy);
         const k = g.cOf.get(id), c = g.cs[k], mid = [P.o[0] + sl[0]!, P.o[1] + sl[1]!], th = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-        out.stem = Math.max(out.stem, st * hf);
-        if (st > 0.42 * L + 0.01) bad('a long stem', [id, st, L]);
         if (th < 30 - 0.01 || th > 45 + 0.01) bad('a stem not at thirty to forty-five degrees, out and down', [id, th]);
         if (Math.sign(dx) !== (P.b ? P.b.dir : Math.sign(mid[0]! - (P.o[0] + c.x)))) bad('a stem leaning in', id);
         const fill = P.cu[k].el.querySelector('.pfill'), u = [Math.cos(sl[2]! * Math.PI / 180), Math.sin(sl[2]! * Math.PI / 180)];
         let inside = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (fill.isPointInFill(new DOMPoint(mid[0]! + u[0]! * f * L, mid[1]! + u[1]! * f * L))) inside++; }
+        // it hangs beneath its cushion, clear of it, on a stem of ten pixels off the twig run out to it; or, with no room
+        // there, it sits on the rim on a short stem
+        if (!inside) {
+          out.below++;
+          const A = pts.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - pts[i - 1]![0]!, q[1]! - pts[i - 1]![1]!) : 0), a), []), d = A[A.length - 1]! - 10;
+          let j = 1; while (j < A.length - 1 && A[j]! < d) j++;
+          const f = Math.max(0, Math.min(1, (d - A[j - 1]!) / ((A[j]! - A[j - 1]!) || 1))), b = [pts[j - 1]![0]! + (pts[j]![0]! - pts[j - 1]![0]!) * f, pts[j - 1]![1]! + (pts[j]![1]! - pts[j - 1]![1]!) * f], sb = Math.hypot(E[0]! - b[0]!, E[1]! - b[1]!);
+          if (sb < 9 || sb > 10.6) bad('a hanging stem not ten pixels', [id, sb]);
+          continue;
+        }
+        out.stem = Math.max(out.stem, st * hf);
+        if (st > 0.42 * L + 0.01) bad('a long stem', [id, st, L]);
         out.over.push(inside / 21);
       }
     }
     return out;
   };
 
-  it('puts the headline journey in the crown, its crest the largest, on wood sized from the data, with leaves that lead', async () => {
+  it('puts the headline journey in the crown, its crest the largest, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
     const bushy = await grownBushy();
     const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
@@ -1731,7 +2162,8 @@ describe('Grow page', () => {
             await expect.poll(() => ins.textContent()).toContain(f.failing ? 'The first failing journey' : 'The headline journey');
             expect(await ins.locator('h3').first().textContent()).toBe(f.title.replace(/`/g, ''));
           } else if (width < 500) expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(11);
-          // each failure's blade lies over its cushion's rim by about three tenths
+          // each failure hangs beneath its cushion, or with no room there its blade lies over the rim by about three tenths
+          expect(f.below + f.over.length, at).toBe(f.hung);
           for (const o of f.over) { expect(o, at + ' over the rim').toBeGreaterThan(0.12); expect(o, at + ' over the rim').toBeLessThan(0.5); }
           if (name !== 'plotline') expect(f.hung, at).toBeGreaterThan(0);
           if (name === 'bushy') expect(f.halos, at).toBeGreaterThan(0);
@@ -1745,22 +2177,177 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
-  it('fills a leaf still to prove on a dark page with a pale leaf, never the page showing through', async () => {
+  /** Where each branch of the headline journey's refusals or failures leaves the trunk: the knot most of its scenarios
+   *  broke at (the run's hop) or, where none broke, the last hop of their route. */
+  const refusals = () => {
+    const w = (0, eval)('({ gw, gbModel, gbWound })'), B = w.gw.B, M = w.gw.M || w.gbModel(), S = w.gw.state;
+    const out: Array<{ id: string; tree: number; end: string; d: number; ra: number; side: boolean; failed: number }> = [];
+    B.L.trees.forEach((T: any, ti: number) => {
+      for (const b of T.br.filter((x: any) => x.pol)) {
+        const j = b.j, P = B.pad[b.id], n = new Map<string, number>();
+        for (const x of P.leaves) {
+          const wd = w.gbWound(M, j, x), ix = j.units.indexOf(x.unit), real = j.units.filter((id: string) => !M.U[id]?.root);
+          const end = wd ?? (x.scenarioKind !== 'happy' && ix >= 0 ? x.unit : real[real.length - 1]);
+          n.set(end, (n.get(end) ?? 0) + 1);
+        }
+        const end = [...n].sort((a, c) => c[1] - a[1])[0]![0], q = T.knots.find((k: any) => k.on === 't' && k.ids.includes(end));
+        if (!q) { out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Infinity, ra: 0, side: false, failed: 0 }); continue; }
+        const p0 = b.pts[0], conv = Math.sign(q.n[0] * q.side);
+        out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Math.hypot(p0[0] - q.bp[0], p0[1] - q.bp[1]), ra: q.ra, side: conv === Math.sign(b.dir), failed: P.leaves.filter((x: any) => S.run[x.id]?.st === 'fail').length });
+      }
+    });
+    return out;
+  };
+
+  it('grows the branch of what the headline journey refuses from the knot where its scenarios break, or end', async () => {
+    const { dir, state } = await grownWithFailure();
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      let unbroken = 0;
+      for (const [name, s] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['failed', state]] as const) {
+        const page = await treePage(browser, server.url, s, { width: 1440, reduce: true });
+        await page.waitForTimeout(400);
+        const got = await page.evaluate(refusals);
+        expect(got.length, name).toBeGreaterThan(0);
+        // its collar is that knot: the branch's first point within the knot's boss and six pixels, on the side the boss stands
+        for (const r of got) {
+          expect(r.d, name + ' ' + r.id + ' at ' + r.end).toBeLessThanOrEqual(r.ra + 6);
+          expect(r.side, name + ' ' + r.id + ' on its knot\'s convex side').toBe(true);
+          if (!r.failed) unbroken++;
+        }
+        if (name === 'plotline') expect(got.find((r) => r.id === 'j1~guard')?.end, name).toBe('POST /seats');
+        await page.close();
+      }
+      // and a branch none of whose scenarios failed sits at the last hop they run
+      expect(unbroken).toBeGreaterThan(0);
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet the legend\u2019s dashed rim round nothing on the tree too, the lists and the legend marking them the same way', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
+    const paint = () => {
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+      const rgba = (c: string) => { if (c === 'none') return null; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return a! < 200 ? null : [r! / 255, g! / 255, b! / 255]; };
+      (window as any).__lab = (c: string) => {
+        const v = rgba(c); if (!v) return null;
+        const lin = v.map((x) => (x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4));
+        const X = (.4124 * lin[0]! + .3576 * lin[1]! + .1805 * lin[2]!) / .95047, Y = .2126 * lin[0]! + .7152 * lin[1]! + .0722 * lin[2]!, Z = (.0193 * lin[0]! + .1192 * lin[1]! + .9505 * lin[2]!) / 1.08883;
+        const f = (t: number) => (t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+        // (lum: the luminance the no-hole check has always read, weighted over the painted values)
+        return { L: 116 * f(Y) - 16, a: 500 * (f(X) - f(Y)), b: 200 * (f(Y) - f(Z)), lum: .2126 * v[0]! + .7152 * v[1]! + .0722 * v[2]! };
+      };
+    };
+    try {
+      for (const width of [1440, 390]) {
+        // a passed leaf, from the plotline grow
+        const pl = await treePage(browser, server.url, folded('plotline-seats.jsonl'), { width, scheme: 'dark', reduce: true });
+        await pl.evaluate(paint);
+        const pass = await pl.evaluate(() => { const e = document.querySelector('.gw-svg.gb .gb-lf.pass:not(.gone):not(.pv-out) .blade'); return e ? (window as any).__lab(getComputedStyle(e).fill) : null; });
+        expect(pass, width + 'px a passed leaf').not.toBeNull();
+        await pl.close();
+        const page = await treePage(browser, server.url, folded('tracegrove-max.jsonl'), { width, scheme: 'dark', reduce: true });
+        await page.waitForTimeout(400);
+        await page.evaluate(paint);
+        const look = await page.evaluate(() => {
+          const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
+          const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { fill: lab(c.fill), stroke: lab(c.stroke), sw: parseFloat(c.strokeWidth), bud: !!e.closest('.bud') }; });
+          return { bg, prove: each('.gw-svg.gb .gb-lf:is(.in,.idle):not(.gone):not(.pv-add):not(.pv-out):not(.pre) .blade'), none: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf.none:not(.gone):not(.bud) .blade')).map((e) => { const c = getComputedStyle(e); return { fill: c.fill, stroke: lab(c.stroke), dash: c.strokeDasharray }; }) };
+        });
+        expect(look.prove.length, width + 'px').toBeGreaterThan(3);
+        const hue = (c: { a: number; b: number }) => Math.atan2(c.b, c.a) * 180 / Math.PI;
+        for (const l of look.prove) {
+          // an opaque neutral fill a step off the page: neither green nor the page, and no hole
+          expect(l.fill, width + 'px a leaf to prove with no fill').not.toBeNull();
+          expect(Math.abs(l.fill!.a), width + 'px fill a*').toBeLessThan(6);
+          expect(Math.abs(l.fill!.b), width + 'px fill b*').toBeLessThan(6);
+          expect(l.fill!.L, width + 'px fill a step off the page').toBeGreaterThanOrEqual(look.bg.L + 3);
+          // rimmed in the passed leaf's green, so it reads as a leaf of the same kind not yet filled
+          expect(l.stroke, width + 'px a leaf to prove with no rim').not.toBeNull();
+          expect(Math.abs(hue(l.stroke!) - hue(pass!)), width + 'px rim hue against a passed leaf').toBeLessThanOrEqual(10);
+          expect(Math.hypot(l.stroke!.a, l.stroke!.b), width + 'px rim chroma').toBeGreaterThan(20);
+          if (!l.bud) expect(l.sw, width + 'px rim width').toBeGreaterThanOrEqual(1.45);
+          // and never read as passed: twenty L* or more from a passed leaf's fill
+          expect(Math.abs(pass!.L - l.fill!.L), width + 'px L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
+        }
+        // a leaf with no flow yet is drawn as the legend draws it, a dashed rim round nothing (no fill at all), its rim a light
+        // green that stands off the page, so it is never read as a filled, passed leaf
+        expect(look.none.length, width + 'px').toBeGreaterThan(0);
+        for (const l of look.none) {
+          expect(l.fill, width + 'px no-flow leaf fill').toBe('none');
+          expect(l.dash, width + 'px no-flow leaf rim').not.toBe('none');
+          expect(l.stroke, width + 'px no-flow leaf with no rim').not.toBeNull();
+          expect(l.stroke!.L - look.bg.L, width + 'px no-flow rim against the page').toBeGreaterThan(30);
+        }
+        // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as a dashed rim
+        // over the page, never a filled leaf
+        const marks = await page.evaluate(() => {
+          const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
+          // (what a mark sits on: the nearest box under it that paints a background)
+          const back = (e: Element) => { for (let a = e.parentElement; a; a = a.parentElement) { const v = lab(getComputedStyle(a).backgroundColor); if (v) return v; } return bg; };
+          const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { where: e.closest('.gw-legend') ? 'legend' : e.closest('.gw-g') ? 'list' : 'other', fill: lab(c.fill), stroke: lab(c.stroke), dash: c.strokeDasharray, back: back(e) }; });
+          return { bg, prove: each('.gw-sw .lf.in'), none: each('.gw-sw .lf.none') };
+        });
+        expect(marks.prove.filter((l) => l.where === 'legend').length, width + 'px the legend’s mark to prove').toBeGreaterThan(0);
+        expect(marks.prove.filter((l) => l.where === 'list').length, width + 'px a list’s glyph to prove').toBeGreaterThan(0);
+        for (const l of marks.prove) {
+          const at = width + 'px ' + l.where + ' mark to prove';
+          expect(l.fill, at + ' with no fill').not.toBeNull();
+          expect(Math.abs(l.fill!.a), at + ' fill a*').toBeLessThan(6);
+          expect(Math.abs(l.fill!.b), at + ' fill b*').toBeLessThan(6);
+          expect(l.fill!.L, at + ' fill a step off the page').toBeGreaterThanOrEqual(Math.max(marks.bg.L, l.back.L) + 3);
+          expect(l.stroke, at + ' with no rim').not.toBeNull();
+          expect(Math.abs(hue(l.stroke!) - hue(pass!)), at + ' rim hue against a passed leaf').toBeLessThanOrEqual(10);
+          expect(Math.hypot(l.stroke!.a, l.stroke!.b), at + ' rim chroma').toBeGreaterThan(20);
+          expect(Math.abs(pass!.L - l.fill!.L), at + ' L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
+        }
+        expect(marks.none.filter((l) => l.where === 'legend').length, width + 'px the legend’s mark for no flow yet').toBeGreaterThan(0);
+        for (const l of marks.none) {
+          const at = width + 'px ' + l.where + ' mark for no flow yet';
+          expect(l.dash, at + ' rim').not.toBe('none');
+          if (l.fill) expect(Math.abs(l.fill.L - l.back.L), at + ' over the page').toBeLessThanOrEqual(3);
+        }
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
+  it('draws a leaf with no flow yet as one in the paint its pad first says so: a mode chosen and nothing run yet, each such leaf is dashed and each pad counts as many as it draws', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
+      // the plotline grow as it stands the moment its mode is chosen, before any scenario runs
+      const s = freshGrow();
+      for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl'), 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line) as GrowEvent; applyGrow(s, ev);
+        if (ev.kind === 'mode.chosen') break;
+      }
       for (const width of [1440, 390]) {
-        const page = await treePage(browser, server.url, folded('tracegrove-max.jsonl'), { width, scheme: 'dark', reduce: true });
-        await page.waitForTimeout(400);
-        const look = await page.evaluate(() => {
-          // a colour as the page paints it, whatever space it was mixed in: none or clear counts as a hole
-          const ctx = document.createElement('canvas').getContext('2d')!;
-          const lum = (c: string) => { if (c === 'none') return -1; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return a! < 200 ? -1 : (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255; };
-          const bg = lum(getComputedStyle(document.body).backgroundColor);
-          return { bg, leaves: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf:is(.in,.idle,.none):not(.gone):not(.bud) .blade')).map((e) => lum(getComputedStyle(e).fill)) };
+        const page = await growPage(browser, server.url, s, width, width < 500);
+        await page.waitForTimeout(600);
+        const seen = await page.evaluate(() => {
+          const gw = (0, eval)('gw'), B = gw.B, S = gw.state, out: string[] = [];
+          let none = 0, drawn = 0;
+          for (const x of S.scenarios as Array<{ id: string; flow?: string | null }>) {
+            const el = B.leaf[x.id] as Element | undefined;
+            if (!el || el.classList.contains('gone') || el.classList.contains('pv-out')) continue;
+            drawn++;
+            const want = x.flow ? 'in' : 'none';
+            if (!el.classList.contains(want)) out.push(x.id + ' is drawn "' + el.getAttribute('class') + '" where its pad says ' + (x.flow ? 'to prove' : 'no flow yet'));
+            if (!x.flow) none++;
+          }
+          // the pads' words, where pads carry words (on a phone a pad wears its badge), count the same leaves
+          const said = (Object.values(B.lbl) as Array<{ el: Element }>).map((l) => l.el.textContent || '').join(' · ');
+          const counted = [...said.matchAll(/(\d+) no flow yet/g)].reduce((a, m) => a + Number(m[1]), 0);
+          return { none, drawn, counted, said, out, narrow: !!B.L.narrow };
         });
-        expect(look.leaves.length, width + 'px').toBeGreaterThan(3);
-        for (const l of look.leaves) expect(l - look.bg, width + 'px pending leaf against the page').toBeGreaterThan(0.3);
+        expect(seen.drawn, width + 'px').toBeGreaterThan(2);
+        expect(seen.none, width + 'px a leaf with no flow yet').toBeGreaterThan(0);
+        if (!seen.narrow) expect(seen.counted, width + 'px ' + seen.said).toBe(seen.none);
+        expect(seen.out, width + 'px').toEqual([]);
         await page.close();
       }
     } finally { await browser.close(); }
@@ -1861,20 +2448,22 @@ describe('Grow page', () => {
       if (g.tip[1] - g.base[1] > 0.4 * Math.hypot(g.tip[0] - g.base[0], g.tip[1] - g.base[1])) bad('dormant bud hangs', g.kid);
       if ([0.5, 0.75, 1].some((f) => onWood(g.base[0] + (g.tip[0] - g.base[0]) * f, g.base[1] + (g.tip[1] - g.base[1]) * f))) bad('dormant bud grows back into the wood', g.kid);
     }
-    // its count of the checks its leaves do not show: a bud-shaped tag tied at its own tip
+    // its count of the checks its leaves do not show: the swollen tip of its own shoot (a dormant knot's, of the short stub it
+    // puts out), a bud set on the very end of the shoot's path and turned to its tangent there, with no tie
     for (const g of [...gs, ...rest]) {
       const t = g.g?.querySelector('.shtag'), shown = !!t && getComputedStyle(t).display !== 'none';
       out.counts.push({ parts: g.uids.map(label), leaves: g.g ? g.g.querySelectorAll('.gb-lf.bud:not(.gone)').length : 0, more: shown ? Number(String(t.querySelector('.shn').textContent).replace('+', '')) : 0 });
       if (!shown) continue;
       out.tags++;
-      const tie = (t.querySelector('.shtie')?.getAttribute('d') ?? '').match(/[-\d.]+/g)?.map(Number) ?? [], bud = t.querySelector('.sbud'), r = bud.getBBox();
-      if (Math.hypot(tie[0]! - g.tip[0], tie[1]! - g.tip[1]) > 3) bad('count tied off its shoot tip', g.kid);
-      if (tie[2]! < r.x - 1 || tie[2]! > r.x + r.width + 1 || tie[3]! < r.y - 1 || tie[3]! > r.y + r.height + 1) bad('tie ends off its tag', g.kid);
-      // tied in the open: the tie never runs over or behind the wood to a tag on the limb's far side
-      for (let i = 1; i <= 10; i++) { const f = i / 10; if (onWood(tie[0]! + (tie[2]! - tie[0]!) * f, tie[1]! + (tie[3]! - tie[1]!) * f)) { bad('count tied across the wood', g.kid); break; } }
-      // a bud, not a pill: round at the tie, drawn to a point away from it
+      for (const e of Array.from(t.querySelectorAll('.shtie')) as SVGPathElement[]) if (e.getAttribute('d') && e.getTotalLength() > 0) bad('count tied by a hairline', g.kid);
+      const bud = t.querySelector('.sbud'), r = bud.getBBox(), m = bud.transform.baseVal.consolidate()?.matrix, P = g.pts as number[][] | undefined;
+      if (!P || P.length < 2) { bad('count with no shoot of its own', g.kid); continue; }
+      const end = P[P.length - 1]!, prev = P[P.length - 3] ?? P[0]!;
+      if (!m || Math.hypot(m.e - end[0]!, m.f - end[1]!) >= 1) bad('count off its shoot’s tip', [g.kid, m ? [m.e, m.f] : null, end]);
+      else { let da = Math.abs(Math.atan2(m.b, m.a) - Math.atan2(end[1]! - prev[1]!, end[0]! - prev[0]!)) * 180 / Math.PI; if (da > 180) da = 360 - da; if (da > 12) bad('count not turned to its shoot’s tangent', [g.kid, Math.round(da)]); }
+      // a bud, not a pill: round at its foot on the tip, drawn to a point away from it, on along the shoot
       const d = bud.getAttribute('d') || '', nums = (d.match(/-?[\d.]+/g) || []).map(Number), apex = [nums[0]!, nums[1]!];
-      if (/[aA]/.test(d) || Math.hypot(apex[0]! - tie[2]!, apex[1]! - tie[3]!) < Math.max(r.width, r.height) * 0.8) bad('count tag is not a bud pointing away from its tie', g.kid);
+      if (/[aA]/.test(d) || Math.hypot(apex[0]!, apex[1]!) < Math.max(r.width, r.height) * 0.8 || apex[0]! <= 0) bad('count tag is not a bud pointing on from its shoot', g.kid);
     }
     const all = [...gs, ...rest];
     for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
@@ -1894,17 +2483,18 @@ describe('Grow page', () => {
       if (el.closest('.budg')) bad('graft bud on a shoot');
       if (!el.querySelector('ellipse.gring')) bad('graft bud with no swelling');
     }
-    // one swelling of the bark for each flow, or past two one swelling marked with how many: bark-toned, longer along the grain
-    // than across it, lit on its rim and tipped with a tiny bud; never a ring
+    // one swelling of the bark for each flow, up to five, and past five the fifth carries the rest as a count bud: bark-toned,
+    // longer along the grain than across it, lit on its rim and tipped with a tiny bud; never a ring, and never '×N' text
     const byKnot = new Map<string, any[]>();
     for (const r of B.graftR ?? []) byKnot.set(r.kid, [...(byKnot.get(r.kid) ?? []), r]);
     const rgb = (c: string) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    if (document.querySelector('.gw-svg.gb .gnum')) bad('graft count written as \u00d7N');
     for (const [kid, rs] of byKnot) {
       const els = rs.map((r: any) => B.bud[r.xid]).filter((e: Element | undefined) => e && !e.classList.contains('gone'));
       const drawn = els.filter((e: Element) => getComputedStyle(e.querySelector('.gsw')!).display !== 'none');
-      if (drawn.length !== (rs.length > 2 ? 1 : rs.length)) bad('graft swellings for ' + rs.length + ' flows', [kid, drawn.length]);
-      const num = drawn.map((e: Element) => e.querySelector('.gnum')?.textContent ?? '');
-      if (rs.length > 2 ? num.join() !== '\u00d7' + rs.length : num.some(Boolean)) bad('graft count', [kid, num]);
+      if (drawn.length !== Math.min(5, rs.length)) bad('graft swellings for ' + rs.length + ' flows', [kid, drawn.length]);
+      const num = drawn.map((e: Element) => e.querySelector('.shtag .shn')?.textContent ?? '').filter(Boolean);
+      if (rs.length > 5 ? num.join() !== '+' + (rs.length - 5) : num.length) bad('graft count', [kid, num]);
       for (const e of drawn) {
         const b = e.querySelector('ellipse.gring')!, rx = Number(b.getAttribute('rx')), ry = Number(b.getAttribute('ry'));
         if (!(rx >= 3.5 && rx <= 5 && ry >= 2 && ry <= 3 && rx > ry)) bad('graft swelling not about 8 by 5', [kid, rx, ry]);
@@ -1917,7 +2507,46 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('grows Max out of the wood: limbs from their parents, bosses on the bend, shoots apart and tied to their counts, existing flows as graft buds', async () => {
+  /** The existing flows as the tree shows them, knot by knot: one swelling of the bark for each flow, up to five, strung along
+   *  the grain at least two radii apart, each centred within its radius of the limb's bark; past five the fifth carries the rest
+   *  as a count bud, '+N'. Nothing is ever written '×N'. */
+  const graftBuds = () => {
+    const B = (0, eval)('gw').B, out = { knots: 0, swellings: 0, counts: [] as string[], bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const seen = (e: Element | null) => { if (!e) return false; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return false; } return e.getBoundingClientRect().width > 0; };
+    if (B.svg.querySelector('.gnum')) bad('an existing flow counted in ×N text');
+    const wood = (Array.from(B.svg.querySelectorAll('path')) as any[]).filter((p) => p.__pts && !p.closest('.stub') && seen(p));
+    const inW = (x: number, y: number) => wood.some((p) => p.isPointInFill(new DOMPoint(x, y)));
+    const byKnot = new Map<string, any[]>();
+    for (const r of B.graftR ?? []) byKnot.set(r.kid, [...(byKnot.get(r.kid) ?? []), r]);
+    for (const [kid, rs] of byKnot) {
+      const els = rs.map((r: any) => [r, B.bud[r.xid]] as [any, Element]).filter(([, e]) => seen(e));
+      if (!els.length) continue;
+      out.knots++;
+      const sw = els.filter(([, e]) => seen(e.querySelector('.gsw')));
+      out.swellings += sw.length;
+      if (sw.length !== Math.min(5, rs.length)) bad('swellings for ' + rs.length + ' flows', [kid, sw.length]);
+      const c = sw.map(([r, e]) => { const g = e.querySelector('ellipse.gring')!; return [Number(g.getAttribute('cx')), Number(g.getAttribute('cy')), r.r as number]; });
+      for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) {
+        const d = Math.hypot(c[i]![0]! - c[j]![0]!, c[i]![1]! - c[j]![1]!);
+        if (d < 2 * Math.max(c[i]![2]!, c[j]![2]!) - .01) bad('two swellings nearer than two radii', [kid, +d.toFixed(1)]);
+      }
+      // the bark runs within one radius of its centre: some of the disc is wood and some is not
+      for (const [x, y, R] of c) {
+        const s0 = inW(x!, y!);
+        let edge = false;
+        for (let a = 0; a < 32 && !edge; a++) for (const f of [.25, .5, .75, 1]) if (inW(x! + Math.cos(a * Math.PI / 16) * R! * f, y! + Math.sin(a * Math.PI / 16) * R! * f) !== s0) { edge = true; break; }
+        if (!edge) bad('swelling further than its radius from the bark', [kid, Math.round(x!), Math.round(y!)]);
+      }
+      const tags = sw.map(([, e]) => e.querySelector('.shtag')).filter(seen);
+      const txt = tags.map((t) => t!.querySelector('.shn')?.textContent ?? '');
+      if (rs.length > 5 ? txt.join() !== '+' + (rs.length - 5) : tags.length) bad('count on the swellings', [kid, rs.length, txt]);
+      if (txt.length) out.counts.push(txt.join());
+    }
+    return out;
+  };
+
+  it('grows Max out of the wood: limbs from their parents, bosses on the bend, shoots apart and each count the swollen tip of its own shoot, existing flows as graft buds', async () => {
     const { dir, state } = await grownBushy();
     // four existing flows that reach one part on the first journey
     const j1 = state.journeys[0]!, unit = j1.units.find((id) => state.scenarios.some((x) => x.unit === id && x.mode === 'max' && !x.journey)) ?? j1.units[0]!;
@@ -1951,6 +2580,9 @@ describe('Grow page', () => {
         expect(g.shoots, width + 'px').toBeGreaterThan(1);
         expect(g.rings.length, width + 'px').toBe(4);
         for (const a of g.rings) expect(a).toMatch(/^Existing flow it re-checks: An existing flow \d still holds, /);
+        const gb = await page.evaluate(graftBuds);
+        expect(gb.bad, width + 'px').toEqual([]);
+        expect([gb.knots, gb.swellings, gb.counts], width + 'px').toEqual([1, 4, []]);
         // the knot's card counts its part checks and the existing flows that reach it; a graft bud's card says what it is
         const cards = await page.evaluate((id) => {
           const w = (0, eval)('gw'), B = w.B, kn = B.knot[id], ring = B.svg.querySelector('.gb-gr:not(.gone)');
@@ -1962,6 +2594,14 @@ describe('Grow page', () => {
         expect(cards.knot).toMatch(/\d+ in Max · (\d+ part checks? · )?4 existing flows/);
         expect(cards.ring).toContain('existing flow');
         expect(cards.ring).toContain('An existing flow');
+        // seven flows through that part: five swellings, the fifth carrying the other two as a count bud
+        const rg0 = state.scenarios.find((x) => x.id === 'rg0')!;
+        await paint({ ...state, scenarios: [...state.scenarios, ...[4, 5, 6].map((i) => ({ ...rg0, id: 'rg' + i, title: 'An existing flow ' + (i + 1) + ' still holds', flow: 'flow.' + i }))] });
+        const g7 = await page.evaluate(graftBuds);
+        expect(g7.bad, width + 'px seven flows').toEqual([]);
+        expect([g7.knots, g7.swellings, g7.counts], width + 'px seven flows').toEqual([1, 5, ['+2']]);
+        expect((await page.evaluate(growth)).bad, width + 'px seven flows').toEqual([]);
+        await paint(state);
         // every knot's part checks are on its own shoot or dormant bud and nowhere else: its leaves and its count add up to what
         // the Outline rolls up for that knot's parts
         expect(g.tags, width + 'px').toBeGreaterThan(0);
@@ -1972,8 +2612,409 @@ describe('Grow page', () => {
         expect(g.counts.flatMap((c) => c.parts).filter((p) => rolled[p]).sort(), width + 'px').toEqual(Object.keys(rolled).sort());
         await page.close();
       }
+      // On the recorded trees in Max, every count shown is the tip of a shoot that grows from a knot's boss, or for a root's
+      // checks from the trunk above that root's flare: never from the soil, the root, bare trunk or the air, and never tied.
+      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, { ...folded(file), mode: 'max' }, width, width < 500);
+        await page.waitForTimeout(2500);
+        const t = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, out = { n: 0, bad: [] as string[] };
+          const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+          const pt = (x: number, y: number) => new DOMPoint(x, y);
+          const trunks = (L.trees as any[]).map((T, ti) => (Array.from(B.svg.querySelectorAll('path.w')) as any[]).find((e) => e.__pts && e.__pts.length === T.tp.length && [0, L.xs[ti]].some((X) => Math.hypot(e.__pts[0][0] - T.tp[0][0] - X, e.__pts[0][1] - T.tp[0][1]) < .5))).filter(Boolean) as SVGGeometryElement[];
+          if (!trunks.length) bad('no trunk to measure against');
+          const inTrunk = (q: number[]) => trunks.some((e) => e.isPointInFill(pt(q[0]!, q[1]!)));
+          const knots = [...new Set(Object.values(B.knot))].map((e: any) => e.__geo).filter(Boolean);
+          for (const g of [...(B.shootGeo ?? []), ...(B.shootRest ?? [])] as any[]) {
+            const tag = g.g?.querySelector('.shtag');
+            if (!tag || getComputedStyle(tag).display === 'none' || g.g.closest('.gone')) continue;
+            out.n++;
+            for (const e of Array.from(tag.querySelectorAll('.shtie')) as SVGPathElement[]) if (e.getAttribute('d') && e.getTotalLength() > 0) bad('count tied by a hairline', g.kid);
+            const P = g.pts as number[][] | undefined, m = tag.querySelector('.sbud')?.transform.baseVal.consolidate()?.matrix;
+            if (!P || P.length < 2 || !m) { bad('count with no shoot of its own', g.kid); continue; }
+            const end = P[P.length - 1]!, base = P[0]!;
+            if (Math.hypot(m.e - end[0]!, m.f - end[1]!) >= 1) bad('count off its shoot’s tip', [g.kid, Math.round(Math.hypot(m.e - end[0]!, m.f - end[1]!))]);
+            if (!(m.f < L.sy(m.e) - 24)) bad('count within 24 px of the soil', [g.kid, Math.round(L.sy(m.e) - m.f)]);
+            const atKnot = knots.some((k: any) => Math.hypot(base[0]! - k.p[0], base[1]! - k.p[1]) <= k.ra + 2);
+            const onTrunk = inTrunk(base) && base[1]! < L.sy(base[0]!) - 24;
+            if (!atKnot && !onTrunk) bad('shoot from neither a knot nor the trunk above the flare', [g.kid, base.map(Math.round)]);
+            // no more than 3 px of it under the trunk's bark
+            let under = 0;
+            for (let i = 1; i < P.length; i++) { const a = P[i - 1]!, b = P[i]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!), n = Math.max(1, Math.ceil(l / .25)); for (let k = 0; k < n; k++) { const f = (k + .5) / n; if (inTrunk([a[0]! + (b[0]! - a[0]!) * f, a[1]! + (b[1]! - a[1]!) * f])) under += l / n; } }
+            if (under > 3) bad('shoot runs under the trunk for', [g.kid, +under.toFixed(1)]);
+          }
+          return out;
+        });
+        expect(t.bad, name + ' ' + width + 'px').toEqual([]);
+        expect(t.n, name + ' ' + width + 'px counts shown').toBeGreaterThan(0);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 120000);
+
+  it('strings the existing flows along the limb, one swelling to a flow, on tracegrove folded in Max and on plotline under Max’s preview', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        // tracegrove itself in Max: its four existing flows all reach one part
+        const page = await growPage(browser, server.url, folded('tracegrove-max.jsonl'), width, width < 500);
+        await page.waitForTimeout(2500);
+        const g = await page.evaluate(graftBuds);
+        expect(g.bad, 'tracegrove ' + width + 'px').toEqual([]);
+        expect([g.knots, g.swellings, g.counts], 'tracegrove ' + width + 'px').toEqual([1, 4, []]);
+        await page.close();
+        // plotline in Minimum with Max pointed at: its existing flows ghost on the tree as Max would grow them
+        const min = { ...folded('plotline-seats.jsonl'), asked: false, modeBy: 'you' as const, mode: 'min' as const };
+        const pv = await growPage(browser, server.url, min, width);
+        await pv.waitForTimeout(1500);
+        await pv.getByTestId('grow-mode-max').scrollIntoViewIfNeeded();
+        const bb = (await pv.getByTestId('grow-mode-max').boundingBox())!;
+        await pv.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+        await expect.poll(() => pv.getByTestId('grow-mode-preview').innerText().catch(() => '')).toContain('as ghosts on the tree');
+        const h = await pv.evaluate(graftBuds);
+        expect(h.bad, 'plotline preview ' + width + 'px').toEqual([]);
+        expect(h.swellings, 'plotline preview ' + width + 'px').toBe(4);
+        await pv.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
+  /** Every shown name's leader against every count drawn on the tree, in page pixels: the nearest each leader comes to the box
+   *  of any count, its own knot's included. */
+  const leadersByCounts = () => {
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement;
+    const boxes = (Array.from(svg.querySelectorAll('.shtag')) as SVGGraphicsElement[]).map((e) => e.getBoundingClientRect()).filter((q) => q.width > 0);
+    const near: Array<[string, number]> = [];
+    for (const id in B.klbl) {
+      const t = B.klbl[id] as Element & { __ld?: SVGPathElement }, ld = t.__ld;
+      if (!t.classList.contains('on') || !ld || !ld.getAttribute('d')) continue;
+      const m = ld.getScreenCTM()!, len = ld.getTotalLength();
+      let d = Infinity;
+      for (let s = 0; s <= len; s += 0.5) {
+        const q = ld.getPointAtLength(s), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f;
+        for (const o of boxes) d = Math.min(d, Math.hypot(Math.max(o.left - x, 0, x - o.right), Math.max(o.top - y, 0, y - o.bottom)));
+      }
+      near.push([t.textContent ?? '', Math.round(d * 10) / 10]);
+    }
+    return { counts: boxes.length, near };
+  };
+
+  it('keeps every name\u2019s leader two pixels or more off the box of every count, its own knot\u2019s too, in each tree the plotline grow paints as it drafts and on the recorded trees', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const bad: unknown[] = []; let met = 0;
+      const look = async (page: import('playwright').Page, at: string) => {
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const r = await page.evaluate(leadersByCounts);
+        if (r.counts && r.near.length) met++;
+        for (const [name, d] of r.near) if (d < 2) bad.push(at + ': ' + name + ' ' + d + 'px');
+      };
+      // the plotline grow as it comes in, each tree it paints on the way, at a desk and on a phone
+      for (const width of [1440, 390]) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 }, hasTouch: width < 500, isMobile: width < 500 });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        await page.evaluate(() => { (0, eval)('gw').tree = 'grove'; });
+        const s = freshGrow();
+        for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl'), 'utf8').split('\n')) {
+          if (!line.trim()) continue;
+          const ev = JSON.parse(line) as GrowEvent; applyGrow(s, ev);
+          if (!['unit.found', 'trunk.grown', 'journey.found', 'scenario.drafted', 'layer.needed', 'flows.checked', 'mode.asked', 'mode.chosen', 'scenario.passed', 'scenario.failed'].includes(ev.kind)) continue;
+          await paintState(page, s);
+          if (await page.locator('[data-testid="grow"] svg.gb[role=group]').count()) await look(page, 'plotline ' + width + 'px after ' + ev.seq + ' ' + ev.kind);
+        }
+        await page.close();
+        // and each recorded tree in Max
+        for (const [name, label] of recorded) {
+          const mx = { ...folded(name), asked: false, modeBy: 'you' as const, mode: 'max' as const };
+          const pg = await growPage(browser, server.url, mx, width, width < 500);
+          await look(pg, label + ' Max ' + width + 'px');
+          await pg.close();
+        }
+      }
+      expect(bad).toEqual([]);
+      expect(met).toBeGreaterThan(4);
+    } finally { await browser.close(); }
+  }, 180000);
+
+  /** The wood a pad sits on, from the drawn page: each branch's girth where it leaves the trunk against the trunk's there, each
+   *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
+   *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
+  const ramify = () => {
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }>, forks: [] as Array<{ id: string; min: number; n: number }>, tall: [] as Array<{ Ht: number; D: number; low: number; crest: boolean; under: number }>, crest: [] as Array<{ sw: number; lum: number; others: number[]; lums: number[] }> };
+    for (const T of L.trees) for (const b of T.br) {
+      out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk);
+      // its girth a caliper and a half (of its own) past the trunk's side, against its collar's
+      const s = b.Tk / 2 + 1.5 * b.b; let i = 1; while (i < b.acc.length - 1 && b.acc[i] < s) i++;
+      out.holds.push(b.w[i] / b.b);
+      // and a refusals' branch on out under its pad to where its first twigs fork (under its inner cushion, at most six tenths
+      // of its run): its collar's girth all the way, so it never reads as a wire
+      if (b.pol) { const g = T.pads[b.id].geo, P0 = b.pts[0], xIn = Math.min(...g.cs.filter((c: any) => c.seat !== null).map((c: any) => b.inner + g.PW / 2 + c.x * b.dir - .66 * c.a), b.inner + g.PW / 2);
+        let mn = Infinity, n = 0; b.pts.forEach((q: number[], k: number) => { const x = (q[0]! - P0[0]) * b.dir; if (x >= b.Tk / 2 && x <= xIn && b.acc[k] <= .6 * b.len) { mn = Math.min(mn, b.w[k] / b.b); n++; } });
+        out.forks.push({ id: b.id, min: mn, n }); }
+      // a raised crest's riser: how many limbs fork off it just under the crest, each leaving it no more than ten pixels
+      // under the crest's underside (so the crest sits on one limb that ramifies under it, not on stilts from low down)
+      const rz = (b.twigs ?? []).find((t: any) => t.lb), cr = T.pads[b.id]?.geo.cs.find((c: any) => c.role === 'crest' && c.seat === null);
+      if (rz && cr) { const yb = b.o[1] + cr.b; out.risers.push({ id: b.id, forks: (b.twigs as any[]).filter((t) => t.c && t.c.pts === rz.pts && t.pts[0][1] - yb >= 0 && t.pts[0][1] - yb <= 10).length }); }
+    }
+    // each trunk's height against its girth, and how high its lowest branch leaves it; and whether its crown's crest is raised
+    for (const T of L.trees) out.tall.push({ Ht: T.Ht, D: T.D, low: Math.min(...T.hs) * T.Ht, crest: T.pads[T.apex.id]?.geo.cs.some((c: any) => c.role === 'crest' && c.seat === null) ?? false, under: T.knots.filter((q: any) => q.on === 't' && q.k < Math.min(...T.br.map((b: any) => b.k))).reduce((a: number, q: any) => a + (q.ids ?? [q.id]).length, 0) });
+    // the crown's crest's rim against every other cushion's: its width and how dark it is
+    { const lumOf = (c: string) => { const n = (c.match(/[\d.]+/g) ?? []).map(Number), [r, g, b] = c.startsWith('color(') ? n.slice(0, 3) : n.slice(0, 3).map((v) => v / 255); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+      for (const T of L.trees) { const cp = B.pad[T.apex.id]; if (!cp) continue; const cr = cp.el.querySelector('.cush.ccr .pfill'); if (!cr) continue;
+        const others = (Array.from(svg.querySelectorAll('.cush .pfill')) as Element[]).filter((f) => f !== cr && f.getBoundingClientRect().width > 0).map((f) => getComputedStyle(f));
+        out.crest.push({ sw: parseFloat(getComputedStyle(cr).strokeWidth), lum: lumOf(getComputedStyle(cr).stroke), others: others.map((c) => parseFloat(c.strokeWidth)), lums: others.map((c) => lumOf(c.stroke)) }); } }
+    // a point and the arc length along a polyline, both ways
+    const acc = (p: number[][]) => p.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), a), []);
+    const proj = (p: number[][], q: number[]) => { const A = acc(p); let best = Infinity, s = 0; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, vx = c[0]! - a[0]!, vy = c[1]! - a[1]!, l = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q[0]! - a[0]!) * vx + (q[1]! - a[1]!) * vy) / l)), d = Math.hypot(q[0]! - a[0]! - vx * t, q[1]! - a[1]! - vy * t); if (d < best) { best = d; s = A[i - 1]! + t * Math.sqrt(l); } } return s; };
+    const at = (A: number[], s: number, v: number[]) => { let i = 1; while (i < A.length - 1 && A[i]! < s) i++; const t = Math.max(0, Math.min(1, (s - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))); return v[i - 1]! + (v[i]! - v[i - 1]!) * t; };
+    for (const e of Array.from(svg.querySelectorAll('path.w')) as any[]) {
+      if (!e.__par || !e.__pw || getComputedStyle(e).display === 'none') continue;
+      const pts: number[][] = e.__pts, wd: number[] = e.__w, b = wd[0]!, pp: number[][] = e.__par, Tk: number = e.__pw[e.__pk], A = acc(pts), half = at(A, Tk / 2, wd) / 2, sk = acc(pp)[e.__pk]!;
+      const fills = (e.__on as Element[]).filter((f) => f.tagName === 'path' && f.isConnected && !f.closest('clipPath') && !f.classList.contains('filsh'));
+      const along = fills.map((f) => { const n = (f.getAttribute('d')!.match(/-?[\d.]+/g) ?? []).map(Number), a = [n[0]!, n[1]!], c = [n[4]!, n[5]!]; return [(Math.abs(proj(pp, a) - sk) - half) / b, (proj(pts, c) - Tk / 2) / b]; }).flat();
+      out.fillets.push({ id: e.getAttribute('class') + ' ' + Math.round(pts[0]![0]!) + ',' + Math.round(pts[0]![1]!), along });
+    }
+    // every cushion as drawn, its lowest edge and its span; every twig as drawn, sampled every half pixel
+    const fills = Array.from(svg.querySelectorAll('.jg .pfill')).filter((f) => f.getBoundingClientRect().width > 0 && getComputedStyle(f.closest('.cush') ?? f).display !== 'none') as SVGGeometryElement[];
+    const pt = svg.createSVGPoint(), inFill = (x: number, y: number) => fills.some((f) => { const m = f.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return f.isPointInFill(pt); });
+    const twigs = (Array.from(svg.querySelectorAll('path.tw')) as any[]).filter((t) => t.__pts && t.getBoundingClientRect().width > 0).map((t) => { const p: number[][] = t.__pts, s: number[][] = []; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, n = Math.max(1, Math.ceil(Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) * 2)); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); } return s; });
+    for (const pid in B.pad) {
+      const P = B.pad[pid]; if (getComputedStyle(P.jg).display === 'none') continue;
+      P.cu.forEach((c: any, k: number) => {
+        const f = c.el.querySelector('.pfill') as SVGGraphicsElement; if (!f || f.getBoundingClientRect().width === 0 || getComputedStyle(c.el).display === 'none') return;
+        const bb = f.getBBox(), m = svg.getScreenCTM()!.inverse().multiply(f.getScreenCTM()!), p0 = new DOMPoint(bb.x, bb.y).matrixTransform(m), p1 = new DOMPoint(bb.x + bb.width, bb.y + bb.height).matrixTransform(m);
+        const n = twigs.filter((s) => s.some((q) => q[0]! > p0.x && q[0]! < p1.x && q[1]! >= p1.y + 4 && q[1]! <= p1.y + 8 && !inFill(q[0]!, q[1]!))).length;
+        out.cushions.push({ pid, k, n });
+      });
+    }
+    // every twig a cushion is lifted on (not a leaf's own): how much of it shows, clear of every cushion and of the wood it
+    // leaves, so a twig is a short fork under its cushion and never a stilt
+    const limbs = (Array.from(svg.querySelectorAll('path.w')) as SVGGeometryElement[]).filter((e) => e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== 'none');
+    const inWood = (x: number, y: number) => limbs.some((e) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); });
+    (Array.from(svg.querySelectorAll('path.tw:not(.lt)')) as any[]).filter((t) => t.__pts && t.getBoundingClientRect().width > 0 && !t.closest('.off, .gone, .cut') && getComputedStyle(t).display !== 'none').forEach((t) => {
+      const p: number[][] = t.__pts; let n = 0;
+      for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, m = Math.max(1, Math.ceil(Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) * 2)); for (let j = 0; j < m; j++) { const x = a[0]! + (c[0]! - a[0]!) * j / m, y = a[1]! + (c[1]! - a[1]!) * j / m; if (!inFill(x, y) && !inWood(x, y)) n++; } }
+      out.stilts.push({ at: Math.round(p[0]![0]!) + ',' + Math.round(p[0]![1]!), len: n / 2 });
+    });
+    return out;
+  };
+
+  it('grows each branch about four tenths of its trunk, holding that girth a caliper and a half past its collar, filleted into it, onto ramified wood: a raised crest on a riser forked just under it, two or more forked twigs under every cushion, showing below its underside as short forks, never stilts', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    let risers = 0;
+    try {
+      for (const [file, name] of recorded) {
+        const page = await growPage(browser, server.url, folded(file), 1440);
+        await page.waitForTimeout(2500);
+        const r = await page.evaluate(ramify);
+        // a branch leaves at about four tenths of the trunk's girth there, as drawn: never under .36 or over .45 of it
+        expect(r.branches.length, name).toBeGreaterThan(0);
+        for (const q of r.branches) { expect(q, name + ' branch/trunk').toBeGreaterThanOrEqual(.36); expect(q, name + ' branch/trunk').toBeLessThanOrEqual(.45); }
+        // and tapers to about .15 of it in its pad
+        for (const q of r.ends) { expect(q, name + ' branch end/trunk').toBeGreaterThanOrEqual(.12); expect(q, name + ' branch end/trunk').toBeLessThanOrEqual(.18); }
+        // holding its collar's girth for a caliper and a half of its own past the trunk's side before it tapers
+        for (const q of r.holds) expect(q, name + ' branch girth held past its collar').toBeGreaterThanOrEqual(.97);
+        // and a refusals' branch on out under its pad to where its first twigs fork from it: never a wire beside its trunk
+        expect(r.forks.length, name).toBeGreaterThan(0);
+        for (const q of r.forks) { expect(q.n, name + ' ' + q.id).toBeGreaterThan(2); expect(q.min, name + ' ' + q.id + ' girth held out to its first fork').toBeGreaterThanOrEqual(.97); }
+        // a tree is no taller than its rules ask: where its crest stands raised on a riser, the room that takes at the top comes
+        // out of the bare trunk under its lowest branch, so either the trunk is twelve and a half girths tall and no more, or its
+        // lowest branch is down to three and a half girths (or a fifth of the tree's height) above the soil (where that bare
+        // trunk carries no more than one part: the parts every journey shares keep the room their knots need there)
+        for (const t of r.tall) if (t.crest && t.under <= 1) expect(t.Ht <= 12.5 * t.D + 1 || t.low <= Math.max(3.5 * t.D, .2 * t.Ht) + 1, name + ' tree taller than it needs ' + JSON.stringify(t)).toBe(true);
+        expect(r.tall.some((t) => t.crest), name + ' a raised crest').toBe(true);
+        if (name === 'plotline') expect(r.tall.some((t) => t.crest && t.under <= 1), name + ' a raised crest over a bare lower trunk').toBe(true);
+        // the crown's crest keeps its weight at the apex: a rim half again as heavy as any other cushion's, and darker than any
+        expect(r.crest.length, name).toBeGreaterThan(0);
+        for (const c of r.crest) { expect(c.sw, name + ' crest rim').toBeGreaterThanOrEqual(1.5); for (const o of c.others) expect(c.sw, name + ' crest rim against another cushion\'s').toBeGreaterThanOrEqual(1.5 * o); for (const l of c.lums) expect(c.lum, name + ' crest rim not darker').toBeLessThan(l); }
+        // a raised crest stands on a riser that forks just under it, two limbs or more off it no more than ten pixels under the
+        // crest, never stilts rising from low on it
+        for (const q of r.risers) expect(q.forks, name + ' forks off the riser under ' + q.id).toBeGreaterThanOrEqual(2);
+        risers += r.risers.length;
+        // each limb's two fillets are round its collar with a radius of about 1.2 of its base girth, on the parent and on itself
+        // (read back off the drawn outline, so to within an eighth where the parent bends)
+        expect(r.fillets.length, name).toBeGreaterThan(1);
+        for (const f of r.fillets) {
+          expect(f.along.length, name + ' ' + f.id).toBe(4);
+          for (const v of f.along) { expect(v, name + ' fillet ' + f.id).toBeGreaterThanOrEqual(1.05); expect(v, name + ' fillet ' + f.id).toBeLessThanOrEqual(1.35); }
+        }
+        // under every cushion at least two twigs show, four to eight pixels below its lowest edge, clear of every cushion
+        expect(r.cushions.length, name).toBeGreaterThan(2);
+        for (const c of r.cushions) expect(c.n, name + ' twigs under ' + c.pid + ' cushion ' + c.k).toBeGreaterThanOrEqual(2);
+        // and no twig a cushion is lifted on shows more than twelve pixels of itself below it: a short fork, never a stilt
+        expect(r.stilts.length, name).toBeGreaterThan(2);
+        for (const q of r.stilts) expect(q.len, name + ' twig at ' + q.at + ' shows').toBeLessThanOrEqual(12);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+    // (a recorded tree has a raised crest, so the riser is tested)
+    expect(risers).toBeGreaterThan(0);
+  }, 60000);
+
+  /** Every leaf that hangs as drawn: whether any of it runs past its cushion's ends; whether it sits on the cushion's rim, and
+   *  if not, how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten pixels of that twig,
+   *  leaves wood that shows. */
+  const hung = (wide: boolean) => {
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, rim: 0, bad: [] as string[], runs: [] as number[] };
+    const shown = (e: Element) => e.getBoundingClientRect().width > 0 && !e.closest('.off, .gone, .cut') && getComputedStyle(e).display !== 'none' && getComputedStyle(e).opacity !== '0';
+    const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => shown(f) && shown(f.closest('.cush') ?? f));
+    const wood = (Array.from(svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]).filter(shown);
+    const pt = svg.createSVGPoint(), inEl = (e: SVGGeometryElement, x: number, y: number) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); };
+    const under = (x: number, y: number) => fills.some((f) => inEl(f, x, y));
+    for (const pid in B.pad) {
+      const P = B.pad[pid]; if (!shown(P.jg)) continue;
+      for (const [id, sl] of P.geo.slot as Map<string, number[]>) {
+        const tw = ((B.ltw ?? {})[id] ?? [])[0], leaf = B.leaf[id];
+        if (!sl[4] || !tw || !leaf || !shown(tw) || leaf.classList.contains('cut') || leaf.classList.contains('gone')) continue;
+        out.n++;
+        const p: number[][] = tw.__pts, s: number[][] = [], A: number[] = [0];
+        // none of it trails past its cushion's ends: the twig and the blade inside them, the blade's middle a leaf's width in from each
+        const g = P.geo, k = g.cOf.get(id), c = g.cs[k], x0 = P.o[0] + c.x - c.a, x1 = P.o[0] + c.x + c.a, mx = P.o[0] + sl[0]!, th = sl[2]! * Math.PI / 180;
+        const hx = g.L / 2 * Math.abs(Math.cos(th)) + g.W / 2 * Math.abs(Math.sin(th)), xs = p.map((q) => q[0]!);
+        if (mx - hx < x0 - 0.5 || mx + hx > x1 + 0.5 || Math.min(...xs) < x0 - 0.5 || Math.max(...xs) > x1 + 0.5 || Math.min(mx - x0, x1 - mx) < g.W)
+          out.bad.push(pid + ' ' + id + ': past its cushion\'s ends ' + JSON.stringify([mx - hx - x0, x1 - mx - hx, Math.min(...xs) - x0, x1 - Math.max(...xs)].map(Math.round)));
+        // where there is no room for that beneath its cushion it sits on the cushion's lower rim instead, its blade over the rim by
+        // about three tenths, its twig behind the foliage; the rest hang from a twig that shows
+        const fill = P.cu[k].el.querySelector('.pfill') as SVGGeometryElement, my = P.o[1] + sl[1]!;
+        let over = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (inEl(fill, mx + Math.cos(th) * f * g.L, my + Math.sin(th) * f * g.L)) over++; }
+        if (over) { out.rim++; if (over / 21 <= 0.12 || over / 21 >= 0.5) out.bad.push(pid + ' ' + id + ': on the rim, ' + Math.round(over / 21 * 100) + '% of its blade over it'); continue; }
+        for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, l = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!), n = Math.max(1, Math.ceil(l * 2)); A.push(A[i - 1]! + l); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); }
+        // one that hangs beneath its cushion hangs under its flat underside, its blade inside where either round end begins,
+        // so it never reads as hanging past the pad (beside a desktop or tablet tree: a phone's small crown may have room for
+        // neither that nor its rim, and keeps the rule above); and on a short twig, never a wire run out under the pad
+        if (wide && (mx - hx < x0 + c.rL * c.h - 0.5 || mx + hx > x1 - c.rR * c.h + 0.5)) out.bad.push(pid + ' ' + id + ': hangs past its cushion\'s flat underside ' + JSON.stringify([mx - hx - x0 - c.rL * c.h, x1 - c.rR * c.h - mx - hx].map(Math.round)));
+        out.runs.push(p.reduce((a, q, i) => a + (i ? Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), 0) / g.L);
+        // no more than two fifths of the twig it hangs from lies under a cushion
+        const hid = s.filter((q) => under(q[0]!, q[1]!)).length / s.length;
+        if (hid > 0.4) out.bad.push(pid + ' ' + id + ': ' + Math.round(hid * 100) + '% of its twig under a cushion');
+        // its stem leaves wood that shows: the stem's base clear of every cushion, with wood within two pixels of it
+        const L = A[A.length - 1]! - 10; let i = 1; while (i < A.length - 1 && A[i]! < L) i++;
+        const f = Math.max(0, Math.min(1, (L - A[i - 1]!) / ((A[i]! - A[i - 1]!) || 1))), b = [p[i - 1]![0]! + (p[i]![0]! - p[i - 1]![0]!) * f, p[i - 1]![1]! + (p[i]![1]! - p[i - 1]![1]!) * f];
+        if (under(b[0]!, b[1]!)) out.bad.push(pid + ' ' + id + ': its stem leaves wood under a cushion ' + JSON.stringify(b.map(Math.round)));
+        else if (![0, 1, 2].some((r) => Array.from({ length: r ? 12 : 1 }, (_, k) => [b[0]! + r * Math.cos(k * Math.PI / 6), b[1]! + r * Math.sin(k * Math.PI / 6)]).some((q) => wood.some((e) => inEl(e, q[0]!, q[1]!)))))
+          out.bad.push(pid + ' ' + id + ': its stem leaves no wood ' + JSON.stringify(b.map(Math.round)));
+      }
+    }
+    return out;
+  };
+
+  /** The leader's end, painted fresh in the page with this state: its last girth against its foot's, the outline round its end
+   *  (each point of it past the end of the spine, as a fraction of the half-girth there, and how far the end bows out of
+   *  a straight cut), and, with the trunk's reveal held at a quarter, a half and three quarters of its length, the wood that
+   *  shows along the spine: the front the last of it, its width a quarter of a caliper behind the front against the wood's
+   *  own width there (a knot's boss and all), how far off the spine it sits there (against the width one caliper back, or 5 px on a thin sapling), and how
+   *  much of its own girth shows one caliper back; held at a twentieth, a tenth and three twentieths, how wide the wood shows
+   *  where a tip a third of the foot wide would be whole; how far the leader turns over its last ten steps; and how long
+   *  the trunk's reveal runs. */
+  const tip = ({ s, v }: { s: unknown; v: unknown }) => {
+    const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.gw.tree = 'grove'; w.growPaint();
+    const B = w.gw.B, T = B.L.trees[0], el = (Array.from(B.svg.querySelectorAll('path.w')) as any[]).find((e) => e.__w === T.tw);
+    const out = { apex: T.tw.at(-1) / T.tw[0], r: T.tw.at(-1) / 2, cap: [] as number[], bow: 0, fronts: [] as Array<{ f: number; ratio: number; off: number; girth: number }>, heads: [] as Array<{ f: number; w: number; most: number }>, kink: 0, ms: 0 };
+    const P: number[][] = el.__pts, e = P.at(-1)!, b = P.at(-2)!, m = Math.hypot(e[0]! - b[0]!, e[1]! - b[1]!) || 1, t = [(e[0]! - b[0]!) / m, (e[1]! - b[1]!) / m], r = T.tw.at(-1) / 2;
+    const cap: number[][] = [];
+    for (let l = 0, L = el.getTotalLength(); l <= L; l += 0.05) { const q = el.getPointAtLength(l), d = [q.x - e[0]!, q.y - e[1]!]; if (d[0]! * t[0]! + d[1]! * t[1]! > 0.02 && Math.hypot(d[0]!, d[1]!) < 2.5 * r + 0.5) cap.push([q.x, q.y]); }
+    out.cap = cap.map((q) => Math.hypot(q[0]! - e[0]!, q[1]! - e[1]!) / r);
+    if (cap.length > 1) { const a = cap[0]!, z = cap.at(-1)!, cl = Math.hypot(z[0]! - a[0]!, z[1]! - a[1]!) || 1; out.bow = Math.max(...cap.map((q) => Math.abs((z[0]! - a[0]!) * (q[1]! - a[1]!) - (z[1]! - a[1]!) * (q[0]! - a[0]!)) / cl)) / r; }
+    // how far the leader turns from one step of its spine to the next over its last ten, in degrees
+    for (let i = Math.max(1, P.length - 10); i < P.length - 1; i++) { const a = Math.atan2(P[i]![1]! - P[i - 1]![1]!, P[i]![0]! - P[i - 1]![0]!), c = Math.atan2(P[i + 1]![1]! - P[i]![1]!, P[i + 1]![0]! - P[i]![0]!); out.kink = Math.max(out.kink, Math.abs(((c - a) * 180 / Math.PI + 540) % 360 - 180)); }
+    // the trunk's own reveal, held: its clip as computed at that moment, in the drawing's space, and the wood inside it
+    const g = B.grow.find((q: any) => q.el === el), [vx, vy] = B.vb, A = [0]; out.ms = g ? g.ms : 0;
+    for (let i = 1; i < P.length; i++) A.push(A[i - 1]! + Math.hypot(P[i]![0]! - P[i - 1]![0]!, P[i]![1]! - P[i - 1]![1]!));
+    const len = A.at(-1)!, at = (d: number) => {
+      let j = 1; while (j < P.length - 1 && A[j]! < d) j++;
+      const u = Math.max(0, Math.min(1, (d - A[j - 1]!) / ((A[j]! - A[j - 1]!) || 1))), a = P[j - 1]!, c = P[j]!, n = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) || 1;
+      return { p: [a[0]! + (c[0]! - a[0]!) * u, a[1]! + (c[1]! - a[1]!) * u], n: [-(c[1]! - a[1]!) / n, (c[0]! - a[0]!) / n], w: T.tw[j - 1] + (T.tw[j] - T.tw[j - 1]) * u };
+    };
+    const clip = document.createElementNS('http://www.w3.org/2000/svg', 'path'), pt = B.svg.createSVGPoint(); B.svg.append(clip);
+    const shows = (x: number, y: number) => { pt.x = x; pt.y = y; return clip.isPointInFill(pt) && el.isPointInFill(pt); };
+    const wood = (x: number, y: number) => { pt.x = x; pt.y = y; return el.isPointInFill(pt); };
+    for (const f of [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]) {
+      if (!g || !g.a) break;
+      const u = 1 - Math.pow(1 - Math.max(0, (f - g.f0) / (1 - g.f0)), 1 / 2.2);
+      for (const a of g.a) { a.pause(); a.currentTime = u * g.ms; }
+      const n = (getComputedStyle(g.cw).clipPath.match(/-?[\d.]+(e-?\d+)?/g) ?? []).map(Number), q: string[] = [];
+      for (let i = 0; i + 1 < n.length; i += 2) q.push(n[i]! + vx + ' ' + (n[i + 1]! + vy));
+      clip.setAttribute('d', 'M' + q.join(' L') + 'Z');
+      let F = -1; for (let d = 0; d <= len; d += 0.25) { const o = at(d); if (shows(o.p[0]!, o.p[1]!)) F = d; else if (F >= 0 && d - F > 3) break; }
+      const side = (d: number, sd: number, inn = shows) => { const o = at(d); let k = 0; for (let h = 0.05; h < o.w; h += 0.05) { if (inn(o.p[0]! + o.n[0]! * h * sd, o.p[1]! + o.n[1]! * h * sd)) k = h; else break; } return k; };
+      // early on, the growing end: how wide the wood shows where a tip a third of the foot wide would be whole, against that
+      const most = Math.max(0.33 * T.tw[0], T.tw.at(-1)), h0 = F - most / 2 - 0.4;
+      if (f < 0.2) { out.heads.push({ f, w: side(h0, 1) + side(h0, -1), most }); continue; }
+      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1), own = side(F - c / 4, 1, wood) + side(F - c / 4, -1, wood);
+      out.fronts.push({ f, ratio: (nl + nr) / own, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
+    }
+    clip.remove();
+    return out;
+  };
+
+  it('ends the leader in a round tip a third of its foot or less, a true half circle, running on into its crown with no hook, and grows it out, a sapling slowly, from a round shoot tip no wider than a third of its foot to a front that is a half circle of the wood’s own girth along the curve, never a sawn-off stub or a sharpened stake', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    // a sapling: the plotline grow before its first journey is found; and the tree it grows into
+    const sap = freshGrow();
+    for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl'), 'utf8').split('\n')) { if (!line.trim()) continue; const ev = JSON.parse(line) as GrowEvent; if (ev.kind === 'journey.found') break; applyGrow(sap, ev); }
+    const tree = { ...folded('plotline-seats.jsonl'), asked: true, modeBy: null, mode: 'min' as const };
+    try {
+      for (const [s, name, width] of [[sap, 'sapling', 1440], [tree, 'tree', 1440], [tree, 'tree', 390]] as const) {
+        const at = name + ' ' + width;
+        const page = await browser.newPage({ viewport: { width, height: 1000 } });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        const o = await page.evaluate(tip, { s, v: growView(s as never) });
+        if (name === 'sapling') expect(o.apex, at + ' its tip against its foot').toBeLessThanOrEqual(0.35);
+        // the leader runs on into its crown about the way it was going, never turning more than ten degrees: no hook at its top
+        expect(o.kink, at + ' the leader turns at its top').toBeLessThanOrEqual(10.5);
+        // a sapling grows slowly enough to be seen growing
+        if (name === 'sapling') expect(o.ms, at + ' its trunk grows over').toBeGreaterThanOrEqual(2000);
+        // the end is a half circle round the end of the spine, never a flat or slanted cut, nor a ring of facets: a true arc,
+        // to within a hundredth of its radius, or the tenth of a pixel the outline is written to on a thin sapling's tip
+        const tol = Math.max(0.01, 0.075 / o.r);
+        expect(o.cap.length, at).toBeGreaterThan(8);
+        expect(Math.min(...o.cap), at + ' its end inside a half circle').toBeGreaterThanOrEqual(1 - tol);
+        expect(Math.max(...o.cap), at + ' its end outside a half circle').toBeLessThanOrEqual(1 + tol);
+        expect(o.bow, at + ' its end bows out of a straight cut').toBeGreaterThan(0.5);
+        // growing: for its first sixth the growing end is a shoot's tip, no wider than a third of the foot (or the leader's own
+        // end), never the girth of the wood below pushed up as a stub
+        expect(o.heads.length, at).toBe(3);
+        for (const hd of o.heads) expect(hd.w, at + ' its growing end at ' + hd.f).toBeLessThanOrEqual(hd.most + 2.5);
+        // and from a quarter of the way on the front is a half circle of the wood's own girth, so a quarter of a caliper behind
+        // it the wood already shows over three quarters of its own width there (a taper to a point, a stake, shows under half),
+        // and one caliper behind it its whole girth; and it is centred on the spine, so the front follows the curve
+        expect(o.fronts.length, at).toBe(3);
+        for (const fr of o.fronts) {
+          expect(fr.ratio, at + ' at ' + fr.f).toBeGreaterThanOrEqual(0.75);
+          expect(fr.ratio, at + ' at ' + fr.f).toBeLessThanOrEqual(1.02);
+          expect(fr.girth, at + ' at ' + fr.f + ' one caliper back').toBeGreaterThanOrEqual(0.85);
+          expect(fr.off, at + ' at ' + fr.f + ' off the spine').toBeLessThanOrEqual(0.2);
+        }
+        await page.close();
+      }
     } finally { await browser.close(); }
   }, 60000);
+
+  it('hangs each failure from a twig that shows: run out under its cushion to it, its stem leaving that twig\'s underside, none of it past the cushion\'s ends, or with no room for that on the cushion\'s rim', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) for (const width of [1440, 768, 390]) {
+        const page = await growPage(browser, server.url, folded(file), width);
+        await page.waitForTimeout(2500);
+        const h = await page.evaluate(hung, width >= 720);
+        expect(h.n, name + ' ' + width).toBeGreaterThan(0);
+        expect(h.n - h.rim, name + ' ' + width + ' hanging beneath').toBeGreaterThan(0);
+        expect(h.bad, name + ' ' + width).toEqual([]);
+        // the twig it hangs from is short: no more than two leaves long beside a desktop or tablet tree, never a wire
+        if (width >= 720) for (const r of h.runs) expect(r, name + ' ' + width + ' hanging twig, in leaves').toBeLessThanOrEqual(2);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 120000);
 
   /** The tree's own clocks, read off the motion it set going: when each piece of wood, leaf, cushion, name, shoot and graft
    *  bud first shows, against when the wood that carries it is there. */
@@ -1985,7 +3026,7 @@ describe('Grow page', () => {
   };
   const timing = () => {
     const B = (0, eval)('gw').B;
-    const out = { wood: 0, leaves: 0, cush: 0, labels: 0, shoots: 0, grafts: 0, bad: [] as string[] };
+    const out = { wood: 0, leaves: 0, cush: 0, labels: 0, shoots: 0, grafts: 0, forks: 0, bad: [] as string[] };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const log: Map<Element, Animation[]> = (window as any).__an, own = (el: Element | null | undefined) => (el && log.get(el)) || [];
     const start = (a: Animation) => Number(a.startTime ?? document.timeline.currentTime) + Number(a.effect!.getTiming().delay ?? 0);
@@ -2021,6 +3062,19 @@ describe('Grow page', () => {
       const t = woodAt(g.pts[0], 1, g); if (t === Infinity) continue;
       out.wood++;
       if (g.t0 < t - 2) bad('wood starts before the wood it grows from reaches it', Math.round(t - g.t0));
+    }
+    // a limb's collar, its fillets and the shade in its crotch come in once its own reveal starts and are whole by the time
+    // its front leaves its parent's edge, so the fork never shows the page or the parent's lit side as a seam
+    for (const g of B.grow) {
+      const el = g.el; if (!el || !el.__col || !el.__pw || !g.pts) continue;
+      const A = [0]; for (let i = 1; i < g.pts.length; i++) A.push(A[i - 1]! + Math.hypot(g.pts[i][0] - g.pts[i - 1][0], g.pts[i][1] - g.pts[i - 1][1]));
+      const Tk = el.__pw[el.__pk], fE = Math.min(1, Tk / 2 / (A[A.length - 1] || 1)), tE = g.t0 + g.ms * (1 - Math.pow(1 - Math.max(0, (fE - g.f0) / (1 - g.f0 || 1)), 1 / 2.2));
+      for (const x of [el.__col, ...(el.__on as Element[]).filter((f) => f.tagName === 'path' && !f.closest('clipPath'))]) {
+        const a = own(x)[0]; if (!a) continue;
+        out.forks++;
+        if (start(a) < g.t0 - 2) bad('fork filled before its limb starts', Math.round(g.t0 - start(a)));
+        if (start(a) + dur(a) > Math.max(tE, g.t0 + 40) + 2) bad('fork filled after its limb leaves its parent', Math.round(start(a) + dur(a) - Math.max(tE, g.t0 + 40)));
+      }
     }
     // a leaf opens out of its twig once the twig has grown and its cushion is all but whole
     for (const id in B.leaf) {
@@ -2137,6 +3191,9 @@ describe('Grow page', () => {
       out.calluses++;
       const cal = sc.querySelector('ellipse.cal'), cres = sc.querySelector('path.cres');
       if (!cal || !cres) return bad(what + ': a callus without its roll or its lit crescent');
+      // big enough to read as a cut that healed, not a speck: six by four at the least
+      const cx2 = 2 * Number(cal.getAttribute('rx')), cy2 = 2 * Number(cal.getAttribute('ry'));
+      if (cx2 < 6 || cy2 < 4) bad(what + ': a callus under six by four', [cx2, cy2]);
       const fc = getComputedStyle(cal), lip = getComputedStyle(cres).stroke;
       if (/url\(/.test(fc.fill) || fc.stroke === 'none') bad(what + ': callus shaded, or with no rim');
       if (Math.abs(lum(fc.fill) - lum(wood)) > 0.15) bad(what + ': callus not in the bark’s tones', [fc.fill, wood]);
@@ -2191,7 +3248,9 @@ describe('Grow page', () => {
       }
     }
     if (real && !groups.size) bad('no leaf’s cut heals where the bark shows');
-    if (!real && B.svg.querySelector('.heal.on')) bad('a mark left by what never grew');
+    // (the marks of cuts made before this paint, if a test listed them in window.__had, are the earlier cuts' own)
+    const had: Element[] = (window as any).__had ?? [];
+    if (!real && (Array.from(B.svg.querySelectorAll('.heal.on')) as Element[]).some((e) => !had.includes(e))) bad('a mark left by what never grew');
     // from the apex down, one about every 40 ms
     out.order.sort((a, b) => a[0]! - b[0]! || a[1]! - b[1]!);
     for (let i = 1; i < out.order.length; i++) if (out.order[i]![1]! < out.order[i - 1]![1]!) bad('cut out of turn from the apex down', [out.order[i - 1], out.order[i]]);
@@ -2217,6 +3276,7 @@ describe('Grow page', () => {
       if (real) {
         if (!E.stub.classList.contains('on')) bad('no callus where a branch that grew was cut', pid);
         if (!E.stub.querySelector('ellipse.cal') || !E.stub.querySelector('path.cres')) bad('the branch’s callus has no roll or crescent', pid);
+        else if (2 * Number(E.stub.querySelector('ellipse.cal').getAttribute('rx')) < 6 || 2 * Number(E.stub.querySelector('ellipse.cal').getAttribute('ry')) < 4) bad('the branch’s callus under six by four', pid);
         if (moving && sc) bad('a branch that grew shrinks back instead of being cut and dropped', pid);
       } else {
         if (E.stub.classList.contains('on')) bad('a mark where a branch that never grew was', pid);
@@ -2267,11 +3327,37 @@ describe('Grow page', () => {
     return performance.now() > Math.max(...ends) + 50 && !B.svg.querySelector('.gb-lf.cut');
   }, null, { timeout: 30000 });
 
-  it('grows nothing ahead of its wood, and takes back into its collar, with no mark, what was only ever shown before a choice', async () => {
+  /** Held part way through a cut (each motion the cut set going, which the test listed in window.__cut, set to ms), every
+   *  falling leaf against what it hangs from: its stalk, the tick across it and its twig, every copy of it, none showing more
+   *  than the leaf itself, so nothing of it is left behind on the cushion as a dash while the leaf goes. The motion then runs on. */
+  const stems = (ms: number) => {
+    const B = (0, eval)('gw').B, out = { n: 0, held: 0, bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const cut: Animation[] = ((window as any).__cut ?? []).filter((a: Animation) => a.playState !== 'finished' && a.playState !== 'idle');
+    const was = cut.map((a) => a.currentTime);
+    for (const a of cut) { a.pause(); a.currentTime = ms; }
+    out.held = cut.length;
+    const strength = (e: Element | null | undefined) => {
+      if (!e) return 0;
+      let o = 1; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return 0; o *= Number(c.opacity); }
+      return o;
+    };
+    for (const id in B.leaf) {
+      const el = B.leaf[id]; if (!el.classList.contains('cut')) continue;
+      out.n++;
+      const leaf = strength(el.__g.querySelector('.blade'));
+      const parts: [string, Element | null][] = [['stalk', el.__g.querySelector('.pet')], ['tick', el.__nick], ...(((B.ltw ?? {})[id] ?? []) as Element[]).map((t, k) => ['twig ' + k, t] as [string, Element])];
+      for (const [what, e] of parts) { const o = strength(e); if (o > leaf + 0.05) bad('leaf ' + id + ': its ' + what + ' stays as it goes', [+o.toFixed(2), +leaf.toFixed(2)]); }
+    }
+    cut.forEach((a, i) => { a.currentTime = was[i]!; a.play(); });
+    return out;
+  };
+
+  it('grows nothing ahead of its wood, fills each fork before its limb shows past its parent, and cuts what grew at the ask as it cuts what grew in a chosen mode: snipped at its collar, falling with its stalk and twig, each cut healed; only a preview’s ghosts go with no mark', async () => {
     const { dir, state } = await grownBushy();
     withMax(state);
-    // asked, not yet chosen: the tree grows, then Min is pointed at and picked; nothing had grown in a chosen mode
-    const asked = { ...state, asked: true, modeBy: null, mode: 'min' as const };
+    // asked, not yet chosen: the tree grows everything drafted, then Min is pointed at and picked; what grew is really cut
+    const asked = { ...state, asked: true, modeBy: null, mode: 'min' as const }, chosen = { ...asked, asked: false, modeBy: 'you' as const };
     const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -2282,28 +3368,51 @@ describe('Grow page', () => {
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         const t = await page.evaluate(timing);
         expect(t.bad, width + 'px').toEqual([]);
-        for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
-        // once it has grown, pointing at Min greys what it would cut; picking it takes them back, from that grey
+        for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts', 'forks'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
+        // once it has grown, pointing at Min greys what it would cut; picking it snips them at their collars, and they fall
+        // from that grey, the cuts healing with calluses in the bark's tones
         await settled(page);
         const before = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return null; }).then(() => page.evaluate(looks));
-        const c = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return null; }).then(() => page.evaluate(cuts, false));
+        const c = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, gbPaint })'), old = new Set(document.getAnimations());
+          w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint();
+          (window as any).__cut = document.getAnimations().filter((a) => !old.has(a));
+          return null;
+        }).then(() => page.evaluate(cuts, true));
         expect(c.bad, width + 'px').toEqual([]);
         expect(c.shoots, width + 'px').toBeGreaterThan(1);
         expect(c.leaves, width + 'px').toBeGreaterThan(1);
-        expect(c.calluses, width + 'px').toBe(0);
+        expect(c.calluses, width + 'px').toBeGreaterThan(0);
         const after = await page.evaluate(looks);
         const changed = Object.keys(after).filter((k) => k in before && before[k] !== after[k]).map((k) => [k, before[k], after[k]]);
         expect(changed, width + 'px').toEqual([]);
         expect(Object.keys(after).filter((k) => k in before).length, width + 'px').toBeGreaterThan(10);
-        // then each branch Min keeps nothing of goes back into its collar, and the Minimum tree at rest has no mark of a cut
+        // a quarter of a second into the cut, each leaf's stalk and twig are going with it: none is left on the cushion
+        const st = await page.evaluate(stems, 250);
+        expect(st.bad, width + 'px').toEqual([]);
+        expect(st.n, width + 'px').toBeGreaterThan(1);
+        expect(st.held, width + 'px').toBeGreaterThan(st.n);
+        // then each branch Min keeps nothing of is cut flush and drops away, and the Minimum tree at rest keeps its calluses
         await settled(page);
-        const b = await page.evaluate(branches, { real: false, moving: true });
+        const b = await page.evaluate(branches, { real: true, moving: true });
         expect(b.bad, width + 'px').toEqual([]);
         expect(b.cut, width + 'px').toBeGreaterThan(0);
-        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length), width + 'px').toBe(0);
+        const marks = await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length);
+        expect(marks, width + 'px').toBeGreaterThan(0);
+        // once Min is chosen, pointing at Max ghosts what it would grow; leaving it, the ghosts just go: nothing falls, and no
+        // mark is added to those the cut left
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, chosen);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); (window as any).__had = Array.from(w.gw.B.svg.querySelectorAll('.heal.on')); w.gw.preview = 'max'; w.gbPaint(); });
+        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.gb-lf.pv-add, .budg.pv-add, .gb-gr.pv-add').length), width + 'px').toBeGreaterThan(0);
+        const g = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = null; w.gbPaint(); return null; }).then(() => page.evaluate(cuts, false));
+        expect(g.bad, width + 'px').toEqual([]);
+        expect(g.calluses, width + 'px').toBe(0);
+        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length), width + 'px').toBe(marks);
+        await page.evaluate(() => { delete (window as any).__had; });
         await page.close();
       }
-      // with reduced motion nothing grows or goes: the tree is there at once, and what is cut is just gone, with no mark
+      // with reduced motion nothing grows or goes: the tree is there at once, and what is cut is just gone, healed at once
       const page = await treePage(browser, server.url, asked, { width: 1440, reduce: true });
       const moving = () => { const B = (0, eval)('gw').B, log: Map<Element, Animation[]> = (window as any).__an; return document.getAnimations().filter((a) => { const e = a.effect as KeyframeEffect | null; return !!e?.target && B.svg.contains(e.target) && a.playState !== 'finished'; }).map((a) => (a.effect as KeyframeEffect).target!.getAttribute('class')).concat([...log.keys()].filter((e) => B.svg.contains(e)).map((e) => 'animated ' + e.getAttribute('class'))); };
       expect(await page.evaluate(moving)).toEqual([]);
@@ -2314,13 +3423,73 @@ describe('Grow page', () => {
         return { cut: B.svg.querySelectorAll('.gb-lf.cut').length, marks: B.svg.querySelectorAll('.heal.on').length, shown: gs.filter((g) => g.g.style.display !== 'none').length, shoots: gs.length };
       });
       expect(rest.cut).toBe(0);
-      expect(rest.marks).toBe(0);
+      expect(rest.marks).toBeGreaterThan(0);
       expect(rest.shown).toBe(0);
       expect(rest.shoots).toBeGreaterThan(1);
-      expect((await page.evaluate(branches, { real: false, moving: false })).bad).toEqual([]);
+      expect((await page.evaluate(branches, { real: true, moving: false })).bad).toEqual([]);
       await page.close();
     } finally { await browser.close(); }
-  }, 120000);
+  }, 150000);
+
+  /** A grow folded from a recorded discovery log: plotline-seats (two journeys, one scenario failed, Minimum) and tracegrove
+   *  itself (two journeys through twelve parts, Max, nothing run yet). */
+  const recordedGrow = (name: string) => {
+    const s = freshGrow();
+    for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', name), 'utf8').split('\n')) if (line.trim()) applyGrow(s, JSON.parse(line) as GrowEvent);
+    return s;
+  };
+
+  it('says a pad’s final words in the same paint a mode is picked: what it keeps and cuts only while a mode is pointed at before a choice, never with what was pruned', async () => {
+    const { dir, state } = await grownBushy();
+    withMax(state);
+    const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    // each pad's state line, both its lines as one
+    const words = () => { const B = (0, eval)('gw').B; return Object.fromEntries(Object.keys(B.lbl).filter((id) => !B.lbl[id].badge).map((id) => [id, [B.lbl[id].t2.textContent, B.lbl[id].t3.textContent].filter(Boolean).join(' · ')])) as Record<string, string>; };
+    try {
+      for (const s of [state, recordedGrow('plotline-seats.jsonl')]) {
+        // asked, so nothing has run yet
+        const asked = { ...s, asked: true, modeBy: null, mode: 'min' as const, run: {} };
+        const page = await treePage(browser, server.url, asked, { width: 1440 });
+        await settled(page);
+        const pointed = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
+        expect(Object.values(pointed).some((t) => /keeps \d+/.test(t)), JSON.stringify(pointed)).toBe(true);
+        const first = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
+        expect(Object.values(first).some((t) => /pruned/.test(t)), JSON.stringify(first)).toBe(true);
+        for (const t of Object.values(first)) expect(/keeps|cuts/.test(t) && /pruned/.test(t), t).toBe(false);
+        await settled(page);
+        expect(await page.evaluate((f) => (0, eval)('(' + f + ')')(), words.toString())).toEqual(first);
+        // and the choice, once it is recorded, says the same
+        const chosen = { ...asked, asked: false, modeBy: 'you' as const };
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, chosen);
+        expect(await page.evaluate((f) => (0, eval)('(' + f + ')')(), words.toString())).toEqual(first);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
+  it('heads each journey once: the branch of what it refuses hangs on its journey unnumbered, so the eyebrows number the journeys and no more', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const file of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) {
+        const page = await treePage(browser, server.url, recordedGrow(file), { width: 1440, reduce: true });
+        const h = await page.evaluate(() => {
+          const w = (0, eval)('gw'), B = w.B, pads = Object.keys(B.lbl).filter((id) => !B.lbl[id].badge);
+          return { js: w.M.J.length as number, eb: pads.map((id) => [B.lbl[id].eb.textContent as string, !!(B.pad[id] && B.pad[id].pol)] as const) };
+        });
+        const nums = h.eb.map(([t]) => t.match(/^JOURNEY (\d+)/)?.[1]).filter(Boolean);
+        expect(nums.length, file + ' ' + JSON.stringify(h.eb)).toBe(h.js);
+        expect([...new Set(nums)].sort(), file).toEqual(Array.from({ length: h.js }, (_, i) => String(i + 1)));
+        // (the tree has a branch of its own for what a journey refuses, and its eyebrow says only that)
+        const pol = h.eb.filter(([, p]) => p).map(([t]) => t);
+        expect(pol.length, file).toBeGreaterThan(0);
+        for (const t of pol) expect(t, file).toMatch(/^(WHAT IT REFUSES|HOW IT FAILS)$/);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
 
   it('cuts what grew in a chosen mode at its collar, lets it fall in the preview’s grey, and heals each cut with a callus in the bark’s tones beside its knot', async () => {
     const { dir, state } = await grownBushy();
@@ -2372,20 +3541,33 @@ describe('Grow page', () => {
   }, 120000);
 
   /** What a previewed bigger mode would grow, as the tree ghosts it: the leaves on the journeys, the part checks on shoots
-   *  (those a shoot's leaves do not show, by its count) and the existing flows as graft buds; each at about half strength
-   *  with a dashed outline. */
+   *  (those a shoot's leaves do not show, by its count) and the existing flows as graft buds (those a swelling does not show,
+   *  by the count bud it carries); each at about half strength with a dashed outline, and a ghost leaf never under a leaf
+   *  that is drawn over it. */
   const ghosts = () => {
-    const B = (0, eval)('gw').B, out = { journeys: 0, parts: 0, flows: 0, bad: [] as string[] };
+    const B = (0, eval)('gw').B, out = { journeys: 0, crown: 0, parts: 0, flows: 0, str: {} as Record<string, number>, bad: [] as string[] };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const seen = (e: Element) => { for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return false; } return e.getBoundingClientRect().width > 0; };
     const strength = (e: Element) => { let o = 1; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o; };
     const look = (mark: Element | null, what: string) => {
       if (!mark) return bad(what + ' ghost has no outline');
       const o = strength(mark), c = getComputedStyle(mark);
+      out.str[what] = +o.toFixed(2);
       if (o < 0.38 || o > 0.52) bad(what + ' ghosted at', +o.toFixed(2));
       if (c.stroke === 'none' || c.strokeDasharray === 'none' || Number(c.strokeOpacity) < 0.9) bad(what + ' ghost without a dashed outline', [c.stroke, c.strokeDasharray]);
     };
-    for (const e of Array.from(B.svg.querySelectorAll('.gb-lf.pv-add:not(.bud)')) as Element[]) if (seen(e)) { out.journeys++; look(e.querySelector('.blade'), 'leaf ' + e.getAttribute('data-k')); }
+    // a leaf drawn over a ghost leaf's middle hides it: the ghost is not there to be counted
+    const drawn = (Array.from(B.svg.querySelectorAll('.gb-lf:not(.pv-add):not(.gone)')) as Element[]).filter((e) => seen(e) && strength(e.querySelector('.blade') ?? e) > 0.25);
+    const under = (e: Element) => {
+      const r = e.querySelector('.blade')!.getBoundingClientRect(), at = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return drawn.find((q) => q !== e && !!(e.compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) && (Array.from(q.querySelectorAll('.blade')) as SVGGeometryElement[]).some((b) => {
+        const m = b.getScreenCTM(); return !!m && getComputedStyle(b).display !== 'none' && b.isPointInFill(at.matrixTransform(m.inverse()));
+      }));
+    };
+    for (const e of Array.from(B.svg.querySelectorAll('.gb-lf.pv-add:not(.bud)')) as Element[]) if (seen(e)) {
+      const q = under(e); if (q) { bad('leaf ' + e.getAttribute('data-k') + ' ghosted under ' + q.getAttribute('data-k')); continue; }
+      out.journeys++; if (B.pad[(e as any).__p]?.crown) out.crown++; look(e.querySelector('.blade'), 'leaf ' + e.getAttribute('data-k'));
+    }
     for (const g of new Set(Object.values(B.shoots ?? {})) as Set<any>) {
       if (!seen(g.g) || !g.g.classList.contains('pv-add')) continue;
       const lv = (Array.from(g.fl.querySelectorAll('.gb-lf.bud.pv-add')) as Element[]).filter(seen);
@@ -2394,7 +3576,11 @@ describe('Grow page', () => {
       if (lv.length + tag !== g.list.length) bad('a shoot ghosts fewer checks than it holds', [g.kid, lv.length, tag, g.list.length]);
       out.parts += lv.length + tag;
     }
-    for (const e of Array.from(B.svg.querySelectorAll('.gb-gr.pv-add')) as Element[]) if (seen(e)) { out.flows++; look(e.querySelector('.gring'), 'existing flow ' + e.getAttribute('data-k')); }
+    for (const e of Array.from(B.svg.querySelectorAll('.gb-gr.pv-add')) as Element[]) {
+      const sw = e.querySelector('.gsw'); if (!seen(e) || !sw || !seen(sw)) continue;
+      const tag = e.querySelector('.shtag .shn'), more = tag && seen(tag) ? Number(String(tag.textContent).replace('+', '')) || 0 : 0;
+      out.flows += 1 + more; look(e.querySelector('.gring'), 'existing flow ' + e.getAttribute('data-k'));
+    }
     return out;
   };
 
@@ -2432,12 +3618,59 @@ describe('Grow page', () => {
         }
         await page.close();
       }
+      // the plotline fold as the live page grows it: asked, grown, then Minimum picked, so what Min cut has fallen. With a leaf of
+      // the second journey pinned, Max's ghosts all show, the crown's too, each at half strength and none under a leaf, as many
+      // as its words say; and so do Standard's, with nothing pinned
+      const pl = recordedGrow('plotline-seats.jsonl');
+      const plAsked = { ...pl, asked: true, modeBy: null, mode: 'min' as const, run: {} }, plMin = { ...pl, asked: false, modeBy: 'you' as const, mode: 'min' as const };
+      for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
+        const page = await treePage(browser, server.url, plAsked, { width, scheme, height: 1400 });
+        // a strength read is the look itself, not an opacity part way through a transition
+        await page.addStyleTag({ content: '.gw-svg.gb, .gw-svg.gb * { transition: none !important; }' });
+        await settled(page);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); });
+        await settled(page);
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, plMin);
+        const point = async (m: string) => {
+          await page.getByTestId('grow-mode-' + m).scrollIntoViewIfNeeded();
+          const bb = (await page.getByTestId('grow-mode-' + m).boundingBox())!;
+          await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+          await expect.poll(() => page.getByTestId('grow-mode-preview').innerText().catch(() => '')).toContain('as ghosts on the tree');
+          return page.getByTestId('grow-mode-preview').innerText();
+        };
+        const j2 = await page.evaluate(() => { const w = (0, eval)('gw'); return Object.keys(w.B.leaf).find((id) => w.B.leaf[id].__j === w.order[1] && !w.B.leaf[id].classList.contains('gone')) ?? null; });
+        expect(j2, width + 'px').not.toBeNull();
+        await page.locator('.gb-lf[data-k="s:' + j2 + '"]').click({ force: true });
+        expect(await page.evaluate(() => !!(0, eval)('gw').pinned), width + 'px').toBe(true);
+        // (each ghost at the one strength it has whatever is pinned: the pin's dimming leaves the ghosts out)
+        const was: Record<string, number> = {};
+        for (const [m, pinned] of [['max', true], ['max', false], ['std', false]] as const) {
+          if (!pinned) await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.growPaint(); });
+          const text = await point(m), g = await page.evaluate(ghosts), n = (re: RegExp) => Number(text.match(re)?.[1] ?? 0);
+          if (m === 'max' && pinned) Object.assign(was, g.str);
+          else if (m === 'max') expect(g.str, 'plotline ' + width + 'px max, pinned then not').toEqual(was);
+          const at = 'plotline ' + width + 'px ' + m + (pinned ? ' pinned' : '');
+          expect(g.bad, at).toEqual([]);
+          expect(g.journeys + g.parts + g.flows, at).toBe(n(/: (\d+) more than/));
+          expect(g.crown, at).toBeGreaterThan(0);
+          if (m === 'max') {
+            expect(n(/: (\d+) more than/), at).toBe(20);
+            expect([g.journeys, g.parts, g.flows], at).toEqual([n(/(\d+) on the journeys/), n(/(\d+) part checks?/), n(/(\d+) existing flows?/)]);
+          } else {
+            expect(n(/: (\d+) more than/), at).toBe(3);
+            expect([g.parts, g.flows], at).toEqual([0, 0]);
+          }
+          await page.mouse.move(1, 1, { steps: 2 });
+        }
+        await page.close();
+      }
     } finally { await browser.close(); }
-  }, 90000);
+  }, 150000);
 
   /** Every branch and branchlet that carries a cushion ends inside it, its round end too, as the cushions stand. */
   const ends = () => {
-    const B = (0, eval)('gw').B, out = { n: 0, bad: [] as string[] };
+    const B = (0, eval)('gw').B, out = { n: 0, forks: 0, off: 0, bad: [] as string[] };
     const chk = (P: any, pid: string, p: number[][], w: number, what: string) => {
       const n = p.length - 1, e = p[n]!, q = p[Math.max(0, n - 2)]!, m = Math.hypot(e[0]! - q[0]!, e[1]! - q[1]!) || 1, t = [(e[0]! - q[0]!) / m, (e[1]! - q[1]!) / m], nr = [-t[1]!, t[0]!], r = w / 2;
       const at = [e, [e[0]! + t[0]! * r, e[1]! + t[1]! * r], [e[0]! + nr[0]! * r, e[1]! + nr[1]! * r], [e[0]! - nr[0]! * r, e[1]! - nr[1]! * r]];
@@ -2447,6 +3680,14 @@ describe('Grow page', () => {
     for (const pid in B.pad) {
       const P = B.pad[pid]; if (P.jg.classList.contains('pruned') || getComputedStyle(P.jg).display === 'none') continue;
       if (P.rt.br) chk(P, pid, P.rt.br, P.b.w[P.b.w.length - 1], 'branch');
+      // the twigs a cushion is lifted on end inside it, and go with it when a mode keeps none of its leaves
+      for (const e of Array.from(P.jg.querySelectorAll('path.tw.fk')) as any[]) {
+        const gone = P.cu[e.__k].el.classList.contains('off');
+        out.forks++; if (gone) out.off++;
+        if (gone !== e.classList.contains('off')) out.bad.push(pid + ' cushion ' + e.__k + (gone ? ' gone, its twig left standing' : ' kept, its twig gone'));
+        else if (gone && ((e.__also ?? []) as Element[]).some((x) => x.isConnected)) out.bad.push(pid + ' cushion ' + e.__k + ' gone, its twig\'s bark left standing');
+        else if (!gone) chk(P, pid, e.__pts, 1, 'twig');
+      }
       const done = new Set<unknown>(); for (const id in P.rt.lt) { const c = P.rt.lt[id].c; if (c && !done.has(c.pts[0] + '')) { done.add(c.pts[0] + ''); chk(P, pid, c.pts, 2.4, 'branchlet'); } }
     }
     return out;
@@ -2458,7 +3699,7 @@ describe('Grow page', () => {
     const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
-      let seen = 0;
+      let seen = 0, forksOff = 0;
       for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
         for (const mode of ['max', 'min'] as const) {
           const page = await treePage(browser, server.url, { ...state, asked: false, modeBy: 'you', mode }, { width, scheme, reduce: true, height: 2400 });
@@ -2467,14 +3708,17 @@ describe('Grow page', () => {
             const e = await page.evaluate(ends), at = width + 'px ' + mode + ' preview ' + pv;
             expect(e.bad, at).toEqual([]);
             expect(e.n, at).toBeGreaterThan(1);
-            // the cushion is opaque to its foot: along each branch where it runs inside its cushion, the page shows foliage,
-            // never the bark seen through it
+            expect(e.forks, at).toBeGreaterThan(1);
+            forksOff += e.off;
+            // the cushion is opaque to its foot: along each branch, and each twig it lifts the cushion on, where it runs inside
+            // its cushion, the page shows foliage, never the bark seen through it
             const spots = await page.evaluate(() => {
               const B = (0, eval)('gw').B, M = B.svg.getScreenCTM(), out: number[][] = [];
               const leaves = (Array.from(B.svg.querySelectorAll('.gb-lf, .gb-gr, .ptag, .lbl, text')) as Element[]).map((e) => e.getBoundingClientRect()).filter((r) => r.width);
               for (const pid in B.pad) {
                 const P = B.pad[pid]; if (!P.rt.br || P.jg.classList.contains('pruned') || getComputedStyle(P.jg).display === 'none') continue;
-                const br = P.rt.br as number[][], along = br.flatMap((a, i) => (i ? [0.25, 0.5, 0.75, 1].map((f) => [br[i - 1]![0]! + (a[0]! - br[i - 1]![0]!) * f, br[i - 1]![1]! + (a[1]! - br[i - 1]![1]!) * f]) : [a]));
+                const tws = (Array.from(P.jg.querySelectorAll('path.tw')) as any[]).filter((t) => t.__pts && getComputedStyle(t).display !== 'none' && getComputedStyle(t).opacity !== '0').map((t) => t.__pts as number[][]);
+                const along = [P.rt.br as number[][], ...tws].flatMap((br) => br.flatMap((a, i) => (i ? [0.25, 0.5, 0.75, 1].map((f) => [br[i - 1]![0]! + (a[0]! - br[i - 1]![0]!) * f, br[i - 1]![1]! + (a[1]! - br[i - 1]![1]!) * f]) : [a])));
                 for (const p of along) {
                   if (![[0, 0], [2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]].every(([dx, dy]) => P.mk.isPointInFill(new DOMPoint(p[0]! + dx!, p[1]! + dy!)))) continue;
                   const x = M.a * p[0]! + M.c * p[1]! + M.e, y = M.b * p[0]! + M.d * p[1]! + M.f;
@@ -2492,6 +3736,7 @@ describe('Grow page', () => {
         }
       }
       expect(seen).toBeGreaterThan(40);
+      expect(forksOff).toBeGreaterThan(0);
     } finally { await browser.close(); }
   }, 120000);
 
@@ -2522,7 +3767,7 @@ describe('Grow page', () => {
       const M = B.svg.getScreenCTM(), sc = Math.hypot(M.a, M.b), P = (q: number[]) => [M.a * q[0]! + M.c * q[1]! + M.e, M.b * q[0]! + M.d * q[1]! + M.f];
       const wood = [...B.svg.querySelectorAll('path.w')].filter(own).map((e: any) => ({ k: e.getAttribute('class') + ':' + e.__pts.length, pts: e.__pts.map(P), hw: e.__w.map((v: number) => v * sc / 2), r: e.__r ? { t0: e.__r.t0, ms: e.__r.ms, f0: e.__r.f0 } : null }));
       const all = (q: string, p: number) => [...B.svg.querySelectorAll(q)].map((e: Element) => box(e.getBoundingClientRect(), p));
-      w.__snaps.push({ N: g.gbN, svg: box(r), wood, ex: all('text, .lbl, .badge, .ptag .tag, .shtag, .tailg, .vein, .heal, .cutmk', 1.5), kn: all('.kn', 2), pads: all('.pad, .gb-lf, .budg', 1), pot: box(B.svg.querySelector('.pots').getBoundingClientRect()) });
+      w.__snaps.push({ N: g.gbN, svg: box(r), wood, ex: all('text, .lbl, .badge, .ptag .tag, .shtag, .tailg, .vein, .heal, .cutmk', 1.5), key: all('.kpip.key:not(.none)', 1.5), kn: all('.kn', 2), pads: all('.pad, .gb-lf, .budg', 1), pot: box(B.svg.querySelector('.pots').getBoundingClientRect()) });
     };
     const revealed = (ts: number) => {
       const g = (0, eval)('gw'), B = g && g.B; if (!B || !B.svg || !B.svg.isConnected) return; let L = 0;
@@ -2559,7 +3804,8 @@ describe('Grow page', () => {
     const dist = (x: number, y: number) => { const o = (y * W + x) * 4; return Math.abs(D[o]! - bk[0]!) + Math.abs(D[o + 1]! - bk[1]!) + Math.abs(D[o + 2]! - bk[2]!); };
     const ink = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ink[y * w + x] = dist(x + x0, y + y0) > 30 ? 1 : 0;
     const inBox = (px: number, py: number, b: number[]) => px >= X(b[0]!) && px <= X(b[2]!) && py >= Y(b[1]!) && py <= Y(b[3]!);
-    for (const b of s.ex) { const a0 = Math.max(x0, X(b[0])), a1 = Math.min(x1, X(b[2])), c0 = Math.max(y0, Y(b[1])), c1 = Math.min(y1, Y(b[3])); for (let y = c0; y < c1; y++) for (let x = a0; x < a1; x++) ink[(y - y0) * w + x - x0] = 0; }
+    // (a pip's row in the key is a label beside the tree, as a journey's badge is; it is tested below never to sit on the wood)
+    for (const b of [...s.ex, ...s.key]) { const a0 = Math.max(x0, X(b[0])), a1 = Math.min(x1, X(b[2])), c0 = Math.max(y0, Y(b[1])), c1 = Math.min(y1, Y(b[3])); for (let y = c0; y < c1; y++) for (let x = a0; x < a1; x++) ink[(y - y0) * w + x - x0] = 0; }
     // a hairline gap of a pixel closed: a dashed or anti-aliased edge is one mark, a knot a body-width off its wood is not
     const dil = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (ink[y * w + x]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < h && xx >= 0 && xx < w) dil[yy * w + xx] = 1; }
@@ -2577,6 +3823,7 @@ describe('Grow page', () => {
     const holes: unknown[] = [];
     for (const p of s.wood) {
       const smp: number[][] = []; for (let i = 1; i < p.pts.length; i++) { const a = p.pts[i - 1], b = p.pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / 3)); for (let k = 0; k < m; k++) smp.push([a[0] + ((b[0] - a[0]) * k) / m, a[1] + ((b[1] - a[1]) * k) / m, p.hw[i - 1]]); }
+      for (const q of smp) if (s.key.some((b: number[]) => q[0]! + q[2]! > b[0]! && q[0]! - q[2]! < b[2]! && q[1]! + q[2]! > b[1]! && q[1]! - q[2]! < b[3]!)) { holes.push({ k: p.k, key: 'a row of the key on the wood', at: q.slice(0, 2).map(Math.round) }); break; }
       const cls = smp.map(([x, y, hw]) => {
         if (hw! < 1.6) return 's'; const px = X(x!), py = Y(y!); if (px < x0 + 1 || py < y0 + 1 || px >= x1 - 1 || py >= y1 - 1) return 's';
         if (s.ex.some((b: number[]) => inBox(px, py, b)) || s.kn.some((b: number[]) => inBox(px, py, b)) || s.pads.some((b: number[]) => inBox(px, py, b))) return 's';

@@ -94,7 +94,7 @@ export const GROVE_CSS = String.raw`
 .gw-sgroup>summary:hover{background:var(--sel)}.gw-sgroup>summary .n{font:500 13px/18px var(--mono);color:var(--ink);flex:1;min-width:0;overflow-wrap:anywhere}.gw-sgroup>summary .c{font:11.5px/16px var(--mono);color:var(--muted);white-space:nowrap}
 .gw-sgroup>summary .car{width:14px;color:var(--muted);font-size:11px;flex:none}.gw-sgroup[open]>summary .car{transform:rotate(90deg)}
 .gw-sgroup .list{padding:0 0 8px 24px}
-.gw-lanes{display:grid;gap:4px;margin-top:2px}.gw-ln{display:grid;grid-template-columns:118px auto minmax(0,1fr);gap:8px;align-items:center;font-size:12px}.gw-ln .note{color:var(--muted);line-height:16px}
+.gw-lanes{display:grid;gap:4px;margin-top:2px}.gw-ln{display:grid;grid-template-columns:minmax(118px,max-content) auto minmax(0,1fr);gap:8px;align-items:center;font-size:12px}.gw-ln .gw-chip{white-space:nowrap}.gw-ln .note{grid-column:1/-1;min-width:0;overflow-wrap:anywhere;color:var(--muted);line-height:16px}
 .gw-xi{display:grid;gap:3px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:19px}.gw-xi:last-child{border:0}
 .gw-xi .hd{display:flex;justify-content:space-between;gap:8px}.gw-xi .k{font:500 11px/16px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
 .gw-xi .path{font:11.5px/16px var(--mono);color:var(--muted);overflow-wrap:anywhere}.gw-xi .need{color:var(--ink2)}
@@ -122,8 +122,10 @@ ${BONSAI_CSS}
 @media (prefers-color-scheme:dark){.gw-sw{--sw-wood:#6E5F50;--sw-lit:#8A7864;--sw-shade:#4A3F35;--sw-cut:#B9A684;--sw-crs:color-mix(in srgb,#93826E 50%,#F4ECDF);--sw-rim:color-mix(in srgb,var(--ochre) 40%,var(--ink3));--sw-sap:#F2B24C;--sw-core:#FFF6E0;--sw-red:#F05A45}}
 .gw-sw .lf{stroke-width:1.1;stroke-linejoin:round}.gw-sw .lf.pass{fill:var(--moss);stroke:var(--moss)}.gw-sw .lf.fail{fill:var(--verm);stroke:var(--verm)}.gw-sw .lf.run{fill:var(--gold);stroke:var(--gold)}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
-/* on a dark page a leaf still to prove is the tree's pale leaf, a lightened cushion green, never the page showing through */
-@media (prefers-color-scheme:dark){.gw-sw .lf.in,.gw-sw .lf.none{fill:color-mix(in oklab,color-mix(in srgb,var(--moss) 56%,var(--paper)) 84%,#fff)}}
+/* on a dark page the marks in the lists and the legend are the tree's own: a leaf still to prove an outline, the passed
+   leaf's green as a rim over a neutral fill a step off the page (the tree's --leaf-prove), never read as passed; one with no
+   flow yet a dashed rim over the page */
+@media (prefers-color-scheme:dark){.gw-sw .lf.in{fill:color-mix(in srgb,var(--paper) 86%,#fff)}.gw-sw .lf.none{fill:var(--paper)}}
 .gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
 .gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cal{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cres{fill:none;stroke:var(--sw-crs);stroke-width:.8;stroke-linecap:round}.gw-sw .rim{fill:var(--sw-rim)}
 .gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
