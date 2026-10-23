@@ -2178,16 +2178,24 @@ function gbFork(pts,rr){const L=gw.B.L,sy=q=>L.sy?L.sy(q):0,p0=L.potC-L.potL/2,p
    nearest piece's girth. Read off every piece of wood the layout drew, once per drawing. */
 function gbGirth(B,p){if(!B.wS){const S=B.wS=[],L=B.L,add=(pts,w,X)=>{if(!pts||!w)return;for(let i=0;i<pts.length;i++)S.push([pts[i][0]+(X||0),pts[i][1],w[i]||1])};
   L.trees.forEach((T,ti)=>{const X=L.xs[ti];add(T.tp,T.tw,X);for(const b of T.br||[]){add(b.pts,b.w,X);for(const t of b.twigs||[])add(t.pts,t.w,X)}for(const t of T.ctw||[])add(t.pts,t.w,X)});for(const r of L.roots||[])add(r.pts,r.w,0)}
- let best=0,nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2];if(d<nd){nd=d;nw=q[2]}}return best||nw}
+ let best=0;for(const q of gbWNear(B,p)){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2]}if(best)return best;
+ let nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<nd){nd=d;nw=q[2]}}return nw}
 /* How far a point is from leaving the wood: the most room round it inside any piece of wood whose body holds it */
-function gbRoom(B,p){if(!B.wS)gbGirth(B,p);let r=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(q[2]/2-d>r)r=q[2]/2-d}return r}
+function gbRoom(B,p){if(!B.wS)gbGirth(B,p);let r=0;for(const q of gbWNear(B,p)){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(q[2]/2-d>r)r=q[2]/2-d}return r}
+/* (only the wood near a point can hold it: its pieces are filed once per drawing in 8 px squares, and a point looks in the
+   squares within half the widest girth of it, and one more each way) */
+function gbWNear(B,p){const S=B.wS;let G=B.wG;if(!G){G=B.wG={m:new Map(),r:0};for(const q of S){const k=Math.floor(q[0]/8)+','+Math.floor(q[1]/8);let a=G.m.get(k);if(!a)G.m.set(k,a=[]);a.push(q);G.r=Math.max(G.r,q[2]/2+.5)}}
+ const out=[],x0=Math.floor((p[0]-G.r)/8)-1,x1=Math.floor((p[0]+G.r)/8)+1,y0=Math.floor((p[1]-G.r)/8)-1,y1=Math.floor((p[1]+G.r)/8)+1;
+ for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){const a=G.m.get(x+','+y);if(a)for(const q of a)out.push(q)}return out}
 /* a path's runs of points (only M and L, as the route is written) */
 const gbSubs=d=>String(d||'').split('M').map(t=>t.trim()).filter(Boolean).map(t=>t.split(/\s*L\s*/).map(q=>q.trim().split(/\s+/).map(Number))).filter(q=>q.length>1&&q.every(v=>v.length===2&&v.every(isFinite)));
 /* A route drawn inside the wood: a filled band along each run, k of the girth wide (between mn and mx), the width eased along
    it so it tapers where the wood does (widening at once where it enters thicker wood, narrowing over a few pixels where it
    leaves it) and never more than seven tenths of the wood it runs in, nor so wide that an edge would leave the wood (at a
    join, where it cuts the corner), with round ends; with sq, the last run's end is cut square (where the red begins). */
-function gbRibbon(B,d,k,mn,mx,sq,ke){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
+function gbRibbon(B,d,k,mn,mx,sq,ke){const ck=[d,k,mn,mx,!!sq,ke||0].join('|'),C=B.ribC||(B.ribC=new Map());if(C.has(ck))return C.get(ck);const r=gbRibbon0(B,d,k,mn,mx,sq,ke);C.set(ck,r);return r}
+/* (a drawing's wood never changes, so each band is worked out once for it) */
+function gbRibbon0(B,d,k,mn,mx,sq,ke){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
   const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g))));
   /* (where the band ends square and hands on to the red, ke: over its last girth it widens to ke of the girth, so the amber
      meets the red at the red's own width) */
@@ -2561,7 +2569,9 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
     into the card's side, there, at either end of it or at any point between, about 24 px apart) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
     word and off the lit wood, it crosses no twig once it is off the thing it leaves (so it ends at a leaf's nearest edge,
     never across the twigs it hangs among), and it would rather not cross a cushion, foliage or the pot. */
- const lead=(CB,all)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
+ const nearAny=(A,p)=>{for(const q of A)if(dB(p,q)<G)return true;return false},ptAny=(A,p)=>{for(const r of A)if(Math.hypot(r[0]-p[0],r[1]-p[1])<5)return true;return false},inAny=(A,p)=>{for(const q of A)if(inB(p,q))return true;return false},
+  twAny=(A,p)=>{for(const s of A)if(p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])return true;return false};
+ const lead=(CB,all,cap=Infinity,zc=Infinity)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
   if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1])),mx=(AB[0]+AB[2])/2;for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4){opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);
    /* (or, below the thing, from the middle of its foot: so a leaf hung among twigs is reached from under it) */
    if(!kb&&y2>AB[3]+4)opts.push([[mx,AB[3]],[mx,y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
@@ -2569,16 +2579,22 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
      in a stacked key it runs clear of the lines above and below) */
   if(kb&&(pa[1]<CB[1]||pa[1]>CB[3])){const ym=(AB[1]+AB[3])/2;for(const [x0,sg] of [[AB[2],1],[AB[0],-1]])for(const x2 of [CB[0]+10,CB[2]-10,x0+sg*(G+4)])if((x2-x0)*sg>G&&x2>=CB[0]+4&&x2<=CB[2]-4)opts.push([[x0,ym],[x2,ym],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear) */
-  let bestL=null;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL.ok)break;continue}let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear;
+     and a way is given up as soon as it costs as much as the best way found, or as would keep its place from winning, since
+     it could only cost more: the way chosen is the same, found sooner. For a place that covers nothing, which wins at once
+     on a clear way, only a way that is not clear is given up so, and should a clear way that costs that much or more be the
+     best left, every way is tried again in full) */
+  let bestL=null,cut=false;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
     const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
-    for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
-     if(off&&txt.some(q=>dB(p,q)<G)){pen+=150;ok=false}
-     if(off&&rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5)){pen+=400;ok=false}
-     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&tw2.some(s=>p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])){pen+=300;ok=false}
-     if(firm.some(q=>!inB(p0,q)&&inB(p,q))){pen+=300;ok=false}else if(cus.some(q=>!inB(p0,q)&&inB(p,q))){pen+=60;ok=false}else if(soft.some(q=>!inB(p0,q)&&inB(p,q)))pen+=60}}
-   if(!bestL||pen<bestL.pen)bestL={pts,pen,ok}}return bestL};
+    /* (only what lies near this piece of it can be too near a point on it, and a piece near nothing is not walked at all) */
+    const nr=(q,r)=>q[0]<Math.max(a[0],b[0])+r&&q[2]>Math.min(a[0],b[0])-r&&q[1]<Math.max(a[1],b[1])+r&&q[3]>Math.min(a[1],b[1])-r,txt2=txt.filter(q=>nr(q,G+1)),rp2=rp.filter(r=>nr([r[0],r[1],r[0],r[1]],6)),fm2=firm.filter(q=>!inB(p0,q)&&nr(q,1)),cu2=cus.filter(q=>!inB(p0,q)&&nr(q,1)),so2=soft.filter(q=>!inB(p0,q)&&nr(q,1));
+    if(txt2.length||rp2.length||tw2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
+     if(off&&txt2.length&&nearAny(txt2,p)){pen+=150;ok=false}
+     if(off&&rp2.length&&ptAny(rp2,p)){pen+=400;ok=false}
+     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){pen+=300;ok=false}
+     if(fm2.length&&inAny(fm2,p)){pen+=300;ok=false}else if(cu2.length&&inAny(cu2,p)){pen+=60;ok=false}else if(so2.length&&inAny(so2,p))pen+=60}}
+   if(!ok&&pen>=zc){cut=true;continue}if(pen<lim)bestL={pts,pen,ok}}if(cut&&bestL&&bestL.ok&&bestL.pen>=zc)return lead(CB,all);return bestL||{pts:null,pen:Infinity,ok:false}};
  /* (a root's card stays within 84 px of where its root crosses the rim, or of where a root in the pot starts) */
  const rd=rr&&rr.pts&&rr.pts.length?toPx(xo||rr.pts[0]):rim,rimB=rd?[rd[0],rd[1],rd[0],rd[1]]:null;
  const fit=(tw,th)=>{const H2=rid?H0+th+12:Math.max(H0,th+8),key=[0,H0,W2,H2];
@@ -2600,19 +2616,22 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  cand.push(...by.map(q=>[q,far(q)]).sort((a,b)=>a[1]-b[1]).map(q=>q[0]));
  let best=null;
  for(const q of cand){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4)),CB=[x,y,x+tw,y+th],CG=[x-G,y-G,x+tw+G,y+th+G];let sc=0,z=true;
+  /* (a place that already covers something and costs as much as the best so far, with its distance from what it explains,
+     is passed over at once: it could only cost more) */
+  const [pa,pc]=near(AB,CB),D=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05,lost=()=>!z&&best&&sc+D>=best.sc;
   for(const b of own){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}}
-  for(const b of hard){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}else if(ovB(CG,b)>0){sc+=300;z=false}}
+  for(const b of hard){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}else if(ovB(CG,b)>0){sc+=300;z=false}}if(lost())continue;
   for(const b of kn12)if(ovB(CG,b)>0){sc+=1e5;z=false}
-  for(const b of mid){const o=ovB(CB,b);if(o>0){sc+=5e4+o*5;z=false}else if(ovB(CG,b)>0){sc+=200;z=false}}
+  for(const b of mid){const o=ovB(CB,b);if(o>0){sc+=5e4+o*5;z=false}else if(ovB(CG,b)>0){sc+=200;z=false}}if(lost())continue;
   if(rpx.some(b=>ovB(CB,b)>0)){sc+=1e5;z=false}
   for(const b of firm){const o=ovB(CB,b);if(o>0){sc+=4e4+o*5;z=false}}
   for(const b of thin){const o=ovB(CB,b);if(o>0){sc+=o*2;z=false}}
-  for(const b of soft)sc+=ovB(CB,b)*2;
+  for(const b of soft)sc+=ovB(CB,b)*2;if(lost())continue;
   for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3){sc+=2e4;z=false}else if(inB(p,CG)){sc+=40;z=false}
   const ko=ovB(CB,key);if(ko>0){sc+=4000+ko*.02;z=false}
   if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false}}
-  const [pa,pc]=near(AB,CB);sc+=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05;if(!z&&best&&sc>=best.sc)continue;
-  const L2=lead(CB);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
+  sc+=D;if(!z&&best&&sc>=best.sc)continue;
+  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
  if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok)best.pts=L3.pts}
  return best};
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
