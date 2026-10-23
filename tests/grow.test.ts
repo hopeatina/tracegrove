@@ -2658,12 +2658,17 @@ describe('Grow page', () => {
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
    *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
   const ramify = () => {
-    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }> };
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }>, forks: [] as Array<{ id: string; min: number; n: number }> };
     for (const T of L.trees) for (const b of T.br) {
       out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk);
       // its girth a caliper and a half (of its own) past the trunk's side, against its collar's
       const s = b.Tk / 2 + 1.5 * b.b; let i = 1; while (i < b.acc.length - 1 && b.acc[i] < s) i++;
       out.holds.push(b.w[i] / b.b);
+      // and a refusals' branch on out under its pad to where its first twigs fork (under its inner cushion, at most six tenths
+      // of its run): its collar's girth all the way, so it never reads as a wire
+      if (b.pol) { const g = T.pads[b.id].geo, P0 = b.pts[0], xIn = Math.min(...g.cs.filter((c: any) => c.seat !== null).map((c: any) => b.inner + g.PW / 2 + c.x * b.dir - .66 * c.a), b.inner + g.PW / 2);
+        let mn = Infinity, n = 0; b.pts.forEach((q: number[], k: number) => { const x = (q[0]! - P0[0]) * b.dir; if (x >= b.Tk / 2 && x <= xIn && b.acc[k] <= .6 * b.len) { mn = Math.min(mn, b.w[k] / b.b); n++; } });
+        out.forks.push({ id: b.id, min: mn, n }); }
       // a raised crest's riser: how many limbs fork off it just under the crest, each leaving it no more than ten pixels
       // under the crest's underside (so the crest sits on one limb that ramifies under it, not on stilts from low down)
       const rz = (b.twigs ?? []).find((t: any) => t.lb), cr = T.pads[b.id]?.geo.cs.find((c: any) => c.role === 'crest' && c.seat === null);
@@ -2721,6 +2726,9 @@ describe('Grow page', () => {
         for (const q of r.ends) { expect(q, name + ' branch end/trunk').toBeGreaterThanOrEqual(.12); expect(q, name + ' branch end/trunk').toBeLessThanOrEqual(.18); }
         // holding its collar's girth for a caliper and a half of its own past the trunk's side before it tapers
         for (const q of r.holds) expect(q, name + ' branch girth held past its collar').toBeGreaterThanOrEqual(.97);
+        // and a refusals' branch on out under its pad to where its first twigs fork from it: never a wire beside its trunk
+        expect(r.forks.length, name).toBeGreaterThan(0);
+        for (const q of r.forks) { expect(q.n, name + ' ' + q.id).toBeGreaterThan(2); expect(q.min, name + ' ' + q.id + ' girth held out to its first fork').toBeGreaterThanOrEqual(.97); }
         // a raised crest stands on a riser that forks just under it, two limbs or more off it no more than ten pixels under the
         // crest, never stilts rising from low on it
         for (const q of r.risers) expect(q.forks, name + ' forks off the riser under ' + q.id).toBeGreaterThanOrEqual(2);

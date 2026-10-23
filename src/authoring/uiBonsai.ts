@@ -705,9 +705,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  const br=items.map((it,i)=>{const h=hs[i],dir=side[i];const k=gbNear(ty,h);const P0=tp[k],Tk=tw[k];const pd=padList[i+1],g=pd.geo;
   /* a branch leaves at about four tenths of the trunk's girth there (never under .36 of it or over .45, the heavier journey
      the thicker): that is its girth where it meets the trunk, its collar, and it holds it for a caliper and a half of its own
-     past the trunk's side before it tapers, fastest there, along the rest of its run to about .15 of the trunk's girth in
-     its pad, never to a thread */
-  const b=Tk*Math.max(.36,Math.min(.45,.45*Math.sqrt(it.w/Wat(h-.04))));
+     past the trunk's side (a refusals' branch, short and high on a thinner trunk, on out under its pad to where its first
+     twigs fork from it, under its inner cushion, so it never reads as a wire); only then it tapers, fastest there, along the
+     rest of its run to about .15 of the trunk's girth in its pad, never to a thread */
+  const b=Tk*Math.max(.3601,Math.min(.45,.45*Math.sqrt(it.w/Wat(h-.04))));
   const inner=Tk/2+(back[i]?.03*H:bare(it));
   /* the branch runs out under its pad and ends inside its outer cushion, so the foliage is held by wood all the way out and
      no wood pokes out past it */
@@ -717,7 +718,8 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
    :[P0,[P0[0]+dir*.22*R,P0[1]+(dr+b1)*R*.9],[P0[0]+dir*.5*R,P0[1]+(dr*.4-b2)*R],[P0[0]+dir*.76*R,P0[1]-rise*R*.45+b1*R*.3],[P0[0]+dir*R,P0[1]-rise*R]];
   const ph=gbRng(gbHash(key+':'+it.id))()*6.28;const raw=back[i]?gbBez(cpb,44):gbResample(gbSmooth(cpb,3),44);
   const pts=raw.map((q,ii)=>{const t=ii/44,n=gbNorm(raw,ii),d=.012*R*Math.sin(t*7+ph)*Math.sin(t*Math.PI);return[q[0]+n[0]*d,q[1]+n[1]*d]});
-  const wOf=a=>{const l=a[a.length-1],hold=1.5*b,run=Math.max(1,l-Tk/2-hold),end=.15*Tk;return a.map(d=>{const v=Math.max(0,Math.min(1,(d-Tk/2-hold)/run));return Math.max(2.5,end+(b-end)*Math.pow(1-v,1.3))})};
+  const cx0=P0[0]+dir*(inner+g.PW/2),xIn=Math.min(...g.cs.filter(c=>c.seat!==null).map(c=>(cx0+c.x-P0[0])*dir-.66*c.a),inner+g.PW/2);
+  const wOf=a=>{const l=a[a.length-1],iIn=pts.findIndex(q=>(q[0]-P0[0])*dir>=xIn),d0=Math.min(.6*l,Math.max(Tk/2+1.5*b,it.pol&&iIn>0?a[iIn]:0)),run=Math.max(1,l-d0),end=.15*Tk;return a.map(d=>{const v=Math.max(0,Math.min(1,(d-d0)/run));return Math.max(2.5,end+(b-end)*Math.pow(1-v,1.3))})};
   let acc=gbLen(pts),len=acc[acc.length-1],w=wOf(acc);
   /* Each cushion sits on ramified wood: the branch runs out under every cushion it carries, its top seven pixels under the
      cushion's lowest edge, and two or three forked twigs rise from it into the foliage between, the leaves' own twigs
