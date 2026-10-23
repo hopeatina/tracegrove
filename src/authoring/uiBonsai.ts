@@ -827,16 +827,17 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   /* (a shoulder's branchlet runs out level under it, its top seven pixels under the cushion's foot, and turns up into it; two
      forked twigs rise from the level stretch into the foliage, and its leaves' twigs leave the branchlet where it has risen
      into the cushion; one that hangs two failures or more turns up into it on its inner side, so its outer underside is
-     clear for them) */
+     clear for them, its forks rising from that inner stretch where the underside over it is still near its foot, each leant
+     toward the cushion's middle as far as keeps both its tips three pixels inside the foliage) */
   let t2,ki;if(cr){ki=leaderAt(yb+9);const e=[X+sd*c.a*.62,yb+cg.bY(c,.62*sd)-3.5],a0=tp[ki],dx=e[0]-a0[0],dy=a0[1]-e[1];const F=gbBez([a0,[a0[0]+dx*.3,a0[1]-dy*.6],[e[0]-dx*.4,e[1]+dy*.05],e],120),A=gbLen(F),i0=F.findIndex(q=>q[1]<yb+cg.bY(c,Math.max(-1,Math.min(1,(q[0]-X)/c.a)))),Lc=i0>0?Math.min(A[120],A[i0]/.7):A[120];
    t2=gbResample(F.filter((_,jj)=>A[jj]<=Lc+1e-6),12)}
   else{ki=leaderAt(yb+9+11*Math.max(.7,cg.z));const a0=tp[ki],e=[X+sd*c.a*(hg?-.6:.35),yb-c.limf*c.h],m=[sd*Math.max(sd*(X-sd*(hg?.95:.2)*c.a),sd*a0[0]+8),yb+9],d1=Math.abs(m[0]-a0[0]),d2=Math.abs(e[0]-m[0]);
    t2=gbResample([...gbBez([a0,[a0[0]+sd*d1*.35,a0[1]-(a0[1]-m[1])*.85],[m[0]-sd*d1*.3,m[1]],m],10),...gbBez([m,[m[0]+sd*d2*.45,m[1]],[e[0]-sd*d2*.1,e[1]+(m[1]-e[1])*.55],e],10).slice(1)],12)}
   const w2=t2.map((_,jj)=>Math.max(1.2,tw[ki]*.55*Math.pow(1-jj/12,.9)+jj/12*1.2));
   ctw.push({pts:t2,w:w2,k,bi:ki,lb:1});cc[k]={pts:t2,w:w2,bi:ki,dir:sd,lo:Math.max(0,t2.findIndex(q=>q[1]<yb-1))};
-  if(!cr){let V=[];t2.forEach((q,jj)=>{if(Math.abs(q[0]-X)<(hg?c.a-Math.max(c.rL,c.rR)*c.h-1:c.a*.7)&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
+  if(!cr){let V=[];t2.forEach((q,jj)=>{if((hg?Math.abs(q[0]-X)<c.a&&cg.bY(c,(q[0]-X)/c.a)>-2.5:Math.abs(q[0]-X)<c.a*.7)&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
    if(V.length){const pick=[V[Math.round(.15*(V.length-1))],V[Math.round(.85*(V.length-1))]].filter((v,j,A)=>A.indexOf(v)===j);
-    (pick.length>1?pick.map((jj,j)=>[jj,2*j-1]):[[pick[0],-3],[pick[0],3]]).forEach(([jj,ln])=>{for(const t of gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,ln)){if(t.fk===1)t.c=cc[k];t.k=k;ctw.push(t)}})}}});
+    (pick.length>1?pick.map((jj,j)=>[jj,2*j-1]):[[pick[0],-3],[pick[0],3]]).forEach(([jj,ln])=>{let f=gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,ln);for(let l=ln+.5;hg&&l<=ln+8&&!f.every(t=>{const q=t.pts[t.pts.length-1],u=(q[0]-X)/c.a;return Math.abs(u)<1&&q[1]<=yb+cg.bY(c,u)-3});l+=.5)f=gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,l);for(const t of f){if(t.fk===1)t.c=cc[k];t.k=k;ctw.push(t)}})}}});
  /* the crest's leaves' twigs leave the leader inside it */
  for(const t of gbLeafTwigs(cg,co,(k,hang)=>{const c=cg.cs[k];if(c===crc&&!hang)return {pts:tp,w:tw,lo:leaderAt(co[1]+c.b-1),dir:1,gap:null};const q=cc[k];return q?{pts:q.pts,w:q.w,lo:hang?0:q.lo,dir:q.dir,gap:null}:null})){if(!t.c&&(t.hang||cg.cs[t.k]!==crc))t.c=cc[t.k];ctw.push(t)}
  const cdrop=cg.drop;
@@ -1402,7 +1403,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||(t.sec?'h'+t.sec:tk))+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
    /* the branchlets that carry the crown's shoulders, or hang its failures, are limbs off the leader like any branch */
    if(t.lb)lbS.set(t.pts,limb(ak,tpp,t.w,{pts:tp,w:T.tw,k:t.bi},'w',JG[T.apex.id],gWood,gGrain,t0,320).el.__r);
-   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id||t.sec?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork||t.sec)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
+   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk||t.fork?' fk':'')});tw.__pts=tpp;tw.__w=t.w;(t.id||t.sec?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork||t.sec)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
   /* knots: a raised boss on the bark, its file named beside it when its journey is lit */
   const padBox=T.padList.map(pd=>{const o=sh(T.origin[pd.id]),g=pd.geo;return [o[0]-g.PW/2,o[1]-g.PH-6,o[0]+g.PW/2,o[1]+g.drop+2]});const placed=L.rl.map(l=>{if(l.box)return l.box;const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;return [x0-2,l.y-L.fs,x0+w0+2,l.y+3]});
   T.knots.forEach(kn=>{const q=sh(kn.p);placed.push([q[0]-6,q[1]-6,q[0]+6,q[1]+6])});
