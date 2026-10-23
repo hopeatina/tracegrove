@@ -620,7 +620,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  anc.forEach((a,i)=>{if(a&&anc.indexOf(a)<i)anc[i]=null});
  /* (a lone branch stands a little under halfway up, so a small tree's canopy, from the crown's top to the cushion's underside, is
     about three fifths of its height, as a grown tree's is) */
- const h1=m>=7?.27:m===1?.46:.31;const lad=[];for(let i=0,h=h1;i<m;i++){lad.push(h);h+=(.86-h)*.4}
+ let h1=m>=7?.27:m===1?.46:.31;const lad=[];for(let i=0,h=h1;i<m;i++){lad.push(h);h+=(.86-h)*.4}
  const hs=items.map(()=>0);{let q=0;items.forEach((it,i)=>{if(!anc[i])hs[i]=lad[q++]});const npH=hs.filter((h,i)=>!anc[i]),n=ownA.length,lo0=npH.length?Math.max(...lad)+.06:.35;
   let floor=npH.length?Math.max(...npH)+.12:null;
   for(const i of items.map((_,i)=>i).filter(i=>anc[i]).sort((a,b)=>ownA.indexOf(anc[a])-ownA.indexOf(anc[b]))){const ix=ownA.indexOf(anc[i]),t=n===1?(lo0+.85)/2:lo0+(.85-lo0)*ix/(n-1);
@@ -636,8 +636,9 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     cushion always means more scenarios; the crown's shoulders reach out on the side away from the first branch, so the
     canopy balances over the roots */
  const pgeo=(pd,K)=>gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,K,pd.pol,M.lmin,!M.nw);
- for(const pd of padList){pd.leaves=leavesOf(pd);pd.geo=pgeo(pd,0)}
+ for(const pd of padList)pd.leaves=leavesOf(pd);
  const cpd=padList[0];
+ const sizePads=()=>{for(const pd of padList)pd.geo=pgeo(pd,0);
  /* The canopy is a scalene triangle, the lowest branch the heaviest and the apex the lightest. Each pad is as wide as its
     leaves ask, clamp(n x 1.6 leaves, 3.2, 12 leaves) (two pitches of eight tenths of a leaf each), times its tier: 1 at the lowest branch, .7 at the apex; never narrower
     than holds its leaves. Then no pad is wider than the one below it (where the upper one is wider than its tier asks, to
@@ -657,15 +658,18 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
    let ok=true,mx=0;if(!M.nw)for(const pd of up){const a=ca(pd);if(a<mx*.999){wd.set(pd,wd.get(pd)*mx/a*1.002);ok=false}mx=Math.max(mx,a)}
    const c0=cpd.geo.cs.find(c=>c.role==='crest'),bm=Math.max(0,...padList.slice(1).flatMap(pd=>pd.geo.cs.map(c=>c.a)));
    if(c0&&c0.a>.75*bm){const lo=up.slice(1).reduce((a,pd)=>ca(pd)>ca(a)?pd:a);wd.set(lo,wd.get(lo)*c0.a/(.75*ca(lo))*1.002);ok=false}
-   if(ok)break}}
- const crc=cpd.geo.cs.find(c=>c.role==='crest'),gap=.022*H,inC=.32*crc.h-crc.bot-.035*H,lift=.02*H+6;let need=lit?.84*H:m<=1?.22*H:m<=2?.27*H:.38*H;
+   if(ok)break}}};sizePads();
+ let crc,gap,inC,lift;
  /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
     upper trunk is not a bare pole (tried first, and kept only if nothing then overlaps) */
- if(!lit){for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(pd.geo.PH*(strict?1:.5)+pd.geo.L*(strict?.75:0)+gap+inC+lift)/(1-hs[pd.i]));
+ const clear=pd=>pd.geo.PH*(strict?1:.5)+pd.geo.L*(strict?.75:0)+gap+inC+lift;
+ const needOf=()=>{crc=cpd.geo.cs.find(c=>c.role==='crest');gap=.022*H;inC=.32*crc.h-crc.bot-.035*H;lift=.02*H+6;let need=lit?.84*H:m<=1?.22*H:m<=2?.27*H:.38*H;
+ if(!lit){for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,clear(pd)/(1-hs[pd.i]));
   for(let i=0;i<m;i++)for(let j=i+1;j<m;j++)if(side[i]===side[j]&&!back[i]&&!back[j]){const a=hs[i]<=hs[j]?i:j,c=a===i?j:i;need=Math.max(need,(padList[a+1].geo.PH+padList[c+1].geo.drop+gap)/((hs[c]-hs[a])||.01))}
   /* and no branch reaches further from the trunk than about two thirds of the tree's height (to the top of its crown): a
      long journey makes a taller tree, not a longer whip */
   for(const pd of padList.slice(1))if(!back[pd.i])need=Math.max(need,(bare(items[pd.i])+pd.geo.PW)/.62-.6*cpd.geo.PH)}
+ return need};let need=needOf();
  /* the wood is sized from the data: the trunk's girth from how many scenarios the tree carries, so a handful of leaves stands
     on a slender trunk, and the trunk at least about twelve girths tall, so a small tree grows tall and light, never squat
     (from the leaf's own size, not the larger one a phone may give it). Never under an eighth of its pot's length (dmin, from
@@ -679,7 +683,17 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* (and a trunk grown taller than its leaves alone would make it thickens with it: never more than fourteen girths tall, so
     with its flare its foot is at least a ninth of its height and it never reads as a pole; a phone's trunk, grown taller for
     its larger leaves, keeps the girth the drawing's height gives it) */
- const Ht=Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);const D=sap?Ht*.05:Math.max(Dd,Math.min(Ht,M.lmin?.92*H+tl:Ht)/14);
+ const htOf=need=>Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);
+ let Ht=htOf(need);
+ /* (and a crest raised on its riser over its shoulders takes the room it needs at the top from the bare trunk under the
+    lowest branch, not by making the tree taller: every branch, and the knots between them, keeps its place under the crown,
+    and the trunk below the lowest branch is that much shorter, never under a fifth of the tree's height or three and a half
+    girths, nor so short that the parts every journey shares, whose knots stand there, fit fewer knots than before, nor the
+    trunk under twelve and a half girths) */
+ if(tl>0&&!lit&&!sap&&m&&!M.lmin){const Hf=Ht,nc=Object.keys(carry).filter(id=>carry[id]>1).length,kt=Math.max(21,1.1*Dd),n0=Math.floor((Math.max(.16,h1-.05)-.09)*Hf/kt)+1,
+   core=nc>1?(Math.min(nc,n0)-1)*kt+.14*(Hf-tl)+6:0,cut=Math.min(tl,Hf-12.5*Dd,Math.min(...hs)*Hf-Math.max(.2*(Hf-tl),3.5*Dd,core));
+  if(cut>1){Ht=Hf-cut;for(let i=0;i<m;i++)hs[i]=(hs[i]*Hf-cut)/Ht;h1=(h1*Hf-cut)/Ht;sizePads();Ht=Math.max(Ht,needOf())}}
+ const D=sap?Ht*.05:Math.max(Dd,Math.min(Ht,M.lmin?.92*H+tl:Ht)/14);
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
  else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;ord.forEach(i=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
   /* with one or two branches the apex leans a little away from the first, so the tree's mass stays over its roots: the
