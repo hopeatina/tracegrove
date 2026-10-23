@@ -219,7 +219,7 @@ function grove(sc){
   steps.forEach((x,j)=>{const row=Math.floor(j/cols),col=j%cols,count=Math.min(cols,steps.length-row*cols),lx=px+(col-(count-1)/2)*25,ly=py-10-row*15,angle=(col%2?-16:16);
    const foot=[lx-8,ly+3];wood.append(sv('path',{class:'twigwood',d:gbLine(gbSpline([[px,py+2],[(px+foot[0])/2,py-2],foot],10))}));
    const at=c.failure&&x.name&&(x.name===c.failure.step||x.reportedName===c.failure.step);
-   pad.append(sv('path',{d:gbLeafD(21,10),transform:'translate('+gbP([lx,ly])+') rotate('+angle+')',class:'run-leaf lf-'+(at?'fail':x.result),'data-leaf':x.id||null},sv('title',{},(x.reportedName||x.name||x.id)+' · '+LABEL[at?'fail':x.result])))});
+   pad.append(sv('path',{d:at||x.result==='fail'?gbLeafBite(21,10):gbLeafD(21,10),transform:'translate('+gbP([lx,ly])+') rotate('+angle+')',class:'run-leaf lf-'+(at?'fail':x.result),'data-leaf':x.id||null},sv('title',{},(x.reportedName||x.name||x.id)+' · '+LABEL[at?'fail':x.result])))});
   if(!steps.length)pad.append(sv('path',{d:gbLeafD(16,8),transform:'translate('+gbP([px,py-8])+')',class:'run-leaf lf-'+(cut?'pruned':'none')}));
   pads.append(pad);
   const text=c.id.length>30?c.id.slice(0,29)+'…':c.id;
