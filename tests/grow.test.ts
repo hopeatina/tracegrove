@@ -1061,7 +1061,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
-  it('sets each card by what it explains, never over a name or with a hairline across one, and has the card and the tree agree on what a leaf runs', async () => {
+  it('sets each card by what it explains, never over a name or with a hairline across one or, past its first 12 px, across a twig, and has the card and the tree agree on what a leaf runs', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1118,6 +1118,19 @@ describe('Grow page', () => {
                 }
                 if (near < 11) out.push(k + ': hairline ' + near.toFixed(1) + ' px from ' + t.textContent);
               }
+              // and past its first 12 px the hairline crosses no twig: it reaches a leaf at its nearest edge, never across the twigs
+              // of the pads it passes
+              const twigs = Array.from(B.svg.querySelectorAll('path.tw') as NodeListOf<SVGGeometryElement>).filter((e) => !e.closest('.budg') && e.getBoundingClientRect().width);
+              const inFill = (e: SVGGeometryElement, x: number, y: number) => { const q = e.getScreenCTM()!.inverse(); return e.isPointInFill(new DOMPoint(q.a * x + q.c * y + q.e, q.b * x + q.d * y + q.f)); };
+              let twig = false;
+              for (let i = 1; i < lead.length && !twig; i++) {
+                const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                for (let s = 0; s <= n && !twig; s += 1) {
+                  const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                  if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) twig = twigs.some((e) => inFill(e, x, y));
+                }
+              }
+              if (twig) out.push(k + ': hairline crosses a twig');
               if (wide) for (const e of Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<Element>)) { const r = e.getBoundingClientRect(); if (r.width && meet(c, r)) out.push(k + ': card on a cushion of ' + (e.closest('[data-pad]') || e).getAttribute('data-pad')); }
             };
             for (const [k, el] of things) {

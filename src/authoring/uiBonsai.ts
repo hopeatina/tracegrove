@@ -2510,11 +2510,17 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const TB=ink.reduce((a,q)=>[Math.min(a[0],q[0]),Math.min(a[1],q[1]),Math.max(a[2],q[2]),Math.max(a[3],q[3])],[1e9,1e9,-1e9,-1e9]);
  /* the nearest points of two boxes, one on each */
  const near=(a,b)=>{const ax=(lo,hi)=>b[hi]<a[lo]?[a[lo],b[hi]]:b[lo]>a[hi]?[a[hi],b[lo]]:[(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2,(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2];const X=ax(0,2),Y=ax(1,3);return [[X[0],Y[0]],[X[1],Y[1]]]};
+ /* the twigs as drawn, each piece as wide as the twig is there */
+ const twg=[];for(const e of B.svg.querySelectorAll('path.tw')){if(!e.__pts||e.closest('.budg'))continue;const q=e.getBoundingClientRect(),m=e.getScreenCTM();if(!q.width||!m)continue;const P=e.__pts.map(p=>[m.a*p[0]+m.c*p[1]+m.e-c.left,m.b*p[0]+m.d*p[1]+m.f-c.top]),W=e.__w||[],sc=Math.hypot(m.a,m.b);
+  for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],r=Math.max(W[i-1]||1,W[i]||1)*sc/2+1.5;twg.push([a,b,r,[Math.min(a[0],b[0])-r,Math.min(a[1],b[1])-r,Math.max(a[0],b[0])+r,Math.max(a[1],b[1])+r]])}}
  /* The hairline back to what it explains, when the card is more than 16 px off: straight, or with one elbow (along, then
     into the card's side, there, at either end of it or at any point between, about 24 px apart) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
-    word and off the lit wood, and it would rather not cross a cushion, foliage or the pot. */
+    word and off the lit wood, it crosses no twig once it is off the thing it leaves (so it ends at a leaf's nearest edge,
+    never across the twigs it hangs among), and it would rather not cross a cushion, foliage or the pot. */
  const lead=(CB,all)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
-  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4)opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
+  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1])),mx=(AB[0]+AB[2])/2;for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4){opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);
+   /* (or, below the thing, from the middle of its foot: so a leaf hung among twigs is reached from under it) */
+   if(!kb&&y2>AB[3]+4)opts.push([[mx,AB[3]],[mx,y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
   if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]]);for(const x2 of gbSteps(CB[0]+10,CB[2]-10))if(Math.abs(x2-pa[0])>4)more.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
   /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
      in a stacked key it runs clear of the lines above and below) */
@@ -2522,9 +2528,11 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear) */
   let bestL=null;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL.ok)break;continue}let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
+    const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
     for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
      if(off&&txt.some(q=>dB(p,q)<G)){pen+=150;ok=false}
      if(off&&rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5)){pen+=400;ok=false}
+     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&tw2.some(s=>p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])){pen+=300;ok=false}
      if(firm.some(q=>!inB(p0,q)&&inB(p,q))){pen+=300;ok=false}else if(cus.some(q=>!inB(p0,q)&&inB(p,q))){pen+=60;ok=false}else if(soft.some(q=>!inB(p0,q)&&inB(p,q)))pen+=60}}
    if(!bestL||pen<bestL.pen)bestL={pts,pen,ok}}return bestL};
  /* (a root's card stays within 84 px of where its root crosses the rim, or of where a root in the pot starts) */
