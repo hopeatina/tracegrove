@@ -2224,7 +2224,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
-  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet the legend\u2019s dashed rim round nothing on the tree too, the lists and the legend marking them the same way', async () => {
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a pale leaf under a dashed rim, never a hole, the lists and the legend marking a leaf to prove as the tree does and no flow yet with a dashed rim', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
@@ -2254,7 +2254,7 @@ describe('Grow page', () => {
         const look = await page.evaluate(() => {
           const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
           const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { fill: lab(c.fill), stroke: lab(c.stroke), sw: parseFloat(c.strokeWidth), bud: !!e.closest('.bud') }; });
-          return { bg, prove: each('.gw-svg.gb .gb-lf:is(.in,.idle):not(.gone):not(.pv-add):not(.pv-out):not(.pre) .blade'), none: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf.none:not(.gone):not(.bud) .blade')).map((e) => { const c = getComputedStyle(e); return { fill: c.fill, stroke: lab(c.stroke), dash: c.strokeDasharray }; }) };
+          return { bg, prove: each('.gw-svg.gb .gb-lf:is(.in,.idle):not(.gone):not(.pv-add):not(.pv-out):not(.pre) .blade'), none: Array.from(document.querySelectorAll('.gw-svg.gb .gb-lf.none:not(.gone):not(.bud) .blade')).map((e) => { const c = getComputedStyle(e); return { fill: c.fill, paint: lab(c.fill), stroke: lab(c.stroke), dash: c.strokeDasharray }; }) };
         });
         expect(look.prove.length, width + 'px').toBeGreaterThan(3);
         const hue = (c: { a: number; b: number }) => Math.atan2(c.b, c.a) * 180 / Math.PI;
@@ -2272,11 +2272,13 @@ describe('Grow page', () => {
           // and never read as passed: twenty L* or more from a passed leaf's fill
           expect(Math.abs(pass!.L - l.fill!.L), width + 'px L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
         }
-        // a leaf with no flow yet is drawn as the legend draws it, a dashed rim round nothing (no fill at all), its rim a light
-        // green that stands off the page, so it is never read as a filled, passed leaf
+        // a leaf with no flow yet stays a pale leaf, never the page showing through: an opaque fill well above the page, under a
+        // dashed rim of a light green that stands off the page
         expect(look.none.length, width + 'px').toBeGreaterThan(0);
         for (const l of look.none) {
-          expect(l.fill, width + 'px no-flow leaf fill').toBe('none');
+          expect(l.fill, width + 'px no-flow leaf with no fill').not.toBe('none');
+          expect(l.paint, width + 'px no-flow leaf with a clear fill').not.toBeNull();
+          expect((l.paint?.lum ?? -1) - look.bg.lum, width + 'px no-flow leaf against the page').toBeGreaterThan(0.3);
           expect(l.dash, width + 'px no-flow leaf rim').not.toBe('none');
           expect(l.stroke, width + 'px no-flow leaf with no rim').not.toBeNull();
           expect(l.stroke!.L - look.bg.L, width + 'px no-flow rim against the page').toBeGreaterThan(30);
