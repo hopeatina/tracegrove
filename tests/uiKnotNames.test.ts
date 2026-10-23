@@ -265,7 +265,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('names every knot at rest, beside it or as a numbered pip (lettered on a phone, where journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of every bud, so no hop of the headline journey goes unnamed, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
+  it('names every knot at rest, beside it or, on a phone only, as a lettered pip (journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of every bud and every shoot from its foot, so no hop of the headline journey goes unnamed and a burl holding its start is named for it, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     let pips = 0;
@@ -304,11 +304,12 @@ describe('the names on the bonsai’s knots', () => {
                 if (vis(boss) || vis(key)) out.push(label(ids[0]!) + ': a pip as well as a leader');
               }
             }
-            // the marks count 1, 2, 3 …, on a phone a, b, c … (its journeys wear numbered badges), and no two names, nor a name and
-            // a key row, sit on one another
-            const phone = !!B.L.narrow, mark = (i: number) => phone ? String.fromCharCode(97 + i) : String(i + 1), ord = (m: string) => /^[a-z]$/.test(m) ? m.charCodeAt(0) - 96 : +m;
+            // the marks count a, b, c … at every width (journeys wear numbered badges), a wide screen needs none (a knot with no
+            // place for its name there grows into its neighbour), and no two names, nor a name and a key row, sit on one another
+            const phone = !!B.L.narrow, mark = (i: number) => String.fromCharCode(97 + i), ord = (m: string) => /^[a-z]$/.test(m) ? m.charCodeAt(0) - 96 : +m;
             if (width === 390 && !phone) out.push('a phone is not laid out as one');
-            for (const m of keyed) if (phone && !/^[a-z]$/.test(m)) out.push('a pip on a phone reads ' + m);
+            for (const m of keyed) if (!/^[a-z]$/.test(m)) out.push('a pip reads ' + m);
+            if (!phone && keyed.length) out.push('a wide screen has pips ' + keyed.join(' '));
             if (keyed.slice().sort((a, b) => ord(a) - ord(b)).join(' ') !== keyed.map((_, i) => mark(i)).join(' ')) out.push('the pips are marked ' + keyed.join(' '));
             // the key is one block: every row's pip at one x, one row's height apart, clear of the wood, the cushions and the pot
             const rows = Object.keys(B.klbl).map((id) => B.klbl[id].parentNode.querySelector('.kpip.key') as SVGGElement).filter((g) => vis(g)).map((g) => ({ c: g.querySelector('circle')!.getBoundingClientRect(), t: (g.parentNode as Element).querySelector('.klbl')!.getBoundingClientRect() })).sort((a, b) => a.c.top - b.c.top);
@@ -335,6 +336,14 @@ describe('the names on the bonsai’s knots', () => {
               if (!vis(pc)) continue;
               const a = pc.querySelector('circle')!.getBoundingClientRect();
               for (const b of buds) if (Math.hypot(Math.max(b.left - a.right, 0, a.left - b.right), Math.max(b.top - a.bottom, 0, a.top - b.bottom)) < 8 - .5) out.push('pip ' + pc.textContent + ' is within 8px of a bud');
+              // and of every shoot, its collar on the bark and its stem out to its count, so a pip never sits where a shoot leaves
+              const cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2, pr = (a.right - a.left) / 2;
+              for (const el of (Array.from(B.svg.querySelectorAll('.budg .tw.shoot, .budg ellipse.w')) as SVGGeometryElement[]).filter(vis)) {
+                const m = el.getScreenCTM()!, n = el.getTotalLength();
+                let d = 1e9;
+                for (let i = 0; i <= 80; i++) { const q = el.getPointAtLength(n * i / 80); d = Math.min(d, Math.hypot(m.a * q.x + m.c * q.y + m.e - cx, m.b * q.x + m.d * q.y + m.f - cy) - pr); }
+                if (d < 8 - .5) { out.push('pip ' + pc.textContent + ' is within 8px of a shoot (' + d.toFixed(1) + ')'); break; }
+              }
             }
             const marks = (Array.from(B.svg.querySelectorAll('.klbl.on, .kpip.key')) as Element[]).filter(vis);
             for (let a = 0; a < marks.length; a++) for (let b = a + 1; b < marks.length; b++) if (marks[a]!.parentNode !== marks[b]!.parentNode && meet(marks[a]!.getBoundingClientRect(), marks[b]!.getBoundingClientRect())) out.push('"' + marks[a]!.textContent + '" and "' + marks[b]!.textContent + '" overlap');
@@ -347,6 +356,9 @@ describe('the names on the bonsai’s knots', () => {
             for (const u of Object.keys(M.U)) if (!M.J.some((j: { entry: string }) => j.entry === u) && ['job', 'table'].includes(M.U[u].unitKind) && tier(u) !== 2) out.push(label(u) + ' is not a store or a job for a place');
             for (const u of Object.keys(M.U)) if (!M.U[u].root && !M.J.some((j: { entry: string }) => j.entry === u) && M.U[u].unitKind === 'module' && M.U[u].layer === 'lib' && tier(u) !== 3) out.push(label(u) + ' is not a helper file for a place');
             for (const u of head.units as string[]) if (!S.units.find((q: { id: string }) => q.id === u).root && !Object.keys(B.klbl).some((id) => B.knot[id].__ids.includes(u) && B.klbl[id].classList.contains('on'))) out.push('headline hop ' + label(u) + ' is unnamed');
+            // and the knot that holds where the headline journey starts is named for it, whatever else grew into it
+            const hk = Object.keys(B.klbl).find((id) => B.knot[id].__ids.includes(head.entry));
+            if (hk && !says(B.klbl[hk].textContent || '', label(head.entry))) out.push('the headline start ' + label(head.entry) + ' is named "' + B.klbl[hk].textContent + '"');
             // the card's path numbers each pipped hop as the key does
             let cards = 0;
             for (const id of Object.keys(B.leaf)) {

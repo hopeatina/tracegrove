@@ -779,10 +779,17 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     nearest pair first, until it holds five or no two helpers stand side by side (a knot that still finds no place for its
     name is a pip, gbKnotNames); the burl leads with the one that held more, and sits between them, weighted by how many
     files each held */
- {const help=q=>gbKTier(M,q.ids)===3,row=()=>knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);let tr=row();
+ {const tier=q=>gbKTier(M,q.ids),help=q=>tier(q)===3,row=()=>knots.filter(q=>q.on==='t').sort((a,b)=>a.k-b.k);let tr=row();
   while(tr.length>5){let best=null;for(let i=1;i<tr.length;i++){const a=tr[i-1],b=tr[i];if(help(a)&&help(b)&&(!best||b.k-a.k<best.b.k-best.a.k))best={a,b}}
    if(!best)break;const {a,b}=best,lead=a.pin?a:b.pin?b:a.ids.length>=b.ids.length?a:b,o=lead===a?b:a,k=lead.pin?lead.k:Math.round((a.k*a.ids.length+b.k*b.ids.length)/(a.ids.length+b.ids.length));
-   lead.ids.push(...o.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(o),1);tr=row()}}
+   lead.ids.push(...o.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(o),1);tr=row()}
+  /* and a knot that found no place for its name beside it when this tree was drawn at this width (gbBuild) grows into the
+     nearest knot of its own kind beside it on the trunk (else the nearest, but never two journeys' starts nor two collars),
+     so a wide screen names every knot on the trunk beside it, never by a pip; the burl leads as above */
+  for(const id of M.kfold||[]){tr=row();const o=tr.find(q=>q.ids.includes(id));if(!o)continue;const to=tier(o),i=tr.indexOf(o),ok=q=>q!==o&&!(q.pin&&o.pin)&&(to||tier(q)),
+    nb=[tr[i-1],tr[i+1]].filter(q=>q&&ok(q)),x=nb.filter(q=>tier(q)===to).sort((a,b)=>Math.abs(a.k-o.k)-Math.abs(b.k-o.k))[0]||nb.sort((a,b)=>Math.abs(a.k-o.k)-Math.abs(b.k-o.k))[0];if(!x)continue;
+   const tx=tier(x),lead=x.pin?x:o.pin?o:tx!==to?(tx<to?x:o):x,f=lead===x?o:x,k=lead.pin?lead.k:Math.round((x.k*x.ids.length+o.k*o.ids.length)/(x.ids.length+o.ids.length));
+   lead.ids.push(...f.ids);lead.k=k;lead.p=tp[k];lead.n=gbNorm(tp,k);lead.w=tw[k];knots.splice(knots.indexOf(f),1)}}
  for(const b of br){if(b.pol)continue;const own=ownOf(b.j).sort((x,y)=>depth(y)-depth(x));const a0=Math.max(b.Tk/2+8,Math.min(.16*b.len,b.inner-8)),a1=Math.max(a0+4,b.inner-4);const fit=Math.min(4,Math.max(1,Math.floor((a1-a0)/KG)+1));
   group(own,fit).forEach((ids,i,a)=>{const d=a.length===1?a0+(a1-a0)*.7:a0+(a1-a0)*i/(a.length-1);const k=gbNear(b.acc,d);knots.push({id:ids[0],ids,on:'b'+b.i,bid:b.id,k,p:b.pts[k],n:gbNorm(b.pts,k),w:b.w[k]})})}
  /* A knot is a boss the wood grew round, not a stud sewn on it: it stands out of the outside of the wood's bend (where the
@@ -801,6 +808,9 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  for(const on of [...new Set(knots.map(q=>q.on))]){let alt=null;const row=knots.filter(q=>q.on===on).sort((a,b)=>a.k-b.k);
   for(const q of row){if(alt===null)alt=q.on==='t'?wood(q).up:-wood(q).up;boss(q,alt);alt=-q.side}
   for(let i=1;i<row.length;i++){const a=row[i-1],b=row[i];if(Math.hypot(a.bp[0]-b.bp[0],a.bp[1]-b.bp[1])<1.2*Math.max(a.w,b.w)){const [x,y]=b.pin&&!a.pin?[b,a]:[a,b];x.ids.push(...y.ids);knots.splice(knots.indexOf(y),1);row.splice(row.indexOf(y),1);i--;boss(x,x.side)}}}
+ /* a burl is named for the most important file in it: where a journey starts (the headline journey's start before any other's),
+    so the hop a journey begins at is always the name on its knot */
+ for(const q of knots)if(q.ids.length>1){const e=q.ids.find(id=>id===apex.entry)||q.ids.find(id=>M.J.some(j=>j.entry===id));if(e&&e!==q.ids[0]){q.ids=[e,...q.ids.filter(id=>id!==e)];q.id=e}}
  /* the outline swells over the boss on its own side, about as far as the boss stands proud of the wood */
  const bx=tp.map(()=>0);for(const b of br)b.bx=b.pts.map(()=>0);
  for(const q of knots){const P=wood(q),arr=q.on==='t'?bx:br.find(x=>x.id===q.bid).bx,amp=Math.max(1.2+q.rb*.3,Math.abs(q.off)+q.rb*.92-q.w/2+1),sg=q.ra*1.15;
@@ -1055,7 +1065,7 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
  const end=Math.max(...P.map(g=>g.t0+g.ms));const done=()=>{if(gbNow()<end+60){requestAnimationFrame(done);return}for(const g of P){for(const a of g.a||[])a.cancel();for(const r of g.an||[])r.remove();if(g.cw)g.cw.replaceWith(g.el)}};setTimeout(done,Math.max(0,end-performance.now())+60)}
 
 /* Build the SVG once per shape; later paints only move leaves and toggle classes. */
-function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
+function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[key])||[];let L=gbLayout(M,width,sap);
  /* a phone scales the drawing to fit its width, so a wide tree is laid out again with leaves large enough to read there,
     about eleven pixels and up */
  if(L.narrow&&!sap){for(let i=0;i<3;i++){const f=width/Math.max(width,L.x1-L.x0+24),lf=Math.min(...L.trees.flatMap(T=>T.padList.map(pd=>pd.geo.L)));if(lf*f>=11.5)break;M.lmin=Math.max(M.lmin||0,11.5/f*1.02);L=gbLayout(M,width,sap)}M.lmin=0}const quiet=gwQuiet(),now=gbNow();const N=gw.gbN=(gw.gbN||0)+1;
@@ -1571,7 +1581,11 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
   for(const el of svg.querySelectorAll('path.tw'))rc.append(sv('path',{d:el.getAttribute('d')}));
   defs.append(rc);gSap.setAttribute('clip-path','url(#gb-rc'+N+')');B.rclip=rc}
  gw.B=B;gw.svg=svg;
- 
+ /* On a wide screen every knot on the trunk is named beside it: one that finds no place for its name grows into its
+    neighbour (gbTree) and the tree is drawn again with that, twice at most, before any of it shows; the fold is kept for
+    this layout, so it is drawn so from then on */
+ if(!sap&&!L.narrow&&(gw.kfd||0)<2){const P=B.kput=gbPutNames(B,true),miss=(B.klq||[]).filter(e=>!e.bid&&P.pip.has(e.id)).map(e=>e.id);
+  if(miss.length){(gw.kfold=gw.kfold||{})[key]=[...M.kfold,...miss];gw.kfd=(gw.kfd||0)+1;try{return gbBuild(M,width,key,sap)}finally{gw.kfd--}}}
  /* queued against the clock the build began on, and started on it, never late by however long the build took */
  if(svg.animate)for(const [el,d0,ms,kind,f] of B.anim){if(kind==='fade')gbPlay(el,[{opacity:0},{opacity:1}],{duration:ms,fill:'backwards'},now+d0);else if(kind==='cu')gbPlay(el,gbCu(f),{duration:ms,fill:'backwards'},now+d0)}
  gbGrowRun(B);
@@ -1861,8 +1875,8 @@ const gbKTier=(M,ids)=>Math.min(...ids.map(id=>{const u=M.U[id]||{},kd=String(u.
    fade a name where it stands; a pip's mark counts on from tree to tree, and every file in its knot answers to it */
 function gbPutNames(B,bud){const out={slot:new Map(),pip:new Map(),num:new Map(),ext:0};let n=0;
  for(const run of B.kplace||[]){const r=run(bud,n);for(const [id,g] of r.slot)out.slot.set(id,g);for(const [id,q] of r.pip){out.pip.set(id,q);for(const u of q.ids)out.num.set(u,q.n)}n+=r.pip.size;out.ext=Math.max(out.ext,r.ext||0)}return out}
-/* a pip's mark: its number, or on a phone, where journeys wear numbered badges, a letter */
-const gbPipMark=(B,n)=>B.L.narrow&&n<=26?String.fromCharCode(96+n):String(n);
+/* a pip's mark: a letter at every width, as journeys wear numbers, so the two are never read as one count */
+const gbPipMark=(B,n)=>n<=26?String.fromCharCode(96+n):String(n);
 /* Set each name where it was placed and light it: every file is named at rest; while something is lit its own names show and
    the rest fade, each where it stands, and a pip and its row in the key go with its name */
 function gbPlaceNames(B){const P=B.knp=B.kput||(B.kput=gbPutNames(B,true));
@@ -2111,6 +2125,8 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid,p=>Math.hypot(p[0]-e[0],p[1]-e[1])<3.8||P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,()=>false);
   for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,inTurned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc))}}
  for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid,p=>P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,()=>false)}
+ /* (a pip keeps as clear of where a shoot leaves its knot, and of the whole shoot up to its count, as of the count itself) */
+ for(const g of [...shoots,...rest]){const P=g.pts||[];for(let i=1;i<P.length;i++)budB.push([Math.min(P[i-1][0],P[i][0])-1.3,Math.min(P[i-1][1],P[i][1])-1.3,Math.max(P[i-1][0],P[i][0])+1.3,Math.max(P[i-1][1],P[i][1])+1.3]);if(P.length)budB.push([P[0][0]-3.3,P[0][1]-2.6,P[0][0]+3.3,P[0][1]+2.6])}
  for(const r of B.graftR||[])if(r.tree===ti&&!r.under){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null);budB.push(aabb(sw));
   /* (a swelling's count is a mark on its crown, its box as a shoot's count's is) */
   if(r.cnt){obs.push({r:r.cnt.r,own:null,cnt:1});budB.push(r.cnt.r)}}
@@ -2227,10 +2243,12 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
     for(const [,x0,y0] of pl){const g=at(x0,y0);if(fits(g)){got=g;break}}if(got)break}
    /* (under the pot: below everything drawn there, its roots' names too, under the pot's middle and inside the drawing) */
    if(!got){const y0=L.y1+4*k,x0=Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,L.potC-bw/2));got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
-   /* a pip keeps 8px from a count bud or a graft bud: it moves off the boss along the limb's normal as little as that takes */
+   /* a pip keeps 8px from a count bud, a graft bud or a shoot: it moves off the boss along the limb's normal as little as that
+      takes, else (where shoots crowd the wood) the least distance any way round */
    const gu=8.5/(V.hf||1),pe=pr+.5,far=c=>budB.every(b=>Math.hypot(Math.max(b[0]-c[0]-pe,0,c[0]-pe-b[2]),Math.max(b[1]-c[1]-pe,0,c[1]-pe-b[3]))>=gu);
    const boss=e=>{let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const m=Math.hypot(v[0],v[1]);v=m>.5?[v[0]/m,v[1]/m]:[e.n[0],e.n[1]];
-    for(let d=0;d<=40*k;d+=.5)for(const sg of d?[1,-1]:[1]){const c=[e.p[0]+v[0]*d*sg,e.p[1]+v[1]*d*sg];if(far(c))return c}return e.p};
+    for(let d=0;d<=40*k;d+=.5)for(const sg of d?[1,-1]:[1]){const c=[e.p[0]+v[0]*d*sg,e.p[1]+v[1]*d*sg];if(far(c))return c}
+    for(let d=.5;d<=60*k;d+=.5)for(const u of D16){const c=[e.p[0]+u[0]*d,e.p[1]+u[1]*d];if(far(c))return c}return e.p};
    got.forEach((o,i)=>{const r=o.r;labs.push(r);const c=boss(o.q.e);pip.set(o.q.e.id,{n:n0+i+1,sh:o.sh||0,x:o.x+2*pr+gap,yb:o.yb,anc:'start',r,cx:o.x+pr,cy:o.yb-.3*fs,bx:c[0],by:c[1],ids:kIds(o.q.e)})})}
   return {slot:best.slot,pip,ext}};
  (B.kplace=B.kplace||[]).push(run)}
