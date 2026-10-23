@@ -129,9 +129,9 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.6}.gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .rib{opacity:0}
 @media (prefers-color-scheme:dark){.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{fill:#ef6b5b;stroke:#2a0d0a}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#f2b3a8}.gb-lf.fail:not(.pv-out):not(.pv-add) .nec{stroke:#2a0d0a}
  /* on a dark page a leaf still to prove stays an outline, a pass-green rim over a neutral fill a step off the page; one with no
-    flow yet is filled with a lightened cushion green: a leaf, never a hole */
+    flow yet is the legend's mark: a dashed rim round nothing, never a filled leaf to be read as passed */
  .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-prove);stroke:var(--moss);stroke-width:1.5;stroke-dasharray:none}
- .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1;stroke-dasharray:2.2 1.6}}
+ .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1;stroke-dasharray:2.2 1.6}}
 .gb-lf.hl:not(.pv-out):not(.pv-add):not(.bud) .blade{stroke-width:1.4}
 .gb .lbl text.t{font:400 13px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v{font:400 12.5px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v.out{fill:var(--muted);text-decoration:line-through}.gb .lbl text.st{font:11px var(--mono);fill:var(--muted)}.gb .lbl tspan.x{fill:var(--cutc)}
 .gb .lbl tspan.code{font-family:var(--mono);font-size:.92em}
