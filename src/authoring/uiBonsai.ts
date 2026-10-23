@@ -352,11 +352,12 @@ function gbTA(k,delay){const G=gw.seen.gt||(gw.seen.gt={}),now=gbNow(),t=now+del
    stays grown however the rebuild draws it, since what grew on it (a cushion, a leaf, a name) is kept where it now sits and
    must never stand past the wood. One whose base the wood has not reached yet in this build (a leaf's twig moved onto a
    riser drafted under it, which is still growing) is new wood there: it waits for that wood as if new. */
-function gbWood(k,delay,ms,len){const G=gw.seen.gw||(gw.seen.gw={}),now=gbNow();let r=G[k];
- if(!r||(delay>0&&r.t0<now+delay-1))r=G[k]={t0:now+delay,ms,f0:0,len};return r}
-/* how much of its length a reveal has uncovered at time t, on its ease-out; and when its front reaches fraction f */
+function gbWood(k,delay,ms,len,lag){const G=gw.seen.gw||(gw.seen.gw={}),now=gbNow();let r=G[k];
+ if(!r||(delay>0&&r.t0<now+delay-1))r=G[k]={t0:now+delay,ms,f0:0,len,lg:(lag||0)/(len||1)};return r}
+/* how much of its length a reveal has uncovered at time t, on its ease-out; and when the wood shows its whole girth at fraction
+   f: when its front, a tip that widens to the wood's girth behind it (gbGrowRun), is that taper's length (lg) past f */
 const gbWF=(r,t)=>{const u=Math.max(0,Math.min(1,(t-r.t0)/r.ms));return r.f0+(1-r.f0)*(1-Math.pow(1-u,2.2))};
-const gbWT=(r,f)=>f<=r.f0?r.t0:r.t0+r.ms*(1-Math.pow(1-Math.min(1,(f-r.f0)/(1-r.f0||1)),1/2.2));
+const gbWT=(r,f)=>(f=Math.min(1,f+(r.lg||0)),f<=r.f0?r.t0:r.t0+r.ms*(1-Math.pow(1-Math.min(1,(f-r.f0)/(1-r.f0||1)),1/2.2)));
 /* Growth runs on the page clock: an animation starts at the moment given, on the same clock as the wood's reveal, not
    when the browser next gets round to starting it, so a slow build or paint never lets a leaf, cushion or name fall out of
    step with the wood it grows on. The wood's reveal (a clip path) runs on the page's own thread, but a fade or a swell may
@@ -701,7 +702,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   /* and above it the leader keeps moving, in bends that shrink toward the top, so the upper trunk is never a straight pole */
   if(last>=0&&hs[last]<.8){const h0=hs[last],q=1-h0;cp.push([h0+q*.32,-side[last]*.03*mv]);if(q>.32)cp.push([h0+q*.66,side[last]*.012*mv])}cp.push([1,m<=2?-S*.035:.008*S])}
  const tp=gbResample(gbSpline(cp.map(([t,x])=>[x*Ht,-t*Ht]),14),96);
- const top=tp[tp.length-1];for(let i=1;i<=4;i++)tp.push([top[0]-S*.012*H*i/4,top[1]-.035*H*i/4]);
+ /* the leader runs on into its crown leaning a little away from its first branch, but never turning more than ten degrees
+    from the way it was going, so it never hooks back on itself */
+ {const top=tp[tp.length-1],tq=tp[tp.length-4],at=Math.atan2(top[1]-tq[1],top[0]-tq[0]),ao=Math.atan2(-.035,-S*.012),dd=Math.atan2(Math.sin(ao-at),Math.cos(ao-at)),a=at+Math.max(-.1745,Math.min(.1745,dd)),tx=Math.hypot(.012*H,.035*H);
+  for(let i=1;i<=4;i++)tp.push([top[0]+Math.cos(a)*tx*i/4,top[1]+Math.sin(a)*tx*i/4])}
  const ty=tp.map(p=>-p[1]/Ht);
  const wts=items.map(it=>it.w),wA=Math.max(.5,M.weight(apex)-items.filter(it=>it.pol).reduce((a,it)=>a+it.w,0));
  const Wat=t=>{let w=wA;items.forEach((it,i)=>{w+=wts[i]*Math.max(0,Math.min(1,(hs[i]-t+.02)/.04))});return w};
@@ -1102,6 +1106,7 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
    is placed in its element's own box, so each clipped element holds an empty rect over the whole drawing, which puts that
    box's corner at the drawing's. Its keyframes are close enough, a longer piece having more, that the band's points,
    moving straight from one to the next, keep to the spine between them. */
+const gbTipR=w=>Math.max(.33*w[0],w[w.length-1])/2+.4;
 function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [vx,vy,W,VH]=B.vb;
  for(const g of P){if(!g.pts)continue;const A=gbLen(g.pts),T=A[A.length-1]||1,n=g.pts.length-1,bx=g.el.__bx;
   /* how far out the band may reach on each side of the spine at each of its points: on the inside of a bend, no further than
@@ -1114,13 +1119,22 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
    const u=(d-A[j-1])/((A[j]-A[j-1])||1),a=g.pts[j-1],b=g.pts[j],m=Math.hypot(b[0]-a[0],b[1]-a[1])||1,t=[(b[0]-a[0])/m,(b[1]-a[1])/m],k=u<.5?j-1:j,w=g.w[j-1]+(g.w[j]-g.w[j-1])*Math.max(0,Math.min(1,u)),H=w*.62+4+(bx&&bx[k]?Math.abs(bx[k]):0);
    return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
   const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NC=15,NP=2*NB+NC;
+  /* for the first sixth of its length the growing end is no wider than a third of the piece's foot (or its own end, if that
+     is wider): a shoot's tip, never the girth of the wood below pushed up as a stub; behind it the wood widens to its whole
+     girth along a taper (a pixel out each side for each pixel back). Over the next sixteenth the tip widens to the wood's own
+     girth and the taper behind it shortens to nothing, so from a quarter of the way on the front is the wood's own girth */
+  const RC=gbTipR(g.w);
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
-   for(let i=0;i<NB;i++){const q=at(-2+(e+2)*i/(NB-1));L.push([q.p[0]+q.n[0]*q.hl,q.p[1]+q.n[1]*q.hl]);R.push([q.p[0]-q.n[0]*q.hr,q.p[1]-q.n[1]*q.hr])}
-   /* past the front: a half circle round the spine there, the wood's own half-width and a little (across it, on the side a
-      knot's boss swells, the boss as well) */
-   const q=at(e),rt=q.w+.4,cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=(rt+(th>0?q.bl:q.br))*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
+   const K=Math.max(0,Math.min(1,(f-.16)/.06)),K2=K*K*(3-2*K),q=at(e),rt=Math.min(q.w+.4,RC+Math.max(0,q.w+.4-RC)*K2),wide=rt>=q.w+.4-1e-6;
+   for(let i=0;i<NB;i++){const d=-2+(e+2)*i/(NB-1),o=at(d),tq=K2>=1?1e9:rt+(e-d)/(1-K2);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
+   /* past the front: a half circle round the spine there, that tip's half-width and a little (across it, on the side a
+      knot's boss swells, the boss as well, where the tip is the wood's whole girth) */
+   const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=(rt+(wide?th>0?q.bl:q.br:0))*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
-  const K=Math.max(24,Math.min(72,Math.ceil(T/6))),kf=[];for(let i=0;i<=K;i++){const u=i/K;kf.push({clipPath:"path('"+shape(i||g.f0?g.f0+(1-g.f0)*(1-Math.pow(1-u,2.2)):0)+"')",offset:u})}
+  /* (and a keyframe at every hundredth of the length while the tip widens to the wood's girth, so the frames between keep to
+     its shape there) */
+  const K=Math.max(24,Math.min(72,Math.ceil(T/6))),us=[],kf=[];for(let i=0;i<=K;i++)us.push(i/K);for(let i=14;i<=27;i++){const v=(i/100-g.f0)/(1-g.f0||1);if(v>0&&v<1)us.push(1-Math.pow(1-v,1/2.2))}
+  us.sort((a,b)=>a-b);for(const u of us)kf.push({clipPath:"path('"+shape(u||g.f0?g.f0+(1-g.f0)*(1-Math.pow(1-u,2.2)):0)+"')",offset:u});
   const cw=sv('g',{});g.el.before(cw);cw.append(g.el);g.cw=cw;g.an=[];
   g.a=[cw,...(g.el.__also||[])].map(e=>{const r=sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'none'});e.append(r);g.an.push(r);return gbPlay(e,kf,{duration:g.ms,fill:'both'},g.t0)})}
  /* once every piece has grown out, by the grow's clock, the clips go, and the wood is just wood */
@@ -1163,7 +1177,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  B.lead=sv('path',{class:'tiplead',d:''});gCur.append(B.lead);
  /* an animation that has not finished yet: started at its first build, continued by any rebuild; a piece of wood keeps its
     reveal (gbWood) in el.__r, whose clock everything that grows on it reads */
- const anim=(k,el,delay,ms,kind)=>{if(kind==='grow'){const len=gbLen(el.__pts),r=el.__r=gbWood(k,delay,ms,len[len.length-1]||1);if(!quiet&&now<r.t0+r.ms)B.grow.push({el,t0:r.t0,ms:r.ms,f0:r.f0,pts:el.__pts,w:el.__w,floor:el.__floor});return r}
+ const anim=(k,el,delay,ms,kind)=>{if(kind==='grow'){const len=gbLen(el.__pts),lw=el.__w,r=el.__r=gbWood(k,delay,ms,len[len.length-1]||1,Math.max(0,Math.max(...lw)/2-gbTipR(lw)));if(!quiet&&now<r.t0+r.ms)B.grow.push({el,t0:r.t0,ms:r.ms,f0:r.f0,lg:r.lg,pts:el.__pts,w:el.__w,floor:el.__floor});return r}
   if(quiet)return;const t0=k===null?now+delay:gbTA(k,delay);if(now-t0>=ms)return;B.anim.push([el,t0-now,ms,kind])};
  const piece=(id,pts,w,cls,parent,delay,ms,floor,bx)=>{const d=gbRib(pts,w,0,pts.length-1,floor,bx);const p=sv('path',{d,class:cls});p.__pts=pts;p.__w=w;p.__floor=floor;p.__bx=bx;parent.append(p);clip.append(sv('path',{d}));anim('wood:'+id,p,delay,ms,'grow');return p};
  /* bark: the lit side and the shaded side, softened so they read as roundness, not as stripes; and a few strands of grain */
@@ -1317,7 +1331,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   /* every piece keeps its reveal by its own key for the whole grow, so a rebuild (a journey joined, a scenario was drafted)
      carries on what was growing and never grows again what was already seen */
   const gk='@'+ti;
-  const tdur=sap?900:1100;const tkw=piece('t'+gk,tp,T.tw,'w',gWood,base,tdur,1.5,T.bx);rxMask.append(sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,undefined,T.bx),fill:'#000'}));if(!sap){/* the growth mask goes outside the softening, so the growing end stays crisp */const tcid='gb-tc'+N+'-'+ti;defs.append(sv('clipPath',{id:tcid},sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,1.5,T.bx)})));const tl=sv('g',{}),tli=sv('g',{'clip-path':'url(#'+tcid+')',filter:'url(#'+softId+')'}),tgr=sv('g',{});tl.append(tli);gLight.after(tl);gGrain.append(tgr);shade(tp,T.tw,2,tli);grain(tp,T.tw,gbHash('grain:'+T.key),tgr,T.knots.filter(q=>q.on==='t').map(q=>[q.k,q.off,q.rb]));tkw.__also=[tl,tgr]}lightAt=Math.max(lightAt,base+tdur);
+  /* (a sapling, the trunk that rises while the first journey is still being traced, grows slowly enough to be seen growing:
+     the tree that replaces it carries its reveal on, so it is still rising as the first branches leave it) */
+  const tdur=sap?2400:1100;const tkw=piece('t'+gk,tp,T.tw,'w',gWood,base,tdur,1.5,T.bx);rxMask.append(sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,undefined,T.bx),fill:'#000'}));if(!sap){/* the growth mask goes outside the softening, so the growing end stays crisp */const tcid='gb-tc'+N+'-'+ti;defs.append(sv('clipPath',{id:tcid},sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,1.5,T.bx)})));const tl=sv('g',{}),tli=sv('g',{'clip-path':'url(#'+tcid+')',filter:'url(#'+softId+')'}),tgr=sv('g',{});tl.append(tli);gLight.after(tl);gGrain.append(tgr);shade(tp,T.tw,2,tli);grain(tp,T.tw,gbHash('grain:'+T.key),tgr,T.knots.filter(q=>q.on==='t').map(q=>[q.k,q.off,q.rb]));tkw.__also=[tl,tgr]}lightAt=Math.max(lightAt,base+tdur);
   /* times on this tree are read off its trunk's own reveal (a rebuild part way through keeps that clock): when the growing
      front passes a point of it, so a branch, twig, knot or cushion first seen in a later build keeps step with its wood */
   const tr=tkw.__r,accT=gbLen(tp),LT=accT[accT.length-1]||1,atK=k=>gbWT(tr,accT[Math.max(0,Math.min(tp.length-1,k))]/LT)-now,at=t=>atK(gbNear(T.ty,t)),tEnd=gbWT(tr,1)-now;
