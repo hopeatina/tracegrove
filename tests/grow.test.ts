@@ -2658,7 +2658,7 @@ describe('Grow page', () => {
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
    *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
   const ramify = () => {
-    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }>, forks: [] as Array<{ id: string; min: number; n: number }> };
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }>, forks: [] as Array<{ id: string; min: number; n: number }>, crest: [] as Array<{ sw: number; lum: number; others: number[]; lums: number[] }> };
     for (const T of L.trees) for (const b of T.br) {
       out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk);
       // its girth a caliper and a half (of its own) past the trunk's side, against its collar's
@@ -2674,6 +2674,11 @@ describe('Grow page', () => {
       const rz = (b.twigs ?? []).find((t: any) => t.lb), cr = T.pads[b.id]?.geo.cs.find((c: any) => c.role === 'crest' && c.seat === null);
       if (rz && cr) { const yb = b.o[1] + cr.b; out.risers.push({ id: b.id, forks: (b.twigs as any[]).filter((t) => t.c && t.c.pts === rz.pts && t.pts[0][1] - yb >= 0 && t.pts[0][1] - yb <= 10).length }); }
     }
+    // the crown's crest's rim against every other cushion's: its width and how dark it is
+    { const lumOf = (c: string) => { const n = (c.match(/[\d.]+/g) ?? []).map(Number), [r, g, b] = c.startsWith('color(') ? n.slice(0, 3) : n.slice(0, 3).map((v) => v / 255); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+      for (const T of L.trees) { const cp = B.pad[T.apex.id]; if (!cp) continue; const cr = cp.el.querySelector('.cush.ccr .pfill'); if (!cr) continue;
+        const others = (Array.from(svg.querySelectorAll('.cush .pfill')) as Element[]).filter((f) => f !== cr && f.getBoundingClientRect().width > 0).map((f) => getComputedStyle(f));
+        out.crest.push({ sw: parseFloat(getComputedStyle(cr).strokeWidth), lum: lumOf(getComputedStyle(cr).stroke), others: others.map((c) => parseFloat(c.strokeWidth)), lums: others.map((c) => lumOf(c.stroke)) }); } }
     // a point and the arc length along a polyline, both ways
     const acc = (p: number[][]) => p.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), a), []);
     const proj = (p: number[][], q: number[]) => { const A = acc(p); let best = Infinity, s = 0; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, vx = c[0]! - a[0]!, vy = c[1]! - a[1]!, l = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q[0]! - a[0]!) * vx + (q[1]! - a[1]!) * vy) / l)), d = Math.hypot(q[0]! - a[0]! - vx * t, q[1]! - a[1]! - vy * t); if (d < best) { best = d; s = A[i - 1]! + t * Math.sqrt(l); } } return s; };
@@ -2729,6 +2734,9 @@ describe('Grow page', () => {
         // and a refusals' branch on out under its pad to where its first twigs fork from it: never a wire beside its trunk
         expect(r.forks.length, name).toBeGreaterThan(0);
         for (const q of r.forks) { expect(q.n, name + ' ' + q.id).toBeGreaterThan(2); expect(q.min, name + ' ' + q.id + ' girth held out to its first fork').toBeGreaterThanOrEqual(.97); }
+        // the crown's crest keeps its weight at the apex: a rim half again as heavy as any other cushion's, and darker than any
+        expect(r.crest.length, name).toBeGreaterThan(0);
+        for (const c of r.crest) { expect(c.sw, name + ' crest rim').toBeGreaterThanOrEqual(1.5); for (const o of c.others) expect(c.sw, name + ' crest rim against another cushion\'s').toBeGreaterThanOrEqual(1.5 * o); for (const l of c.lums) expect(c.lum, name + ' crest rim not darker').toBeLessThan(l); }
         // a raised crest stands on a riser that forks just under it, two limbs or more off it no more than ten pixels under the
         // crest, never stilts rising from low on it
         for (const q of r.risers) expect(q.forks, name + ' forks off the riser under ' + q.id).toBeGreaterThanOrEqual(2);
