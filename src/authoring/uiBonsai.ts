@@ -372,8 +372,8 @@ function gbCuAt(v){for(let i=1;i<GB_CU.length;i++){const [a,p]=GB_CU[i-1],[b,q]=
 const GB_FALL=500,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
 function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'px) translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) rotate('+gbF(r)+'deg) translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';
  return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.4,transform:T(.45*dx,.16*dy,.7*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
-/* What was only ever shown before a choice, or as a preview, was never grown, so a mode that drops it does not cut it: it
-   shrinks back into p (its collar) as it fades, in GB_BACK ms on the same ease-in, and leaves no mark. */
+/* What was only ever a preview's ghost was never grown, so a mode that drops it does not cut it: it shrinks back into p
+   (its collar) as it fades, in GB_BACK ms on the same ease-in, and leaves no mark. */
 /* A healed cut: a small roll of callus at c, in the bark's own tones, rx along the grain t and ry across it, with a thin lit
    crescent along its lip on the side n it was cut from. Never a pale disc: it reads as bark, and a knot always stands over it. */
 function gbCal(c,t,n,rx,ry,cls,...kids){const ang=Math.atan2(t[1],t[0])*180/Math.PI,cr=[];for(let i=0;i<=8;i++){const th=Math.PI*i/8;cr.push([c[0]+(t[0]*Math.cos(th)*rx+n[0]*Math.sin(th)*ry)*.8,c[1]+(t[1]*Math.cos(th)*rx+n[1]*Math.sin(th)*ry)*.8])}
@@ -1641,8 +1641,8 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  if(!gw.B||gw.B.key!==key){const O=gw.B;gw.prevIn={};gw.prevShown={};gw.prevBuds=O?O.budsShown:undefined;
   if(O){for(const id in O.leaf)gw.prevIn[id]=O.leaf[id].__in;for(const id in O.pad)gw.prevShown[id]=O.pad[id].shown}gbBuild(M,width,key,sap)}
  const B=gw.B;gw.M=M;const vis=s.modeBy?s.mode:s.asked&&gw.picking?gw.picking:null;/* a preview: before a mode is chosen, what each would keep; once one is set, what another would keep or add, as ghosts */const pv=gw.preview&&gw.preview!==(s.modeBy?s.mode:null)?gw.preview:null;let n=0;const quiet=gwQuiet();
- /* what has grown in a chosen mode, for the whole grow: only that is cut when a mode drops it, and heals over; the rest was
-    only ever shown before a choice, or previewed, and goes back into its collar with no mark */
+ /* what has grown, for the whole grow: whatever the tree drew at rest, before a choice (at the ask, say) or in a chosen mode.
+    Only that is cut when a mode drops it, and heals over; the rest was only ever a preview's ghost, and goes with no mark */
  const real=(gw.seen=gw.seen||new Set()).real||(gw.seen.real=new Set());
  const order=sap?[]:gbOrder(M);gw.order=order.map(j=>j.id);
  /* one tab stop into the tree: the first journey in the order the list and the inspector use */
@@ -1669,11 +1669,11 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
        if(tf&&tf.animate)gbPlay(tf,[{opacity:0},{opacity:1}],{duration:170,fill:'backwards'},t0)}}}
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2])+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');el.__x=x;el.__y=P.o[1]+sl[1];
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
-    /* pruning, at its turn from the apex down. A leaf that grew in a chosen mode is snipped where its twig leaves the wood: twig
-       and leaf tip 20 to 30 degrees about the cut and drop away along a short arc as they fade, in the grey the preview gave
-       them, and the cut heals over (the callus below). One that was only ever shown before a choice, or as a preview, was
-       never grown: it shrinks back into its collar as it fades, and leaves no mark */
-    if(im&&vis)real.add(x.id);
+    /* pruning, at its turn from the apex down. A leaf that grew, at rest before a choice or in a chosen mode, is snipped where
+       its twig leaves the wood: twig and leaf tip 20 to 30 degrees about the cut and drop away along a short arc as they fade,
+       in the grey the preview gave them, and the cut heals over (the callus below). One that was only ever a preview's ghost
+       was never grown: it shrinks back into its collar as it fades, and leaves no mark */
+    if(im&&(vis||!pv))real.add(x.id);
     if(add)cls+=' pv-add';else if(!im){if(was===true&&!quiet&&el.__g.animate&&!(gbNow()<(el.__t0||0))){el.__cutAt=Date.now();for(const a of el.__g.getAnimations())a.cancel();const lag=el.__lag=cutLag.get('s:'+x.id)||0,tw=((B.ltw||{})[x.id]||[])[0],tq=P.rt.lt[x.id],fell=el.__fell=real.has(x.id);
       const pos=[P.o[0]+sl[0],P.o[1]+sl[1]],a=sl[2]*Math.PI/180,sc=sl[3]||1,ca=Math.cos(a),sa=Math.sin(a),piv=tq?tq.pts[0]:[pos[0]-ca*(g.L/2+GB_PET)*sc,pos[1]-sa*(g.L/2+GB_PET)*sc];
       const h=gbHash('fall:'+x.id),dir=ca>.2?1:ca<-.2?-1:h<.5?-1:1,th=dir*(20+10*gbHash('spin:'+x.id)),hf=gbHf(B),dx=dir*(6+10*h)/hf,dy=(40+40*gbHash('drop:'+x.id))/hf;
@@ -1720,10 +1720,10 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    const falling=list.some(x=>B.leaf[x.id]&&B.leaf[x.id].classList.contains('cut'));const pruned=!!vis&&list.length>0&&!shown;const bare=!list.length;const cut=pruned&&!falling;const back=cut&&!!pv&&list.some(x=>gbRank[x.mode]<=gbRank[pv]);
    P.el.setAttribute('class','pad'+(P.crown?' crown':'')+(P.b&&P.b.back?' back':'')+(bare?' bare':'')+(gk!==kk?' pv-grow':'')+(failed?' failed':'')+(gw.pinned==='j:'+j.id?' sel':''));
    P.el.setAttribute('aria-label',(P.pol?'Journey '+n+', '+(P.pol==='failure'?'the ways it fails':'what it refuses'):'Journey '+n+', '+j.title)+(pruned?', pruned in '+gbModeName(vis):''));
-   /* a journey's branch the chosen mode keeps nothing of: cut flush at the trunk and dropped if it grew in a chosen mode, its
-      callus left (the stub); taken back into its collar, with no mark, if it was only ever shown before a choice. Either way
-      the collar and fillets it laid on the trunk go with it, so nothing of it stands proud of the bark */
-   if(vis&&shown>0)real.add('p:'+pid);const pfell=real.has('p:'+pid),E=B.brEl[pid];
+   /* a journey's branch the chosen mode keeps nothing of: cut flush at the trunk and dropped if it grew (at rest before a
+      choice, or in a chosen mode), its callus left (the stub); taken back into its collar, with no mark, if it was only ever a
+      preview's. Either way the collar and fillets it laid on the trunk go with it, so nothing of it stands proud of the bark */
+   if((vis||!pv)&&shown>0)real.add('p:'+pid);const pfell=real.has('p:'+pid),E=B.brEl[pid];
    if(P.shown===undefined)P.shown=(gw.prevShown||{})[pid];if(cut&&!P.cutDone){P.cutDone=true;if(!quiet&&P.shown&&P.jg.animate&&!P.crown){P.jg.animate(pfell||!E?[{transform:'translateY(0)',opacity:1},{transform:'translateY(20px)',opacity:0}]:gbBackK(E.col),{duration:pfell||!E?450:GB_BACK,easing:'ease-in'}).onfinish=()=>{if(P.cutDone)P.jg.classList.add('pruned')}}else P.jg.classList.add('pruned')}
    if(!cut){P.cutDone=false;P.jg.classList.remove('pruned')}P.shown=!cut;
    const willCut=!!pv&&!P.crown&&list.length>0&&cutN===list.length;P.jg.classList.toggle('pv-cut',willCut);P.jg.classList.toggle('pv-back',back);
@@ -1793,14 +1793,14 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   /* where a shoot that grew in a chosen mode heals once a mode drops it: a callus beside its knot (gbBuild's cal), under the boss */
   /* (laid just under its own knot, which may sit on a branch's wood above the scars layer: the knot stays a raised boss over it) */
   if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,2.6,1.7,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
-  if(vis==='max'&&any)real.add('sh:'+g.kid);const fell=real.has('sh:'+g.kid);
+  if(any&&(vis==='max'||(!vis&&!pv)))real.add('sh:'+g.kid);const fell=real.has('sh:'+g.kid);
   if(on){g.g.style.display='';stop()}
   /* (one cut before it has sprouted never sprouts; one cut while sprouting falls from where it got to) */
   else if(was&&!quiet&&(!pvWas||chose)&&g.fl&&g.fl.animate&&!g.fade&&!(gbNow()<(g.sp||0)-300)){g.g.style.display='';const lag=cutLag.get(g)||0;for(const a of g.fl.getAnimations())a.cancel();
-   /* a dropped shoot that grew in a chosen mode is snipped at its collar, at its turn from the apex down: its callus shows
+   /* a dropped shoot that grew, at rest before a choice or in a chosen mode, is snipped at its collar, at its turn from the apex down: its callus shows
       beside the knot at once, and the shoot, still in the grey the preview gave it, tips 20 to 30 degrees about the cut, away
       from the wood, and drops 40 to 80 px along a short arc as it fades, in half a second, gathering speed. One only ever
-      shown before a choice, or previewed, shrinks back into its collar as it fades, and leaves no mark. Its count does not
+      a preview's ghost shrinks back into its collar as it fades, and leaves no mark. Its count does not
       fall: it just fades. Once gone the motion is let go of, so the shoot can show again (a later preview's ghost, say) */
    const sd=g.tip[0]>=g.base[0]?1:-1,th=sd*(20+10*gbHash('shf:'+g.kid)),hf=gbHf(B),dy=(40+40*gbHash('shy:'+g.kid))/hf,dx=sd*(6+10*gbHash('shx:'+g.kid))/hf;
    g.fade=g.fl.animate(fell?gbFallK(g.base,dx,dy,th):gbBackK(g.base),{duration:fell?GB_FALL:GB_BACK,delay:lag,easing:GB_EASEIN,fill:'forwards'});

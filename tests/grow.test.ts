@@ -2946,7 +2946,9 @@ describe('Grow page', () => {
       }
     }
     if (real && !groups.size) bad('no leaf’s cut heals where the bark shows');
-    if (!real && B.svg.querySelector('.heal.on')) bad('a mark left by what never grew');
+    // (the marks of cuts made before this paint, if a test listed them in window.__had, are the earlier cuts' own)
+    const had: Element[] = (window as any).__had ?? [];
+    if (!real && (Array.from(B.svg.querySelectorAll('.heal.on')) as Element[]).some((e) => !had.includes(e))) bad('a mark left by what never grew');
     // from the apex down, one about every 40 ms
     out.order.sort((a, b) => a[0]! - b[0]! || a[1]! - b[1]!);
     for (let i = 1; i < out.order.length; i++) if (out.order[i]![1]! < out.order[i - 1]![1]!) bad('cut out of turn from the apex down', [out.order[i - 1], out.order[i]]);
@@ -3022,11 +3024,37 @@ describe('Grow page', () => {
     return performance.now() > Math.max(...ends) + 50 && !B.svg.querySelector('.gb-lf.cut');
   }, null, { timeout: 30000 });
 
-  it('grows nothing ahead of its wood, and takes back into its collar, with no mark, what was only ever shown before a choice', async () => {
+  /** Held part way through a cut (each motion the cut set going, which the test listed in window.__cut, set to ms), every
+   *  falling leaf against what it hangs from: its stalk, the tick across it and its twig, every copy of it, none showing more
+   *  than the leaf itself, so nothing of it is left behind on the cushion as a dash while the leaf goes. The motion then runs on. */
+  const stems = (ms: number) => {
+    const B = (0, eval)('gw').B, out = { n: 0, held: 0, bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const cut: Animation[] = ((window as any).__cut ?? []).filter((a: Animation) => a.playState !== 'finished' && a.playState !== 'idle');
+    const was = cut.map((a) => a.currentTime);
+    for (const a of cut) { a.pause(); a.currentTime = ms; }
+    out.held = cut.length;
+    const strength = (e: Element | null | undefined) => {
+      if (!e) return 0;
+      let o = 1; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return 0; o *= Number(c.opacity); }
+      return o;
+    };
+    for (const id in B.leaf) {
+      const el = B.leaf[id]; if (!el.classList.contains('cut')) continue;
+      out.n++;
+      const leaf = strength(el.__g.querySelector('.blade'));
+      const parts: [string, Element | null][] = [['stalk', el.__g.querySelector('.pet')], ['tick', el.__nick], ...(((B.ltw ?? {})[id] ?? []) as Element[]).map((t, k) => ['twig ' + k, t] as [string, Element])];
+      for (const [what, e] of parts) { const o = strength(e); if (o > leaf + 0.05) bad('leaf ' + id + ': its ' + what + ' stays as it goes', [+o.toFixed(2), +leaf.toFixed(2)]); }
+    }
+    cut.forEach((a, i) => { a.currentTime = was[i]!; a.play(); });
+    return out;
+  };
+
+  it('grows nothing ahead of its wood, and cuts what grew at the ask as it cuts what grew in a chosen mode: snipped at its collar, falling with its stalk and twig, each cut healed; only a preview’s ghosts go with no mark', async () => {
     const { dir, state } = await grownBushy();
     withMax(state);
-    // asked, not yet chosen: the tree grows, then Min is pointed at and picked; nothing had grown in a chosen mode
-    const asked = { ...state, asked: true, modeBy: null, mode: 'min' as const };
+    // asked, not yet chosen: the tree grows everything drafted, then Min is pointed at and picked; what grew is really cut
+    const asked = { ...state, asked: true, modeBy: null, mode: 'min' as const }, chosen = { ...asked, asked: false, modeBy: 'you' as const };
     const server = await startUi({ dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -3038,27 +3066,50 @@ describe('Grow page', () => {
         const t = await page.evaluate(timing);
         expect(t.bad, width + 'px').toEqual([]);
         for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
-        // once it has grown, pointing at Min greys what it would cut; picking it takes them back, from that grey
+        // once it has grown, pointing at Min greys what it would cut; picking it snips them at their collars, and they fall
+        // from that grey, the cuts healing with calluses in the bark's tones
         await settled(page);
         const before = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return null; }).then(() => page.evaluate(looks));
-        const c = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return null; }).then(() => page.evaluate(cuts, false));
+        const c = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, gbPaint })'), old = new Set(document.getAnimations());
+          w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint();
+          (window as any).__cut = document.getAnimations().filter((a) => !old.has(a));
+          return null;
+        }).then(() => page.evaluate(cuts, true));
         expect(c.bad, width + 'px').toEqual([]);
         expect(c.shoots, width + 'px').toBeGreaterThan(1);
         expect(c.leaves, width + 'px').toBeGreaterThan(1);
-        expect(c.calluses, width + 'px').toBe(0);
+        expect(c.calluses, width + 'px').toBeGreaterThan(0);
         const after = await page.evaluate(looks);
         const changed = Object.keys(after).filter((k) => k in before && before[k] !== after[k]).map((k) => [k, before[k], after[k]]);
         expect(changed, width + 'px').toEqual([]);
         expect(Object.keys(after).filter((k) => k in before).length, width + 'px').toBeGreaterThan(10);
-        // then each branch Min keeps nothing of goes back into its collar, and the Minimum tree at rest has no mark of a cut
+        // a quarter of a second into the cut, each leaf's stalk and twig are going with it: none is left on the cushion
+        const st = await page.evaluate(stems, 250);
+        expect(st.bad, width + 'px').toEqual([]);
+        expect(st.n, width + 'px').toBeGreaterThan(1);
+        expect(st.held, width + 'px').toBeGreaterThan(st.n);
+        // then each branch Min keeps nothing of is cut flush and drops away, and the Minimum tree at rest keeps its calluses
         await settled(page);
-        const b = await page.evaluate(branches, { real: false, moving: true });
+        const b = await page.evaluate(branches, { real: true, moving: true });
         expect(b.bad, width + 'px').toEqual([]);
         expect(b.cut, width + 'px').toBeGreaterThan(0);
-        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length), width + 'px').toBe(0);
+        const marks = await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length);
+        expect(marks, width + 'px').toBeGreaterThan(0);
+        // once Min is chosen, pointing at Max ghosts what it would grow; leaving it, the ghosts just go: nothing falls, and no
+        // mark is added to those the cut left
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, chosen);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); (window as any).__had = Array.from(w.gw.B.svg.querySelectorAll('.heal.on')); w.gw.preview = 'max'; w.gbPaint(); });
+        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.gb-lf.pv-add, .budg.pv-add, .gb-gr.pv-add').length), width + 'px').toBeGreaterThan(0);
+        const g = await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = null; w.gbPaint(); return null; }).then(() => page.evaluate(cuts, false));
+        expect(g.bad, width + 'px').toEqual([]);
+        expect(g.calluses, width + 'px').toBe(0);
+        expect(await page.evaluate(() => (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length), width + 'px').toBe(marks);
+        await page.evaluate(() => { delete (window as any).__had; });
         await page.close();
       }
-      // with reduced motion nothing grows or goes: the tree is there at once, and what is cut is just gone, with no mark
+      // with reduced motion nothing grows or goes: the tree is there at once, and what is cut is just gone, healed at once
       const page = await treePage(browser, server.url, asked, { width: 1440, reduce: true });
       const moving = () => { const B = (0, eval)('gw').B, log: Map<Element, Animation[]> = (window as any).__an; return document.getAnimations().filter((a) => { const e = a.effect as KeyframeEffect | null; return !!e?.target && B.svg.contains(e.target) && a.playState !== 'finished'; }).map((a) => (a.effect as KeyframeEffect).target!.getAttribute('class')).concat([...log.keys()].filter((e) => B.svg.contains(e)).map((e) => 'animated ' + e.getAttribute('class'))); };
       expect(await page.evaluate(moving)).toEqual([]);
@@ -3069,13 +3120,13 @@ describe('Grow page', () => {
         return { cut: B.svg.querySelectorAll('.gb-lf.cut').length, marks: B.svg.querySelectorAll('.heal.on').length, shown: gs.filter((g) => g.g.style.display !== 'none').length, shoots: gs.length };
       });
       expect(rest.cut).toBe(0);
-      expect(rest.marks).toBe(0);
+      expect(rest.marks).toBeGreaterThan(0);
       expect(rest.shown).toBe(0);
       expect(rest.shoots).toBeGreaterThan(1);
-      expect((await page.evaluate(branches, { real: false, moving: false })).bad).toEqual([]);
+      expect((await page.evaluate(branches, { real: true, moving: false })).bad).toEqual([]);
       await page.close();
     } finally { await browser.close(); }
-  }, 120000);
+  }, 150000);
 
   /** A grow folded from a recorded discovery log: plotline-seats (two journeys, one scenario failed, Minimum) and tracegrove
    *  itself (two journeys through twelve parts, Max, nothing run yet). */
