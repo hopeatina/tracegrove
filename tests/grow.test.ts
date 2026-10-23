@@ -2291,17 +2291,18 @@ describe('Grow page', () => {
       if (el.closest('.budg')) bad('graft bud on a shoot');
       if (!el.querySelector('ellipse.gring')) bad('graft bud with no swelling');
     }
-    // one swelling of the bark for each flow, or past two one swelling marked with how many: bark-toned, longer along the grain
-    // than across it, lit on its rim and tipped with a tiny bud; never a ring
+    // one swelling of the bark for each flow, up to five, and past five the fifth carries the rest as a count bud: bark-toned,
+    // longer along the grain than across it, lit on its rim and tipped with a tiny bud; never a ring, and never '×N' text
     const byKnot = new Map<string, any[]>();
     for (const r of B.graftR ?? []) byKnot.set(r.kid, [...(byKnot.get(r.kid) ?? []), r]);
     const rgb = (c: string) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    if (document.querySelector('.gw-svg.gb .gnum')) bad('graft count written as \u00d7N');
     for (const [kid, rs] of byKnot) {
       const els = rs.map((r: any) => B.bud[r.xid]).filter((e: Element | undefined) => e && !e.classList.contains('gone'));
       const drawn = els.filter((e: Element) => getComputedStyle(e.querySelector('.gsw')!).display !== 'none');
-      if (drawn.length !== (rs.length > 2 ? 1 : rs.length)) bad('graft swellings for ' + rs.length + ' flows', [kid, drawn.length]);
-      const num = drawn.map((e: Element) => e.querySelector('.gnum')?.textContent ?? '');
-      if (rs.length > 2 ? num.join() !== '\u00d7' + rs.length : num.some(Boolean)) bad('graft count', [kid, num]);
+      if (drawn.length !== Math.min(5, rs.length)) bad('graft swellings for ' + rs.length + ' flows', [kid, drawn.length]);
+      const num = drawn.map((e: Element) => e.querySelector('.shtag .shn')?.textContent ?? '').filter(Boolean);
+      if (rs.length > 5 ? num.join() !== '+' + (rs.length - 5) : num.length) bad('graft count', [kid, num]);
       for (const e of drawn) {
         const b = e.querySelector('ellipse.gring')!, rx = Number(b.getAttribute('rx')), ry = Number(b.getAttribute('ry'));
         if (!(rx >= 3.5 && rx <= 5 && ry >= 2 && ry <= 3 && rx > ry)) bad('graft swelling not about 8 by 5', [kid, rx, ry]);
@@ -2310,6 +2311,45 @@ describe('Grow page', () => {
         if (!e.querySelector('.gcres') || !e.querySelector('.gtip')) bad('graft swelling without its lit rim and bud tip', kid);
         if (e.querySelector('circle:not(.hitc)')) bad('graft bud drawn as a ring', kid);
       }
+    }
+    return out;
+  };
+
+  /** The existing flows as the tree shows them, knot by knot: one swelling of the bark for each flow, up to five, strung along
+   *  the grain at least two radii apart, each centred within its radius of the limb's bark; past five the fifth carries the rest
+   *  as a count bud, '+N'. Nothing is ever written '×N'. */
+  const graftBuds = () => {
+    const B = (0, eval)('gw').B, out = { knots: 0, swellings: 0, counts: [] as string[], bad: [] as string[] };
+    const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+    const seen = (e: Element | null) => { if (!e) return false; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return false; } return e.getBoundingClientRect().width > 0; };
+    if (B.svg.querySelector('.gnum')) bad('an existing flow counted in ×N text');
+    const wood = (Array.from(B.svg.querySelectorAll('path')) as any[]).filter((p) => p.__pts && !p.closest('.stub') && seen(p));
+    const inW = (x: number, y: number) => wood.some((p) => p.isPointInFill(new DOMPoint(x, y)));
+    const byKnot = new Map<string, any[]>();
+    for (const r of B.graftR ?? []) byKnot.set(r.kid, [...(byKnot.get(r.kid) ?? []), r]);
+    for (const [kid, rs] of byKnot) {
+      const els = rs.map((r: any) => [r, B.bud[r.xid]] as [any, Element]).filter(([, e]) => seen(e));
+      if (!els.length) continue;
+      out.knots++;
+      const sw = els.filter(([, e]) => seen(e.querySelector('.gsw')));
+      out.swellings += sw.length;
+      if (sw.length !== Math.min(5, rs.length)) bad('swellings for ' + rs.length + ' flows', [kid, sw.length]);
+      const c = sw.map(([r, e]) => { const g = e.querySelector('ellipse.gring')!; return [Number(g.getAttribute('cx')), Number(g.getAttribute('cy')), r.r as number]; });
+      for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) {
+        const d = Math.hypot(c[i]![0]! - c[j]![0]!, c[i]![1]! - c[j]![1]!);
+        if (d < 2 * Math.max(c[i]![2]!, c[j]![2]!) - .01) bad('two swellings nearer than two radii', [kid, +d.toFixed(1)]);
+      }
+      // the bark runs within one radius of its centre: some of the disc is wood and some is not
+      for (const [x, y, R] of c) {
+        const s0 = inW(x!, y!);
+        let edge = false;
+        for (let a = 0; a < 32 && !edge; a++) for (const f of [.25, .5, .75, 1]) if (inW(x! + Math.cos(a * Math.PI / 16) * R! * f, y! + Math.sin(a * Math.PI / 16) * R! * f) !== s0) { edge = true; break; }
+        if (!edge) bad('swelling further than its radius from the bark', [kid, Math.round(x!), Math.round(y!)]);
+      }
+      const tags = sw.map(([, e]) => e.querySelector('.shtag')).filter(seen);
+      const txt = tags.map((t) => t!.querySelector('.shn')?.textContent ?? '');
+      if (rs.length > 5 ? txt.join() !== '+' + (rs.length - 5) : tags.length) bad('count on the swellings', [kid, rs.length, txt]);
+      if (txt.length) out.counts.push(txt.join());
     }
     return out;
   };
@@ -2348,6 +2388,9 @@ describe('Grow page', () => {
         expect(g.shoots, width + 'px').toBeGreaterThan(1);
         expect(g.rings.length, width + 'px').toBe(4);
         for (const a of g.rings) expect(a).toMatch(/^Existing flow it re-checks: An existing flow \d still holds, /);
+        const gb = await page.evaluate(graftBuds);
+        expect(gb.bad, width + 'px').toEqual([]);
+        expect([gb.knots, gb.swellings, gb.counts], width + 'px').toEqual([1, 4, []]);
         // the knot's card counts its part checks and the existing flows that reach it; a graft bud's card says what it is
         const cards = await page.evaluate((id) => {
           const w = (0, eval)('gw'), B = w.B, kn = B.knot[id], ring = B.svg.querySelector('.gb-gr:not(.gone)');
@@ -2359,6 +2402,14 @@ describe('Grow page', () => {
         expect(cards.knot).toMatch(/\d+ in Max · (\d+ part checks? · )?4 existing flows/);
         expect(cards.ring).toContain('existing flow');
         expect(cards.ring).toContain('An existing flow');
+        // seven flows through that part: five swellings, the fifth carrying the other two as a count bud
+        const rg0 = state.scenarios.find((x) => x.id === 'rg0')!;
+        await paint({ ...state, scenarios: [...state.scenarios, ...[4, 5, 6].map((i) => ({ ...rg0, id: 'rg' + i, title: 'An existing flow ' + (i + 1) + ' still holds', flow: 'flow.' + i }))] });
+        const g7 = await page.evaluate(graftBuds);
+        expect(g7.bad, width + 'px seven flows').toEqual([]);
+        expect([g7.knots, g7.swellings, g7.counts], width + 'px seven flows').toEqual([1, 5, ['+2']]);
+        expect((await page.evaluate(growth)).bad, width + 'px seven flows').toEqual([]);
+        await paint(state);
         // every knot's part checks are on its own shoot or dormant bud and nowhere else: its leaves and its count add up to what
         // the Outline rolls up for that knot's parts
         expect(g.tags, width + 'px').toBeGreaterThan(0);
@@ -2408,6 +2459,34 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 120000);
+
+  it('strings the existing flows along the limb, one swelling to a flow, on tracegrove folded in Max and on plotline under Max’s preview', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        // tracegrove itself in Max: its four existing flows all reach one part
+        const page = await growPage(browser, server.url, folded('tracegrove-max.jsonl'), width, width < 500);
+        await page.waitForTimeout(2500);
+        const g = await page.evaluate(graftBuds);
+        expect(g.bad, 'tracegrove ' + width + 'px').toEqual([]);
+        expect([g.knots, g.swellings, g.counts], 'tracegrove ' + width + 'px').toEqual([1, 4, []]);
+        await page.close();
+        // plotline in Minimum with Max pointed at: its existing flows ghost on the tree as Max would grow them
+        const min = { ...folded('plotline-seats.jsonl'), asked: false, modeBy: 'you' as const, mode: 'min' as const };
+        const pv = await growPage(browser, server.url, min, width);
+        await pv.waitForTimeout(1500);
+        await pv.getByTestId('grow-mode-max').scrollIntoViewIfNeeded();
+        const bb = (await pv.getByTestId('grow-mode-max').boundingBox())!;
+        await pv.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+        await expect.poll(() => pv.getByTestId('grow-mode-preview').innerText().catch(() => '')).toContain('as ghosts on the tree');
+        const h = await pv.evaluate(graftBuds);
+        expect(h.bad, 'plotline preview ' + width + 'px').toEqual([]);
+        expect(h.swellings, 'plotline preview ' + width + 'px').toBe(4);
+        await pv.close();
+      }
+    } finally { await browser.close(); }
+  }, 90000);
 
   /** The wood a pad sits on, from the drawn page: each branch's girth where it leaves the trunk against the trunk's there, each
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
