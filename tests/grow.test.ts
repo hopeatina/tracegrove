@@ -3238,20 +3238,33 @@ describe('Grow page', () => {
   }, 120000);
 
   /** What a previewed bigger mode would grow, as the tree ghosts it: the leaves on the journeys, the part checks on shoots
-   *  (those a shoot's leaves do not show, by its count) and the existing flows as graft buds; each at about half strength
-   *  with a dashed outline. */
+   *  (those a shoot's leaves do not show, by its count) and the existing flows as graft buds (those a swelling does not show,
+   *  by the count bud it carries); each at about half strength with a dashed outline, and a ghost leaf never under a leaf
+   *  that is drawn over it. */
   const ghosts = () => {
-    const B = (0, eval)('gw').B, out = { journeys: 0, parts: 0, flows: 0, bad: [] as string[] };
+    const B = (0, eval)('gw').B, out = { journeys: 0, crown: 0, parts: 0, flows: 0, str: {} as Record<string, number>, bad: [] as string[] };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const seen = (e: Element) => { for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return false; } return e.getBoundingClientRect().width > 0; };
     const strength = (e: Element) => { let o = 1; for (let n: Element | null = e; n && n !== B.svg; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o; };
     const look = (mark: Element | null, what: string) => {
       if (!mark) return bad(what + ' ghost has no outline');
       const o = strength(mark), c = getComputedStyle(mark);
+      out.str[what] = +o.toFixed(2);
       if (o < 0.38 || o > 0.52) bad(what + ' ghosted at', +o.toFixed(2));
       if (c.stroke === 'none' || c.strokeDasharray === 'none' || Number(c.strokeOpacity) < 0.9) bad(what + ' ghost without a dashed outline', [c.stroke, c.strokeDasharray]);
     };
-    for (const e of Array.from(B.svg.querySelectorAll('.gb-lf.pv-add:not(.bud)')) as Element[]) if (seen(e)) { out.journeys++; look(e.querySelector('.blade'), 'leaf ' + e.getAttribute('data-k')); }
+    // a leaf drawn over a ghost leaf's middle hides it: the ghost is not there to be counted
+    const drawn = (Array.from(B.svg.querySelectorAll('.gb-lf:not(.pv-add):not(.gone)')) as Element[]).filter((e) => seen(e) && strength(e.querySelector('.blade') ?? e) > 0.25);
+    const under = (e: Element) => {
+      const r = e.querySelector('.blade')!.getBoundingClientRect(), at = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return drawn.find((q) => q !== e && !!(e.compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) && (Array.from(q.querySelectorAll('.blade')) as SVGGeometryElement[]).some((b) => {
+        const m = b.getScreenCTM(); return !!m && getComputedStyle(b).display !== 'none' && b.isPointInFill(at.matrixTransform(m.inverse()));
+      }));
+    };
+    for (const e of Array.from(B.svg.querySelectorAll('.gb-lf.pv-add:not(.bud)')) as Element[]) if (seen(e)) {
+      const q = under(e); if (q) { bad('leaf ' + e.getAttribute('data-k') + ' ghosted under ' + q.getAttribute('data-k')); continue; }
+      out.journeys++; if (B.pad[(e as any).__p]?.crown) out.crown++; look(e.querySelector('.blade'), 'leaf ' + e.getAttribute('data-k'));
+    }
     for (const g of new Set(Object.values(B.shoots ?? {})) as Set<any>) {
       if (!seen(g.g) || !g.g.classList.contains('pv-add')) continue;
       const lv = (Array.from(g.fl.querySelectorAll('.gb-lf.bud.pv-add')) as Element[]).filter(seen);
@@ -3260,7 +3273,11 @@ describe('Grow page', () => {
       if (lv.length + tag !== g.list.length) bad('a shoot ghosts fewer checks than it holds', [g.kid, lv.length, tag, g.list.length]);
       out.parts += lv.length + tag;
     }
-    for (const e of Array.from(B.svg.querySelectorAll('.gb-gr.pv-add')) as Element[]) if (seen(e)) { out.flows++; look(e.querySelector('.gring'), 'existing flow ' + e.getAttribute('data-k')); }
+    for (const e of Array.from(B.svg.querySelectorAll('.gb-gr.pv-add')) as Element[]) {
+      const sw = e.querySelector('.gsw'); if (!seen(e) || !sw || !seen(sw)) continue;
+      const tag = e.querySelector('.shtag .shn'), more = tag && seen(tag) ? Number(String(tag.textContent).replace('+', '')) || 0 : 0;
+      out.flows += 1 + more; look(e.querySelector('.gring'), 'existing flow ' + e.getAttribute('data-k'));
+    }
     return out;
   };
 
@@ -3298,8 +3315,55 @@ describe('Grow page', () => {
         }
         await page.close();
       }
+      // the plotline fold as the live page grows it: asked, grown, then Minimum picked, so what Min cut has fallen. With a leaf of
+      // the second journey pinned, Max's ghosts all show, the crown's too, each at half strength and none under a leaf, as many
+      // as its words say; and so do Standard's, with nothing pinned
+      const pl = recordedGrow('plotline-seats.jsonl');
+      const plAsked = { ...pl, asked: true, modeBy: null, mode: 'min' as const, run: {} }, plMin = { ...pl, asked: false, modeBy: 'you' as const, mode: 'min' as const };
+      for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
+        const page = await treePage(browser, server.url, plAsked, { width, scheme, height: 1400 });
+        // a strength read is the look itself, not an opacity part way through a transition
+        await page.addStyleTag({ content: '.gw-svg.gb, .gw-svg.gb * { transition: none !important; }' });
+        await settled(page);
+        await page.evaluate(() => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); });
+        await settled(page);
+        await page.evaluate(() => { (0, eval)('gw').picking = null; });
+        await paintState(page, plMin);
+        const point = async (m: string) => {
+          await page.getByTestId('grow-mode-' + m).scrollIntoViewIfNeeded();
+          const bb = (await page.getByTestId('grow-mode-' + m).boundingBox())!;
+          await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+          await expect.poll(() => page.getByTestId('grow-mode-preview').innerText().catch(() => '')).toContain('as ghosts on the tree');
+          return page.getByTestId('grow-mode-preview').innerText();
+        };
+        const j2 = await page.evaluate(() => { const w = (0, eval)('gw'); return Object.keys(w.B.leaf).find((id) => w.B.leaf[id].__j === w.order[1] && !w.B.leaf[id].classList.contains('gone')) ?? null; });
+        expect(j2, width + 'px').not.toBeNull();
+        await page.locator('.gb-lf[data-k="s:' + j2 + '"]').click({ force: true });
+        expect(await page.evaluate(() => !!(0, eval)('gw').pinned), width + 'px').toBe(true);
+        // (each ghost at the one strength it has whatever is pinned: the pin's dimming leaves the ghosts out)
+        const was: Record<string, number> = {};
+        for (const [m, pinned] of [['max', true], ['max', false], ['std', false]] as const) {
+          if (!pinned) await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.growPaint(); });
+          const text = await point(m), g = await page.evaluate(ghosts), n = (re: RegExp) => Number(text.match(re)?.[1] ?? 0);
+          if (m === 'max' && pinned) Object.assign(was, g.str);
+          else if (m === 'max') expect(g.str, 'plotline ' + width + 'px max, pinned then not').toEqual(was);
+          const at = 'plotline ' + width + 'px ' + m + (pinned ? ' pinned' : '');
+          expect(g.bad, at).toEqual([]);
+          expect(g.journeys + g.parts + g.flows, at).toBe(n(/: (\d+) more than/));
+          expect(g.crown, at).toBeGreaterThan(0);
+          if (m === 'max') {
+            expect(n(/: (\d+) more than/), at).toBe(20);
+            expect([g.journeys, g.parts, g.flows], at).toEqual([n(/(\d+) on the journeys/), n(/(\d+) part checks?/), n(/(\d+) existing flows?/)]);
+          } else {
+            expect(n(/: (\d+) more than/), at).toBe(3);
+            expect([g.parts, g.flows], at).toEqual([0, 0]);
+          }
+          await page.mouse.move(1, 1, { steps: 2 });
+        }
+        await page.close();
+      }
     } finally { await browser.close(); }
-  }, 90000);
+  }, 150000);
 
   /** Every branch and branchlet that carries a cushion ends inside it, its round end too, as the cushions stand. */
   const ends = () => {
