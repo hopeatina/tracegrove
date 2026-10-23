@@ -2636,15 +2636,16 @@ describe('Grow page', () => {
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
    *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
   const ramify = () => {
-    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }> };
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }>, stilts: [] as Array<{ at: string; len: number }> };
     for (const T of L.trees) for (const b of T.br) {
       out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk);
       // its girth a caliper and a half (of its own) past the trunk's side, against its collar's
       const s = b.Tk / 2 + 1.5 * b.b; let i = 1; while (i < b.acc.length - 1 && b.acc[i] < s) i++;
       out.holds.push(b.w[i] / b.b);
-      // a raised crest's riser: how many limbs fork off it no more than three fifths of the way from its foot to the crest
+      // a raised crest's riser: how many limbs fork off it just under the crest, each leaving it no more than ten pixels
+      // under the crest's underside (so the crest sits on one limb that ramifies under it, not on stilts from low down)
       const rz = (b.twigs ?? []).find((t: any) => t.lb), cr = T.pads[b.id]?.geo.cs.find((c: any) => c.role === 'crest' && c.seat === null);
-      if (rz && cr) { const y0 = rz.pts[0][1], yb = b.o[1] + cr.b; out.risers.push({ id: b.id, forks: (b.twigs as any[]).filter((t) => t.c && t.c.pts === rz.pts && (y0 - rz.pts[t.bi][1]) / ((y0 - yb) || 1) <= .6).length }); }
+      if (rz && cr) { const yb = b.o[1] + cr.b; out.risers.push({ id: b.id, forks: (b.twigs as any[]).filter((t) => t.c && t.c.pts === rz.pts && t.pts[0][1] - yb >= 0 && t.pts[0][1] - yb <= 10).length }); }
     }
     // a point and the arc length along a polyline, both ways
     const acc = (p: number[][]) => p.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), a), []);
@@ -2670,10 +2671,19 @@ describe('Grow page', () => {
         out.cushions.push({ pid, k, n });
       });
     }
+    // every twig a cushion is lifted on (not a leaf's own): how much of it shows, clear of every cushion and of the wood it
+    // leaves, so a twig is a short fork under its cushion and never a stilt
+    const limbs = (Array.from(svg.querySelectorAll('path.w')) as SVGGeometryElement[]).filter((e) => e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== 'none');
+    const inWood = (x: number, y: number) => limbs.some((e) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); });
+    (Array.from(svg.querySelectorAll('path.tw:not(.lt)')) as any[]).filter((t) => t.__pts && t.getBoundingClientRect().width > 0 && !t.closest('.off, .gone, .cut') && getComputedStyle(t).display !== 'none').forEach((t) => {
+      const p: number[][] = t.__pts; let n = 0;
+      for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, m = Math.max(1, Math.ceil(Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) * 2)); for (let j = 0; j < m; j++) { const x = a[0]! + (c[0]! - a[0]!) * j / m, y = a[1]! + (c[1]! - a[1]!) * j / m; if (!inFill(x, y) && !inWood(x, y)) n++; } }
+      out.stilts.push({ at: Math.round(p[0]![0]!) + ',' + Math.round(p[0]![1]!), len: n / 2 });
+    });
     return out;
   };
 
-  it('grows each branch about four tenths of its trunk, holding that girth a caliper and a half past its collar, filleted into it, onto ramified wood: a raised crest on a short forked riser, two or more forked twigs under every cushion, showing below its underside', async () => {
+  it('grows each branch about four tenths of its trunk, holding that girth a caliper and a half past its collar, filleted into it, onto ramified wood: a raised crest on a riser forked just under it, two or more forked twigs under every cushion, showing below its underside as short forks, never stilts', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     let risers = 0;
@@ -2689,7 +2699,8 @@ describe('Grow page', () => {
         for (const q of r.ends) { expect(q, name + ' branch end/trunk').toBeGreaterThanOrEqual(.12); expect(q, name + ' branch end/trunk').toBeLessThanOrEqual(.18); }
         // holding its collar's girth for a caliper and a half of its own past the trunk's side before it tapers
         for (const q of r.holds) expect(q, name + ' branch girth held past its collar').toBeGreaterThanOrEqual(.97);
-        // a raised crest stands on a short riser that forks, two limbs or more off it in its lower three fifths, never one long pole
+        // a raised crest stands on a riser that forks just under it, two limbs or more off it no more than ten pixels under the
+        // crest, never stilts rising from low on it
         for (const q of r.risers) expect(q.forks, name + ' forks off the riser under ' + q.id).toBeGreaterThanOrEqual(2);
         risers += r.risers.length;
         // each limb's two fillets are round its collar with a radius of about 1.2 of its base girth, on the parent and on itself
@@ -2702,6 +2713,9 @@ describe('Grow page', () => {
         // under every cushion at least two twigs show, four to eight pixels below its lowest edge, clear of every cushion
         expect(r.cushions.length, name).toBeGreaterThan(2);
         for (const c of r.cushions) expect(c.n, name + ' twigs under ' + c.pid + ' cushion ' + c.k).toBeGreaterThanOrEqual(2);
+        // and no twig a cushion is lifted on shows more than twelve pixels of itself below it: a short fork, never a stilt
+        expect(r.stilts.length, name).toBeGreaterThan(2);
+        for (const q of r.stilts) expect(q.len, name + ' twig at ' + q.at + ' shows').toBeLessThanOrEqual(12);
         await page.close();
       }
     } finally { await browser.close(); }
@@ -2712,8 +2726,8 @@ describe('Grow page', () => {
   /** Every leaf that hangs as drawn: whether any of it runs past its cushion's ends; whether it sits on the cushion's rim, and
    *  if not, how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten pixels of that twig,
    *  leaves wood that shows. */
-  const hung = () => {
-    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, rim: 0, bad: [] as string[] };
+  const hung = (wide: boolean) => {
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, rim: 0, bad: [] as string[], runs: [] as number[] };
     const shown = (e: Element) => e.getBoundingClientRect().width > 0 && !e.closest('.off, .gone, .cut') && getComputedStyle(e).display !== 'none' && getComputedStyle(e).opacity !== '0';
     const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => shown(f) && shown(f.closest('.cush') ?? f));
     const wood = (Array.from(svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]).filter(shown);
@@ -2737,6 +2751,11 @@ describe('Grow page', () => {
         let over = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (inEl(fill, mx + Math.cos(th) * f * g.L, my + Math.sin(th) * f * g.L)) over++; }
         if (over) { out.rim++; if (over / 21 <= 0.12 || over / 21 >= 0.5) out.bad.push(pid + ' ' + id + ': on the rim, ' + Math.round(over / 21 * 100) + '% of its blade over it'); continue; }
         for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, l = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!), n = Math.max(1, Math.ceil(l * 2)); A.push(A[i - 1]! + l); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); }
+        // one that hangs beneath its cushion hangs under its flat underside, its blade inside where either round end begins,
+        // so it never reads as hanging past the pad (beside a desktop or tablet tree: a phone's small crown may have room for
+        // neither that nor its rim, and keeps the rule above); and on a short twig, never a wire run out under the pad
+        if (wide && (mx - hx < x0 + c.rL * c.h - 0.5 || mx + hx > x1 - c.rR * c.h + 0.5)) out.bad.push(pid + ' ' + id + ': hangs past its cushion\'s flat underside ' + JSON.stringify([mx - hx - x0 - c.rL * c.h, x1 - c.rR * c.h - mx - hx].map(Math.round)));
+        out.runs.push(p.reduce((a, q, i) => a + (i ? Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), 0) / g.L);
         // no more than two fifths of the twig it hangs from lies under a cushion
         const hid = s.filter((q) => under(q[0]!, q[1]!)).length / s.length;
         if (hid > 0.4) out.bad.push(pid + ' ' + id + ': ' + Math.round(hid * 100) + '% of its twig under a cushion');
@@ -2838,10 +2857,12 @@ describe('Grow page', () => {
       for (const [file, name] of recorded) for (const width of [1440, 768, 390]) {
         const page = await growPage(browser, server.url, folded(file), width);
         await page.waitForTimeout(2500);
-        const h = await page.evaluate(hung);
+        const h = await page.evaluate(hung, width >= 720);
         expect(h.n, name + ' ' + width).toBeGreaterThan(0);
         expect(h.n - h.rim, name + ' ' + width + ' hanging beneath').toBeGreaterThan(0);
         expect(h.bad, name + ' ' + width).toEqual([]);
+        // the twig it hangs from is short: no more than two leaves long beside a desktop or tablet tree, never a wire
+        if (width >= 720) for (const r of h.runs) expect(r, name + ' ' + width + ' hanging twig, in leaves').toBeLessThanOrEqual(2);
         await page.close();
       }
     } finally { await browser.close(); }
