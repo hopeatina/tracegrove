@@ -1,3 +1,4 @@
+import { BRAND_MARK } from './uiBrand.ts';
 import { READINESS_JS } from './uiReadiness.ts';
 import { CHROME_CSS, CHROME_JS } from './uiChrome.ts';
 /**
@@ -16,6 +17,7 @@ import { BENCHMARK_CSS, BENCHMARK_JS } from './uiBenchmark.ts';
 export const UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>tracegrove</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -116,11 +118,11 @@ kbd{font:500 11px/16px var(--mono);border:1px solid var(--line2);border-bottom-w
 .finding{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--paper)}
 .step.live,.node.live{box-shadow:inset 3px 0 0 var(--moss);background:var(--paper)}.live .dot{animation:breathe 1.1s ease-in-out infinite}
 .grovecard{position:relative;padding:12px 12px 4px;margin-bottom:16px}.grovecard svg{display:block;width:100%;max-width:760px;height:auto;margin:0 auto}
-.grove .pad{cursor:pointer}.grove .pad circle{stroke:var(--paper);stroke-width:1.6}.grove.focus .pad{opacity:.5}.grove .pad.on,.grove .pad:hover{opacity:1}.grove .pad{transition:opacity .15s}
+.grove .pad{cursor:pointer}.grove .run-leaf{stroke:var(--paper);stroke-width:1.3}.grove .pad-hit{fill:transparent;stroke:none}.grove .pad:focus-visible{outline:none}.grove .pad:focus-visible .pad-hit{stroke:var(--ink3);stroke-width:1;stroke-dasharray:3 3}.grove .foliage{fill:var(--pad-dim);stroke:var(--pad-edge);stroke-width:.6}.grove .wood-light{fill:var(--wood-lit)}.grove .twigwood{fill:none;stroke:var(--wood);stroke-width:1.2;stroke-linecap:round}.grove.focus .pad:not(.on) .run-leaf{opacity:.65}.grove .pad.on,.grove .pad:hover{opacity:1}.grove .pad{transition:opacity .15s}
 .grove .lf-pass{fill:var(--moss)}.grove .lf-fail{fill:var(--verm)}.grove .lf-warn{fill:var(--ochre)}.grove .lf-none{fill:var(--paper);stroke:var(--twig)!important;stroke-dasharray:2 2}.grove .lf-live{fill:var(--new);animation:leaf 1s ease-in-out infinite}
 .grove .lf-pruned{fill:none;stroke:var(--twig)!important;stroke-dasharray:2 2}
-.grove .wood{fill:var(--trunk)}.grove .cutwood{fill:none;stroke:var(--twig);stroke-dasharray:3 3;stroke-width:1.4}.grove .soil{stroke:var(--soil);stroke-width:1}
-.grove .root{fill:none;stroke:var(--gold);stroke-linecap:round}.grove .tip{fill:var(--gold)}.grove .tip.fail{fill:var(--verm)}.grove .tip.none{fill:var(--paper);stroke:var(--gold);stroke-dasharray:2 2}
+.grove .wood{fill:var(--wood)}.grove .cutwood{fill:none;stroke:var(--twig);stroke-dasharray:3 3;stroke-width:1.4}.grove .soil{stroke:var(--soil);stroke-width:1}
+.grove .root{fill:var(--gold);opacity:.75}.grove .tip{fill:var(--gold)}.grove .tip.fail{fill:var(--verm)}.grove .tip.none{fill:var(--paper);stroke:var(--gold);stroke-dasharray:2 2}
 .grove text{font:11px var(--mono);fill:var(--ink3)}.grove text.on{fill:var(--ink);font-weight:500}.grove text.rt{fill:var(--gold)}.grove text.bad{fill:var(--verm)}
 @keyframes leaf{0%,100%{opacity:.45}50%{opacity:1}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:4px 8px 8px;font-size:12px;color:var(--ink3)}.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
@@ -143,7 +145,7 @@ ${BENCHMARK_CSS}
 ${CHROME_CSS}
 </style></head><body>
 <a class="skip btn" href="#main">Skip to content</a>
-<header><span class="brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M12 18c-.6-2.6 1.4-3.6.6-6.4" stroke="var(--ink)" stroke-width="1.8"/><path d="M12.4 13.4c-2-.4-3.6-1.4-4.6-2.6M12.8 11.6c1.6-.6 3-1.8 3.8-3" stroke="var(--ink)" stroke-width="1.1"/><g fill="var(--moss)"><circle cx="6.2" cy="10.2" r="1.7"/><circle cx="8.8" cy="9.6" r="1.7"/><circle cx="15.6" cy="7.4" r="1.7"/><circle cx="18.2" cy="8" r="1.7"/><circle cx="11.6" cy="6" r="1.9"/></g><path d="M3 18h18" stroke="var(--ink3)" stroke-width=".9"/><path d="M12 18c-1 1.6-2.6 2.6-4.4 3M12 18c1.2 1.4 2.8 2.2 4.6 2.4" stroke="var(--gold)" stroke-width=".9"/></svg>tracegrove</span>
+<header><span class="brand">${BRAND_MARK}tracegrove</span>
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
 <main class="page" id="main" tabindex="-1"></main>
 <script>
@@ -196,38 +198,39 @@ function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(
    Same grammar as the mark: leaves above the soil line are what a user does, gold roots below are the system read back. */
 const SVGNS='http://www.w3.org/2000/svg';
 function sv(tag,attrs,...kids){const el=document.createElementNS(SVGNS,tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,String(v))}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
-function cr(p,n){n=n||14;const o=[];for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],d=p[i+2]||c;
- for(let k=0;k<n;k++){const t=k/n,t2=t*t,t3=t2*t;o.push([0,1].map(j=>.5*((2*b[j])+(-a[j]+c[j])*t+(2*a[j]-5*b[j]+4*c[j]-d[j])*t2+(-a[j]+3*b[j]-3*c[j]+d[j])*t3)))}}o.push(p[p.length-1]);return o}
-function ribbon(p,w0,w1){const c=cr(p),L=[],R=[];for(let i=0;i<c.length;i++){const a=c[Math.max(0,i-1)],b=c[Math.min(c.length-1,i+1)];let dx=b[0]-a[0],dy=b[1]-a[1];const m=Math.hypot(dx,dy)||1;dx/=m;dy/=m;
- const w=(w0+(w1-w0)*Math.pow(i/(c.length-1),.8))/2;L.push([c[i][0]-dy*w,c[i][1]+dx*w]);R.push([c[i][0]+dy*w,c[i][1]-dx*w])}
- const f=q=>q[0].toFixed(1)+' '+q[1].toFixed(1);return 'M'+L.map(f).join(' L')+' L'+R.reverse().map(f).join(' L')+' Z'}
-const line=p=>'M'+cr(p).map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' L');
 const resource=p=>(p||'').split('?')[0].split('/').map(g=>/^\{[^}]*\}$/.test(g)||/^\d+$/.test(g)||/^[0-9a-f-]{12,}$/i.test(g)||(/^[A-Za-z0-9_-]{16,}$/.test(g)&&/\d/.test(g))?'·':g).join('/')||'/';
-function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg=sv('svg',{viewBox:'0 0 '+W+' 300',class:'grove'+(ui.sel?' focus':''),role:'img','aria-label':n+' scenarios as a grove: one pad per scenario, one leaf per step'});
- const wood=sv('g'),roots=sv('g'),pads=sv('g'),labels=sv('g');svg.append(sv('line',{class:'soil',x1:24,x2:W-24,y1:SOIL,y2:SOIL}),roots,wood,pads,labels);
- const top=[CX+4,128];wood.append(sv('path',{class:'wood',d:ribbon([[CX,SOIL+2],[CX-10,178],[CX+10,152],top],13,6)}));
- const r=7,gap=r*2.15,placed=[];
- sc.forEach((c,i)=>{const a=n===1?-Math.PI/2:Math.PI+0.42+(Math.PI-0.84)*i/(n-1);const px=CX+Math.cos(a)*Math.min(250,90+70*n),py=118+Math.sin(a)*62;
-  const cut=c.state==='pruned';const mid=[(top[0]+px)/2,Math.min(top[1],py)+18];
-  wood.append(cut?sv('path',{class:'cutwood',d:line([top,mid,[px,py+10]])}):sv('path',{class:'wood',d:ribbon([top,mid,[px,py+8]],4.5,1.6)}));
-  const steps=cut?[{id:'',result:'pruned'},{id:'',result:'pruned'},{id:'',result:'pruned'}]:c.steps.length?c.steps:[{id:'',result:'none'}];
-  const perRow=Math.ceil(steps.length/(steps.length>4?2:1));const pad=sv('g',{class:'pad'+(ui.sel===c.id?' on':''),tabindex:'-1','data-pad':c.id,on:{click:()=>{ui.sel=c.id;ui.step=Math.max(0,c.steps.findIndex(x=>x.result==='fail'));render();inspectStep()}}},sv('title',{},c.id+' · '+LABEL[c.state]));
-  steps.forEach((x,j)=>{const row=Math.floor(j/perRow),col=j%perRow,inRow=row===0?Math.min(perRow,steps.length):steps.length-perRow;
-   const at=c.failure&&x.name&&(x.name===c.failure.step||x.reportedName===c.failure.step);pad.append(sv('circle',{cx:(px+(col-(inRow-1)/2)*gap).toFixed(1),cy:(py-row*gap*.86).toFixed(1),r:r,class:'lf-'+(at?'fail':x.result),'data-leaf':x.id||null},at?sv('title',{},'Case failed at '+c.failure.step):null))});
+function grove(sc){
+ const W=640,n=sc.length,rowCount=c=>Math.max(1,Math.ceil(c.steps.length/6)),crownY=40+rowCount(sc[0]||{steps:[]})*15,levels=new Map();let nextY=crownY+45;for(let i=n-1;i>0;i--){const py=nextY+rowCount(sc[i])*15+16;levels.set(i,py);nextY=py+40}const SOIL=Math.max(260,crownY+180,nextY+35),H=SOIL+110;
+ const svg=sv('svg',{viewBox:'0 0 '+W+' '+H,class:'grove'+(ui.sel?' focus':''),role:'group','aria-label':n+' scenarios as a grove: one branch per scenario, one leaf per step'});
+ const wood=sv('g'),roots=sv('g'),pads=sv('g'),labels=sv('g');svg.append(roots,wood,pads,labels);
+ const height=SOIL-crownY,trunk=gbSpline([[320,SOIL],[312,SOIL-height*.13],[334,SOIL-height*.37],[310,SOIL-height*.64],[332,SOIL-height*.86],[326,crownY]],14);
+ const widths=trunk.map((_,i)=>17*Math.pow(1-i/(trunk.length-1),.8)+1.4);
+ const timber=(points,w)=>{wood.append(sv('path',{class:'wood',d:gbRib(points,w)}),sv('path',{class:'wood-light',d:gbBand(points,w,.25,.7)}))};
+ timber(trunk,widths);
+ const atY=y=>trunk.reduce((a,b)=>Math.abs(b[1]-y)<Math.abs(a[1]-y)?b:a);
+ sc.forEach((c,i)=>{
+  const crown=i===0,side=i%2?-1:1,py=crown?crownY:levels.get(i),px=crown?326:320+side*(180-(i-1)*100/Math.max(1,n-2)),cut=c.state==='pruned';
+  const start=crown?trunk[trunk.length-5]:atY(py+28),points=gbSpline([start,[start[0]+(px-start[0])*.38,py+22],[px-side*28,py+10],[px,py]],14);
+  if(!crown){if(cut)wood.append(sv('path',{class:'cutwood',d:gbLine(points)}));else timber(points,points.map((_,j)=>5.8*Math.pow(1-j/(points.length-1),.8)+.8))}
+  const steps=cut?[]:c.steps,cols=Math.min(6,Math.max(1,steps.length)),rows=Math.ceil(steps.length/cols),half=Math.max(30,cols*13),top=py-Math.max(16,rows*15),select=()=>{ui.sel=c.id;ui.step=Math.max(0,c.steps.findIndex(x=>x.result==='fail'));render();document.querySelector('.grove [data-pad][aria-pressed=true]')?.focus({preventScroll:true});inspectStep()};
+  const pad=sv('g',{class:'pad'+(ui.sel===c.id?' on':''),'data-pad':c.id,tabindex:0,role:'button','aria-label':c.id+' · '+LABEL[c.state],'aria-pressed':ui.sel===c.id?'true':'false',on:{click:select,keydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select()}}}},sv('title',{},c.title+' · '+LABEL[c.state]));
+  pad.append(sv('ellipse',{cx:px,cy:(top+py)/2,rx:half+16,ry:(py-top)/2+14,class:'pad-hit'}));
+  if(!cut&&steps.length)pad.append(sv('path',{class:'foliage',d:gbCushD([px,py],{top:[[-half-10,0],[-half-12,-8],[-half*.8,top-py-2],[-half*.6,top-py+2],[-half*.4,top-py-10],[-half*.1,top-py-5],[half*.2,top-py-11],[half*.45,top-py-1],[half*.7,top-py-4],[half+8,-8],[half+10,0]],bot:[[-half-10,0],[0,5],[half+10,0]]})}));
+  steps.forEach((x,j)=>{const row=Math.floor(j/cols),col=j%cols,count=Math.min(cols,steps.length-row*cols),lx=px+(col-(count-1)/2)*25,ly=py-10-row*15,angle=(col%2?-16:16);
+   const foot=[lx-8,ly+3];wood.append(sv('path',{class:'twigwood',d:gbLine(gbSpline([[px,py+2],[(px+foot[0])/2,py-2],foot],10))}));
+   const at=c.failure&&x.name&&(x.name===c.failure.step||x.reportedName===c.failure.step);
+   pad.append(sv('path',{d:gbLeafD(21,10),transform:'translate('+gbP([lx,ly])+') rotate('+angle+')',class:'run-leaf lf-'+(at?'fail':x.result),'data-leaf':x.id||null},sv('title',{},(x.reportedName||x.name||x.id)+' · '+LABEL[at?'fail':x.result])))});
+  if(!steps.length)pad.append(sv('path',{d:gbLeafD(16,8),transform:'translate('+gbP([px,py-8])+')',class:'run-leaf lf-'+(cut?'pruned':'none')}));
   pads.append(pad);
-  const text=c.id.length>26?c.id.slice(0,25)+'…':c.id,half=text.length*3.4+4,rows=steps.length>4?2:1;
-  const box=y=>({x0:px-half,x1:px+half,y0:y-11,y1:y+3}),hit=b=>placed.some(q=>b.x0<q.x1&&q.x0<b.x1&&b.y0<q.y1&&q.y0<b.y1);
-  let ly=py-(rows-1)*gap*.86-r-8;if(hit(box(ly)))ly=py+r+15;placed.push(box(ly));minY=Math.min(minY,ly-12);
-  labels.append(sv('text',{x:px.toFixed(1),y:ly.toFixed(1),'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},text))});
- // Roots are what the app served during the run (recorded by the proxy, including a page's own fetches); a scenario without a run falls back to the paths its steps declare.
- const res=new Map();const touch=(k,result)=>{const v=res.get(k)||{fail:false,pass:false};if(result==='fail')v.fail=true;if(result==='pass')v.pass=true;res.set(k,v)};
- for(const c of sc){if(c.requests&&c.requests.length){const by=new Map(c.steps.map(x=>[x.id,x.result]));for(const q of c.requests)if(q.step)touch(resource(q.path),by.get(q.step)||'none');continue}
-  for(const x of c.steps){if(!x.path||!x.path.startsWith('/')||['UI','JOB','MCP'].includes(x.method))continue;touch(resource(x.path),x.result)}}
- const keys=[...res.keys()].slice(0,8);keys.forEach((k,i)=>{const m=keys.length;const a=m===1?Math.PI/2:0.3+(Math.PI-0.6)*(m-1-i)/(m-1);const tx=CX+Math.cos(a)*Math.min(270,80+60*m),ty=SOIL+18+Math.sin(a)*56;const v=res.get(k);
-  roots.append(sv('path',{class:'root',d:line([[CX,SOIL+1],[(CX+tx)/2,SOIL+10+Math.sin(a)*20],[tx,ty]]),'stroke-width':1.6}),sv('circle',{class:'tip '+(v.fail?'fail':v.pass?'':'none'),cx:tx.toFixed(1),cy:ty.toFixed(1),r:3.6}),
-   sv('text',{x:tx.toFixed(1),y:(ty+16+(i%2)*12).toFixed(1),'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
- svg.setAttribute('viewBox','0 '+Math.floor(minY)+' '+W+' '+Math.ceil(312-minY));
- if(res.size>keys.length)labels.append(sv('text',{x:W-24,y:304,'text-anchor':'end'},'+'+(res.size-keys.length)+' more resources'));
+  const text=c.id.length>30?c.id.slice(0,29)+'…':c.id;
+  labels.append(sv('text',{x:px,y:top-12,'text-anchor':'middle',class:(ui.sel===c.id?'on ':'')+(c.state==='fail'?'bad':'')},text));
+ });
+ const res=new Map(),touch=(k,result)=>{const v=res.get(k)||{fail:false,pass:false};if(result==='fail')v.fail=true;if(result==='pass')v.pass=true;res.set(k,v)};
+ for(const c of sc){if(c.requests&&c.requests.length){const by=new Map(c.steps.map(x=>[x.id,x.result]));for(const q of c.requests)if(q.step)touch(resource(q.path),by.get(q.step)||'none');continue}for(const x of c.steps){if(!x.path||!x.path.startsWith('/')||['UI','JOB','MCP'].includes(x.method))continue;touch(resource(x.path),x.result)}}
+ roots.append(sv('line',{class:'soil',x1:65,x2:575,y1:SOIL+2,y2:SOIL+2}));
+ const keys=[...res.keys()].slice(0,8);keys.forEach((k,i)=>{const tx=keys.length===1?320:100+i*440/(keys.length-1),ty=SOIL+45+(i%2)*22,v=res.get(k),points=gbSpline([[320,SOIL],[320+(tx-320)*.35,SOIL+22],[tx,ty]],14);
+  roots.append(sv('path',{class:'root',d:gbRib(points,points.map((_,j)=>2.8*(1-j/(points.length-1))+.6))}),sv('circle',{class:'tip '+(v.fail?'fail':v.pass?'':'none'),cx:tx,cy:ty,r:3}),sv('text',{x:tx,y:ty+18,'text-anchor':'middle',class:'rt'},k.length>22?k.slice(0,21)+'…':k))});
+ if(res.size>keys.length)labels.append(sv('text',{x:W-24,y:H-8,'text-anchor':'end'},'+'+(res.size-keys.length)+' more resources'));
  return svg}
 // Step ids are the slug of the authored name; a saved name with the same slug is the same step, not a rename.
 const slug=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
@@ -344,8 +347,8 @@ async function runNow(grep){if(state.compileError){ui.error=state.compileError;r
 async function prune(file,graft){try{await api('/api/prune',{file,graft});toast(graft?'Grafted back':'Pruned '+file.split('/').pop(),{label:'Undo',run:()=>prune(file,!graft)});ui.sel=null;await load()}catch(e){toast(e.error||'Could not '+(graft?'graft':'prune'))}}
 
 /* ---------- Discover: source, reachability, intent ---------- */
-function seed(){return sv('svg',{width:44,height:44,viewBox:'0 0 44 44','aria-hidden':'true',fill:'none','stroke-linecap':'round'},sv('line',{x1:4,y1:30,x2:40,y2:30,stroke:'currentColor','stroke-opacity':.4}),
- sv('path',{d:'M22 30c0-5-1-8 1-12',stroke:'currentColor','stroke-width':1.6}),sv('circle',{cx:23,cy:14,r:4,stroke:'currentColor','stroke-dasharray':'2 2'}),sv('path',{d:'M22 30c-3 3-7 4-10 4M22 30c3 3 6 5 9 5',stroke:'var(--gold)','stroke-width':1.2}))}
+function seed(){const points=gbSpline([[22,30],[20,24],[23,18],[22,12]],10);return sv('svg',{width:44,height:44,viewBox:'0 0 44 44','aria-hidden':'true',fill:'none','stroke-linecap':'round'},sv('line',{x1:4,y1:30,x2:40,y2:30,stroke:'currentColor','stroke-opacity':.4}),
+ sv('path',{d:gbRib(points,points.map((_,i)=>2*(1-i/(points.length-1))+.5)),fill:'currentColor'}),sv('path',{d:gbLeafD(13,6),transform:'translate(16 16) rotate(25)',fill:'currentColor'}),sv('path',{d:gbLeafD(13,6),transform:'translate(28 11) rotate(-22)',fill:'currentColor'}),sv('path',{d:'M22 30c-3 3-7 4-10 4M22 30c3 3 6 5 9 5',stroke:'var(--gold)','stroke-width':1.2}))}
 function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;const available=!!(name&&state.agent.detected[a.provider]);
  const sources=[{v:'',label:'working tree',note:'uncommitted files included'}].concat(g.branches.map(b=>({v:b,label:b,note:b===g.current?'checked out':b===g.base?'base':''})));
  const chips=h('label',{class:'source-picker'},'Source',h('select',{'aria-label':'Source',on:{change:e=>{ui.source=e.target.value;if(!gw.busy){gw.state=null;gw.view=null;gw.lastFor=null;gw.svg=null;gw.B=null;gw.pinned=null}scan()}}},(g.isRepo?sources:sources.slice(0,1)).map(s=>h('option',{value:s.v,selected:ui.source===s.v},s.label+(s.note?' · '+s.note:'')))));
