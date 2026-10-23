@@ -71,13 +71,15 @@ it('keeps dense recorded-tree geometry finite and inside its scene', async () =>
   try {
     const result = await page.evaluate(() => {
       const cases = Array.from({ length: 12 }, (_, i) => ({ id: 'scenario.' + i, title: 'Scenario ' + i, state: i % 3 ? 'pass' : 'fail', requests: [], steps: Array.from({ length: [1, 6, 24, 48][i % 4]! }, (_, j) => ({ id: 'step_' + i + '_' + j, result: j % 5 ? 'pass' : 'fail', name: 'Step ' + j, method: 'GET', path: '/api/' + i })) }));
-      const svg = (window as unknown as { grove(cases: unknown[]): SVGSVGElement }).grove(cases);
+      const renderer = window as unknown as { grove(cases: unknown[]): SVGSVGElement; recordedTreeCases(input: typeof cases, selected: string, expanded: boolean): typeof cases };
+      const compact = renderer.recordedTreeCases(cases, 'scenario.11', false);
+      const svg = renderer.grove(renderer.recordedTreeCases(cases, 'scenario.11', true));
       document.body.append(svg); const box = svg.viewBox.baseVal;
       const pads = Array.from(svg.querySelectorAll('[data-pad]')).map(el => (el as SVGGraphicsElement).getBBox());
-      const result = { leaves: svg.querySelectorAll('[data-leaf]').length, expected: cases.reduce((sum, c) => sum + c.steps.length, 0), invalid: Array.from(svg.querySelectorAll('path')).some(el => /NaN|Infinity|undefined/.test(el.getAttribute('d') || '')), contained: pads.every(r => r.x >= 0 && r.y >= 0 && r.x + r.width <= box.width && r.y + r.height <= box.height) };
+      const result = { compactCount: compact.length, selectedIncluded: compact.some(c => c.id === 'scenario.11'), leaves: svg.querySelectorAll('[data-leaf]').length, expected: cases.reduce((sum, c) => sum + c.steps.length, 0), invalid: Array.from(svg.querySelectorAll('path')).some(el => /NaN|Infinity|undefined/.test(el.getAttribute('d') || '')), contained: pads.every(r => r.x >= 0 && r.y >= 0 && r.x + r.width <= box.width && r.y + r.height <= box.height) };
       svg.remove(); return result;
     });
-    expect(result.leaves).toBe(result.expected); expect(result.invalid).toBe(false); expect(result.contained).toBe(true);
+    expect(result.compactCount).toBe(8); expect(result.selectedIncluded).toBe(true); expect(result.leaves).toBe(result.expected); expect(result.invalid).toBe(false); expect(result.contained).toBe(true);
   } finally { await page.close(); }
 });
 it('keeps each review disclosure independent across a refresh', async () => {

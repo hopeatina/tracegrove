@@ -199,6 +199,7 @@ function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(
 const SVGNS='http://www.w3.org/2000/svg';
 function sv(tag,attrs,...kids){const el=document.createElementNS(SVGNS,tag);for(const[k,v]of Object.entries(attrs||{})){if(k==='on')for(const[e,f]of Object.entries(v))el.addEventListener(e,f);else if(v!==null&&v!==undefined&&v!==false)el.setAttribute(k,String(v))}for(const kid of kids.flat()){if(kid===null||kid===undefined||kid===false)continue;el.append(kid instanceof Node?kid:document.createTextNode(String(kid)))}return el}
 const resource=p=>(p||'').split('?')[0].split('/').map(g=>/^\{[^}]*\}$/.test(g)||/^\d+$/.test(g)||/^[0-9a-f-]{12,}$/i.test(g)||(/^[A-Za-z0-9_-]{16,}$/.test(g)&&/\d/.test(g))?'·':g).join('/')||'/';
+function recordedTreeCases(cases,selected,expanded){if(expanded||cases.length<=8)return cases;const ids=new Set();if(cases.some(c=>c.id===selected))ids.add(selected);for(const c of cases)if(c.state==='fail'&&ids.size<8)ids.add(c.id);for(const c of cases)if(ids.size<8)ids.add(c.id);return cases.filter(c=>ids.has(c.id))}
 function grove(sc){
  const W=640,n=sc.length,rowCount=c=>Math.max(1,Math.ceil(c.steps.length/6)),crownY=40+rowCount(sc[0]||{steps:[]})*15,levels=new Map();let nextY=crownY+45;for(let i=n-1;i>0;i--){const py=nextY+rowCount(sc[i])*15+16;levels.set(i,py);nextY=py+40}const SOIL=Math.max(260,crownY+180,nextY+35),H=SOIL+110;
  const svg=sv('svg',{viewBox:'0 0 '+W+' '+H,class:'grove'+(ui.sel?' focus':''),role:'group','aria-label':n+' scenarios as a grove: one branch per scenario, one leaf per step'});
@@ -265,7 +266,7 @@ function runTab(){
    run.sourceIssue?h('p',{'aria-label':'Saved evidence status'},run.sourceIssue):null,
    h('p',{},'Recorded run request: '+(run.sourceChecked?sourceDescription(run.sourceBinding):'Unavailable — saved evidence could not establish the input.')))):null,
   state.compileError?h('div',{style:'margin-top:16px'},blocked(state.compileError)):null,ui.error?h('div',{style:'margin-top:16px'},blocked(ui.error)):null);
- const canopy=h('section',{class:'card grovecard','aria-label':'Grove'},grove(sc),legend());
+ const shown=recordedTreeCases(sc,ui.sel,ui.treeExpanded);const canopy=h('section',{class:'card grovecard','aria-label':'Grove'},grove(shown),legend(),sc.length>8?h('div',{class:'row small muted',style:'padding:8px;justify-content:space-between'},h('span',{},shown.length+' of '+sc.length+' branches · selection and failures take priority'),h('button',{class:'btn ghost sm',on:{click:()=>{ui.treeExpanded=!ui.treeExpanded;render()}}},ui.treeExpanded?'Show a compact tree':'Show all '+sc.length+' branches')):null);
  const tree=h('section',{class:'grow','aria-label':'Scenario tree'},canopy,h('div',{class:'rulehead'},h('span',{class:'label'},'Scenarios'),h('span',{class:'rule'}),h('span',{class:'small muted'},'step · request · run clock · status')),
   h('div',{class:'tree'+(ui.running?' growing':'')},sc.map(s=>branch(s))));
  const side=h('div',{class:'side'},fixes(sc,run),detail(sc));
