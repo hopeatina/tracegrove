@@ -2033,6 +2033,14 @@ describe('Grow page', () => {
             for (const c of pc) expect(per(c) / base, width + 'px ' + pid + ' ' + c.role + ' of ' + c.n).toBeLessThan(1.03);
             for (const a of pc) for (const b of pc) if (a.n < b.n) expect(a.a * a.h).toBeLessThan(b.a * b.h);
           }
+          // and pads of one tier share one k too, each cushion's area per leaf over its pad's tier squared, a cushion with fewer
+          // leaves the smaller across them as well (pads at different tiers are held to their tier's width, or wider where
+          // that will not hold their leaves or the pad above them, so only their widths are compared, below)
+          const tierOf = (pid: string) => f.pads.find((q) => q.pid === pid && q.tree === tree)!.tier, nk = (c: { a: number; h: number; n: number; pid: string }) => per(c) / tierOf(c.pid) ** 2;
+          for (const a of cs) for (const b of cs) if (a.pid !== b.pid && Math.abs(tierOf(a.pid) - tierOf(b.pid)) < 0.005) {
+            expect(nk(a) / nk(b), width + 'px ' + a.pid + ' ' + a.role + ' against ' + b.pid + ' ' + b.role + ', one tier').toBeLessThan(1.03);
+            if (a.n < b.n) expect(a.a * a.h / tierOf(a.pid) ** 2, width + 'px ' + a.pid + ' ' + a.role + ' against ' + b.pid + ' ' + b.role + ', one tier').toBeLessThan(b.a * b.h / tierOf(b.pid) ** 2);
+          }
           const pads = f.pads.filter((q) => q.tree === tree).sort((a, b) => a.h - b.h);
           for (let i = 1; i < pads.length; i++) expect(pads[i]!.PW, width + 'px ' + pads[i]!.pid + ' against the pad below it').toBeLessThanOrEqual(1.05 * pads[i - 1]!.PW);
           for (const q of pads) expect(q.PW, width + 'px ' + q.pid + ' as wide as its leaves ask at its tier').toBeGreaterThanOrEqual(Math.max(3.2 * q.L, Math.min(12 * q.L, q.n * 1.6 * q.L)) * q.tier - 0.01);
@@ -2156,7 +2164,7 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('puts the headline journey in the crown, its crest the largest, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
+  it('puts the headline journey in the crown, its crest at most three quarters across the widest cushion below it, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
     const bushy = await grownBushy();
     const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });

@@ -5,7 +5,7 @@
  *
  * The wood is one material. The trunk is the change, so every journey grows from it, even one that shares
  * no code with the others. The headline journey (the first that failed, else the one the spec names most, else
- * the one with the most scenarios) is the crown, its crest the largest on the tree; the others branch below it,
+ * the one with the most scenarios) is the crown, the smallest pad, at the apex; the others branch below it,
  * the one with the most scenarios lowest (branches on the outside of curves, alternating, the apex leaning back
  * over the roots). A change with one journey grows that journey's
  * guards and failures as branches of their own. Pads are clumps of foliage, one per leaf: the happy path on
