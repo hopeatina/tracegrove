@@ -2556,8 +2556,16 @@ describe('Grow page', () => {
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
    *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
   const ramify = () => {
-    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }> };
-    for (const T of L.trees) for (const b of T.br) { out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk); }
+    const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, svg = B.svg as SVGSVGElement, out = { branches: [] as number[], ends: [] as number[], holds: [] as number[], risers: [] as Array<{ id: string; forks: number }>, fillets: [] as Array<{ id: string; along: number[] }>, cushions: [] as Array<{ pid: string; k: number; n: number }> };
+    for (const T of L.trees) for (const b of T.br) {
+      out.branches.push(b.b / b.Tk, b.w[0] / b.Tk); out.ends.push(b.w[b.w.length - 1] / b.Tk);
+      // its girth a caliper and a half (of its own) past the trunk's side, against its collar's
+      const s = b.Tk / 2 + 1.5 * b.b; let i = 1; while (i < b.acc.length - 1 && b.acc[i] < s) i++;
+      out.holds.push(b.w[i] / b.b);
+      // a raised crest's riser: how many limbs fork off it no more than three fifths of the way from its foot to the crest
+      const rz = (b.twigs ?? []).find((t: any) => t.lb), cr = T.pads[b.id]?.geo.cs.find((c: any) => c.role === 'crest' && c.seat === null);
+      if (rz && cr) { const y0 = rz.pts[0][1], yb = b.o[1] + cr.b; out.risers.push({ id: b.id, forks: (b.twigs as any[]).filter((t) => t.c && t.c.pts === rz.pts && (y0 - rz.pts[t.bi][1]) / ((y0 - yb) || 1) <= .6).length }); }
+    }
     // a point and the arc length along a polyline, both ways
     const acc = (p: number[][]) => p.reduce((a: number[], q, i) => (a.push(i ? a[i - 1]! + Math.hypot(q[0]! - p[i - 1]![0]!, q[1]! - p[i - 1]![1]!) : 0), a), []);
     const proj = (p: number[][], q: number[]) => { const A = acc(p); let best = Infinity, s = 0; for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, vx = c[0]! - a[0]!, vy = c[1]! - a[1]!, l = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q[0]! - a[0]!) * vx + (q[1]! - a[1]!) * vy) / l)), d = Math.hypot(q[0]! - a[0]! - vx * t, q[1]! - a[1]! - vy * t); if (d < best) { best = d; s = A[i - 1]! + t * Math.sqrt(l); } } return s; };
@@ -2585,9 +2593,10 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('grows each branch about four tenths of its trunk, filleted into it, onto ramified wood: two or more forked twigs under every cushion, showing below its underside', async () => {
+  it('grows each branch about four tenths of its trunk, holding that girth a caliper and a half past its collar, filleted into it, onto ramified wood: a raised crest on a short forked riser, two or more forked twigs under every cushion, showing below its underside', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
+    let risers = 0;
     try {
       for (const [file, name] of recorded) {
         const page = await growPage(browser, server.url, folded(file), 1440);
@@ -2598,6 +2607,11 @@ describe('Grow page', () => {
         for (const q of r.branches) { expect(q, name + ' branch/trunk').toBeGreaterThanOrEqual(.36); expect(q, name + ' branch/trunk').toBeLessThanOrEqual(.45); }
         // and tapers to about .15 of it in its pad
         for (const q of r.ends) { expect(q, name + ' branch end/trunk').toBeGreaterThanOrEqual(.12); expect(q, name + ' branch end/trunk').toBeLessThanOrEqual(.18); }
+        // holding its collar's girth for a caliper and a half of its own past the trunk's side before it tapers
+        for (const q of r.holds) expect(q, name + ' branch girth held past its collar').toBeGreaterThanOrEqual(.97);
+        // a raised crest stands on a short riser that forks, two limbs or more off it in its lower three fifths, never one long pole
+        for (const q of r.risers) expect(q.forks, name + ' forks off the riser under ' + q.id).toBeGreaterThanOrEqual(2);
+        risers += r.risers.length;
         // each limb's two fillets are round its collar with a radius of about 1.2 of its base girth, on the parent and on itself
         // (read back off the drawn outline, so to within an eighth where the parent bends)
         expect(r.fillets.length, name).toBeGreaterThan(1);
@@ -2611,6 +2625,8 @@ describe('Grow page', () => {
         await page.close();
       }
     } finally { await browser.close(); }
+    // (a recorded tree has a raised crest, so the riser is tested)
+    expect(risers).toBeGreaterThan(0);
   }, 60000);
 
   /** Every leaf that hangs as drawn: how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten

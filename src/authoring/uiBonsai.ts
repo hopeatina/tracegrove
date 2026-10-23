@@ -677,8 +677,9 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     pad, and runs on under the pad, where three to five branchlets fork up into the foliage they carry. */
  const br=items.map((it,i)=>{const h=hs[i],dir=side[i];const k=gbNear(ty,h);const P0=tp[k],Tk=tw[k];const pd=padList[i+1],g=pd.geo;
   /* a branch leaves at about four tenths of the trunk's girth there (never under .36 of it or over .45, the heavier journey
-     the thicker): that is its girth where it meets the trunk, its collar; past the collar it is a sixth less, and it tapers
-     along its whole run, fastest near the trunk, to about .15 of the trunk's girth in its pad, never to a thread */
+     the thicker): that is its girth where it meets the trunk, its collar, and it holds it for a caliper and a half of its own
+     past the trunk's side before it tapers, fastest there, along the rest of its run to about .15 of the trunk's girth in
+     its pad, never to a thread */
   const b=Tk*Math.max(.36,Math.min(.45,.45*Math.sqrt(it.w/Wat(h-.04))));
   const inner=Tk/2+(back[i]?.03*H:bare(it));
   /* the branch runs out under its pad and ends inside its outer cushion, so the foliage is held by wood all the way out and
@@ -689,7 +690,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
    :[P0,[P0[0]+dir*.22*R,P0[1]+(dr+b1)*R*.9],[P0[0]+dir*.5*R,P0[1]+(dr*.4-b2)*R],[P0[0]+dir*.76*R,P0[1]-rise*R*.45+b1*R*.3],[P0[0]+dir*R,P0[1]-rise*R]];
   const ph=gbRng(gbHash(key+':'+it.id))()*6.28;const raw=back[i]?gbBez(cpb,44):gbResample(gbSmooth(cpb,3),44);
   const pts=raw.map((q,ii)=>{const t=ii/44,n=gbNorm(raw,ii),d=.012*R*Math.sin(t*7+ph)*Math.sin(t*Math.PI);return[q[0]+n[0]*d,q[1]+n[1]*d]});
-  const wOf=a=>{const l=a[a.length-1];return a.map(d=>{const u=d/l,out=Math.max(0,d-Tk/2);return Math.max(2.5,b/1.2*(.45+.55*Math.pow(1-u,1.3))*(1+.2*Math.exp(-out/6)))})};
+  const wOf=a=>{const l=a[a.length-1],hold=1.5*b,run=Math.max(1,l-Tk/2-hold),end=.15*Tk;return a.map(d=>{const v=Math.max(0,Math.min(1,(d-Tk/2-hold)/run));return Math.max(2.5,end+(b-end)*Math.pow(1-v,1.3))})};
   let acc=gbLen(pts),len=acc[acc.length-1],w=wOf(acc);
   /* Each cushion sits on ramified wood: the branch runs out under every cushion it carries, its top seven pixels under the
      cushion's lowest edge, and two or three forked twigs rise from it into the foliage between, the leaves' own twigs
@@ -700,12 +701,17 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   if(cl.seat!==null){const x0=cx+cl.x-dir*.45*cl.a,up=tip[1]-(o[1]+cl.b-.3*cl.h),span=(tip[0]-x0)*dir;
    if(up>0&&span>1){for(const q of pts){const f=Math.max(0,Math.min(1,(q[0]-x0)*dir/span));q[1]-=up*f*f*(3-2*f)}acc=gbLen(pts);len=acc[acc.length-1];w=wOf(acc)}}
   /* A crest raised over shoulders stands on a riser: a secondary branch leaving the wood further in and rising out at about
-     sixty degrees into the crest's foot, from which its leaves' twigs fork. */
+     sixty degrees toward the crest's foot, never one long pole: about two fifths of the way up (and at least twelve pixels
+     under the crest) it forks, a thinner leader running on into the crest's foot, from which its leaves' twigs fork, and two
+     side forks of unequal length spreading thirty to forty-five degrees either way up into the crest. */
   const cr=g.cs.find(c=>c.role==='crest'&&c.seat===null);let rz=null;
   if(cr){
    const yb=o[1]+cr.b,E0=[o[0]+cr.x+dir*.06*cr.a,yb-.36*cr.h],ri=near(E0[0]-dir*Math.min(.62*(pts[near(E0[0])][1]-E0[1]),.6*cr.a)),S0=pts[ri],dx=E0[0]-S0[0],dy=S0[1]-E0[1];
-   const rp=gbBez([S0,[S0[0]+dx*.5,S0[1]-dy*.3],[E0[0]-dx*.12,E0[1]+dy*.45],E0],14),w0=Math.max(3,w[ri]*.68);
-   rz={pts:rp,w:rp.map((_,j)=>Math.max(1.8,w0*(1-.45*j/14))),bi:ri,lo:rp.findIndex(q=>q[1]<yb+2)}}
+   const rp=gbBez([S0,[S0[0]+dx*.5,S0[1]-dy*.3],[E0[0]-dx*.12,E0[1]+dy*.45],E0],14),w0=Math.max(3,w[ri]*.68),yF=Math.max(S0[1]-.4*(S0[1]-yb),yb+12);
+   const jF=Math.max(3,Math.min(10,rp.findIndex(q=>q[1]<yF)-1)),wF=w0*(1-.2*jF/14);
+   rz={pts:rp,w:rp.map((_,j)=>j<=jF?Math.max(1.8,w0*(1-.2*j/14)):Math.max(1.8,wF*.72*(1-.45*(j-jF)/(14-jF)))),bi:ri,lo:rp.findIndex(q=>q[1]<yb+2),jF};
+   const F=rp[jF];rz.fks=[[-dir,.32,.22],[dir,.24,.16]].map(([sd,ax,ay])=>{const T=[E0[0]+sd*ax*cr.a,yb-ay*cr.h],q=gbBez([F,[F[0]+(T[0]-F[0])*.25,F[1]-(F[1]-T[1])*.4],[T[0]-(T[0]-F[0])*.15,T[1]+(F[1]-T[1])*.3],T],10),w1=Math.max(1.5,wF*.6);
+    return {pts:q,w:q.map((_,j)=>w1+(1.1-w1)*j/10),bi:jF,c:rz,fk:1}})}
   /* each cushion's forked twigs: off the branch under a seated one, two (three under three leaves or more, or a wide one)
      spread across where the wood runs at least five pixels under it; off the riser a raised crest stands on, two from the
      last point of it that far under the crest, fanning either way. They are the cushion's own wood: its leaves' twigs still
@@ -717,7 +723,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   const twigs=gbLeafTwigs(g,o,(k,hang)=>!hang&&g.cs[k]===cr&&rz?{pts:rz.pts,w:rz.w,lo:Math.max(1,rz.lo),dir}:{pts,w,lo:b0(),dir});
   for(const t of twigs){if(rz&&!t.hang&&g.cs[t.k]===cr)t.c=rz;t.at=(t.c?t.c.bi:t.bi)/(pts.length-1)}
   for(const k in fk)for(const pr of fk[k])for(const t of pr){t.k=+k;t.at=(t.c&&t.fk===1?t.c.bi:t.fk===1?t.bi:t.c.bi)/(pts.length-1)}
-  twigs.unshift(...Object.values(fk).flat(2));if(rz)twigs.unshift({pts:rz.pts,w:rz.w,bi:rz.bi,k:g.cs.indexOf(cr),at:rz.bi/(pts.length-1),lb:1});
+  twigs.unshift(...Object.values(fk).flat(2));if(rz){for(const t of rz.fks){t.k=g.cs.indexOf(cr);t.at=rz.bi/(pts.length-1)}twigs.unshift({pts:rz.pts,w:rz.w,bi:rz.bi,k:g.cs.indexOf(cr),at:rz.bi/(pts.length-1),lb:1},...rz.fks)}
   function b0(){return Math.max(1,acc.findIndex(d=>d>=Tk*.5))+2}
   return {it,j:it.j,id:it.id,pol:it.pol,i,h,dir,k,back:back[i],pts,w,len,acc,R,inner,exit:Math.max(1,acc.findIndex(d=>d>=Tk*.5)),tip:pts[pts.length-1],b,Tk,o,twigs}});
  const pads={},origin={};for(const pd of padList){pads[pd.id]=pd;if(!pd.crown){pd.b=br[pd.i];origin[pd.id]=pd.b.o}}
@@ -1346,9 +1352,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    const grow1=(pl,k0,wd,uids,kid,routeOf,lo,pref,bs,tf,limb,dp)=>{let best=null;const n1=pl.length-1,acc=gbLen(pl),step=acc[n1]/n1,jA=(gbHash('sha:'+kid)-.5)*12,jL=1+(gbHash('shl:'+kid)-.5)*.3;
     const c=uids.reduce((a,id)=>a+own(id).length,0),nl=Math.max(1,Math.min(c,4));
     /* a knot's shoot comes from its boss; a sucker or a shoot on no knot from the trunk, as near where it was asked as it can */
-    /* (out of the boss's rim, at the bark; where nothing can grow from there, from a little deeper in the boss) */
+    /* (out of the boss's rim, at the bark; where nothing can grow from there, from a little deeper in the boss; and where its
+       limb, held thick past its collar, is too deep to clear from there, from the boss's inner rim, over the limb's bark) */
     const inPad=r=>padBox.slice(0,nPad).reduce((a,q)=>a+ov(r,q),0)>.2*(r[2]-r[0])*(r[3]-r[1]);
-    for(const bf of bs?[.8,.55]:[0]){if(best&&!best.o&&!inPad(best.r))break;best=null;
+    for(const bf of bs?[.8,.55,-.8]:[0]){if(best&&!best.o&&!inPad(best.r))break;best=null;
     for(const off of bs?[0]:[0,6,-6,12,-12,18,-18,24,-24,32,-32,40,-40,50,-50,60,-60,72,-72,84,-84]){const kk=Math.max(lo,Math.min(n1-2,k0+Math.round(off/step)));const a=pl[kk],n=gbNorm(pl,kk),wk=wd[kk];
      /* the outside of the bend: away from the middle of the chord across it; where the wood runs straight, the asked side */
      const ka=pl[Math.max(0,kk-6)],kb=pl[Math.min(n1,kk+6)],cv=(a[0]-(ka[0]+kb[0])/2)*n[0]+(a[1]-(ka[1]+kb[1])/2)*n[1];
@@ -1476,12 +1483,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    for(const uid in M.buds)for(const x of M.buds[uid])if(x.scenarioKind==='regression'){const id=x.unit||uid,kn=T.knots.find(q=>q.ids.includes(id)),rt=!kn&&L.roots.find(r=>r.id===id&&r.tree===ti),kk=kn?'k:'+kn.id:rt?'r:'+id:'';if(!by.has(kk))by.set(kk,[]);by.get(kk).push(x)}
    for(const [kk,xs] of by){const kn=kk[0]==='k'?T.knots.find(q=>'k:'+q.id===kk):null,rt=kk[0]==='r'?L.roots.find(r=>'r:'+r.id===kk):null,b=kn&&kn.bid?T.br.find(x=>x.id===kn.bid):null;
     const P=b?b.pts.map(sh):rt?rt.pts:tp,W=b?b.w:rt?rt.w:T.tw,acc=gbLen(P),k0=kn?kn.k:Math.round((rt?.3:.8)*(P.length-1)),R=4,sd0=kn?Math.sign(kn.off)||1:0,gap=kn?kn.ra+R+1.7+(kn.pin?5:0):0;/* (a collar knot's a little further off, clear of its branch's foot) */
-    const at=s0=>{const d=acc[k0]+s0;if(d<4||d>acc[acc.length-1]-4)return null;let j=1;while(j<P.length-1&&acc[j]<d)j++;const f=Math.min(1,(d-acc[j-1])/((acc[j]-acc[j-1])||1)),nn=gbNorm(P,j),wj=W[j-1]+(W[j]-W[j-1])*f;if(wj<4)return null;
+    const at=s0=>{const d=acc[k0]+s0;if(d<(b?b.Tk/2+R+1:4)||d>acc[acc.length-1]-4)return null;let j=1;while(j<P.length-1&&acc[j]<d)j++;const f=Math.min(1,(d-acc[j-1])/((acc[j]-acc[j-1])||1)),nn=gbNorm(P,j),wj=W[j-1]+(W[j]-W[j-1])*f;if(wj<4)return null;
      const sd=sd0||(nn[1]<0?1:-1),o=sd*(wj/2-1.2),c=[P[j-1][0]+(P[j][0]-P[j-1][0])*f+nn[0]*o,P[j-1][1]+(P[j][1]-P[j-1][1])*f+nn[1]*o];c.n=[nn[0]*sd,nn[1]*sd];c.t=[nn[1],-nn[0]];return c};
     /* strung along the grain outward from the boss, each as clear of the boss as of the next, on one side and, when that
        side is full, on the other; where the wood between its neighbours is short, the first tucked against the boss's own
        rim, then closer together, never nearer than two of their radii. A side that meets another knot is full: a bud never
-       stands past a neighbour, nearer it than its own */
+       stands past a neighbour, nearer it than its own, nor on a branch's foot inside the trunk */
     const kel=kn&&B.knot[kn.ids[0]],route=kel?kel.__route:P.slice(0,k0+1).reverse(),want=Math.min(5,xs.length);let done=[];
     /* (a knot's shoot or dormant stub rises from it: its graft buds take the side of the boss away from it) */
     const sg=kn&&[...(B.shootGeo||[]),...(B.shootRest||[])].find(g=>g.kid===kn.id),sq=sg&&(sg.pts?sg.pts[Math.min(3,sg.pts.length-1)]:sg.tip),c1=sq&&at(gap),c2=sq&&at(-gap);
@@ -2250,11 +2257,15 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    /* (under the pot: below everything drawn there, its roots' names too, under the pot's middle and inside the drawing) */
    if(!got){const y0=L.y1+4*k,x0=Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,L.potC-bw/2));got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
    /* a pip keeps 8px from a count bud, a graft bud or a shoot: it moves off the boss along the limb's normal as little as that
-      takes, else (where shoots crowd the wood) the least distance any way round */
-   const gu=8.5/(V.hf||1),pe=pr+.5,far=c=>budB.every(b=>Math.hypot(Math.max(b[0]-c[0]-pe,0,c[0]-pe-b[2]),Math.max(b[1]-c[1]-pe,0,c[1]-pe-b[3]))>=gu);
+      takes, else (where shoots crowd the wood) the least distance any way round; always still on its wood, never adrift
+      beside it, and never further in across its limb than the boss stands (where no such place keeps that clear, the one that
+      keeps clearest) */
+   const gu=8.5/(V.hf||1),pe=pr+.5,clr=c=>Math.min(1e9,...budB.map(b=>Math.hypot(Math.max(b[0]-c[0]-pe,0,c[0]-pe-b[2]),Math.max(b[1]-c[1]-pe,0,c[1]-pe-b[3])))),far=c=>clr(c)>=gu;
    const boss=e=>{let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const m=Math.hypot(v[0],v[1]);v=m>.5?[v[0]/m,v[1]/m]:[e.n[0],e.n[1]];
-    for(let d=0;d<=40*k;d+=.5)for(const sg of d?[1,-1]:[1]){const c=[e.p[0]+v[0]*d*sg,e.p[1]+v[1]*d*sg];if(far(c))return c}
-    for(let d=.5;d<=60*k;d+=.5)for(const u of D16){const c=[e.p[0]+u[0]*d,e.p[1]+u[1]*d];if(far(c))return c}return e.p};
+    const on=c=>Math.hypot(c[0]-e.p[0],c[1]-e.p[1])<e.ra+pe-1||caps.some(q=>q.tag==='wood'&&gbSegD(c,c,q.a,q.b)<q.r-3+pe-1),o0=Math.min(m,e.ra);let bst=null,bc=-1;
+    const ok=c=>{if(!on(c)||(c[0]-e.p0[0])*v[0]+(c[1]-e.p0[1])*v[1]<o0-.5)return false;if(far(c))return true;const cv=clr(c);if(cv>bc){bc=cv;bst=c}return false};
+    for(let d=0;d<=40*k;d+=.5)for(const sg of d?[1,-1]:[1]){const c=[e.p[0]+v[0]*d*sg,e.p[1]+v[1]*d*sg];if(ok(c))return c}
+    for(let d=.5;d<=60*k;d+=.5)for(const u of D16){const c=[e.p[0]+u[0]*d,e.p[1]+u[1]*d];if(ok(c))return c}return bst||e.p};
    got.forEach((o,i)=>{const r=o.r;labs.push(r);const c=boss(o.q.e);pip.set(o.q.e.id,{n:n0+i+1,sh:o.sh||0,x:o.x+2*pr+gap,yb:o.yb,anc:'start',r,cx:o.x+pr,cy:o.yb-.3*fs,bx:c[0],by:c[1],ids:kIds(o.q.e)})})}
   return {slot:best.slot,pip,ext}};
  (B.kplace=B.kplace||[]).push(run)}
