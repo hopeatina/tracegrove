@@ -2035,12 +2035,33 @@ describe('Grow page', () => {
           }
           // and pads of one tier share one k too, each cushion's area per leaf over its pad's tier squared, a cushion with fewer
           // leaves the smaller across them as well (pads at different tiers are held to their tier's width, or wider where
-          // that will not hold their leaves or the pad above them, so only their widths are compared, below)
+          // that will not hold their leaves or the pad above them, so their k is not compared, only their widths, below)
           const tierOf = (pid: string) => f.pads.find((q) => q.pid === pid && q.tree === tree)!.tier, nk = (c: { a: number; h: number; n: number; pid: string }) => per(c) / tierOf(c.pid) ** 2;
           for (const a of cs) for (const b of cs) if (a.pid !== b.pid && Math.abs(tierOf(a.pid) - tierOf(b.pid)) < 0.005) {
             expect(nk(a) / nk(b), width + 'px ' + a.pid + ' ' + a.role + ' against ' + b.pid + ' ' + b.role + ', one tier').toBeLessThan(1.03);
             if (a.n < b.n) expect(a.a * a.h / tierOf(a.pid) ** 2, width + 'px ' + a.pid + ' ' + a.role + ' against ' + b.pid + ' ' + b.role + ', one tier').toBeLessThan(b.a * b.h / tierOf(b.pid) ** 2);
           }
+          // and across the whole tree, as it always was, the crown's crest apart: a cushion with fewer leaves is the smaller
+          // in area, whichever pads the two are on. Where the one with fewer leaves sits on the same tier as the other or a
+          // higher, narrower one, the tiers only make that surer, so it holds for every such pair. Where it sits lower it holds
+          // too, unless the pads' own rules are what hold its pad wider than its leaves ask: as wide as a pad above it that holds
+          // more leaves (no pad wider than the one below it), its widest cushion as wide as a pad above's widest that holds more
+          // leaves (beside a desktop tree no cushion wider than one below), or that cushion grown to the crown's crest's cap
+          // (the crest at most three quarters across it)
+          const padOf = (pid: string) => f.pads.find((q) => q.pid === pid && q.tree === tree)!;
+          const plain = cs.filter((c) => !(c.crown && c.role === 'crest')), crest = cs.find((c) => c.crown && c.role === 'crest');
+          const top = (pid: string) => cs.filter((c) => c.pid === pid).reduce((m, c) => (c.a > m.a ? c : m));
+          const held = (pid: string) => {
+            const p = padOf(pid), w = top(pid);
+            return f.pads.some((q) => q.tree === tree && q.h > p.h && ((q.n > p.n && p.PW <= 1.01 * q.PW) || (top(q.pid).n > w.n && w.a <= 1.01 * top(q.pid).a)))
+              || (!!crest && Math.abs((0.75 * w.a) / crest.a - 1) <= 0.01);
+          };
+          let across = 0;
+          for (const a of plain) for (const b of plain) if (a.n < b.n && (tierOf(a.pid) <= tierOf(b.pid) + 0.005 || !held(a.pid))) {
+            if (a.pid !== b.pid) across++;
+            expect(a.a * a.h, width + 'px ' + a.pid + ' ' + a.role + ' of ' + a.n + ' against ' + b.pid + ' ' + b.role + ' of ' + b.n + ', across the tree').toBeLessThan(b.a * b.h);
+          }
+          if (new Set(plain.map((c) => c.pid)).size > 1) expect(across, width + 'px pairs of cushions on different pads compared').toBeGreaterThan(0);
           const pads = f.pads.filter((q) => q.tree === tree).sort((a, b) => a.h - b.h);
           for (let i = 1; i < pads.length; i++) expect(pads[i]!.PW, width + 'px ' + pads[i]!.pid + ' against the pad below it').toBeLessThanOrEqual(1.05 * pads[i - 1]!.PW);
           for (const q of pads) expect(q.PW, width + 'px ' + q.pid + ' as wide as its leaves ask at its tier').toBeGreaterThanOrEqual(Math.max(3.2 * q.L, Math.min(12 * q.L, q.n * 1.6 * q.L)) * q.tier - 0.01);
