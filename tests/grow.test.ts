@@ -2271,7 +2271,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
-  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a pale leaf under a dashed rim, never a hole, the lists and the legend marking a leaf to prove as the tree does and no flow yet with a dashed rim', async () => {
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a pale leaf under a dashed rim, never a hole, the lists and the legend marking a leaf to prove and one with no flow yet as the tree does', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
@@ -2330,13 +2330,13 @@ describe('Grow page', () => {
           expect(l.stroke, width + 'px no-flow leaf with no rim').not.toBeNull();
           expect(l.stroke!.L - look.bg.L, width + 'px no-flow rim against the page').toBeGreaterThan(30);
         }
-        // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as a dashed rim
-        // over the page, never a filled leaf
+        // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as the tree
+        // does too: a pale leaf under a dashed rim, never a hole
         const marks = await page.evaluate(() => {
           const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
           // (what a mark sits on: the nearest box under it that paints a background)
           const back = (e: Element) => { for (let a = e.parentElement; a; a = a.parentElement) { const v = lab(getComputedStyle(a).backgroundColor); if (v) return v; } return bg; };
-          const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { where: e.closest('.gw-legend') ? 'legend' : e.closest('.gw-g') ? 'list' : 'other', fill: lab(c.fill), stroke: lab(c.stroke), dash: c.strokeDasharray, back: back(e) }; });
+          const each = (sel: string) => Array.from(document.querySelectorAll(sel)).map((e) => { const c = getComputedStyle(e); return { where: e.closest('.gw-legend') ? 'legend' : e.closest('.gw-g') ? 'list' : 'other', raw: c.fill, fill: lab(c.fill), stroke: lab(c.stroke), dash: c.strokeDasharray, back: back(e) }; });
           return { bg, prove: each('.gw-sw .lf.in'), none: each('.gw-sw .lf.none') };
         });
         expect(marks.prove.filter((l) => l.where === 'legend').length, width + 'px the legend’s mark to prove').toBeGreaterThan(0);
@@ -2356,7 +2356,11 @@ describe('Grow page', () => {
         for (const l of marks.none) {
           const at = width + 'px ' + l.where + ' mark for no flow yet';
           expect(l.dash, at + ' rim').not.toBe('none');
-          if (l.fill) expect(Math.abs(l.fill.L - l.back.L), at + ' over the page').toBeLessThanOrEqual(3);
+          expect(l.raw, at + ' with no fill').not.toBe('none');
+          expect(l.fill, at + ' with a clear fill').not.toBeNull();
+          expect((l.fill?.lum ?? -1) - Math.max(marks.bg.lum, l.back.lum), at + ' against the page').toBeGreaterThan(0.3);
+          // (the same paint as the tree's own leaf with no flow yet)
+          for (const k of ['L', 'a', 'b'] as const) expect(Math.abs(l.fill![k] - look.none[0]!.paint![k]), at + ' ' + k + '* against the tree’s').toBeLessThanOrEqual(2);
         }
         await page.close();
       }
