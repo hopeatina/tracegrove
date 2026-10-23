@@ -617,17 +617,23 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* The canopy is a scalene triangle, the lowest branch the heaviest and the apex the lightest. Each pad is as wide as its
     leaves ask, clamp(n x 1.6 leaves, 3.2, 12 leaves) (two pitches of eight tenths of a leaf each), times its tier: 1 at the lowest branch, .7 at the apex; never narrower
     than holds its leaves. Then no pad is wider than the one below it (where the upper one is wider than its tier asks, to
-    hold its leaves, the lower grows to match), the apex is at most three quarters across the widest pad below it, and the
+    hold its leaves, the lower grows to match), nor (beside a desktop tree) is any of its cushions wider than the widest
+    cushion of a pad below it, the apex is at most three quarters across the widest pad below it, and the
     crown's crest is at most three quarters across the widest cushion below it (the pad with that cushion grows to match, and those under it with it). A pad's
     width is linear in its size, so each is drawn at the size that gives it its width. */
  if(m){const hOf=pd=>pd.crown?1:hs[pd.i],hLo=Math.min(...padList.map(hOf)),up=padList.slice().sort((a,b)=>hOf(b)-hOf(a)),tier=pd=>1-.3*(hOf(pd)-hLo)/((1-hLo)||1);
   const want=pd=>{const L=pd.geo.L,n=pd.geo.cs.reduce((a,c)=>a+c.ids.length,0);return Math.max(3.2*L,Math.min(12*L,n*1.6*L))*tier(pd)};
   const fit=new Map(padList.map(pd=>[pd,{k:pd.geo.need,PW:pd.geo.PW}])),wd=new Map(padList.map(pd=>[pd,Math.max(want(pd),pd.geo.PW)]));
-  for(let it=0;it<4;it++){for(let q=1;q<up.length;q++)wd.set(up[q],Math.max(wd.get(up[q]),wd.get(up[q-1])));
+  const ca=pd=>Math.max(...pd.geo.cs.map(c=>c.a));
+  for(let it=0;it<8;it++){for(let q=1;q<up.length;q++)wd.set(up[q],Math.max(wd.get(up[q]),wd.get(up[q-1])));
    if(up.length>1){const lo=up[up.length-1],w0=wd.get(up[0]),wm=Math.max(...up.slice(1).map(pd=>wd.get(pd)));if(w0>.75*wm)wd.set(lo,Math.max(wd.get(lo),w0/.75*1.002))}
    for(const pd of padList){const f=fit.get(pd);pd.geo=pgeo(pd,f.k*wd.get(pd)/f.PW)}
-   const c0=cpd.geo.cs.find(c=>c.role==='crest'),bm=Math.max(0,...padList.slice(1).flatMap(pd=>pd.geo.cs.map(c=>c.a)));if(!c0||c0.a<=.75*bm)break;
-   const ca=pd=>Math.max(...pd.geo.cs.map(c=>c.a)),lo=up.slice(1).reduce((a,pd)=>ca(pd)>ca(a)?pd:a);wd.set(lo,wd.get(lo)*c0.a/(.75*ca(lo))*1.002)}}
+   /* (and beside a desktop tree, cushion by cushion, from the top down: no pad's widest cushion is wider than the widest
+      of a pad under it, the lower growing to match; a phone's narrow tree has no room to widen its lower pads) */
+   let ok=true,mx=0;if(!M.nw)for(const pd of up){const a=ca(pd);if(a<mx*.999){wd.set(pd,wd.get(pd)*mx/a*1.002);ok=false}mx=Math.max(mx,a)}
+   const c0=cpd.geo.cs.find(c=>c.role==='crest'),bm=Math.max(0,...padList.slice(1).flatMap(pd=>pd.geo.cs.map(c=>c.a)));
+   if(c0&&c0.a>.75*bm){const lo=up.slice(1).reduce((a,pd)=>ca(pd)>ca(a)?pd:a);wd.set(lo,wd.get(lo)*c0.a/(.75*ca(lo))*1.002);ok=false}
+   if(ok)break}}
  const crc=cpd.geo.cs.find(c=>c.role==='crest'),gap=.022*H,inC=.32*crc.h-crc.bot-.035*H,lift=.02*H+6;let need=lit?.84*H:m<=1?.22*H:m<=2?.27*H:.38*H;
  /* the crown clears the pads below it; when it stands clear of them to the side it need only rise above their middle, so the
     upper trunk is not a bare pole (tried first, and kept only if nothing then overlaps) */

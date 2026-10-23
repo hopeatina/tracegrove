@@ -1949,6 +1949,9 @@ describe('Grow page', () => {
     if (lowPW && crown.geo.PW > 0.75 * lowPW + 0.01) bad('the crown over three quarters of the widest pad below it', [crown.geo.PW, lowPW]);
     const up = mine.slice().sort((a, b) => (a.crown ? 1 : a.b.h) - (b.crown ? 1 : b.b.h));
     for (let i = 1; i < up.length; i++) if (up[i].geo.PW > 1.05 * up[i - 1].geo.PW) bad('a pad wider than the one below it', [up[i].id, up[i].geo.PW, up[i - 1].id, up[i - 1].geo.PW]);
+    // and cushion by cushion: no pad's widest cushion wider than the widest cushion of any pad below it
+    const ca = (P: any) => Math.max(...P.geo.cs.map((c: any) => c.a));
+    if (!B.L.narrow) for (let i = 1; i < up.length; i++) { const lo = Math.max(...up.slice(0, i).map(ca)); if (ca(up[i]) > lo + 0.01) bad('a cushion wider than any of a pad below it', [up[i].id, Math.round(2 * ca(up[i])), Math.round(2 * lo)]); }
     // the crown in tiers: its crest on its riser above its shoulders, and (beside a desktop tree; on a phone it stays one
     // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each narrower than its crest
     // where they hold its happy paths
@@ -2025,7 +2028,7 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('puts the headline journey in the crown, its crest the largest, on wood sized from the data, with leaves that lead', async () => {
+  it('puts the headline journey in the crown, its crest the largest, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
     const bushy = await grownBushy();
     const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
