@@ -162,13 +162,13 @@ export const BONSAI_CSS = String.raw`
 @media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.7}.gb .rt.ext .w{stroke:color-mix(in srgb,var(--rt-ext) 55%,#fff);stroke-opacity:.9;stroke-width:.8}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}}
  /* the lit route is sap in the wood: an amber band about three tenths of the girth wide with a soft halo round it and a fine
     cream core along its spine, so it reads as a glow on the bark on a light page and a dark one; where it broke, the wood
-    itself is red (gbRed), the same band in red */
+    itself is red (gbRed), a band about half the girth, feathered in and out */
 .gw-svg.gb{--sap:#E9A23B;--sap-core:#FFF3D6;--sap-red:#D63A28}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
 .gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.5px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
-.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{fill:var(--sap-red)}
+.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .rs{stop-color:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
@@ -2043,7 +2043,7 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);
  /* (a spur up the leader to a reached hop above the route, gbSpur, is the same sap: its band and its core line) */
  if(!B.sapS){B.sapS=sv('path',{class:'sap spur',d:''});B.sap.after(B.sapS)}
- const rib=d?gbRibbon(B,d,.33,1.4,9,sq)+(ds?' '+gbRibbon(B,ds,.33,1.4,9,false):''):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);B.sapS.setAttribute('d',d?ds:'');gbRed(B,dw)}
+ const rib=d?gbRibbon(B,d,.33,1.4,9,sq,sq&&dw?GB_REDK-.03:0)+(ds?' '+gbRibbon(B,ds,.33,1.4,9,false):''):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);B.sapS.setAttribute('d',d?ds:'');gbRed(B,dw)}
 /* The wood a leaf's sap runs through on its way down: from where its stalk meets its cushion, down the twig that carries
    that cushion (or, for the outer cushion, to the branch's end inside it), along the branch's centre line to the trunk
    (round a fillet as wide as the branch, not a corner), and down the trunk's centre line. Without a cushion it joins the
@@ -2163,8 +2163,12 @@ const gbSubs=d=>String(d||'').split('M').map(t=>t.trim()).filter(Boolean).map(t=
    it so it tapers where the wood does (widening at once where it enters thicker wood, narrowing over a few pixels where it
    leaves it) and never more than seven tenths of the wood it runs in, nor so wide that an edge would leave the wood (at a
    join, where it cuts the corner), with round ends; with sq, the last run's end is cut square (where the red begins). */
-function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
-  const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g)))),w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return Math.min(wc[i],Math.max(w0[i],s/c))});
+function gbRibbon(B,d,k,mn,mx,sq,ke){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
+  const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g))));
+  /* (where the band ends square and hands on to the red, ke: over its last girth it widens to ke of the girth, so the amber
+     meets the red at the red's own width) */
+  if(sq&&last&&ke){const T=a[a.length-1],Lr=Math.max(6,G[n]);for(let i=0;i<=n;i++){const u=Math.max(0,Math.min(1,1-(T-T*i/n)/Lr)),s=u*u*(3-2*u);w0[i]=Math.min(wc[i],w0[i]+(Math.max(w0[i],ke*G[i])-w0[i])*s)}}
+  const w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return Math.min(wc[i],Math.max(w0[i],s/c))});
   /* where the wood is thin (a twig, or where a twig meets what carries it) each edge is checked against the wood as drawn,
      and drawn in toward the centre line until it is inside */
   const wd=B.wEls||(B.wEls=Array.from(B.svg.querySelectorAll('#gb-wood'+B.N+'>*,path.tw')).map(e=>{let b=null;try{b=e.getBBox()}catch(_){}return {e,b:b&&b.width+b.height>0?[b.x-1,b.y-1,b.x+b.width+1,b.y+b.height+1]:null}}));
@@ -2177,11 +2181,20 @@ function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const
   const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
   const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
   out+=(out?' ':'')+'M'+[...Lf,...(sq&&last?[]:cap(e,me,w[n]/2,1)),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
-/* Where it broke, the limb's own wood turns red: the same band as the amber on the same centre line (gbRibbon, three tenths
-   of the girth), so amber and red read as one stroke; flat red with no feather or blur, round at both ends, its start laid
-   over the amber's end so no wood shows between them, clipped to the bark, in the wood's own group, so the bosses on either
-   side stand over it */
-function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();const d=dw?gbRibbon(B,dw,.33,1.4,9,false):'';if(d)g.append(sv('path',{class:'sapw',d}))}
+/* Where it broke, the limb's own wood turns red: a crisp band GB_REDK of the girth wide on its centre line (the amber widens
+   to meet it, gbRibbon), each end cut square across the limb, feathered in and out along its length (each stop set where
+   the path itself reaches that share of its length), with no blur, inside the bark, in the wood's own group, so the bosses
+   on either side stand over it */
+const GB_REDK=.44;
+function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
+ for(const run of gbSubs(dw)){const A=gbLen(run),T=A[A.length-1];if(!(T>2))continue;const n=Math.max(2,Math.ceil(T/1.2)),P=gbResample(run,n);
+  const w0=P.map(q=>gbGirth(B,q)),w=w0.map((_,k)=>{let s=0,c=0;for(let j=Math.max(0,k-3);j<=Math.min(n,k+3);j++){s+=w0[j];c++}return s/c});
+  const a=P[0],e=P[n],cx=e[0]-a[0],cy=e[1]-a[1],cl=cx*cx+cy*cy||1,on=f=>{const q=P[Math.round(f*n)];return Math.max(0,Math.min(1,((q[0]-a[0])*cx+(q[1]-a[1])*cy)/cl))};
+  const id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
+  if(!gr){gr=sv('linearGradient',{id,gradientUnits:'userSpaceOnUse'},...[[0,0],[.28,1],[.72,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})));B.defs.append(gr)}
+  for(const [k,v] of [['x1',a[0]],['y1',a[1]],['x2',e[0]],['y2',e[1]]])gr.setAttribute(k,gbF(v));
+  const st=gr.querySelectorAll('stop');st[1].setAttribute('offset',gbF(on(.28)));st[2].setAttribute('offset',gbF(on(.72)));
+  g.append(sv('path',{class:'sapw',d:gbBand(P,w,GB_REDK,-GB_REDK),fill:'url(#'+id+')'}))}}
 /* Every file's name and every shoot's count, placed against one set of things to keep clear of: the wood (trunk, branches,
    twigs, roots), every cushion's outline and 4 px round it, every leaf with its stalk, the shoots and their leaves, the knots,
    the pot and the soil, the plant tags, and every other name and number. A count sits just off its shoot's tip. The names are

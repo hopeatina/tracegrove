@@ -1253,7 +1253,7 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 240000);
-  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, the same band on the same centre line, flat, crisp, round at both ends and short of the next boss, and no red in the wood at rest', async () => {
+  it('runs a lit route as sap inside the wood: an amber band about three tenths of the girth, and where it broke the wood itself turned red, about half its girth on the same centre line, feathered in and out, crisp, cut square at both ends and short of the next boss, and no red in the wood at rest', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1284,8 +1284,11 @@ describe('Grow page', () => {
         const geos = Object.keys(B.knot).map((k) => B.knot[k].__geo).filter(Boolean);
         const brk = geos.slice().sort((a: { p: number[] }, b: { p: number[] }) => Math.hypot(a.p[0]! - R.red[0][0], a.p[1]! - R.red[0][1]) - Math.hypot(b.p[0]! - R.red[0][0], b.p[1]! - R.red[0][1]))[0];
         const end = R.red[R.red.length - 1];
-        // the red's paint: its fill as written (no gradient) and as shown
-        const fills = reds.map((e) => [e.getAttribute('fill') || '', getComputedStyle(e).fill, getComputedStyle(e).opacity]);
+        // the red's paint: feathered in and out by its gradient's stops, each stop the sap's red, and no fade laid over it
+        const grad = (e: Element) => { const m = (e.getAttribute('fill') || '').match(/^url\((#[^)]+)\)$/); return Array.from((m && document.querySelector(m[1]!))?.querySelectorAll('stop') ?? []); };
+        const stops = reds.map((e) => grad(e).map((q) => Number(q.getAttribute('stop-opacity'))));
+        const stopColors = reds.flatMap((e) => grad(e).map((q) => getComputedStyle(q).stopColor));
+        const fills = reds.map((e) => [e.getAttribute('fill') || '', getComputedStyle(e).opacity]);
         // the amber's width over the last few pixels before the red begins (R.main is a point to the pixel)
         const amberEnd: number[] = [];
         for (let k = 3; k <= 8 && k < R.main.length - 1; k++) { const i = R.main.length - 1 - k, n = normal(R.main, i), [g1, g2] = reach(inside([B.sapR]), R.main[i], n); if (g1! > 0 && g2! > 0) amberEnd.push(g1! + g2!); }
@@ -1305,7 +1308,7 @@ describe('Grow page', () => {
           return h > 0 && isFinite(worst) ? Math.atan(worst) * 180 / Math.PI : 90;
         };
         const m = (B.svg as SVGSVGElement).getScreenCTM()!, mid = R.red.slice(Math.floor(R.red.length * .3), Math.ceil(R.red.length * .7) + 1).map((q: number[]) => { const s = new DOMPoint(q[0], q[1]).matrixTransform(m); return [s.x, s.y]; });
-        const out = { red, glow, fills, amberEnd, redTok: probeFill('var(--sap-red)'), dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)'), filters: reds.map((e) => getComputedStyle(e).filter), outline, outside, ends: [square('start'), square('end')], mid };
+        const out = { red, glow, stops, stopColors, fills, amberEnd, redTok: probeFill('var(--sap-red)'), dots: (B.sapX.getAttribute('d') || '').length, start: off(R.red[0], brk, 0), clear: geos.filter((g: unknown) => g !== brk).every((g: { p: number[]; n: number[]; tg: number[]; ra: number; rb: number }) => off(end, g, 4)), sap: cs(B.sapR), wood: probeFill('var(--wood)'), filters: reds.map((e) => getComputedStyle(e).filter), outline, outside, ends: [square('start'), square('end')], mid };
         return out;
       };
       // At rest, nothing pointed at and nothing pinned: no red stroke in the wood, and the wood where the scenario broke shows
@@ -1342,17 +1345,17 @@ describe('Grow page', () => {
         const lit = await pixels(browser, (await page.screenshot()).toString('base64'), r.mid);
         expect(lit.filter(hot).length, scheme + ' red on the spine when lit ' + JSON.stringify(lit)).toBeGreaterThan(0);
         await page.evaluate(() => (0, eval)('gbHover')(null));
-        // The red is the limb's own wood: inside its body, the same band as the amber (about three tenths of its girth, and
-        // within a pixel and a half of the amber's width where the amber ends) on the same spine, so amber and red read as one
-        // stroke; a crisp flat red with no blur and no gradient feather, every point of its outline inside the bark, and each
-        // end round.
+        // The red is the limb's own wood: inside its body, about half its girth wide (and within a pixel and a half of the
+        // amber's width where the amber ends) on the same spine, so amber and red read as one stroke; a crisp red with no blur,
+        // feathered in and out along its length by its gradient's stops, every point of its outline inside the bark, and each
+        // end cut square across the limb.
         expect(r.red.length, scheme).toBeGreaterThan(0);
         expect(r.amberEnd.length, scheme).toBeGreaterThan(2);
         const aw = r.amberEnd.reduce((a, b) => a + b, 0) / r.amberEnd.length, rw = r.red.reduce((a, q) => a + q[1]!, 0) / r.red.length;
         expect(Math.abs(rw - aw), scheme + ' red ' + rw.toFixed(1) + ' px wide against the amber\'s ' + aw.toFixed(1)).toBeLessThanOrEqual(1.5);
         for (const [wood, red, skew, edge] of r.red) {
-          expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.18);
-          expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.42);
+          expect(red! / wood!, scheme + ' red/girth').toBeGreaterThanOrEqual(.4);
+          expect(red! / wood!, scheme + ' red/girth').toBeLessThanOrEqual(.6);
           expect(skew!, scheme + ' red off the spine').toBeLessThanOrEqual(1.5);
           expect(skew! / wood!, scheme + ' red off the spine, of the girth').toBeLessThanOrEqual(.1);
           expect(edge!, scheme + ' red outside the wood').toBeGreaterThanOrEqual(0);
@@ -1361,13 +1364,17 @@ describe('Grow page', () => {
         for (const f of r.filters) expect(f, scheme + ' red blurred').toBe('none');
         expect(r.outline, scheme).toBeGreaterThan(10);
         expect(r.outside, scheme + ' red outline outside the bark').toBe(0);
-        for (const a of r.ends) expect(a, scheme + ' red end not round (deg off the limb’s normal)').toBeGreaterThanOrEqual(15);
-        for (const a of r.ends) expect(a, scheme + ' red end not round (deg off the limb’s normal)').toBeLessThanOrEqual(35);
-        // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, flat red all along.
+        expect(r.ends.length, scheme).toBe(2);
+        for (const a of r.ends) expect(a, scheme + ' red end off the limb’s normal (deg)').toBeLessThanOrEqual(15);
+        // It starts past the boss of the hop where it broke and stops four pixels short of any other boss, faded in and out.
         expect(r.start, scheme).toBe(true);
         expect(r.clear, scheme).toBe(true);
         expect(r.fills.length, scheme).toBeGreaterThan(0);
-        for (const [attr, fill, op] of r.fills) { expect(attr, scheme + ' red painted with a gradient').not.toMatch(/url/); expect(fill, scheme).toBe(r.redTok); expect(op, scheme).toBe('1'); }
+        for (const [attr, op] of r.fills) { expect(attr, scheme + ' red feathered by its gradient').toMatch(/^url\(#/); expect(op, scheme).toBe('1'); }
+        expect(r.stops.length, scheme).toBe(r.fills.length);
+        for (const s of r.stops) { expect(s[0], scheme).toBe(0); expect(s[s.length - 1], scheme).toBe(0); expect(Math.max(...s), scheme).toBe(1); }
+        expect(r.stopColors.length, scheme).toBeGreaterThan(0);
+        for (const c of r.stopColors) expect(c, scheme + ' red stop').toBe(r.redTok);
         // Past the break the route is grey dots.
         expect(r.dots, scheme).toBeGreaterThan(0);
         // The glow is a band inside the wood about three tenths of its girth, amber, standing out from the bark.
