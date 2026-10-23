@@ -39,8 +39,8 @@ export const BONSAI_CSS = String.raw`
 .gb .kn .k1{fill:var(--wood-lit);opacity:.28;transition:fill .2s,opacity .2s}.gb .kn .k2{fill:color-mix(in srgb,var(--wood-lit) 62%,var(--cut));opacity:.42;filter:blur(1px)}.gb .kn .kc{fill:var(--wood-shade);opacity:.42;filter:blur(.4px)}
 .gb .kn .ring{fill:none;stroke:var(--ink);stroke-width:1;opacity:0;transition:opacity .2s}
 /* a lit knot glows from inside the bark; no annotation ring is drawn on the wood */
-.gb .kn .halo{fill:var(--kg,var(--gold));opacity:0;transition:opacity .2s}.gb .kn.on .halo,.gb .kn:hover .halo{opacity:1}.gb .kn.trace .halo{opacity:1}.gb .kn.on .k1{fill:color-mix(in srgb,var(--gold) 45%,var(--wood-lit));opacity:.5}
-.gb .kn .crack{display:none;fill:none;stroke:var(--verm);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gb .kn.wound:not(.wmute) .crack{display:inline}.gb .kn.wound:not(.wmute) .halo{opacity:.75;fill:var(--kgw,var(--verm))}.gb .kn.wound.on:not(.wmute) .halo{opacity:1}
+.gb .kn .halo{fill:none;stroke:var(--gold);stroke-width:1.5;opacity:0;transition:opacity .2s}.gb .kn.on .halo,.gb .kn:hover .halo{opacity:1}.gb .kn.trace .halo{opacity:1}.gb .kn.on .k1{fill:color-mix(in srgb,var(--gold) 45%,var(--wood-lit));opacity:.5}
+.gb .kn .crack{display:none;fill:none;stroke:var(--verm);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gb .kn.wound:not(.wmute) .crack{display:inline}.gb .kn.wound:not(.wmute) .halo{opacity:.75;stroke:var(--verm)}.gb .kn.wound.on:not(.wmute) .halo{opacity:1}
 .gb .klbl{font:500 10px var(--mono);fill:var(--ink2);paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round;opacity:0;transition:opacity .2s;pointer-events:none}.gb .klbl.on{opacity:1}.gb .klbl.wound:not(.wmute){opacity:1;fill:var(--verm-ink)}.gb .klbl.brk:not(.wmute){opacity:1;fill:var(--ink)}.gb .kld{fill:none;stroke:var(--ink3);stroke-width:.8;opacity:0;transition:opacity .2s;pointer-events:none}.gb .klbl.on+.kld,.gb .klbl.wound:not(.wmute)+.kld,.gb .klbl.brk:not(.wmute)+.kld{opacity:.8}
 .gb .vein,.gb .tw,.gb .sap,.gb .leader,.gb .grain{pointer-events:none}.gb .hitc,.gb .hitp{fill:transparent;stroke:none}.gb-lf.cut .hitp,.gb-lf.gone .hitp,.gb-gr.cut .hitp,.gb-gr.gone .hitp{display:none}.gb .hitl{fill:none;stroke:transparent;stroke-linecap:round}
 .gb [data-k]{cursor:pointer;outline:none}
@@ -159,13 +159,13 @@ export const BONSAI_CSS = String.raw`
 @media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.7}.gb .rt.ext .w{stroke:color-mix(in srgb,var(--rt-ext) 55%,#fff);stroke-opacity:.9;stroke-width:.8}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}}
  /* the lit route is sap in the wood: an amber band about three tenths of the girth wide with a soft halo round it and a fine
     cream core along its spine, so it reads as a glow on the bark on a light page and a dark one; where it broke, the wood
-    itself is red (gbRed), feathered in and out */
+    itself is red (gbRed), the same band in red */
 .gw-svg.gb{--sap:#E9A23B;--sap-core:#FFF3D6;--sap-red:#D63A28}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
 .gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.5px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
-.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{opacity:.92}.gb .rs{stop-color:var(--sap-red)}
+.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{fill:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
@@ -1116,9 +1116,6 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  const svg=sv('svg',{class:'gw-svg gb'+(L.narrow&&!sap?' nw':''),tabindex:'-1',viewBox:gbF(vx)+' '+gbF(vy)+' '+gbF(W)+' '+gbF(VH),role:'group','aria-label':'The change as a bonsai: each branch is an end-to-end journey, each leaf one of its scenarios, knots are the files it passes through, roots what it depends on'});
  const defs=sv('defs',{});const clipId='gb-wood'+N,softId='gb-soft'+N;const clip=sv('clipPath',{id:clipId});
  defs.append(clip,sv('filter',{id:softId,x:'-10%',y:'-10%',width:'120%',height:'120%'},sv('feGaussianBlur',{stdDeviation:'2.2'})));svg.append(defs);
- /* a lit knot's glow: amber from inside the boss, fading out into the bark round it (red for one that broke) */
- for(const [k,c] of [['kg','--gold'],['kw','--verm']])defs.append(sv('radialGradient',{id:'gb-'+k+N},sv('stop',{offset:0,style:'stop-color:var('+c+');stop-opacity:.72'}),sv('stop',{offset:.45,style:'stop-color:var('+c+');stop-opacity:.36'}),sv('stop',{offset:1,style:'stop-color:var('+c+');stop-opacity:0'})));
- svg.style.setProperty('--kg','url(#gb-kg'+N+')');svg.style.setProperty('--kgw','url(#gb-kw'+N+')');
  /* foliage is lit from above: the crest lighter, the body its own green, the underside in shade */
  const padG='gb-pad'+N;defs.append(sv('pattern',{id:padG+'s',patternUnits:'userSpaceOnUse',width:31,height:23},...[[10.0,3.5,-58,'s',1.6],[11.3,1.3,59,'s',1.2],[13.0,5.5,38,'s',1.7],[29.4,14.5,-55,'s',1.5],[30.3,1.1,-36,'s',1.2],[3.7,7.1,-24,'s',1.7],[5.8,2.2,-54,'s',1.7],[15.4,12.2,10,'s',2.0],[11.2,5.7,-24,'l',1.3],[17.8,12.1,17,'l',1.4],[30.4,2.7,37,'s',1.4],[28.9,9.7,-51,'l',1.7],[27.1,7.2,19,'s',1.7],[14.1,19.3,-1,'s',1.8],[1.9,16.1,44,'s',1.5],[20.7,0.5,48,'s',1.7],[15.3,5.0,3,'s',1.3],[12.1,20.0,-50,'s',1.5],[8.6,3.1,40,'l',1.4],[12.9,8.3,27,'l',1.3],[5.5,5.3,-11,'s',1.9],[5.7,6.5,-33,'s',1.5],[17.6,21.9,61,'l',1.8],[22.9,10.5,30,'s',1.5],[14.9,9.2,-22,'s',1.3],[5.0,7.8,-57,'s',1.7]].map(([x,y,a,c,rx])=>sv('ellipse',{cx:x,cy:y,rx,ry:rx*.5,transform:'rotate('+a+' '+x+' '+y+')',class:'st'+c}))));
  /* each clump of foliage lit on its top and in its own shade beneath, the crest's a step lighter than its shoulders' */
@@ -1486,7 +1483,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    /* A knot is a boss the wood grew round (gbTree sets it off the centre line on the outside of the bend, sizes it and swells
       the outline over it): the bark's own colour a step lighter, half again as long along the grain as across it, softly lit
       on its upper left, with a shadow only along its lower crescent away from the light, and the grain parting round it. Lit,
-      it glows from inside, softly, its size and place its own, never a coin laid on the wood */
+      a fine amber ring (red where it broke) just inside its boss, so nothing of it spills onto the bark round it */
    const ra=kn.ra,rb=kn.rb,ang=Math.atan2(n[1],n[0])*180/Math.PI+90,tg=[n[1],-n[0]];
    const lx=-.6*tg[0]-.8*tg[1],ly=-.6*n[0]-.8*n[1];const lo=[tg[0]*lx*ra*.32+n[0]*ly*rb*.42,tg[1]*lx*ra*.32+n[1]*ly*rb*.42];
    const E=(c,a,b,cls)=>sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(a),ry:gbF(b),transform:'rotate('+gbF(ang)+' '+gbP(c)+')',class:cls});
@@ -1495,7 +1492,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    for(let i=0;i<=10;i++)cres.push(at2(t0-1.3+2.6*i/10,1,0));for(let i=10;i>=0;i--)cres.push(at2(t0-1.3+2.6*i/10,.84,.45));
    const cr=[[-1,0],[-.45,.55],[0,-.45],[.45,.5],[1,0]].map(([u,v])=>[p[0]+tg[0]*u*(ra+4)+n[0]*v*2.2,p[1]+tg[1]*u*(ra+4)+n[1]*v*2.2]);
    const u=M.U[kn.id];const names=kn.ids.map(id=>(M.U[id]||{}).label||id);
-   const glow=E(p,ra*1.8,rb*1.9,'halo');glow.setAttribute('clip-path','url(#'+clipId+')');
+   const glow=E(p,Math.max(1,ra-1.25),Math.max(1,rb-1.25),'halo');
    const g=sv('g',{class:'kn'+(many?' burl':''),'data-k':'u:'+kn.id,tabindex:-1,role:'button','aria-label':many?names.length+' parts of the change, grown together: '+names.join(', '):(u?u.label:kn.id)+', a part of the change'},
     E(p,ra,rb,'k1'),E([p[0]+lo[0],p[1]+lo[1]],ra*.7,rb*.58,'k2'),sv('path',{d:gbLine(cres)+'Z',class:'kc'}),glow,E(p,ra+2.4,rb+2.4,'ring'),sv('path',{d:gbLine(cr),class:'crack'}),
     sv('circle',{cx:gbF(p[0]),cy:gbF(p[1]),r:Math.max(9,ra+3),class:'hitc'}));
@@ -1994,8 +1991,8 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  gbPlaceNames(B);
  for(const id in B.root){B.root[id].classList.toggle('hl',litU.has(id));B.root[id].classList.toggle('sel',gw.pinned==='u:'+id)}
  /* The route (gbRoute) for a leaf; for a root, the sap it sends up the trunk to each journey it feeds */
- let d='',dx='',dw='',df='',dc='',sq=false;const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
- if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||'';dc=R.dc||'';sq=!!R.sq}}
+ let d='',dx='',dw='',df='',dc='',ds='',sq=false;const x=L.leaf;const line=pts=>'M'+pts.map(gbP).join(' L');
+ if(x){const R=R0||gbRoute(x);if(R){d=R.d;dx=R.dx;dw=R.dw;df=R.df||'';dc=R.dc||'';ds=R.ds||'';sq=!!R.sq}}
  else if(rootPart){const rr=B.L.roots.find(q=>q.id===L.part);if(rr){const up=rr.pts.slice().reverse();for(const jid of L.js){const pid=(B.padsOf[jid]||[]).find(q=>!B.pad[q].pol)||(B.padsOf[jid]||[])[0];const P=pid&&B.pad[pid];if(!P)continue;
    /* (up the root to where it forks from the trunk above the soil, then up the trunk: no spur down into the ground) */
    const sp=gbSpine(P.rt,P.o),f=gbFork(sp,rr);d+=(d?' ':'')+line(gbSmooth([...sp.slice(0,f.iJ),...f.out].reverse(),1))}if(!d)d=line(up)}}
@@ -2006,7 +2003,9 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
     and the red are bands inside the wood, sized from its girth (gbRibbon, gbRed) */
  if(!B.sapF){B.sapF=sv('path',{class:'sap faint',d:''});B.sapXo=sv('path',{class:'sap resto',d:''});B.sapX.before(B.sapF,B.sapXo)}
  B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);
- const rib=d?gbRibbon(B,d,.33,1.4,9,sq):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);gbRed(B,dw)}
+ /* (a spur up the leader to a reached hop above the route, gbSpur, is the same sap: its band and its core line) */
+ if(!B.sapS){B.sapS=sv('path',{class:'sap spur',d:''});B.sap.after(B.sapS)}
+ const rib=d?gbRibbon(B,d,.33,1.4,9,sq)+(ds?' '+gbRibbon(B,ds,.33,1.4,9,false):''):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);B.sapS.setAttribute('d',d?ds:'');gbRed(B,dw)}
 /* The wood a leaf's sap runs through on its way down: from where its stalk meets its cushion, down the twig that carries
    that cushion (or, for the outer cushion, to the branch's end inside it), along the branch's centre line to the trunk
    (round a fillet as wide as the branch, not a corner), and down the trunk's centre line. Without a cushion it joins the
@@ -2039,8 +2038,20 @@ function gbFillet(all,J){J=J.filter(([c])=>c>0&&c<all.length-1).sort((a,b)=>a[0]
    unlit, with no dots: it was never meant to run there. When the run does not say where it broke, only the leaf is red. A
    part check's route is the wood its shoot grows from. Also returns the route's stretches as points: main, the amber's run
    along the leader, from where the leaf's own wood has joined it, a point to the pixel; the red stretch; and out, the hops
-   past what it checks. sq: the amber ends square where the red begins. */
-function gbRoute(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id];if(!el)return null;const line=pts=>'M'+pts.map(gbP).join(' L');
+   past what it checks. sq: the amber ends square where the red begins, under the red's round start. ds: the spurs (gbSpur). */
+function gbRoute(x){const R=gbRoute0(x);return R?gbSpur(x,R):R}
+/* A hop the scenario reached on the leader above where its leaf's own wood joins the leader lights too: a spur of sap runs
+   down the leader's centre line from just past that hop's knot to where the route (all of it amber there) comes down the
+   leader, so every hop it reached is lit and none is skipped. Returns the route with the spur's points, its path ds, and the
+   knots it passes added to those that light. */
+function gbSpur(x,R){const B=gw.B,el=B.leaf[x.id]||B.bud[x.id],P=el&&B.pad[el.__p];if(!R.lit||!R.main||!R.main.length||!P||!P.rt||!P.rt.tp)return R;
+ const tp=P.rt.tp,Mn=R.main,onM=q=>Mn.some(m=>Math.hypot(m[0]-q[0],m[1]-q[1])<1.2);let lo=-1;for(let i=0;i<tp.length;i++)if(onM(tp[i]))lo=i;if(lo<0)return R;
+ const kOn=id=>{const kn=B.knot[id];return !!kn&&!B.root[id]&&kn.__on==='t'},at=id=>{const p=B.pos[id];let ci=-1,bd=4;if(p)tp.forEach((q,i)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<bd){bd=d;ci=i}});return ci};
+ let hi=-1;for(const id of R.lit)if(kOn(id)&&!(R.kon&&R.kon.has(id))){const ci=at(id);if(ci>lo)hi=Math.max(hi,ci)}if(hi<0)return R;
+ const s=tp.slice(lo,gbFwd(tp,hi,3)+1).reverse(),kon=new Set(R.kon||[]);
+ for(const id of R.lit)if(kOn(id)){const g=B.knot[id].__geo,p=B.pos[id];if(g&&p&&s.some((q,i)=>i>0&&gbSegD(p,p,s[i-1],q)<=g.ra+3))kon.add(id)}
+ return {...R,spur:s,ds:'M'+s.map(gbP).join(' L'),kon}}
+function gbRoute0(x){const B=gw.B,M=gw.M,L=B.L;const el=B.leaf[x.id]||B.bud[x.id];if(!el)return null;const line=pts=>'M'+pts.map(gbP).join(' L');
  const j=M.J.find(q=>M.leaves[q.id].includes(x));
  if(!j){if(el.__route)return {d:line(gbSmooth(el.__route,1)),dx:'',dw:'',df:''};const g=el.__base&&B.budG[x.unit];return g?{d:line(gbSmooth(g.route,1)),dx:'',dw:'',df:''}:null}
  const P=B.pad[el.__p];const m=/translate\(([-\d.]+)px,\s*([-\d.]+)px\)(?:\s*rotate\(([-\d.]+)deg\))?/.exec(el.style.transform);if(!m||!P||!P.rt)return null;
@@ -2128,18 +2139,11 @@ function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const
   const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
   const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
   out+=(out?' ':'')+'M'+[...Lf,...(sq&&last?[]:cap(e,me,w[n]/2,1)),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
-/* Where it broke, the limb's own wood turns red: a crisp stroke half the girth wide on its centre line, each end cut square
-   across the limb, feathered in and out along its length (each stop set where the path itself reaches that share of its
-   length), clipped to the bark, in the wood's own group, so the bosses on either side stand over it */
-function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
- for(const run of gbSubs(dw)){const A=gbLen(run),T=A[A.length-1];if(!(T>2))continue;const n=Math.max(2,Math.ceil(T/1.2)),P=gbResample(run,n);
-  const w0=P.map(q=>Math.max(6,Math.min(30,gbGirth(B,q)))),w=w0.map((_,k)=>{let s=0,c=0;for(let j=Math.max(0,k-3);j<=Math.min(n,k+3);j++){s+=w0[j];c++}return s/c});
-  const a=P[0],e=P[n],cx=e[0]-a[0],cy=e[1]-a[1],cl=cx*cx+cy*cy||1,on=f=>{const q=P[Math.round(f*n)];return Math.max(0,Math.min(1,((q[0]-a[0])*cx+(q[1]-a[1])*cy)/cl))};
-  const id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
-  if(!gr){gr=sv('linearGradient',{id,gradientUnits:'userSpaceOnUse'},...[[0,0],[.28,1],[.72,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})));B.defs.append(gr)}
-  for(const [k,v] of [['x1',a[0]],['y1',a[1]],['x2',e[0]],['y2',e[1]]])gr.setAttribute(k,gbF(v));
-  const st=gr.querySelectorAll('stop');st[1].setAttribute('offset',gbF(on(.28)));st[2].setAttribute('offset',gbF(on(.72)));
-  g.append(sv('path',{class:'sapw',d:gbBand(P,w,.5,-.5),fill:'url(#'+id+')'}))}}
+/* Where it broke, the limb's own wood turns red: the same band as the amber on the same centre line (gbRibbon, three tenths
+   of the girth), so amber and red read as one stroke; flat red with no feather or blur, round at both ends, its start laid
+   over the amber's end so no wood shows between them, clipped to the bark, in the wood's own group, so the bosses on either
+   side stand over it */
+function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();const d=dw?gbRibbon(B,dw,.33,1.4,9,false):'';if(d)g.append(sv('path',{class:'sapw',d}))}
 /* Every file's name and every shoot's count, placed against one set of things to keep clear of: the wood (trunk, branches,
    twigs, roots), every cushion's outline and 4 px round it, every leaf with its stalk, the shoots and their leaves, the knots,
    the pot and the soil, the plant tags, and every other name and number. A count sits just off its shoot's tip. The names are
