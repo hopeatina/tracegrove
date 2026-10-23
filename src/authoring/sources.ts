@@ -34,6 +34,17 @@ function walk(root: string, rel: string, into: string[], skip: Set<string>): voi
   }
 }
 
+/** The source files among `files` (paths relative to the launch folder, as a git tree lists them): the ones the launcher's walk
+ *  would reach, past the same skipped folders, that the globs match. */
+export function sourcesAmong(files: string[], globs: string[], extraSkip: string[] = []): string[] {
+  const skip = new Set([...SKIP_DIRS, ...extraSkip]); const patterns = globs.map(globToRegExp);
+  return files.filter((file) => {
+    const parts = file.split('/');
+    for (let i = 1; i < parts.length; i++) if (skip.has(parts[i - 1]!) || skip.has(parts.slice(0, i).join('/'))) return false;
+    return patterns.some((pattern) => pattern.test(file));
+  }).sort();
+}
+
 /** Default globs: source files under the app root, minus dependency, cache and test-tool folders. */
 export function defaultSourceGlobs(): string[] {
   return [`**/*.{${DEFAULT_EXTENSIONS.join(',')}}`];

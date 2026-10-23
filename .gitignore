@@ -10,3 +10,4 @@ __pycache__/
 /artifacts/qa/
 .tracegrove/
 .scratch/
+dogfood/.data/

@@ -6,7 +6,8 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, normalize, resolve } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { maskComments, scanSource } from './discover.ts';
 import type { Layer } from './growState.ts';
 
@@ -20,6 +21,8 @@ export type ChangeUnit = {
   /** the changed lines that belong to this unit */
   added: AddedLine[];
   method?: string; path?: string; provider?: Provider;
+  /** files folded into this unit (a CLI file without a command of its own belongs to the command it serves) */
+  also?: string[];
 };
 export type Provider = { name: string; keys: string[] };
 export type Criterion = { id: string; text: string };
@@ -31,19 +34,81 @@ export function git(dir: string, args: string[], input?: string): string {
 }
 
 const ASSET = /\.(png|jpe?g|gif|svg|webp|ico|mp4|webm|mov|woff2?|ttf|otf|pdf|zip|gz)$/i;
-const TEST = /(^|\/)(tests?|__tests__|spec|conformance|e2e)\/|\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$|_test\.(py|go)$/;
+// Test scaffolding counts as test: harnesses, fixtures and dogfood projects drive the code, they are not it.
+const TEST = /(^|\/)(tests?|__tests__|spec|conformance|e2e|dogfood|fixtures|__fixtures__|harness)\/|\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$|_test\.(py|go)$/;
 const DOC = /\.(md|mdx|rst|txt|adoc)$|(^|\/)docs?\//i;
 const CODE = /\.(py|[cm]?js|[cm]?ts|jsx|tsx|vue|svelte|rb|go|rs|java|kt|php|sql|prisma|html|css|scss)$/;
-export function roleOf(path: string): FileRole {
+/** `harness`: whether a code file is a harness beside the app (see `harnessOf`); a harness counts as test. */
+export function roleOf(path: string, harness: (path: string) => boolean = () => false): FileRole {
   if (ASSET.test(path)) return 'asset';
   if (TEST.test(path)) return 'test';
   if (DOC.test(path)) return 'doc';
-  return CODE.test(path) ? 'code' : 'config';
+  if (!CODE.test(path)) return 'config';
+  return harness(path) ? 'test' : 'code';
 }
-export const isTestFile = (path: string) => TEST.test(path);
+/** A test by its path; given `harness` (see `harnessOf`), a harness file beside the app is one too, as `roleOf` says. */
+export const isTestFile = (path: string, harness?: (path: string) => boolean) => TEST.test(path) || (CODE.test(path) && !!harness?.(path));
+const MANIFEST = /(^|\/)(package\.json|pyproject\.toml|requirements\.txt|setup\.py|go\.mod|Cargo\.toml|Gemfile|pom\.xml|build\.gradle(\.kts)?)$/;
+const CONFIG = /(^|\/)tracegrove\.config\.ya?ml$/;
+/**
+ * Folders below the root that hold their own tracegrove.config.yaml and no package manifest: a tracegrove project
+ * beside the code. It may be a harness that drives the app from outside (a QA project) or the app itself (a service
+ * of a monorepo with one root pyproject.toml or go.mod, a sample app), so `harnessOf` decides file by file.
+ * A folder with its own manifest is a package of a monorepo, and its code stays code.
+ */
+export function scaffoldsOf(listing: readonly string[]): string[] {
+  const packages = new Set(listing.filter((f) => MANIFEST.test(f)).map((f) => dirname(f)));
+  return listing.filter((f) => f.includes('/') && CONFIG.test(f)).map((f) => dirname(f)).filter((d) => !packages.has(d));
+}
+const within = (folder: string, path: string) => path === folder || path.startsWith(`${folder}/`);
+/** Whether a tracegrove config puts the app it tests in its own folder: its entry, or a source it watches, resolves there. */
+function appInside(folder: string, config: string | null): boolean {
+  let app: { root?: unknown; entry?: unknown; sources?: unknown } | undefined;
+  try { app = (parseYaml(config ?? '') as { app?: typeof app } | null)?.app; } catch { return false; }
+  if (!app || typeof app !== 'object') return false;
+  const root = typeof app.root === 'string' ? app.root : '.';
+  const named = [app.entry, ...(Array.isArray(app.sources) ? app.sources : [])].filter((x): x is string => typeof x === 'string');
+  return named.some((x) => within(folder, normalize(join(folder, root, x.split(/[*?[{]/)[0]!))));
+}
+/** Whether a source file imports code by a relative path that leads out of `folder`: it drives code that lives elsewhere. */
+export function reachesOutOf(folder: string, file: string, text: string): boolean {
+  const masked = maskComments(file, text);
+  if (file.endsWith('.py')) {
+    for (const m of masked.matchAll(/^\s*from\s+(\.+)([\w.]*)\s+import\b/gm)) {
+      let at = dirname(file); for (let i = 1; i < m[1]!.length; i++) at = dirname(at);
+      if (!within(folder, normalize(join(at, m[2]!.replace(/\./g, '/'))))) return true;
+    }
+    return false;
+  }
+  for (const m of masked.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"\n]*)['"]/g)) {
+    if (!within(folder, normalize(join(dirname(file), m[1]!)))) return true;
+  }
+  return false;
+}
+/**
+ * Which code files on the branch are a harness beside the app rather than the app: a file in a tracegrove project
+ * folder (see `scaffoldsOf`) whose config does not put the app in that folder, and which itself imports code from
+ * outside the folder. Without both, a file stays code, so a change to a service or a sample is never hidden.
+ */
+export function harnessOf(dir: string, branch: string): (path: string) => boolean {
+  let listing: string[];
+  try { listing = git(dir, ['ls-tree', '-r', '--name-only', branch]).split('\n').filter(Boolean); } catch { return () => false; }
+  const folders = scaffoldsOf(listing).filter((d) => !appInside(d, readAt(dir, branch, listing.find((f) => dirname(f) === d && CONFIG.test(f))!)));
+  if (!folders.length) return () => false;
+  const memo = new Map<string, boolean>();
+  return (path) => {
+    if (!CODE.test(path)) return false;
+    const folder = folders.filter((d) => path.startsWith(`${d}/`)).sort((a, b) => b.length - a.length)[0];
+    if (!folder) return false;
+    if (!memo.has(path)) { const text = readAt(dir, branch, path); memo.set(path, text !== null && reachesOutOf(folder, path, text)); }
+    return memo.get(path)!;
+  };
+}
 
 /** Files and added lines of `base...branch`, with each hunk's new-side line range. */
 export function readChange(dir: string, base: string, branch: string): FileChange[] {
+  const harness = harnessOf(dir, branch);
+  const role = (path: string) => roleOf(path, harness);
   const stats = new Map<string, { adds: number; dels: number }>();
   for (const line of git(dir, ['diff', '--numstat', '--relative', '--no-renames', `${base}...${branch}`]).split('\n')) {
     const m = /^(\d+|-)\t(\d+|-)\t(.+)$/.exec(line);
@@ -57,7 +122,7 @@ export function readChange(dir: string, base: string, branch: string): FileChang
       const path = line.slice(4).replace(/^b\//, '');
       if (path === '/dev/null') { current = null; continue; }
       const st = stats.get(path) ?? { adds: 0, dels: 0 };
-      current = { path, ...st, role: roleOf(path), isNew: pendingNew, ranges: [], added: [] }; files.set(path, current); continue;
+      current = { path, ...st, role: role(path), isNew: pendingNew, ranges: [], added: [] }; files.set(path, current); continue;
     }
     if (header && line.startsWith('--- ')) { if (line === '--- /dev/null') pendingNew = true; continue; }
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
@@ -69,7 +134,7 @@ export function readChange(dir: string, base: string, branch: string): FileChang
     if (current && line.startsWith('+')) { if (current.added.length < 4000) current.added.push({ line: next, text: line.slice(1) }); next++; }
   }
   // Binary files and pure deletions have no hunk text; numstat still lists them.
-  for (const [path, st] of stats) if (!files.has(path)) files.set(path, { path, ...st, role: roleOf(path), isNew: false, ranges: [], added: [] });
+  for (const [path, st] of stats) if (!files.has(path)) files.set(path, { path, ...st, role: role(path), isNew: false, ranges: [], added: [] });
   return [...files.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 export function readAt(dir: string, branch: string, path: string): string | null {
@@ -148,7 +213,7 @@ export function findSpec(dir: string, base: string, branch: string, pr: PullRequ
   return { missing: pr ? `PR #${pr.number} has no acceptance criteria (list items under an "Acceptance criteria" heading, or checkboxes)` : 'no PR found and no spec in the commit messages; pass --spec <file>' };
 }
 
-const PROVIDERS: Array<{ name: string; test: RegExp; keys: string[] }> = [
+export const PROVIDERS: Array<{ name: string; test: RegExp; keys: string[] }> = [
   { name: 'GitHub', test: /\b(?:execFile(?:Sync)?|spawn(?:Sync)?)\(\s*['"]gh['"]|@octokit\/|api\.github\.com/, keys: ['GH_TOKEN', 'GITHUB_TOKEN'] },
   { name: 'Stripe', test: /from\s+['"]stripe['"]|require\(\s*['"]stripe['"]\s*\)|api\.stripe\.com|import stripe/, keys: ['STRIPE_SECRET_KEY', 'STRIPE_TEST_KEY'] },
   { name: 'SendGrid', test: /@sendgrid\/|api\.sendgrid\.com|import sendgrid/, keys: ['SENDGRID_API_KEY'] },
@@ -175,6 +240,68 @@ function programName(dir: string): string {
     return pkg.name ?? basename(resolve(dir));
   } catch { return basename(resolve(dir)); }
 }
+const REGEX_AFTER = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+/**
+ * Blank the text of every template literal that spans lines, keeping newlines and the code inside `${…}`.
+ * Source a file writes out (`writeFileSync(app, `…url.pathname === '/x'…`)`) is text, not a route it serves.
+ * A small lexer: comments, quotes, regex literals and nested templates are skipped so a backtick inside
+ * them does not open a literal; anything it cannot read ends at the line and leaves the text as it was.
+ * A quote that does not close on its line is text, not a string (an apostrophe in JSX: <p>Don't</p>), and
+ * `</` closes a JSX tag rather than starting a regex, so neither hides a backtick that opens a template.
+ */
+export function maskTemplates(file: string, text: string): string {
+  if (!/\.[cm]?[jt]sx?$/.test(file) || !text.includes('`')) return text;
+  const out = text.split(''); const n = text.length;
+  const ident = (c: string | undefined) => !!c && /[\w$]/.test(c);
+  // The index after the closing quote, or -1 when the quote does not close on its line.
+  const quoted = (i: number, q: string) => { for (let j = i + 1; j < n; j++) { const c = text[j]; if (c === '\\') j++; else if (c === q) return j + 1; else if (c === '\n') return -1; } return -1; };
+  const regex = (i: number) => {
+    let cls = false;
+    for (let j = i + 1; j < n; j++) {
+      const c = text[j];
+      if (c === '\\') { j++; continue; }
+      if (c === '\n') return i + 1; // not a regex after all: a division
+      if (cls) { if (c === ']') cls = false; } else if (c === '[') cls = true;
+      else if (c === '/') { j++; while (j < n && /[a-z]/i.test(text[j]!)) j++; return j; }
+    }
+    return i + 1;
+  };
+  // A run of code; inside `${…}` it ends at the brace that closes the expression.
+  const code = (i: number, expr: boolean): number => {
+    let depth = 0; let prev = ''; let word = '';
+    while (i < n) {
+      const c = text[i]!;
+      if (c === '/' && text[i + 1] === '/') { const e = text.indexOf('\n', i); i = e < 0 ? n : e; continue; }
+      if (c === '/' && text[i + 1] === '*') { const e = text.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+      if (c === '\'' || c === '"') { const end = quoted(i, c); i = end < 0 ? i + 1 : end; prev = c; continue; }
+      if (c === '`') { i = template(i); prev = c; continue; }
+      if (c === '/' && (ident(prev) ? REGEX_AFTER.has(word) : !/[)\]'"`<]/.test(prev))) { i = regex(i); prev = '/'; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') { if (expr && depth === 0) return i + 1; depth--; }
+      if (!/\s/.test(c)) { if (ident(c)) word = ident(text[i - 1]) ? word + c : c; prev = c; }
+      i++;
+    }
+    return n;
+  };
+  const template = (i: number): number => {
+    const parts: Array<[number, number]> = []; let from = i + 1;
+    for (let j = i + 1; j < n; j++) {
+      const c = text[j];
+      if (c === '\\') { j++; continue; }
+      if (c === '$' && text[j + 1] === '{') { parts.push([from, j]); j = code(j + 2, true) - 1; from = j + 1; continue; }
+      if (c !== '`') continue;
+      parts.push([from, j]);
+      if (parts.some(([a, b]) => text.slice(a, b).includes('\n'))) for (const [a, b] of parts) for (let k = a; k < b; k++) if (out[k] !== '\n') out[k] = ' ';
+      return j + 1;
+    }
+    return n;
+  };
+  code(0, false);
+  return out.join('');
+}
+/** Routes a changed file declares, leaving out text inside multi-line template literals (generated source, fixtures). */
+export const routesOf = (file: string, text: string) => scanSource(file, maskTemplates(file, text));
+
 /** A line that holds a regular expression or a pattern table describes code; it does not call it. */
 export const isPatternSource = (text: string) => /\\[.()/[\]sbdwS]|\/[^/\n]*\\\(|\/[^/\n]+\/[a-z]*\.(?:test|exec)\(/.test(text);
 const stem = (file: string) => basename(file).replace(/\.[^.]+$/, '');
@@ -197,7 +324,7 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
     const callsCode = addedCode.filter((a) => !isPatternSource(a.text));
     const own: ChangeUnit[] = [];
     // Routes whose declaration or handler body changed.
-    const routes = /\.(py|[cm]?[jt]sx?)$/.test(f.path) ? scanSource(f.path, text).filter((r) => r.method !== 'ANY') : [];
+    const routes = /\.(py|[cm]?[jt]sx?)$/.test(f.path) ? routesOf(f.path, text).filter((r) => r.method !== 'ANY') : [];
     routes.sort((a, b) => a.line - b.line);
     routes.forEach((r, i) => {
       const end = routes[i + 1]?.line ?? r.line + 40;
@@ -244,7 +371,7 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
   // A CLI file without a command of its own (argument parsing, rendering) belongs to the command it serves.
   const command = branches.find((u) => u.kind === 'command');
   for (const f of folded) {
-    if (command) { command.added.push(...f.added); continue; }
+    if (command) { command.added.push(...f.added); (command.also ??= []).push(f.path); continue; }
     branches.push({ id: '', label: basename(f.path), kind: 'module', layer: 'cli', root: false, file: f.path, line: f.added[0]?.line ?? 1, parent: null, needles: [`/${stem(f.path)}.`], added: f.added });
   }
   const order: Layer[] = ['ui', 'cli', 'api', 'jobs', 'lib'];

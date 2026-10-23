@@ -13,8 +13,9 @@ import { exportVerifiedBundle, verifyBundle } from '../core/bundle.ts';
 import { createDurableDirectory } from '../core/atomicFiles.ts';
 import { readBoundedFile } from '../core/boundedFile.ts';
 import { Conflict } from '../core/errors.ts';
-import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CaseSpec, type ExecutionReceipt } from '../protocol/index.ts';
+import { BrowserObservation, NativeJobObservation, McpToolObservation, ConversationObservation, StandInObservation, CaseSpec, type ExecutionReceipt, type Step } from '../protocol/index.ts';
 import { getPath } from '../core/reducer.ts';
+import { checksOf, comparedOf, expGot } from './checkCompare.ts';
 import { runVideos } from './media.ts';
 import { verifiedObservedRequests, type ObservedRequest } from './traffic.ts';
 import { describeBlock } from '../core/blockCodes.ts';
@@ -100,8 +101,22 @@ function explainDiffers(message: string, output: unknown, assertions: Assertions
   return `${m[1]} is ${got ? brief(got.value) : 'missing'}, expected ${brief(predicate.value)}`;
 }
 
-export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined, assertions: Assertions = []): CaseReport {
+/** A field of a stand-in call's JSON body, when it is plainly that kind of value. */
+const field = <T extends 'number' | 'string'>(json: unknown, key: string, type: T): (T extends 'number' ? number : string) | null => {
+  const v = json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>)[key] : undefined;
+  return typeof v === type ? v as T extends 'number' ? number : string : null;
+};
+/** Whether a sealed request body names a saved value ("{invoiceId}") that the runner fills in when it sends it. */
+const templated = (v: unknown): boolean => typeof v === 'string' ? /\{[A-Za-z_][A-Za-z0-9_]*\}/.test(v)
+  : Array.isArray(v) ? v.some(templated) : !!v && typeof v === 'object' && Object.values(v as Record<string, unknown>).some(templated);
+/** Who a step acted as, from its sealed auth: the persona's own name, no session, or a named credential. */
+function actedAs(auth: { kind: string; name?: string } | undefined, persona: string): string {
+  return !auth ? persona : auth.kind === 'none' ? 'no session' : auth.kind === 'credential' ? `credential ${auth.name ?? ''}`.trim() : persona;
+}
+
+export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | undefined, assertions: Assertions = [], specSteps: Step[] = []): CaseReport {
   const stepInfo = new Map((flow?.steps ?? []).map((s) => [s.id, s]));
+  const personaId = receipt.personaRef?.id ?? '', persona = personaId.split('.persona.').pop() || personaId;
   const steps: StepReport[] = receipt.steps.map((s) => {
     const info = stepInfo.get(s.stepId);
     const output = s.output as { status?: number } | null;
@@ -111,11 +126,42 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const conversation = ConversationObservation.safeParse(s.output);
     const standIn = StandInObservation.safeParse(s.output);
     const own = receipt.assertions.filter((a) => a.assertionId.replace(/\.expect$/, '') === s.stepId);
+    // The check that failed here, as the run recorded it against its declared predicate: what it expected, and what it got.
+    const failed = own.find((a) => a.result === 'fail' && a.reasonCode);
+    const declared = failed && assertions.find((a) => a.id === failed.assertionId);
+    const compared = failed && declared ? comparedOf(declared.predicate, failed, { method: info?.method ?? '', path: info?.path ?? '' }) : null;
+    // What the app answered an HTTP step, as recorded.
+    const http = output && !standIn.success && !conversation.success && !mcp.success && !browser.success && !job.success && typeof output.status === 'number' ? output as { body?: unknown; bodyText?: string | null } : null;
+    const body = http ? http.body ?? http.bodyText ?? null : null;
+    // From the verified bundle, for the drawer and the Run tab: every comparison each check made, the step's own timing, what
+    // it sent, and, for a watch step, its deadline and the stand-in calls it read.
+    const checked = own.flatMap((a) => { const d = assertions.find((x) => x.id === a.assertionId); return d ? checksOf(d.predicate, a, { method: info?.method ?? '', path: info?.path ?? '' }) : []; });
+    const spec = specSteps.find((x) => x.id === s.stepId);
+    // The path it sent is the one the runner recorded (a saved value filled in); the body is the sealed spec's, which says so
+    // when it names a saved value the runner filled in, since the body sent is not recorded.
+    let sentPath: string | null = null;
+    try { const u = http && typeof (output as { url?: unknown }).url === 'string' ? new URL((output as { url: string }).url) : null; sentPath = u ? `${u.pathname}${u.search}` : null; } catch { sentPath = null; }
+    const sent = spec?.kind === 'http.request' ? { body: spec.body === null ? null : excerpt(spec.body, 4096), as: actedAs(spec.auth, persona),
+      ...(sentPath ? { path: sentPath } : {}), ...(templated(spec.body) ? { declared: true } : {}) } : null;
+    const watch = spec && 'pollIntervalMs' in spec ? { deadlineMs: spec.timeoutMs, everyMs: spec.pollIntervalMs, polls: typeof (s.output as { attempts?: unknown } | null)?.attempts === 'number' ? (s.output as { attempts: number }).attempts : null } : null;
+    const calls = standIn.success ? standIn.data.calls.map((c) => ({ standIn: standIn.data.standIn, method: c.method, path: c.path, status: c.status, at: c.at, key: c.key ?? null,
+      ...(c.repeat !== undefined ? { repeat: c.repeat } : {}), faulted: c.faulted, amount: field(c.json, 'amount', 'number'), currency: field(c.json, 'currency', 'string'),
+      description: field(c.json, 'description', 'string'), during: null as string | null })) : null;
     return { id: s.stepId, name: info?.name ?? s.stepId, method: info?.method ?? '', path: info?.path ?? '', result: s.result, status: typeof output?.status === 'number' ? output.status : null, durationMs: s.timing?.durationMs ?? null, reason: s.reasonCode,
       declared: !!info, expectStatus: info?.expectStatus ?? null, ...(info?.expectation ? { expectation: info.expectation } : {}),
       ...(own.length && s.result === 'completed' ? { checks: own.every((a) => a.result === 'pass') ? 'pass' as const : 'fail' as const } : {}),
+      ...(compared ? { compared } : {}), ...(body !== null && body !== '' ? { answer: excerpt(body, 4096) } : {}),
+      ...(checked.length ? { checked } : {}), ...(s.timing ? { startedAt: s.timing.startedAt, finishedAt: s.timing.finishedAt } : {}),
+      ...(calls ? { calls } : {}), ...(sent ? { request: sent } : {}), ...(watch ? { watch } : {}),
+      ...(http && typeof (output as { durationMs?: unknown }).durationMs === 'number' ? { httpMs: (output as { durationMs: number }).durationMs } : {}),
       ...(standIn.success ? { observedText: standInLine(standIn.data) } : conversation.success ? { observedText: conversationLine(conversation.data) } : mcp.success ? { observedText: observedLine(mcp.data) } : browser.success ? { observedText: browser.data.text === null ? null : excerpt(browser.data.text, 500) } : job.success ? { observedText: `${job.data.action}: ${job.data.status}\n${excerpt(JSON.stringify(job.data.output, null, 2), 800)}` } : {}) };
   });
+  // Each stand-in call goes on the step whose recorded start and finish hold its own timestamp: never guessed from the order.
+  const span = steps.flatMap((x) => x.startedAt && x.finishedAt ? [{ id: x.id, from: Date.parse(x.startedAt), to: Date.parse(x.finishedAt) }] : []);
+  for (const c of steps.flatMap((x) => x.calls ?? [])) {
+    const t = Date.parse(c.at);
+    c.during = (span.find((x) => t >= x.from && t < x.to) ?? span.find((x) => t >= x.from && t <= x.to))?.id ?? null;
+  }
   let failure: CaseReport['failure'] = null;
   const order = new Map(receipt.steps.map((s, index) => [s.stepId, index]));
   const failedAssertion = receipt.assertions.filter((a) => a.result !== 'pass')
@@ -138,7 +184,13 @@ export function caseReport(receipt: ExecutionReceipt, flow: CompiledFlowInfo | u
     const stepId = failedAssertion.assertionId.replace(/\.expect$/, '');
     const step = receipt.steps.find((s) => s.stepId === stepId);
     const standIn = StandInObservation.safeParse(step?.output);
-    const counted = standIn.success && /^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}` : null;
+    // A count it can compare is said in the one wording the verdict, grow --json and the page use (checkCompare's expGot:
+    // "expected 2 charges, got 3"); with no recorded check to read, the compiled expectation ("2 calls received").
+    const compared = steps.find((x) => x.id === stepId)?.compared;
+    const said = compared ? expGot(compared) : null;
+    const counted = !standIn.success || !/^body\.count\b/.test(failedAssertion.reasonCode ?? '') ? null
+      : said ? said.charAt(0).toLowerCase() + said.slice(1)
+      : `expected ${(stepInfo.get(stepId)?.expectation ?? 'a different call count').replace(/ received$/, '')}, got ${standIn.data.count}`;
     const message = counted ?? (failedAssertion.reasonCode ? explainDiffers(failedAssertion.reasonCode, step?.output, assertions, stepId) : `assertion ${failedAssertion.result}`);
     failure = { step: stepInfo.get(stepId)?.name ?? stepId, message, observed: observedLine(step?.output) };
   } else if (receipt.outcome !== 'passed') {
@@ -265,7 +317,7 @@ export async function runTests(options: TestOptions): Promise<{ report: TestRunR
   const flowsById = new Map(compiled.flows.map((f) => [f.caseId, f]));
   const cases = (summary?.receipts ?? []).map((r) => {
     const spec = project.suiteCases.map((entry) => project.corpus.getAs(CaseSpec, entry.ref)).find((c) => c.ref.id === r.caseRef.id);
-    const report = caseReport(r, flowsById.get(r.caseRef.id), spec?.assertions ?? []);
+    const report = caseReport(r, flowsById.get(r.caseRef.id), spec?.assertions ?? [], spec?.steps ?? []);
     // A host that never started explains every not_run step; surface its sealed message.
     const events = join(runDir, 'bundle', 'cells', r.selectionCellId, 'events.jsonl');
     if (bundleVerified && existsSync(events)) report.requests = verifiedObservedRequests(r, readFileSync(events));

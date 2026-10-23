@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
 import { CONFIG_FILE, STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompileResult } from './compile.ts';
@@ -18,7 +18,8 @@ import { initProject } from './init.ts';
 import { draftFlow, gitInfo, safeRef } from './discover.ts';
 import { discoverLive, draftWithAgent } from './workspace.ts';
 import { grow, lastGrow } from './grow.ts';
-import { growView, type GrowState, type Mode } from './growState.ts';
+import { type GrowState, type Mode, type VerdictFacts } from './growState.ts';
+import { growViewAt } from './growJson.ts';
 import { DEFAULT_MODELS, detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from './agent.ts';
 import { UI_HTML } from './uiPage.ts';
 import { RunActivity, runActivity } from './activity.ts';
@@ -32,8 +33,9 @@ import { readRunSource, readSavedRun } from './runSource.ts';
 import { envList } from '../environments/commands.ts';
 import { runEnvDoctor } from '../environments/doctorCache.ts';
 import { SavedRunName } from './runReport.ts';
-import { isRunDirectory } from './runLocation.ts';
+import { configRunsRoot, isRunDirectory } from './runLocation.ts';
 import { compareSavedRuns, SavedRunPair } from './runComparison.ts';
+import { happenedIn } from './happened.ts';
 import { nativeImportsReply, readNativeUpload } from './uiImportsApi.ts';
 import { savedWorkflowKnowledge } from './workflowKnowledge.ts';
 import { projectBenchmark } from './projectBenchmark.ts';
@@ -62,6 +64,10 @@ export async function startUi(options: { dir: string; branch?: string | null; po
   let active: { id: string; kind: 'run' | 'heal' | 'draft' | 'grow'; controller: AbortController; cancelling: boolean } | null = null;
   /** The live grow waiting for a mode choice, if any: answered by POST /api/grow/mode. */
   let growPick: { id: string; done: (mode: Mode | null) => void } | null = null;
+  // What each grow's first failure recorded, read once per run for the verdict (runs never change once saved).
+  const growFacts = new Map<string, VerdictFacts>();
+  const growWords = new Map<string, string | null>();
+  const growMore = new Map<string, string | null>();
   let closing = false;
   let closePromise: Promise<void> | null = null;
   const pendingBodies = new Map<IncomingMessage, ServerResponse>();
@@ -94,6 +100,12 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       .map((name) => { const r = readSavedRun(join(runsDir, name));
         return { name, outcome: r.outcome, startedAt: r.startedAt, finishedAt: r.finishedAt, totals: r.totals, evidenceStatus: r.evidenceStatus, bundleVerified: r.bundleVerified, environment: r.environment ?? null,
           cases: r.cases.map((c) => ({ caseId: c.caseId, outcome: c.outcome, durationMs: c.durationMs })) }; });
+  };
+  /** Where a named run is saved: in this folder, or, for a grow whose config is in a subfolder (`?config=`, as the grow recorded
+   *  it), beside that config, where the grow saved it. Null for a config outside this folder. */
+  const runRoot = (url: URL): string | null => {
+    const config = url.searchParams.get('config');
+    return config === null || config === '' ? dir : configRunsRoot(dir, config);
   };
   const testDir = () => {
     try { return resolve(dir, existsSync(configPath()) ? loadAuthoringConfig(configPath()).testDir : 'tracegrove'); } catch { return join(dir, 'tracegrove'); }
@@ -282,7 +294,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       if (req.method === 'GET' && url.pathname === '/api/grow/last') {
         const branch = url.searchParams.get('branch') || gitInfo(dir).current;
         let last = null; try { last = branch ? lastGrow(dir, safeRef(branch)) : null; } catch { last = null; }
-        return send(200, last ? { ...last, view: growView(last.state) } : null);
+        return send(200, last ? { ...last, view: growViewAt(last.state, dir, growFacts, growWords, growMore) } : null);
       }
       if (req.method === 'POST' && url.pathname === '/api/grow') {
         // Live discovery of a change, streamed as server-sent events over a token-guarded POST:
@@ -298,8 +310,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         res.on('close', () => { if (!res.writableFinished) operation.controller.abort(); });
         sse('session', { id: operation.id });
         let snapshot: GrowState | null = null; let last = 0; let timer: ReturnType<typeof setTimeout> | null = null;
-        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growView(snapshot) }); };
-        const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, agent: { off: !body.agent }, signal: operation.controller.signal,
+        const flush = () => { timer = null; last = Date.now(); if (snapshot) sse('state', { state: snapshot, view: growViewAt(snapshot, dir, growFacts, growWords, growMore) }); };
+        const job = grow({ dir, branch: body.branch, base: body.base, mode: body.mode, prove: body.prove, proveOn: 'Grow again with “Prove with real flows” on', agent: { off: !body.agent }, signal: operation.controller.signal,
           ...(body.mode ? {} : { chooseMode: () => new Promise<Mode | null>((done) => { growPick = { id: operation.id, done }; operation.controller.signal.addEventListener('abort', () => done(null), { once: true }); }) }) },
         (event, state) => { sse('event', event); snapshot = state; if (Date.now() - last >= 100) flush(); else timer ??= setTimeout(flush, 100); });
         running = job;
@@ -322,9 +334,11 @@ export async function startUi(options: { dir: string; branch?: string | null; po
       }
       const video = /^\/api\/runs\/([^/]+)\/media\/([a-f0-9]{64})$/.exec(url.pathname);
       if ((req.method === 'GET' || req.method === 'HEAD') && video) {
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
         try {
-          if (readSavedRun(join(dir, STATE_DIR, 'runs', decodeURIComponent(video[1]!))).evidenceStatus !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
-          const bytes = readRunVideo(dir, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
+          if (readSavedRun(join(root, STATE_DIR, 'runs', decodeURIComponent(video[1]!))).evidenceStatus !== 'verified') return send(409, { error: 'Recording is not bound to freshly verified saved evidence.' });
+          const bytes = readRunVideo(root, decodeURIComponent(video[1]!), video[2]!, url.searchParams.get('case') ?? '');
           const range = videoRange(req.headers.range, bytes.length);
           const headers = { 'content-type': 'video/webm', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
             'cross-origin-resource-policy': 'same-origin', 'x-content-type-options': 'nosniff' };
@@ -349,10 +363,32 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         try { return send(200, compareSavedRuns(dir, pair.data)); }
         catch { return send(409, { error: 'Comparison unavailable. Re-check both retained evidence bundles; no recorded result is available for this comparison.' }); }
       }
+      // What happened in one scenario's run, for the grow page's drawer: read only from the run's verified bundle under this
+      // folder's .tracegrove (or beside the grow's config in a subfolder), and only with the session token.
+      const happened = /^\/api\/runs\/([^/]+)\/happened$/.exec(url.pathname);
+      if (req.method === 'GET' && happened) {
+        if (req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
+        let name: string; try { name = decodeURIComponent(happened[1]!); } catch { return send(400, { error: 'bad run name' }); }
+        if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
+        // The flow is named, never guessed: a run of one flow is not read as another.
+        const caseId = url.searchParams.get('case');
+        if (!caseId) return send(400, { error: 'name the flow: ?case=<flow id>' });
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
+        let found: ReturnType<typeof happenedIn>;
+        // The base branch the grow set the change against, to say whether a run of it is recorded; a name, never an option.
+        const base = url.searchParams.get('base');
+        if (base !== null && !/^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,200}$/.test(base)) return send(400, { error: 'bad base branch name' });
+        const cfg = url.searchParams.get('config');
+        try { found = happenedIn(root, name, caseId, { base, config: cfg ? join(root, basename(cfg)) : configPath() }); } catch { return send(404, { error: 'run not found' }); }
+        return found ? send(200, found) : send(404, { error: 'the run has no record of that flow' });
+      }
       if (req.method === 'GET' && url.pathname.startsWith('/api/runs/')) {
         const name = decodeURIComponent(url.pathname.slice('/api/runs/'.length));
         if (!SavedRunName.safeParse(name).success || name === 'latest') return send(400, { error: 'bad run name' });
-        const file = join(dir, STATE_DIR, 'runs', name, 'summary.json');
+        const root = runRoot(url);
+        if (!root) return send(400, { error: 'config must name a file inside this folder' });
+        const file = join(root, STATE_DIR, 'runs', name, 'summary.json');
         return existsSync(dirname(file)) ? send(200, readSavedRun(dirname(file))) : send(404, { error: 'run not found' });
       }
       if (req.method === 'POST' && url.pathname === '/api/test') {

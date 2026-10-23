@@ -1,0 +1,252 @@
+From 44f64f1ba3dde48cfa5e02112f33c74e5ddb2a55 Mon Sep 17 00:00:00 2001
+From: fx <fx@tracegrove.dev>
+Date: Wed, 21 Oct 2026 13:47:03 +0000
+Subject: [PATCH 1/2] Seats: prorated seat changes, billing page control,
+ nightly audit
+
+## Acceptance criteria
+- [ ] An owner adds a seat from the billing page and is charged the prorated difference
+- [ ] Removing a seat never charges the card
+- [ ] Seat counts outside 1 to 500 are refused
+- [ ] The nightly audit emails the owner when members exceed paid seats
+- [ ] Another tenant can never change your seats
+---
+ app/billing.mjs               | 15 +++++++++++++++
+ jobs/seat-audit.mjs           | 16 ++++++++++++++++
+ lib/seats.mjs                 | 14 ++++++++++++++
+ migrations/003_seats.sql      |  1 +
+ web/components/SeatsPanel.jsx | 24 ++++++++++++++++++++++++
+ 5 files changed, 70 insertions(+)
+ create mode 100644 jobs/seat-audit.mjs
+ create mode 100644 lib/seats.mjs
+ create mode 100644 migrations/003_seats.sql
+ create mode 100644 web/components/SeatsPanel.jsx
+
+diff --git a/app/billing.mjs b/app/billing.mjs
+index 85cd85d..33447c5 100644
+--- a/app/billing.mjs
++++ b/app/billing.mjs
+@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
+ import { join } from 'node:path';
+ import { randomUUID } from 'node:crypto';
+ import { send, readBody } from './http.mjs';
++import { prorate, SEAT_PRICE } from '../lib/seats.mjs';
+ 
+ const dir = process.env.BILLING_DATA_DIR ?? './billing-data';
+ const tokens = JSON.parse(process.env.BILLING_TOKENS ?? '{}');
+@@ -88,6 +89,20 @@ const server = createServer(async (req, res) => {
+     return send(res, 200, { account: view(account), invoice });
+   }
+ 
++  if (req.method === 'GET' && url.pathname === '/seats') return send(res, 200, { seats: account.seats ?? 1, price: SEAT_PRICE[account.plan] });
++  if (req.method === 'POST' && url.pathname === '/seats') {
++    const body = await readBody(req).catch(() => ({}));
++    let amount;
++    try { amount = prorate(account.plan, account.seats ?? 1, body.seats, body.daysLeft ?? 30); } catch { return send(res, 400, { error: 'bad_seats' }); }
++    if (amount > 0) {
++      const result = await charge(account, amount, `${account.plan} seats`);
++      if (!result.ok) return send(res, 402, { error: 'payment_failed' });
++      account.invoices.push({ id: `inv_${randomUUID().slice(0, 8)}`, plan: account.plan, amount, chargeId: result.body?.id ?? null });
++    }
++    account.seats = body.seats; save(account);
++    return send(res, 200, { seats: account.seats, charged: Math.max(0, amount) });
++  }
++
+   if (req.method === 'GET' && url.pathname === '/invoices') return send(res, 200, { invoices: account.invoices });
+   const one = url.pathname.match(/^\/invoices\/([A-Za-z0-9_]+)$/);
+   if (req.method === 'GET' && one) {
+diff --git a/jobs/seat-audit.mjs b/jobs/seat-audit.mjs
+new file mode 100644
+index 0000000..21c2f2b
+--- /dev/null
++++ b/jobs/seat-audit.mjs
+@@ -0,0 +1,16 @@
++// Nightly: compare each account's members with its paid seats and email the owner when over.
++import cron from 'node-cron';
++import Stripe from 'stripe';
++import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
++import { overSeats } from '../lib/seats.mjs';
++
++const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '');
++cron.schedule('0 3 * * *', async () => {
++  for (const f of readdirSync(process.env.BILLING_DATA_DIR ?? './billing-data')) {
++    const account = JSON.parse(readFileSync(f, 'utf8'));
++    const members = (await stripe.subscriptions.list({ customer: account.id })).data.length;
++    const over = overSeats(account, members);
++    if (over > 0) await fetch(`${process.env.EMAIL_URL}/send`, { method: 'POST', body: JSON.stringify({ to: account.id, template: 'over_seats', over }) });
++    writeFileSync(`${f}.audit`, JSON.stringify({ over, at: Date.now() }));
++  }
++});
+diff --git a/lib/seats.mjs b/lib/seats.mjs
+new file mode 100644
+index 0000000..bcecb02
+--- /dev/null
++++ b/lib/seats.mjs
+@@ -0,0 +1,14 @@
++// Seat pricing: each seat on a plan has a monthly price; changing seats mid-cycle is prorated.
++export const SEAT_PRICE = { starter: 0, team: 900, business: 2900 };
++
++/** The prorated charge for moving from `from` to `to` seats with `daysLeft` days left in the cycle. */
++export function prorate(plan, from, to, daysLeft, daysInCycle = 30) {
++  if (!Number.isInteger(to) || to < 1 || to > 500) throw new RangeError('seats must be 1-500');
++  const delta = to - from;
++  return Math.round(delta * SEAT_PRICE[plan] * (daysLeft / daysInCycle));
++}
++
++/** Members beyond the paid seats, for the nightly audit. */
++export function overSeats(account, members) {
++  return Math.max(0, members - (account.seats ?? 1));
++}
+diff --git a/migrations/003_seats.sql b/migrations/003_seats.sql
+new file mode 100644
+index 0000000..56da0f8
+--- /dev/null
++++ b/migrations/003_seats.sql
+@@ -0,0 +1 @@
++create table seats (account_id text primary key, seats integer not null check (seats between 1 and 500));
+diff --git a/web/components/SeatsPanel.jsx b/web/components/SeatsPanel.jsx
+new file mode 100644
+index 0000000..5325dfd
+--- /dev/null
++++ b/web/components/SeatsPanel.jsx
+@@ -0,0 +1,24 @@
++import { useEffect, useState } from 'react';
++
++/** The billing page's seat control: shows paid seats and lets an owner add or remove them. */
++export function SeatsPanel({ token }) {
++  const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
++  const [seats, setSeats] = useState(null);
++  const [error, setError] = useState(null);
++  useEffect(() => { fetch('/seats', { headers }).then((r) => r.json()).then((d) => setSeats(d.seats)); }, []);
++  async function change(next) {
++    const r = await fetch('/seats', { method: 'POST', headers, body: JSON.stringify({ seats: next }) });
++    const d = await r.json();
++    if (!r.ok) return setError(d.error === 'payment_failed' ? 'Your card was declined.' : 'Choose between 1 and 500 seats.');
++    setError(null); setSeats(d.seats);
++  }
++  if (seats === null) return <p>Loading seats…</p>;
++  return (
++    <section aria-label="Seats">
++      <h2>{seats} seats</h2>
++      <button onClick={() => change(seats + 1)}>Add a seat</button>
++      <button onClick={() => change(seats - 1)} disabled={seats <= 1}>Remove a seat</button>
++      {error && <p role="alert">{error}</p>}
++    </section>
++  );
++}
+-- 
+2.43.0
+
+
+From a034a30c9c31af794fe5433e44a5c548122d080c Mon Sep 17 00:00:00 2001
+From: fx <fx@tracegrove.dev>
+Date: Wed, 21 Oct 2026 13:47:41 +0000
+Subject: [PATCH 2/2] Seats flows
+
+---
+ app/billing.mjs                        |  4 ++--
+ tracegrove/seats/add-seat.flow.yaml    | 15 +++++++++++++++
+ tracegrove/seats/anonymous.flow.yaml   |  8 ++++++++
+ tracegrove/seats/bad-seats.flow.yaml   | 10 ++++++++++
+ tracegrove/seats/remove-seat.flow.yaml | 20 ++++++++++++++++++++
+ 5 files changed, 55 insertions(+), 2 deletions(-)
+ create mode 100644 tracegrove/seats/add-seat.flow.yaml
+ create mode 100644 tracegrove/seats/anonymous.flow.yaml
+ create mode 100644 tracegrove/seats/bad-seats.flow.yaml
+ create mode 100644 tracegrove/seats/remove-seat.flow.yaml
+
+diff --git a/app/billing.mjs b/app/billing.mjs
+index 33447c5..7fb2d8c 100644
+--- a/app/billing.mjs
++++ b/app/billing.mjs
+@@ -94,8 +94,8 @@ const server = createServer(async (req, res) => {
+     const body = await readBody(req).catch(() => ({}));
+     let amount;
+     try { amount = prorate(account.plan, account.seats ?? 1, body.seats, body.daysLeft ?? 30); } catch { return send(res, 400, { error: 'bad_seats' }); }
+-    if (amount > 0) {
+-      const result = await charge(account, amount, `${account.plan} seats`);
++    if (amount !== 0) {
++      const result = await charge(account, Math.abs(amount), `${account.plan} seats`);
+       if (!result.ok) return send(res, 402, { error: 'payment_failed' });
+       account.invoices.push({ id: `inv_${randomUUID().slice(0, 8)}`, plan: account.plan, amount, chargeId: result.body?.id ?? null });
+     }
+diff --git a/tracegrove/seats/add-seat.flow.yaml b/tracegrove/seats/add-seat.flow.yaml
+new file mode 100644
+index 0000000..2e75606
+--- /dev/null
++++ b/tracegrove/seats/add-seat.flow.yaml
+@@ -0,0 +1,15 @@
++title: An owner on Team adds a seat and is charged the prorated seat price
++risk: critical
++tags: [billing, seats]
++steps:
++  - name: owner moves to Team
++    POST: /subscription
++    json: { plan: team }
++    expect: 200
++  - name: owner adds a second seat with the whole cycle left
++    POST: /seats
++    json: { seats: 2, daysLeft: 30 }
++    expect: { status: 200, json: { seats: 2, charged: 900 } }
++  - name: the seat count reads back
++    GET: /seats
++    expect: { status: 200, json: { seats: 2 } }
+diff --git a/tracegrove/seats/anonymous.flow.yaml b/tracegrove/seats/anonymous.flow.yaml
+new file mode 100644
+index 0000000..5397c62
+--- /dev/null
++++ b/tracegrove/seats/anonymous.flow.yaml
+@@ -0,0 +1,8 @@
++title: Without a token nobody can change seats
++tags: [billing, seats, authz]
++steps:
++  - name: anonymous is refused
++    POST: /seats
++    as: none
++    json: { seats: 3 }
++    expect: 401
+diff --git a/tracegrove/seats/bad-seats.flow.yaml b/tracegrove/seats/bad-seats.flow.yaml
+new file mode 100644
+index 0000000..7fd9414
+--- /dev/null
++++ b/tracegrove/seats/bad-seats.flow.yaml
+@@ -0,0 +1,10 @@
++title: Seat counts outside 1 to 500 are refused
++tags: [billing, seats]
++steps:
++  - name: zero seats is refused
++    POST: /seats
++    json: { seats: 0 }
++    expect: { status: 400, json: { error: bad_seats } }
++  - name: nothing changed
++    GET: /seats
++    expect: { status: 200, json: { seats: 1 } }
+diff --git a/tracegrove/seats/remove-seat.flow.yaml b/tracegrove/seats/remove-seat.flow.yaml
+new file mode 100644
+index 0000000..9e8f8a7
+--- /dev/null
++++ b/tracegrove/seats/remove-seat.flow.yaml
+@@ -0,0 +1,20 @@
++title: Removing a seat never charges the card
++risk: critical
++tags: [billing, seats]
++steps:
++  - name: owner moves to Team
++    POST: /subscription
++    json: { plan: team }
++    expect: 200
++  - name: owner adds a seat
++    POST: /seats
++    json: { seats: 2, daysLeft: 30 }
++    expect: 200
++  - name: owner removes it again
++    POST: /seats
++    json: { seats: 1, daysLeft: 30 }
++    expect: { status: 200, json: { seats: 1, charged: 0 } }
++  - name: only the Team upgrade and the added seat were charged
++    standin: payments
++    received: POST /v1/charges
++    expect: { calls: 2 }
+-- 
+2.43.0
+

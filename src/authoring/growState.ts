@@ -3,6 +3,7 @@
  * One stream, `tracegrove.discovery-event/v1`, drives the terminal, `--jsonl`, MCP and the UI. Views
  * never invent progress: each one folds the same events with `applyGrow` and draws the result.
  */
+import { expGot } from './checkCompare.ts';
 
 export const GROW_EVENT_VERSION = 'tracegrove.discovery-event/v1';
 export const PHASES = ['Read the change and its spec', 'Grow the tree', 'Trace each branch', 'Draft scenarios', 'Choose how much', 'Prove it'] as const;
@@ -18,10 +19,16 @@ export const LAYER_CODE: Record<Layer, string> = { ui: 'ui', api: 'api', cli: 'c
 export type CellStatus = 'built' | 'indirect' | 'missing';
 export type ScenarioKind = 'happy' | 'sad' | 'edge' | 'regression';
 export type Mode = 'min' | 'std' | 'max';
+/** Where a person or caller starts a journey. */
+export type Surface = 'browser' | 'terminal' | 'http' | 'job';
+/** A journey scenario proves the path end to end; a part scenario checks one part on its own (max). */
+export type ScenarioLevel = 'journey' | 'part';
+/** What a scenario shows: the path works, the app refuses what it must (auth, validation), or it survives a fault. */
+export type Polarity = 'happy' | 'guard' | 'failure';
 export const MODES: Array<{ id: Mode; label: string; blurb: string }> = [
-  { id: 'min', label: 'Minimum', blurb: 'every spec criterion, plus the riskiest failure of each part' },
-  { id: 'std', label: 'Standard', blurb: 'adds the remaining sad paths and edge cases' },
-  { id: 'max', label: 'Max', blurb: 'adds regression of every existing flow the change reaches' },
+  { id: 'min', label: 'Minimum', blurb: 'each critical journey end to end, its riskiest guard or failure, and every spec criterion' },
+  { id: 'std', label: 'Standard', blurb: 'adds the other journeys, and the other ways each one can fail' },
+  { id: 'max', label: 'Max', blurb: 'adds every part on its own, and regression of the flows the change reaches' },
 ];
 export const MODE_RANK: Record<Mode, number> = { min: 0, std: 1, max: 2 };
 export type ExtensionKind = 'breakdown' | 'action' | 'flow' | 'seed' | 'verification script' | 'adapter draft';
@@ -30,6 +37,7 @@ export const EXTENSION_STATE: Record<ExtensionState, string> = { proven: 'proven
 export type Tracer = 'rules' | 'claude' | 'codex';
 
 type E<K extends string, T> = { kind: K } & T;
+// Fields added after v1 shipped are optional (a scenario's journey, level, polarity and modeWhy), so older logs still load.
 export type GrowEventBody =
   | E<'phase.started', { phase: number }>
   | E<'change.read', { branch: string; base: string; head: string | null; pr: number | null; title: string; url: string | null; files: number; adds: number; dels: number; untraced: number }>
@@ -39,6 +47,8 @@ export type GrowEventBody =
   | E<'criterion.found', { id: string; text: string }>
   | E<'trunk.grown', Record<never, never>>
   | E<'unit.found', { unit: string; label: string; unitKind: string; loc: string; root: boolean; layer: Layer; parent: string | null }>
+  | E<'journey.found', { journey: string; title: string; entry: string; units: string[]; surface: Surface; why: string; loc: string }>
+  | E<'journey.named', { journey: string; title: string; by: Tracer | 'spec' }>
   | E<'agent.started', { agent: string; brief: string; by: Tracer; model: string | null; units: string[] }>
   | E<'agent.said', { agent: string; line: string }>
   | E<'depth.checked', { agent: string; unit: string; step: DepthStep; status: DepthStatus; loc: string; note: string; by: Tracer }>
@@ -51,14 +61,16 @@ export type GrowEventBody =
   | E<'agent.done', { agent: string; ok: boolean; note: string }>
   | E<'extension.written', { ext: string; extKind: ExtensionKind; name: string; path: string; why: string; state: ExtensionState; need: string; unit: string | null }>
   | E<'extension.proven', { ext: string; by: string }>
-  | E<'scenario.drafted', { scenario: string; unit: string; scenarioKind: ScenarioKind; mode: Mode; title: string; proves: string; criteria: string[]; layers: Layer[]; flow: string | null; variants: Array<'mock' | 'real'>; realKey: string | null; mockOnly: string | null; by: Tracer; ext: string[] }>
+  | E<'scenario.drafted', { scenario: string; unit: string; scenarioKind: ScenarioKind; mode: Mode; title: string; proves: string; criteria: string[]; layers: Layer[]; flow: string | null; variants: Array<'mock' | 'real'>; realKey: string | null; mockOnly: string | null; by: Tracer; ext: string[]; journey?: string | null; level?: ScenarioLevel; polarity?: Polarity; modeWhy?: string }>
   | E<'mode.asked', { counts: Record<Mode, number> }>
   | E<'mode.chosen', { mode: Mode; by: 'flag' | 'you' | 'default' }>
   | E<'flows.checked', { scenarios: number; runnable: number; config: string | null }>
   | E<'scenario.running', { scenario: string; flow: string }>
   | E<'scenario.passed', { scenario: string; took: number; run: string | null }>
-  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string }>
-  | E<'scenario.not_run', { scenario: string; why: string }>
+  /* `outcome` is the case outcome the run recorded: assertion_failed for a check that did not hold. A run that never reached its
+     checks (infrastructure_failed, blocked, inconclusive, cancelled) is a scenario.not_run that names its run. */
+  | E<'scenario.failed', { scenario: string; took: number; run: string | null; why: string; hop?: string; after?: boolean; outcome?: string }>
+  | E<'scenario.not_run', { scenario: string; why: string; run?: string | null; outcome?: string }>
   | E<'variant.passed', { scenario: string; took: number; note: string }>
   | E<'variant.skipped', { scenario: string; note: string }>
   | E<'variant.not_applicable', { scenario: string; note: string }>
@@ -69,15 +81,18 @@ export type GrowEventKind = GrowEvent['kind'];
 type Of<K extends GrowEventKind> = Extract<GrowEvent, { kind: K }>;
 
 export type GrowUnit = Omit<Of<'unit.found'>, 'kind' | 'v' | 'seq'> & { id: string; foundAt: number };
+export type GrowJourney = Omit<Of<'journey.found'>, 'kind' | 'v' | 'seq' | 'journey'> & { id: string; titleBy: Tracer | 'spec' | 'rules' };
 export type GrowAgent = { id: string; brief: string; by: Tracer; model: string | null; units: string[]; unit: string | null; note: string; done: boolean; ok: boolean; said: string[] };
 export type GrowScenario = Omit<Of<'scenario.drafted'>, 'kind' | 'v' | 'seq' | 'scenario'> & { id: string };
-export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null };
+/** A failed run's hop: the route whose step broke, or (after) the last route called before a failed check on other evidence. */
+/** `flow` is the flow the grow ran for the scenario (from scenario.running), so its run opens at the right case. */
+export type RunState = { st: 'run' | 'pass' | 'fail' | 'not_run'; ms?: number; why?: string; run?: string | null; hop?: string; after?: boolean; flow?: string };
 export type GrowState = {
   phase: number; phaseAt: Record<number, number>; ms: number;
   change: Of<'change.read'> | null; files: Array<Of<'file.changed'>>;
   spec: Of<'spec.found'> | null; specMissing: string | null; criteria: Array<{ id: string; text: string }>;
   linked: Record<string, Array<{ unit: string; why: string }>>; unbuilt: Record<string, string>; drift: Array<Of<'drift.found'>>;
-  trunkAt: number | null; units: GrowUnit[];
+  trunkAt: number | null; units: GrowUnit[]; journeys: GrowJourney[];
   depth: Record<string, Partial<Record<DepthStep, Of<'depth.checked'>>>>;
   cells: Record<string, Array<Of<'layer.needed'>>>;
   stops: Array<Of<'trace.stopped'>>; dropped: Array<Of<'claim.dropped'>>;
@@ -91,11 +106,16 @@ export type GrowState = {
 };
 
 export function freshGrow(): GrowState {
-  return { phase: -1, phaseAt: {}, ms: 0, change: null, files: [], spec: null, specMissing: null, criteria: [], linked: {}, unbuilt: {}, drift: [], trunkAt: null, units: [],
+  return { phase: -1, phaseAt: {}, ms: 0, change: null, files: [], spec: null, specMissing: null, criteria: [], linked: {}, unbuilt: {}, drift: [], trunkAt: null, units: [], journeys: [],
     depth: {}, cells: {}, stops: [], dropped: [], agents: [], focus: null, ext: {}, extOrder: [], scenarios: [], counts: null, asked: false, mode: 'min', modeBy: null,
     flows: null, run: {}, real: {}, done: null, blocked: null, last: 0 };
 }
 
+/** Logs saved before grow said how to prove a scenario it did not run told the reader to pass --prove, a flag grow has never
+ *  taken: they read as the instruction that works. */
+const runnable = (why: string) => why.replace(/^Run with --prove to run /, 'Run grow without --no-prove to run ');
+/** The flow a scenario was started with, kept when its result lands. */
+const ranFlow = (s: GrowState, id: string) => (s.run[id]?.flow ? { flow: s.run[id]!.flow } : {});
 const strip = <T extends { kind: string; v?: string; seq?: number }>(e: T) => { const { kind: _k, v: _v, seq: _s, ...rest } = e; return rest; };
 
 /** Fold one event into the state. Pure apart from mutating `s`, so every view gets the same answer. */
@@ -111,6 +131,8 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'criterion.found': s.criteria.push({ id: e.id, text: e.text }); break;
     case 'trunk.grown': s.trunkAt = e.ms; break;
     case 'unit.found': s.units.push({ ...strip(e), id: e.unit, foundAt: e.ms }); break;
+    case 'journey.found': { const { journey: _j, ...rest } = strip(e); s.journeys.push({ ...rest, id: e.journey, titleBy: 'rules' }); break; }
+    case 'journey.named': { const j = s.journeys.find((x) => x.id === e.journey); if (j) { j.title = e.title; j.titleBy = e.by; } break; }
     case 'agent.started': s.agents.push({ id: e.agent, brief: e.brief, by: e.by, model: e.model, units: e.units, unit: null, note: 'starting', done: false, ok: true, said: [] }); break;
     case 'agent.said': { const a = agent(e.agent); if (a) { a.note = e.line; a.said.push(e.line); if (a.said.length > 40) a.said.shift(); } break; }
     case 'depth.checked': {
@@ -138,10 +160,13 @@ export function applyGrow(s: GrowState, e: GrowEvent): GrowState {
     case 'mode.asked': s.asked = true; s.counts = e.counts; break;
     case 'mode.chosen': s.asked = false; s.mode = e.mode; s.modeBy = e.by; break;
     case 'flows.checked': s.flows = e; break;
-    case 'scenario.running': s.run[e.scenario] = { st: 'run' }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run }; break;
-    case 'scenario.failed': s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
-    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: e.why }; break;
+    case 'scenario.running': s.run[e.scenario] = { st: 'run', ...(e.flow ? { flow: e.flow } : {}) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.passed': s.run[e.scenario] = { st: 'pass', ms: e.took, run: e.run, ...ranFlow(s, e.scenario) }; break;
+    case 'scenario.failed':
+      // A run that never reached its checks is not a failed check: it proved nothing, so its scenario is not tested yet.
+      if (neverChecked(e)) { s.run[e.scenario] = { st: 'not_run', why: couldNotRun(e.why), ...(e.run ? { run: e.run } : {}), ...ranFlow(s, e.scenario) }; break; }
+      s.run[e.scenario] = { st: 'fail', ms: e.took, run: e.run, why: e.why, ...(e.hop ? { hop: e.hop, after: !!e.after } : {}), ...ranFlow(s, e.scenario) }; s.focus = s.scenarios.find((x) => x.id === e.scenario)?.unit ?? s.focus; break;
+    case 'scenario.not_run': s.run[e.scenario] = { st: 'not_run', why: runnable(e.why), ...(e.run ? { run: e.run } : {}), ...ranFlow(s, e.scenario) }; break;
     case 'variant.passed': s.real[e.scenario] = { st: 'pass', ms: e.took, note: e.note }; break;
     case 'variant.skipped': s.real[e.scenario] = { st: 'not_run', note: e.note }; break;
     case 'variant.not_applicable': s.real[e.scenario] = { st: 'not_run', note: e.note, na: true }; break;
@@ -199,14 +224,115 @@ export function growSummary(s: GrowState) {
   };
 }
 
-/** What the UI draws besides raw state: the same derived answers the terminal computes. */
-export function growView(s: GrowState) {
+/** What the UI draws besides raw state: the same derived answers the terminal computes. `broke` is what the first failure's
+ *  run recorded (growJson's verdictFacts reads it), so the verdict can say how it failed. */
+export function growView(s: GrowState, broke: VerdictFacts | null = null) {
   return {
     criteria: s.criteria.map((c) => ({ ...c, status: criterionStatus(s, c.id), units: (s.linked[c.id] ?? []).map((l) => l.unit) })),
     depth: Object.fromEntries(s.units.map((u) => [u.id, { pips: depthOf(s, u.id), score: depthScore(s, u.id) }])),
     gaps: Object.fromEntries(s.units.map((u) => [u.id, unitHasGap(s, u.id)])),
     counts: { min: modeCount(s, 'min'), std: modeCount(s, 'std'), max: modeCount(s, 'max') },
     summary: growSummary(s),
+    verdict: growVerdict(s, { broke }),
   };
 }
 export type GrowView = ReturnType<typeof growView>;
+
+/** A scenario's title in plain words: no backticks, and no "METHOD /path: " it is sent through. */
+export function plainTitle(t: string): string {
+  const flat = String(t ?? '').split('`').join('');
+  const m = /^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \S+: (.+)$/s.exec(flat);
+  return m ? m[1]! : flat;
+}
+
+export type VerdictKind = 'not ready' | 'not proven yet' | 'ready' | 'stopped' | 'cancelled';
+/** What each exit code tells a script or an agent to do next. */
+export const EXIT_MEANING: Record<VerdictKind, string> = { 'not ready': 'fix', 'not proven yet': 'prove more', ready: 'ready', stopped: 'blocked', cancelled: 'cancelled' };
+const VERDICT_WORD: Record<VerdictKind, string> = { 'not ready': 'Not ready', 'not proven yet': 'Not proven yet', ready: 'Ready', stopped: 'Stopped', cancelled: 'Cancelled' };
+const VERDICT_MARK: Record<VerdictKind, string> = { 'not ready': '✗', 'not proven yet': '◌', ready: '✓', stopped: '✕', cancelled: '✕' };
+const VERDICT_CODE: Record<VerdictKind, number> = { 'not ready': 1, 'not proven yet': 3, ready: 0, stopped: 2, cancelled: 4 };
+
+/** What the first failure's run recorded: the step that broke, and the check there with what it expected and got. Null
+ *  fields were not recorded (the run is gone, or its evidence does not say). */
+export type VerdictFacts = { step: number | null; stepName: string | null; check: string | null; expected: unknown; got: unknown };
+/**
+ * A failed result's reason as a sentence can carry it: where it broke (the check, or a stage such as "(app startup)") and the
+ * first line of what it said, without a trailing "last app output:" whose lines were cut. A stack trace is never a reason.
+ */
+export function failReason(why: string | undefined): { where: string | null; said: string } {
+  const w = String(why ?? '').trim(); const i = w.indexOf(': ');
+  const said = (i > 0 ? w.slice(i + 2) : w).split('\n')[0]!.trim().replace(/;[^;]*:$/, '').trim();
+  return { where: i > 0 ? w.slice(0, i) : null, said };
+}
+/** The stages a run names (src/authoring/run.ts) when it broke before any check compared anything: the app did not start, it
+ *  was stopped before its first step, a fixture could not be set up, or the case ended with no step or check failing. */
+const STAGE = /^\((app startup|before steps|fixture[^)]*|case)\)$/;
+/** A failed result that never reached its checks. A log says so with the run's `outcome`; one saved before it did, only by the
+ *  stage its reason names, such as "(app startup): application exited before becoming ready". */
+function neverChecked(e: { why: string; outcome?: string }): boolean {
+  return e.outcome ? e.outcome !== 'assertion_failed' : STAGE.test(failReason(e.why).where ?? '');
+}
+/**
+ * Why a run that never reached its checks proves nothing, in words: "Could not run: the app did not start (application exited
+ * before becoming ready)". Only the first line of what it said, as for a failure.
+ */
+export function couldNotRun(why: string): string {
+  const { where, said } = failReason(why);
+  const stage = STAGE.exec(where ?? '')?.[1] ?? null;
+  const what = stage === 'app startup' ? 'the app did not start' : stage === 'before steps' ? 'it was stopped before its first step'
+    : stage?.startsWith('fixture') ? `${stage} could not be set up` : null;
+  const line = what || stage ? said : String(why ?? '').trim().split('\n')[0]!.trim().replace(/;[^;]*:$/, '').trim();
+  if (!line) return what ? `Could not run: ${what}` : 'Could not run, with no reason recorded';
+  return what ? `Could not run: ${what} (${line})` : `Could not run: ${line}`;
+}
+/** How a failure broke, in words: what its check expected and got when the run recorded it, else the reason its result gave. */
+function howItBroke(r: RunState | undefined, broke: VerdictFacts | null | undefined): string | null {
+  if (broke?.check) { const t = expGot({ check: broke.check, expected: broke.expected, got: broke.got }); return t.charAt(0).toLowerCase() + t.slice(1); }
+  return failReason(r?.why).said || null;
+}
+
+/**
+ * The one verdict on a grow, from the counts in its state. The page, `grow --json` and the exit code all read it:
+ * "Not ready" when a check failed, "Not proven yet" when nothing failed but a scenario in the chosen mode has no result or
+ * the mode holds no scenario at all, "Ready" when at least one passed and every one did. Exit codes: 1 fix, 3 prove more
+ * (0 with `allowUnproven`), 0 ready; a grow that stopped (2) or was cancelled (4) keeps its own code. `broke` is what the
+ * first failure's run recorded, so the verdict can say how it failed.
+ */
+export function growVerdict(s: GrowState, opts: { allowUnproven?: boolean; broke?: VerdictFacts | null } = {}) {
+  const inRun = s.scenarios.filter((x) => inMode(s, x));
+  const passed = inRun.filter((x) => s.run[x.id]?.st === 'pass');
+  const failed = inRun.filter((x) => s.run[x.id]?.st === 'fail');
+  const open = inRun.filter((x) => s.run[x.id]?.st !== 'pass' && s.run[x.id]?.st !== 'fail');
+  // Ready needs a scenario that passed: a mode with none proved nothing, which is not the same as nothing failing.
+  const kind: VerdictKind = s.blocked ? (s.blocked.code === 'discovery_cancelled' ? 'cancelled' : 'stopped')
+    : failed.length ? 'not ready' : open.length || !passed.length ? 'not proven yet' : 'ready';
+  const promise = (x: GrowScenario) => (x.criteria.length ? x.criteria.join(', ') : null);
+  const first = failed[0];
+  const reasonOf = (x: GrowScenario) => { const r = s.run[x.id]; return r?.st === 'not_run' ? r.why ?? 'No reason was recorded' : r?.st === 'run' ? 'It was still running when the grow stopped' : 'No result was recorded'; };
+  // The mode the grow chose; none yet (null) when it stopped before choosing.
+  const mode = s.modeBy ? MODES.find((m) => m.id === s.mode)!.label : null;
+  const n = inRun.length, scen = (k: number) => `${k} scenario${k === 1 ? '' : 's'}`;
+  const promiseWords = (p: string | null) => (p ? ` (promise${p.includes(',') ? 's' : ''} ${p})` : '');
+  // A failure is named by the promise its scenario makes, then how it broke: "“Removing a seat never charges the card” failed:
+  // expected 2 charges, got 3". The title alone would say the opposite of what happened.
+  const how = first ? howItBroke(s.run[first.id], opts.broke) : null;
+  const text = kind === 'not ready' ? `“${plainTitle(first!.title)}” failed${how ? `: ${how}` : ', with no reason recorded'}`
+    : kind === 'not proven yet' ? (n ? `${open.length} of ${scen(n)} in ${mode} not tested yet` : `nothing in this change was traced to a scenario${s.scenarios.length ? ` in ${mode}` : ''}`)
+    : kind === 'ready' ? `${passed.length} of ${scen(n)} in ${mode} passed`
+    : `${s.blocked!.code}: ${s.blocked!.detail}`;
+  const detail = kind === 'not ready' ? `${text}${promiseWords(promise(first!))}${failed.length > 1 ? `, and ${failed.length - 1} more failed` : ''}` : text;
+  return {
+    verdict: kind, word: VERDICT_WORD[kind], mark: VERDICT_MARK[kind], exitCode: kind === 'not proven yet' && opts.allowUnproven ? 0 : VERDICT_CODE[kind], exitMeaning: EXIT_MEANING[kind], mode,
+    counts: { passed: passed.length, failed: failed.length, notTestedYet: open.length },
+    promises: { hold: s.criteria.filter((c) => criterionStatus(s, c.id).cls === 'pass').length, of: s.criteria.length },
+    first: first ? { scenario: first.id, title: plainTitle(first.title), promise: promise(first), flow: s.run[first.id]?.flow ?? first.flow ?? null, run: s.run[first.id]?.run ?? null,
+      step: opts.broke?.step ?? null, check: opts.broke?.check ?? null, expected: opts.broke?.check ? opts.broke.expected : null, got: opts.broke?.check ? opts.broke.got : null } : null,
+    failed: failed.map((x) => x.id), more: Math.max(0, failed.length - 1),
+    /** each scenario not tested yet, with its reason; one whose run never reached its checks names that run */
+    unproven: open.map((x) => ({ scenario: x.id, title: plainTitle(x.title), reason: reasonOf(x), ...(s.run[x.id]?.run ? { run: s.run[x.id]!.run! } : {}) })),
+    /** What the page says beside the mark and the word; `detail` adds the promise and how many more failed, and with the mark
+     *  and the word it is the line the terminal prints. */
+    text, detail, line: `${VERDICT_MARK[kind]} ${VERDICT_WORD[kind]}: ${detail}`,
+  };
+}
+export type GrowVerdict = ReturnType<typeof growVerdict>;

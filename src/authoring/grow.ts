@@ -8,23 +8,25 @@
  * a criterion resting on agent-written pieces nobody reviewed is "agent-checked", never "proved"; a
  * scenario without a flow is "not proven yet", never green.
  */
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { Blocked } from '../core/errors.ts';
 import { STATE_DIR, compileProject, configInDirectory, loadAuthoringConfig, type CompiledFlowInfo } from './compile.ts';
-import { gitInfo, safeRef, scanSource } from './discover.ts';
+import { gitInfo, safeRef } from './discover.ts';
 import { riskOf } from './discoveryEvents.ts';
 import { agentEnv, claudeResult, describeAgentLine, detectAgents, resolveAgentSettings, DEFAULT_MODELS, type AgentSettings } from './agent.ts';
 import { matchesTemplate } from './traffic.ts';
 import { runTests } from './run.ts';
-import { draftWithAgent } from './workspace.ts';
-import { findSpec, git, grepAt, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
+import type { TestRunReport } from './runReport.ts';
+import { draftWithAgent, latestObservedRun, type ProvedFlow } from './workspace.ts';
+import { PROVIDERS, findSpec, git, grepAt, harnessOf, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, routesOf, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
+import { journeysOf, reachGraph, words } from './growReach.ts';
 import {
-  GROW_EVENT_VERSION, MODE_RANK, applyGrow, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
-  type GrowState, type Layer, type Mode, type ScenarioKind, type Tracer,
+  GROW_EVENT_VERSION, MODE_RANK, applyGrow, couldNotRun, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
+  type GrowJourney, type GrowState, type Layer, type Mode, type Polarity, type ScenarioKind, type ScenarioLevel, type Tracer,
 } from './growState.ts';
 
 export type GrowOptions = {
@@ -37,13 +39,19 @@ export type GrowOptions = {
   chooseMode?: (counts: Record<Mode, number>) => Promise<Mode | null>;
   /** write the event log under .tracegrove/discovery/ (default true) */
   save?: boolean;
+  /** how to turn proving on where this grow was started, for the reason a scenario was not run (default: the command line's) */
+  proveOn?: string;
 };
+/** What the command line says to prove a scenario that was not run. */
+export const PROVE_ON_CLI = 'Run grow without --no-prove';
 export type GrowResult = { state: GrowState; events: GrowEvent[]; log: string | null };
 
 type Ctx = {
   dir: string; branch: string; base: string; files: FileChange[]; units: ChangeUnit[]; criteria: Criterion[];
   state: GrowState; emit: (e: GrowEventBody) => void; signal: AbortSignal | undefined;
   callers: Map<string, string | null>; proposals: Map<string, Proposal[]>;
+  /** whether a file on the branch is a test or a harness beside the app, as `roleOf` decides for the change's own files */
+  isTest: (path: string) => boolean;
 };
 type Proposal = { kind: Exclude<ScenarioKind, 'regression'>; title: string; proves: string; criteria: string[] };
 
@@ -98,7 +106,18 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
 
 function worktreeFor(dir: string, branch: string): string | null {
   const path = join(mkdtempSync(join(tmpdir(), 'tracegrove-grow-')), 'tree');
-  try { git(dir, ['worktree', 'add', '--detach', path, branch]); return path; } catch { return null; }
+  try { git(dir, ['worktree', 'add', '--detach', path, branch]); } catch { return null; }
+  prepareWorktree(dir, path);
+  return path;
+}
+/** A fresh worktree has the branch's sources and nothing else. Installed packages come from the checkout next door;
+ *  a build script runs so what proves the branch is the branch's own build, not a stale one. A failed build is left for the flows to report. */
+function prepareWorktree(home: string, work: string): void {
+  for (const dep of ['node_modules', '.venv']) if (existsSync(join(home, dep)) && !existsSync(join(work, dep))) { try { symlinkSync(join(home, dep), join(work, dep), 'dir'); } catch { /* the flows will say what is missing */ } }
+  let scripts: Record<string, unknown> = {};
+  try { scripts = (JSON.parse(readFileSync(join(work, 'package.json'), 'utf8')) as { scripts?: Record<string, unknown> }).scripts ?? {}; } catch { return; }
+  if (typeof scripts.build !== 'string') return;
+  spawnSync('npm', ['run', 'build', '--silent'], { cwd: work, stdio: 'ignore', timeout: 10 * 60_000, env: { ...process.env, CI: '1' } });
 }
 function removeWorktree(dir: string, path: string) {
   try { git(dir, ['worktree', 'remove', '--force', path]); } catch { /* already gone */ }
@@ -109,12 +128,16 @@ async function traceAndProve(home: string, work: string | null, options: GrowOpt
   change: { branch: string; base: string; files: FileChange[]; units: ChangeUnit[]; criteria: Criterion[]; onDisk: boolean }): Promise<void> {
   const { branch, base, files, units, criteria } = change;
   const dir = work ?? home;
-  const ctx: Ctx = { dir, branch, base, files, units, criteria, state, emit, signal: options.signal, callers: new Map(), proposals: new Map() };
+  const harness = harnessOf(dir, branch);
+  const ctx: Ctx = { dir, branch, base, files, units, criteria, state, emit, signal: options.signal, callers: new Map(), proposals: new Map(), isTest: (path) => isTestFile(path, harness) };
 
   // Phase 1: the tree.
   emit({ kind: 'phase.started', phase: 1 });
   emit({ kind: 'trunk.grown' });
   for (const u of units) emit({ kind: 'unit.found', unit: u.id, label: u.label, unitKind: u.kind, loc: `${u.file}:${u.line}`, root: u.root, layer: u.layer, parent: u.parent });
+  // Journeys: what a person or caller does end to end, read from which part requests or calls which.
+  const { journeys } = journeysOf(units, reachGraph(dir, branch, units, PROVIDERS));
+  for (const j of journeys) emit({ kind: 'journey.found', journey: j.id, title: j.title, entry: j.entry, units: j.units, surface: j.surface, why: j.why, loc: j.loc });
   aborted(ctx);
 
   // Phase 2: trace. The rules answer at once; an agent then deepens each lane in parallel.
@@ -137,7 +160,9 @@ async function traceAndProve(home: string, work: string | null, options: GrowOpt
   if (agent.settings && ctx.proposals.size) emit({ kind: 'extension.written', ext: 'x1', extKind: 'breakdown', name: 'Tree and scenario breakdown',
     path: `${STATE_DIR}/discovery/${slug(branch)}.jsonl`, why: 'Units come straight from the diff and every cited line was checked. Which scenarios matter is the agent’s judgment.',
     state: 'review', need: 'Skim the scenarios once. Each one counts only after a flow proves it.', unit: null });
-  draftScenarios(ctx, flows, config);
+  let seen: Map<string, Array<{ method: string; path: string }>> = new Map();
+  if (config) { try { seen = new Map((latestObservedRun(dirname(config), null)?.cases ?? []).map((c) => [c.caseId, c.requests])); } catch { /* no saved runs */ } }
+  draftScenarios(ctx, flows, config, seen);
   aborted(ctx);
 
   // Phase 4: how much to prove.
@@ -154,7 +179,7 @@ async function traceAndProve(home: string, work: string | null, options: GrowOpt
   const t = Date.now();
   if (options.prove) await prove(ctx, config, agent.settings);
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[mode]);
-  if (!options.prove) for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: s.flow ? `Run with --prove to run ${s.flow}` : 'No flow proves this yet' });
+  if (!options.prove) for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: s.flow ? `${options.proveOn ?? PROVE_ON_CLI} to run ${s.flow}` : 'No flow proves this yet' });
   const res = (st: string) => inRun.filter((s) => state.run[s.id]?.st === st).length;
   emit({ kind: 'discovery.finished', ran: res('pass') + res('fail'), passed: res('pass'), failed: res('fail'), notRun: res('not_run') });
 }
@@ -257,7 +282,7 @@ const sentence = (parts: string[]) => { const s = parts.length > 1 ? `${parts.sl
 function callersOf(ctx: Ctx, u: ChangeUnit): { status: DepthStatus; loc: string; note: string } {
   if (u.root && u.parent) { const p = ctx.units.find((x) => x.id === u.parent); return { status: 'ok', loc: `${u.file}:${u.line}`, note: `Called from ${p?.label ?? u.file}` }; }
   if (u.root) return { status: 'ok', loc: `${u.file}:${u.line}`, note: `Reached from ${u.file}` };
-  const hits = grepAt(ctx.dir, ctx.branch, u.needles).filter((h) => h.file !== u.file && !isTestFile(h.file));
+  const hits = grepAt(ctx.dir, ctx.branch, u.needles).filter((h) => h.file !== u.file && !ctx.isTest(h.file));
   const pick = u.kind === 'route' ? hits.find((h) => /fetch\(|api\(|EventSource|href|url|curl|GET|POST/.test(h.text)) ?? hits[0]
     : u.kind === 'command' ? hits.find((h) => /\.md$/.test(h.file)) ?? hits[0]
     : hits.find((h) => /\bimport\b|\brequire\(|\bfrom\s/.test(h.text));
@@ -270,7 +295,7 @@ function callersOf(ctx: Ctx, u: ChangeUnit): { status: DepthStatus; loc: string;
 
 function testsOf(ctx: Ctx, u: ChangeUnit): { status: DepthStatus; loc: string; note: string } {
   const needles = u.layer === 'ext' && u.provider?.name === 'GitHub' ? ['gh pr view', "'gh'"] : u.root ? [u.label] : u.needles;
-  const hits = grepAt(ctx.dir, ctx.branch, needles).filter((h) => isTestFile(h.file) && h.file !== u.file);
+  const hits = grepAt(ctx.dir, ctx.branch, needles).filter((h) => ctx.isTest(h.file) && h.file !== u.file);
   if (!hits.length) return { status: 'none', loc: '—', note: 'No test mentions it' };
   const changed = new Set(ctx.files.filter((f) => f.role === 'test').map((f) => f.path));
   const pick = hits.find((h) => changed.has(h.file)) ?? hits[0]!;
@@ -309,7 +334,7 @@ function agentFor(dir: string, options: GrowOptions, checkedOut: boolean): { set
 
 const Claim = z.object({ found: z.boolean(), loc: z.string().max(300).default(''), note: z.string().max(500).default('') });
 const AgentAnswer = z.object({ units: z.array(z.object({
-  unit: z.string(), read: Claim.nullish(), callers: Claim.nullish(), effects: Claim.extend({ stop: z.string().max(400).nullish() }).nullish(), tests: Claim.nullish(),
+  unit: z.string(), journey: z.string().max(80).nullish(), read: Claim.nullish(), callers: Claim.nullish(), effects: Claim.extend({ stop: z.string().max(400).nullish() }).nullish(), tests: Claim.nullish(),
   spec: z.object({ criteria: z.array(z.string()).max(24).default([]), note: z.string().max(500).default('') }).nullish(),
   scenarios: z.array(z.object({ kind: z.enum(['happy', 'sad', 'edge']), title: z.string().min(3).max(160), proves: z.string().max(500).default(''), criteria: z.array(z.string()).max(24).default([]) })).max(6).default([]),
 })).max(60) });
@@ -327,6 +352,7 @@ export function tracePrompt(input: { branch: string; base: string; brief: string
     '- effects: what it writes, sends or runs. If the effect leaves this repo (a third-party service), set "stop" to one sentence saying where tracing has to stop.',
     '- tests: a test that exercises it (found=false if none).',
     '- spec: {"criteria": ["C1"], "note": "..."} with the criteria it serves by meaning; empty when it serves none.',
+    'For a unit where a person or caller starts (a screen, a command, a job, a route called from outside), add "journey": what they do there, in 3 to 7 plain words (for example "Add a seat from the billing page").',
     'Then propose 1 to 4 scenarios per unit that would prove it end to end: {"kind": "happy"|"sad"|"edge", "title": "...", "proves": "what must be observably true", "criteria": ["C1"]}. Put the riskiest failure first among sad and edge.',
     '', 'Cite only lines you opened. tracegrove checks every path:line you cite against the branch and drops claims that do not exist.',
     'Reply with JSON only, no prose: {"units": [{"unit": "u1", "read": {...}, "callers": {...}, "effects": {...}, "tests": {...}, "spec": {...}, "scenarios": [...]}]}',
@@ -383,6 +409,8 @@ async function traceWithAgent(ctx: Ctx, agent: string, lane: { brief: string; un
       emit({ kind: 'depth.checked', agent, unit: u.id, step, status: stop ? 'stop' : 'ok', loc: c.loc, note: stop || c.note, by: settings.provider as Tracer }); kept++;
       if (stop) emit({ kind: 'trace.stopped', unit: u.id, at: c.loc, why: stop });
     };
+    const journey = a.journey?.trim() ? ctx.state.journeys.find((j) => j.entry === u.id) : undefined;
+    if (journey && a.journey) emit({ kind: 'journey.named', journey: journey.id, title: a.journey.trim().replace(/[.]$/, ''), by: settings.provider as Tracer });
     claim('read', a.read); claim('callers', a.callers); claim('effects', a.effects, a.effects?.stop ?? null); claim('tests', a.tests);
     if (a.spec) {
       const ids = a.spec.criteria.filter((id) => ctx.criteria.some((c) => c.id === id));
@@ -443,7 +471,7 @@ function templates(u: ChangeUnit, effects: string[]): Template[] {
     { kind: 'sad', title: 'Unexpected input does not escape as a crash', proves: 'Its callers report a clear error instead of a stack trace.', risk: 1 }];
 }
 
-type FlowRow = { caseId: string; title: string; file: string; steps: CompiledFlowInfo['steps'] };
+type FlowRow = { caseId: string; title: string; file: string; risk: string; steps: CompiledFlowInfo['steps'] };
 function findConfig(dir: string, explicit: string | null): string | null {
   if (explicit) { const path = resolve(dir, explicit); return existsSync(path) ? path : null; }
   const here = configInDirectory(dir);
@@ -458,7 +486,7 @@ function findConfig(dir: string, explicit: string | null): string | null {
   return null;
 }
 function loadFlows(configPath: string): FlowRow[] {
-  try { return compileProject(configPath).flows.map((f) => ({ caseId: f.caseId, title: f.title, file: f.file, steps: f.steps })); } catch { return []; }
+  try { return compileProject(configPath).flows.map((f) => ({ caseId: f.caseId, title: f.title, file: f.file, risk: f.risk, steps: f.steps })); } catch { return []; }
 }
 // A literal route (/notes/count) is reached only by that literal path; a flow step on /notes/{noteId} could be any note.
 const sameRoute = (u: ChangeUnit, s: { method: string; path: string }) => s.method === u.method
@@ -476,84 +504,347 @@ function flowFor(u: ChangeUnit, t: Template, flows: FlowRow[], taken: Set<string
 
 const AUTH_WORDS = /\btoken|\bsession|sign(?:ed)?[ -]?(?:in|out)|log[ -]?in|\bauth|anonymous|unauthori|permission|forbidden/i;
 const FAILURE_WORDS = /reject|refus|invalid|\berror|\bfail/i;
-/** Which criteria a rules template can speak for: auth edges take the criteria about tokens and sessions, happy paths the rest, failures those phrased as a refusal. */
-function criteriaFor(ctx: Ctx, u: ChangeUnit, t: Template, linked: string[]): string[] {
+/** Which of the linked criteria a scenario speaks for: an auth edge those about tokens and sessions, a happy path the rest, a failure those phrased as a refusal. */
+function speaksFor(ctx: Ctx, t: { kind: ScenarioKind; auth?: boolean }, linked: string[]): string[] {
   const text = (id: string) => ctx.criteria.find((c) => c.id === id)?.text ?? '';
-  if (t.auth) {
-    const ids = ctx.criteria.filter((c) => AUTH_WORDS.test(c.text)).map((c) => c.id);
-    for (const id of ids) if (!ctx.state.linked[id]?.some((l) => l.unit === u.id)) ctx.emit({ kind: 'criterion.linked', id, unit: u.id, why: `${u.label} has a signed-out edge, which is what it describes` });
-    return ids;
-  }
+  if (t.auth) return linked.filter((id) => AUTH_WORDS.test(text(id)));
   if (t.kind === 'happy') return linked.filter((id) => !AUTH_WORDS.test(text(id)) || !FAILURE_WORDS.test(text(id)));
   return linked.filter((id) => FAILURE_WORDS.test(text(id)) && !AUTH_WORDS.test(text(id)));
 }
+/** Which criteria a rules template can speak for: as `speaksFor`, except that a signed-out edge takes every criterion about tokens and sessions, and links it. */
+function criteriaFor(ctx: Ctx, u: ChangeUnit, t: Template, linked: string[]): string[] {
+  if (!t.auth) return speaksFor(ctx, t, linked);
+  const ids = ctx.criteria.filter((c) => AUTH_WORDS.test(c.text)).map((c) => c.id);
+  for (const id of ids) if (!ctx.state.linked[id]?.some((l) => l.unit === u.id)) ctx.emit({ kind: 'criterion.linked', id, unit: u.id, why: `${u.label} has a signed-out edge, which is what it describes` });
+  return ids;
+}
 
-function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null) {
+type Drafted = Template & { criteria: string[]; on?: ChangeUnit; polarity?: Polarity };
+const AUTH_TITLE = /session|token|signed.out|unauth|forbidden|permission/i;
+const SLOW = /time ?out|slow|unreachable|hang/i;
+const GUARD = /refus|reject|invalid|\bbad (?:input|flag|body|request)|unauthori|forbid|denied|permission|signed.out|without a (?:session|token)|\bnever\b|outside|constraint|\blimit|not allowed|\b4(?:0\d|22|29)\b/i;
+const FAULT = /\bwhen\b.*\b(?:fail|error|refuse|down)|slow|unreachable|time ?out|retr(?:y|ies)|crash|declin|hiccup/i;
+/** Happy when the path works, including an edge it must still work at (a small screen, an empty list); guard when the app
+ * refuses what it must (a session, a valid body); failure when it meets a fault. */
+const polarityOf = (t: { kind: ScenarioKind; title: string; auth?: boolean }): Polarity =>
+  t.kind === 'happy' ? 'happy' : t.auth || (GUARD.test(t.title) && !FAULT.test(t.title)) ? 'guard' : t.kind === 'sad' || FAULT.test(t.title) ? 'failure' : 'happy';
+/** A flow's polarity, read from its steps: a stand-in fault is a failure, an expected 4xx a guard, otherwise the path works. */
+const flowPolarity = (f: FlowRow): Polarity => (f.steps.some((st) => st.method === 'FAULT') ? 'failure' : f.steps.some((st) => st.expectStatus !== null && st.expectStatus >= 400) ? 'guard' : 'happy');
+/** A flow title that restates a criterion: it shares at least three of the criterion's words, and half of them or more. */
+const restates = (title: string, criterion: string) => { const want = termsOf(criterion); const shared = [...termsOf(title)].filter((t) => want.has(t)).length; return shared >= 3 && shared * 2 >= want.size; };
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A journey's own scenarios, at the surface a person starts from: end to end first, then the ways it fails there. */
+function journeyTemplates(entry: ChangeUnit, parts: ChangeUnit[], effects: string[]): Template[] {
+  if (entry.layer !== 'ui') return templates(entry, effects);
+  const routes = parts.filter((p) => p.kind === 'route');
+  const names = routes.slice(0, 3).map((r) => r.label).join(', ') + (routes.length > 3 ? ` and ${routes.length - 3} more` : '');
+  return [
+    { kind: 'happy', title: `${words(entry.label)} works end to end in a real browser`, risk: 0,
+      proves: routes.length ? `In a real browser, ${entry.label} calls ${names} and the page shows the result.` : `In a real browser, ${entry.label} renders and its main control does what it says.` },
+    { kind: 'sad', title: 'When the server refuses, the page says so', proves: `An error from ${routes[0]?.label ?? 'its API'} shows as a readable message, not a blank view.`, risk: 2 },
+    { kind: 'edge', title: 'Works on a 375 px screen', proves: 'No horizontal scroll, and every control can be reached.', risk: 1 },
+  ];
+}
+
+/**
+ * The browser flow that proves a browser journey, by evidence: its last verified run reached the journey's
+ * routes, its steps drive a test id, label or role that the change's UI lines add, or its API steps reach the
+ * journey's routes. The most evidence wins. A title sharing three words with the journey comes last, and only
+ * when there is no saved run to go by.
+ */
+const GENERIC = new Set(['browser', 'page', 'terminal', 'works', 'real', 'screen']);
+function browserFlowFor(j: GrowJourney, parts: ChangeUnit[], added: string, flows: FlowRow[], taken: Set<string>, seen: Map<string, Array<{ method: string; path: string }>>): string | null {
+  const routes = parts.filter((u) => u.kind === 'route');
+  const want = new Set([...termsOf([j.title, ...parts.map((u) => (u.kind === 'route' ? u.path ?? '' : words(u.label)))].join(' '))].filter((t) => !GENERIC.has(t)));
+  // A control the added lines name: quoted or as element text, or built from a quoted prefix ('grow-mode-' + id).
+  const prefixes = [...added.matchAll(/['"`]([\w-]{3,}[-_])['"`]\s*\+/g)].map((m) => m[1]!);
+  const named = (name: string) => name.length >= 3 && (new RegExp(`['"\`>]${escapeRe(name)}['"\`<]`).test(added) || prefixes.some((p) => name.startsWith(p) && name.length > p.length));
+  const best = flows.filter((f) => !taken.has(`${f.caseId}:happy`) && f.steps.some((st) => st.method === 'UI')).map((f) => {
+    const hits = routes.filter((r) => (seen.get(f.caseId) ?? []).some((q) => sameRoute(r, q))).length;
+    const marks = new Set(f.steps.filter((st) => st.method === 'UI' && !st.path.startsWith('navigate ')).map((st) => st.path.slice(st.path.indexOf(' ') + 1)).filter(named)).size;
+    const reached = routes.filter((r) => f.steps.some((st) => st.method !== 'UI' && sameRoute(r, st))).length;
+    const shared = [...termsOf(f.title)].filter((t) => want.has(t)).length;
+    return { f, evidence: hits + marks + reached, shared };
+  }).filter((m) => m.evidence > 0 || (!seen.size && m.shared >= 3)).sort((a, b) => b.evidence - a.evidence || b.shared - a.shared)[0];
+  if (!best) return null;
+  taken.add(`${best.f.caseId}:happy`); return best.f.caseId;
+}
+
+const CRITICAL_CAP = 3;
+/**
+ * The critical cut: the journeys whose own proof belongs in the minimum, never more than three. The journey that
+ * holds the most of the change always; then, with a spec, the journeys that serve its criteria, the one serving
+ * the most still unserved first; then any other journey holding a tenth of the change or more. A journey's weight
+ * is the changed lines it owns (a part several share counts once, for the journey that ranks first) times the
+ * layers it crosses. A criterion that only a journey outside the cut serves still joins the minimum, through one
+ * scenario (see `draftScenarios`).
+ */
+function criticalJourneys(ctx: Ctx, linkedTo: (unit: string) => string[]): Set<string> {
+  const js = ctx.state.journeys;
+  const unit = (id: string) => ctx.units.find((u) => u.id === id);
+  const layers = (j: GrowJourney) => new Set(j.units.map((id) => unit(id)?.layer)).size;
+  const claimed = new Set<string>(); const ranked: Array<{ j: GrowJourney; weight: number }> = [];
+  for (let left = [...js]; left.length;) {
+    const top = left.map((j) => ({ j, weight: j.units.filter((id) => !claimed.has(id)).reduce((n, id) => n + (unit(id)?.added.length ?? 0), 0) * layers(j) }))
+      .sort((a, b) => b.weight - a.weight)[0]!;
+    ranked.push(top); top.j.units.forEach((id) => claimed.add(id)); left = left.filter((j) => j !== top.j);
+  }
+  if (!ranked.length) return new Set();
+  const total = ranked.reduce((n, r) => n + r.weight, 0);
+  const serves = (j: GrowJourney) => [...new Set(j.units.flatMap(linkedTo))];
+  const picked = [ranked[0]!.j]; const served = new Set(serves(ranked[0]!.j));
+  while (picked.length < CRITICAL_CAP) {
+    const next = ranked.filter((r) => !picked.includes(r.j)).map((r) => ({ j: r.j, gain: serves(r.j).filter((c) => !served.has(c)).length }))
+      .filter((x) => x.gain > 0).sort((a, b) => b.gain - a.gain)[0];
+    if (!next) break;
+    picked.push(next.j); serves(next.j).forEach((c) => served.add(c));
+  }
+  for (const r of ranked) if (picked.length < CRITICAL_CAP && !picked.includes(r.j) && r.weight >= total / 10) picked.push(r.j);
+  return new Set(picked.map((j) => j.id));
+}
+
+/**
+ * Scenarios by journey. A journey's own scenarios prove it end to end from where a person starts. The minimum
+ * is a critical cut: each critical journey's happy path and its single riskiest guard or failure, plus, for each spec
+ * criterion they leave unanswered, the one scenario that answers it; other journeys and the other ways each one
+ * fails are standard. Max adds every part on its own (a route's contract, a module through its callers, a third
+ * party's errors) and regressions. Every criterion linked to the change is carried by a scenario, and the
+ * minimum carries each one, so the minimum answers the whole spec without proving any criterion twice over.
+ */
+function draftScenarios(ctx: Ctx, flows: FlowRow[], config: string | null, seen: Map<string, Array<{ method: string; path: string }>>) {
   const { emit, state } = ctx;
-  const hasSpec = ctx.criteria.length > 0;
   let n = 0; const taken = new Set<string>();
-  const linkedTo = (unit: string) => Object.entries(state.linked).filter(([, l]) => l.some((x) => x.unit === unit)).map(([id]) => id);
-  for (const u of ctx.units) {
-    const effects = (state.depth[u.id]?.effects?.note ?? '').toLowerCase();
-    const crit = [...new Set([...linkedTo(u.id), ...(u.parent ? linkedTo(u.parent) : [])])];
-    const tracer: Tracer = ctx.proposals.has(u.id) ? (state.agents.find((a) => a.by !== 'rules' && a.units.includes(u.id))?.by ?? 'rules') : 'rules';
-    const base = templates(u, ['streams server-sent events', 'writes the database'].filter((e) => effects.includes(e)));
-    const proposed = ctx.proposals.get(u.id);
-    const list: Array<Template & { criteria: string[] }> = proposed
-      ? proposed.map((p, i) => ({ kind: p.kind, title: p.title, proves: p.proves, criteria: p.criteria.length ? p.criteria : crit, risk: p.kind === 'happy' ? 0 : 10 - i,
-          ...(u.layer === 'ext' && /time ?out|slow|unreachable|hang/i.test(p.title) ? { mockOnly: `${u.label} can’t be made slow or unreachable on demand, so this fault runs against the stand-in only` } : {}),
-          ...(/session|token|signed.out|unauth|forbidden|permission/i.test(p.title) ? { auth: true } : {}) }))
-      : base.map((t) => ({ ...t, criteria: criteriaFor(ctx, u, t, crit) }));
-    const failures = list.filter((t) => t.kind !== 'happy').sort((a, b) => b.risk - a.risk);
-    const riskiest = failures[0];
+  const unit = (id: string) => ctx.units.find((u) => u.id === id);
+  const linkedTo = (id: string) => Object.entries(state.linked).filter(([, l]) => l.some((x) => x.unit === id)).map(([c]) => c);
+  const effectsOf = (u: ChangeUnit) => { const e = (state.depth[u.id]?.effects?.note ?? '').toLowerCase(); return ['streams server-sent events', 'writes the database'].filter((x) => e.includes(x)); };
+  const tracerOf = (u: ChangeUnit): Tracer => (ctx.proposals.has(u.id) ? state.agents.find((a) => a.by !== 'rules' && a.units.includes(u.id))?.by ?? 'rules' : 'rules');
+  // A proposal that names no criteria speaks for those of the unit's that fit its kind: a sad path does not inherit the happy path's.
+  const proposed = (u: ChangeUnit, crit: string[]): Drafted[] | null => ctx.proposals.get(u.id)?.map((p, i) => ({ kind: p.kind, title: p.title, proves: p.proves,
+    criteria: p.criteria.length ? [...p.criteria] : speaksFor(ctx, { kind: p.kind, auth: AUTH_TITLE.test(p.title) }, crit), risk: p.kind === 'happy' ? 0 : 10 - i,
+    ...(u.layer === 'ext' && SLOW.test(p.title) ? { mockOnly: `${u.label} can’t be made slow or unreachable on demand, so this fault runs against the stand-in only` } : {}),
+    ...(AUTH_TITLE.test(p.title) ? { auth: true } : {}) })) ?? null;
+  const carried = new Set<string>();
+  const carries = (t: Drafted) => `carries ${t.criteria.join(', ')}`;
+  const put = (u: ChangeUnit, t: Drafted, mode: Mode, why: string, journey: GrowJourney | null, level: ScenarioLevel, flow: string | null) => {
+    const reach = journey && level === 'journey' ? journey.units.map(unit).filter((x): x is ChangeUnit => !!x) : [u];
+    const provider = u.layer === 'ext' ? u : reach.find((r) => r.layer === 'ext') ?? ctx.units.find((r) => r.layer === 'ext' && r.parent === u.id);
+    const ext = u.layer === 'ext' || (t.kind === 'happy' && !!provider);
+    const layers = [...new Set([...reach.map((r) => r.layer), ...reach.flatMap((r) => (state.cells[r.id] ?? []).map((c) => c.layer)), ...(ext ? ['ext' as Layer] : [])])];
+    if (mode === 'min') t.criteria.forEach((c) => carried.add(c));
+    emit({ kind: 'scenario.drafted', scenario: `s${++n}`, unit: u.id, scenarioKind: t.kind, mode, title: t.title, proves: t.proves, criteria: t.criteria, layers,
+      flow, variants: ext ? (t.mockOnly ? ['mock'] : ['mock', 'real']) : [], realKey: ext && provider?.provider ? provider.provider.keys.join(' or ') : null,
+      mockOnly: t.mockOnly ?? null, by: tracerOf(u), ext: ctx.proposals.has(u.id) ? ['x1'] : [], journey: journey?.id ?? null, level, polarity: t.polarity ?? polarityOf(t), modeWhy: why });
+  };
+
+  // Spec words name a journey the rules could only call by its file: the first criterion its entry serves, or any of its parts.
+  for (const j of state.journeys) {
+    if (j.titleBy !== 'rules') continue;
+    const happy = (id: string) => linkedTo(id).filter((c) => !FAILURE_WORDS.test(ctx.criteria.find((x) => x.id === c)?.text ?? ''));
+    const pick = happy(j.entry)[0] ?? j.units.map(happy).flat()[0];
+    const text = pick ? ctx.criteria.find((c) => c.id === pick)!.text.replace(/[.]$/, '') : null;
+    if (text) emit({ kind: 'journey.named', journey: j.id, title: text.charAt(0).toUpperCase() + text.slice(1), by: 'spec' });
+  }
+
+  // Each journey's own scenarios, planned in full first so the minimum is cut across all of them.
+  const critical = criticalJourneys(ctx, linkedTo);
+  const textOf = (id: string) => ctx.criteria.find((c) => c.id === id)?.text ?? '';
+  // Every criterion `crit` names is carried by one of `list`. One that no scenario speaks for (a template's words did
+  // not fit it, or an agent named others) goes to the closest: a refusal to a failure path, a signed-out refusal to
+  // the signed-out edge, anything else to the happy path.
+  const carryAll = (list: Drafted[], crit: string[]) => {
+    for (const c of crit) {
+      if (list.some((t) => t.criteria.includes(c))) continue;
+      const auth = AUTH_WORDS.test(textOf(c));
+      const fails = list.filter((t) => t.kind !== 'happy');
+      const home = FAILURE_WORDS.test(textOf(c)) ? fails.find((t) => !!t.auth === auth) ?? fails[0] ?? list[0] : list.find((t) => t.kind === 'happy') ?? list[0];
+      home?.criteria.push(c);
+    }
+  };
+  const authDone = new Set<string>();
+  const plan: Array<{ j: GrowJourney; on: ChangeUnit; t: Drafted; flow: string | null; mode: Mode; why: string; critical: boolean }> = [];
+  for (const j of state.journeys) {
+    const entry = unit(j.entry); if (!entry) continue;
+    const parts = j.units.map(unit).filter((x): x is ChangeUnit => !!x);
+    const crit = [...new Set(parts.flatMap((p) => linkedTo(p.id)))];
+    const browser = entry.layer === 'ui';
+    // On a screen the happy path takes what the spec says works and the refusal what it says fails; the 375 px check speaks for neither.
+    const list: Drafted[] = proposed(entry, crit) ?? journeyTemplates(entry, parts, effectsOf(entry)).map((t) => ({ ...t,
+      criteria: !browser ? criteriaFor(ctx, entry, t, crit) : t.kind === 'happy' ? crit.filter((c) => !FAILURE_WORDS.test(textOf(c))) : t.kind === 'sad' ? criteriaFor(ctx, entry, t, crit) : [] }));
+    // A screen's routes are still reachable without the screen: the riskiest one's signed-out edge belongs to the journey.
+    if (browser) {
+      const route = parts.filter((p) => p.kind === 'route' && !authDone.has(p.id)).sort((a, b) => riskOf({ method: b.method!, path: b.path! }).score - riskOf({ method: a.method!, path: a.path! }).score)[0];
+      if (route) {
+        const t: Template = { kind: 'edge', title: `Without a session, ${route.label} is refused`, proves: 'A caller with no token or session gets 401 or 403, never data.', risk: 3 + riskOf({ method: route.method!, path: route.path! }).score, auth: true };
+        list.push({ ...t, criteria: criteriaFor(ctx, route, t, linkedTo(route.id)), on: route });
+      }
+    }
+    // Every criterion the journey's parts serve is carried by one of its own scenarios.
+    carryAll(list, crit);
+    for (const t of list) if (t.auth) authDone.add((t.on ?? entry).id);
+    const happy = list.find((t) => t.kind === 'happy');
+    // The riskiest guard or failure: one the tree hangs or shoulders, before an edge the path must still work at.
+    const polOf = (t: Drafted) => t.polarity ?? polarityOf(t);
+    const byRisk = (a: Drafted, b: Drafted) => b.risk - a.risk;
+    const riskiest = list.filter((t) => t.kind !== 'happy' && polOf(t) !== 'happy').sort(byRisk)[0] ?? list.filter((t) => t.kind !== 'happy').sort(byRisk)[0];
+    const isCritical = critical.has(j.id);
+    // The UI lines this journey's screens add, which a browser flow's controls are matched against.
+    const added = browser ? ctx.files.filter((f) => parts.some((p) => p.layer === 'ui' && (p.file === f.path || p.also?.includes(f.path)))).flatMap((f) => f.added.map((a) => a.text)).join('\n') : '';
     for (const t of list) {
-      const mode: Mode = t.kind === 'happy' ? (crit.length || !hasSpec || u.root ? 'min' : 'std')
-        : t === riskiest && (u.layer !== 'lib' || u.kind === 'command') ? 'min' : 'std';
-      const ext = u.layer === 'ext' || (t.kind === 'happy' && ctx.units.some((r) => r.layer === 'ext' && r.parent === u.id));
-      const provider = u.layer === 'ext' ? u : ctx.units.find((r) => r.layer === 'ext' && r.parent === u.id);
-      const layers = [...new Set([u.layer, ...(state.cells[u.id] ?? []).map((c) => c.layer), ...(ext ? ['ext' as Layer] : [])])];
-      emit({ kind: 'scenario.drafted', scenario: `s${++n}`, unit: u.id, scenarioKind: t.kind, mode, title: t.title, proves: t.proves, criteria: t.criteria, layers,
-        flow: flowFor(u, t, flows, taken), variants: ext ? (t.mockOnly ? ['mock'] : ['mock', 'real']) : [], realKey: ext && provider?.provider ? provider.provider.keys.join(' or ') : null,
-        mockOnly: t.mockOnly ?? null, by: tracer, ext: proposed ? ['x1'] : [] });
+      const on = t.on ?? entry;
+      const flow = browser && !t.on ? (t.kind === 'happy' ? browserFlowFor(j, parts, added, flows, taken, seen) : null) : flowFor(on, t, flows, taken);
+      const [mode, why]: [Mode, string] = isCritical && (t === happy || t === riskiest)
+        ? ['min', t.criteria.length ? carries(t) : t === happy ? 'happy path of a critical journey' : 'riskiest guard or failure of this journey']
+        : ['std', polOf(t) === 'failure' ? 'another way it fails' : polOf(t) === 'guard' ? 'another guard' : isCritical ? 'another happy path' : 'happy path of a journey outside the critical cut'];
+      plan.push({ j, on, t, flow, mode, why, critical: isCritical });
     }
   }
+  // A criterion the cut leaves unanswered joins the minimum through one scenario: the one answering the most of what
+  // is still open, from a critical journey first, then one a flow already proves. The rest stay where they are.
+  const open = new Set(plan.flatMap((p) => p.t.criteria));
+  for (const p of plan) if (p.mode === 'min') p.t.criteria.forEach((c) => open.delete(c));
+  const gain = (p: (typeof plan)[number]) => p.t.criteria.filter((c) => open.has(c)).length;
+  for (;;) {
+    const best = plan.filter((p) => p.mode !== 'min' && gain(p) > 0)
+      .sort((a, b) => gain(b) - gain(a) || Number(b.critical) - Number(a.critical) || Number(!!b.flow) - Number(!!a.flow))[0];
+    if (!best) break;
+    best.mode = 'min'; best.why = carries(best.t); best.t.criteria.forEach((c) => open.delete(c));
+  }
+  for (const p of plan) put(p.on, p.t, p.mode, p.why, p.j, 'journey', p.flow);
+
+  // Flows this branch adds or changes are the author's own proof: each one that reaches a journey's routes is a scenario
+  // of that journey. One already proving a journey's path or riskiest guard or failure is drafted above; the rest join the
+  // minimum only when they restate a criterion, and are standard otherwise.
+  const flowRoot = config ? relative(ctx.dir, dirname(config)) : '';
+  const changed = new Set(ctx.files.map((f) => f.path));
+  for (const f of flows) {
+    if (!changed.has(join(flowRoot, f.file)) || state.scenarios.some((x) => x.flow === f.caseId)) continue;
+    const j = state.journeys.find((x) => x.units.some((id) => { const u = unit(id); return u?.kind === 'route' && f.steps.some((st) => sameRoute(u, st)); }));
+    if (!j) continue;
+    const on = j.units.map(unit).find((u) => u?.kind === 'route' && f.steps.some((st) => sameRoute(u, st)))!;
+    const refuses = f.steps.some((st) => st.expectStatus !== null && st.expectStatus >= 400);
+    const criteria = ctx.criteria.filter((c) => restates(f.title, c.text)).map((c) => c.id);
+    for (const id of criteria) if (!state.linked[id]?.some((l) => l.unit === on.id)) emit({ kind: 'criterion.linked', id, unit: on.id, why: `${f.caseId}, which this branch adds, says it and reaches ${on.label}` });
+    // A flow that answers 200 can still be a guard: "never charges the card" is a rule the path must keep.
+    const fp = flowPolarity(f), byTitle = polarityOf({ kind: refuses ? 'sad' : 'edge', title: f.title });
+    const t: Drafted = { kind: refuses ? 'sad' : 'edge', title: f.title, proves: `${f.caseId}, which this branch adds, holds end to end.`, risk: 0, criteria, polarity: fp === 'happy' && byTitle === 'guard' ? 'guard' : fp };
+    put(on, t, criteria.length ? 'min' : 'std', criteria.length ? carries(t) : 'a flow this branch adds', j, 'journey', f.caseId);
+  }
+
+  // Parts on their own (max): every part a journey passes through, then changed parts no journey reaches.
+  // One that carries a criterion no journey scenario proves is lifted into the minimum.
+  const inJourney = new Set(state.journeys.flatMap((j) => j.units));
+  const done = new Set(state.journeys.map((j) => j.entry));
+  const owner = (id: string) => state.journeys.find((j) => j.units.includes(id)) ?? null;
+  for (const u of [...ctx.units.filter((x) => inJourney.has(x.id)), ...ctx.units.filter((x) => !inJourney.has(x.id))]) {
+    if (done.has(u.id)) continue; done.add(u.id);
+    const own = linkedTo(u.id);
+    const list: Drafted[] = proposed(u, own) ?? templates(u, effectsOf(u)).map((t) => ({ ...t, criteria: criteriaFor(ctx, u, t, own) }));
+    carryAll(list, own);
+    for (const t of list) {
+      if (t.auth && authDone.has(u.id)) continue;
+      const lift = t.criteria.some((c) => !carried.has(c));
+      put(u, t, lift ? 'min' : 'max', lift ? carries(t) : 'part on its own', owner(u.id), 'part', flowFor(u, t, flows, taken));
+    }
+  }
+
   // Max: regression of every existing flow that reaches a route declared in a changed file.
-  const changedRoutes = ctx.files.filter((f) => f.role === 'code').flatMap((f) => { const text = readAt(ctx.dir, ctx.branch, f.path); return text ? scanSource(f.path, text).map((r) => ({ ...r, file: f.path })) : []; });
-  const used = new Set(state.scenarios.map((s) => s.flow).filter(Boolean));
+  const changedRoutes = ctx.files.filter((f) => f.role === 'code').flatMap((f) => { const text = readAt(ctx.dir, ctx.branch, f.path); return text ? routesOf(f.path, text).map((r) => ({ ...r, file: f.path })) : []; });
+  const used = new Set(state.scenarios.map((x) => x.flow).filter(Boolean));
   let r = 0;
   for (const f of flows) {
     if (used.has(f.caseId)) continue;
-    const hit = changedRoutes.find((cr) => f.steps.some((s) => (cr.method === 'ANY' || s.method === cr.method) && (matchesTemplate(cr.path, s.path) || s.path === cr.path)));
+    const hit = changedRoutes.find((cr) => f.steps.some((st) => (cr.method === 'ANY' || st.method === cr.method) && (matchesTemplate(cr.path, st.path) || st.path === cr.path)));
     if (!hit) continue;
-    const unit = ctx.units.find((u) => u.kind === 'route' && u.method === hit.method && u.path === hit.path) ?? ctx.units.find((u) => u.file === hit.file) ?? ctx.units.find((u) => !u.root);
-    if (!unit) continue;
-    emit({ kind: 'scenario.drafted', scenario: `r${++r}`, unit: unit.id, scenarioKind: 'regression', mode: 'max', title: f.title, proves: `${f.caseId} reaches ${hit.method} ${hit.path} in ${hit.file}, which this change edits.`,
-      criteria: [], layers: ['api'], flow: f.caseId, variants: [], realKey: null, mockOnly: null, by: 'rules', ext: [] });
+    const u = ctx.units.find((x) => x.kind === 'route' && x.method === hit.method && x.path === hit.path) ?? ctx.units.find((x) => x.file === hit.file) ?? ctx.units.find((x) => !x.root);
+    if (!u) continue;
+    emit({ kind: 'scenario.drafted', scenario: `r${++r}`, unit: u.id, scenarioKind: 'regression', mode: 'max', title: f.title, proves: `${f.caseId} reaches ${hit.method} ${hit.path} in ${hit.file}, which this change edits.`,
+      criteria: [], layers: ['api'], flow: f.caseId, variants: [], realKey: null, mockOnly: null, by: 'rules', ext: [], journey: owner(u.id)?.id ?? null, level: 'part', polarity: flowPolarity(f), modeWhy: 'regression' });
   }
-  emit({ kind: 'flows.checked', scenarios: state.scenarios.length, runnable: state.scenarios.filter((s) => s.flow).length, config: config ? relative(ctx.dir, config) : null });
+  emit({ kind: 'flows.checked', scenarios: state.scenarios.length, runnable: state.scenarios.filter((x) => x.flow).length, config: config ? relative(ctx.dir, config) : null });
 }
 
 /* ---------- prove ---------- */
+
+/**
+ * What a flow an agent wrote proved for its scenario, read as a run of an existing flow is: passed; failed only when a check ran
+ * and did not hold (the case outcome assertion_failed); otherwise not tested yet, with why, and the run that says so. A flow that
+ * did not compile, an app that did not start, a run that was blocked, cancelled or inconclusive, or evidence that did not verify
+ * proves nothing either way.
+ */
+export function writtenFlowResult(scenario: string, flow: Pick<ProvedFlow, 'outcome' | 'detail' | 'run' | 'caseOutcome' | 'failure' | 'verified'>): GrowEventBody {
+  if (flow.outcome === 'proven') return { kind: 'scenario.passed', scenario, took: 0, run: flow.run };
+  // A run whose evidence did not verify proves nothing either way, and its saved record keeps no case (runReport.ts): it is not
+  // proven, though it ran. One that never ran (verified null) says why it could not run.
+  const unverified = flow.detail === 'the run evidence did not verify' && flow.verified !== null;
+  if (flow.caseOutcome === 'assertion_failed' && !unverified) return { kind: 'scenario.failed', scenario, took: 0, run: flow.run, why: flow.failure ?? flow.detail ?? flow.outcome, outcome: 'assertion_failed' };
+  const why = unverified && (flow.caseOutcome === 'passed' || !flow.caseOutcome) ? 'Not proven: the run evidence did not verify'
+    : couldNotRun(flow.failure ?? flow.detail ?? 'the run recorded no result for this flow');
+  return { kind: 'scenario.not_run', scenario, why, ...(flow.run ? { run: flow.run } : {}), ...(flow.caseOutcome ? { outcome: flow.caseOutcome } : {}) };
+}
+
+/**
+ * The scenario each flow an agent wrote speaks for, by file. A written flow speaks for a scenario when it says the same thing (two
+ * or more terms shared with the scenario's title and claim) and either reached that scenario's route, or served nothing at all:
+ * one that did not compile, whose run never reached its checks, or whose evidence did not verify leaves no request on record, so
+ * it is the scenario its title says, read only as not tested yet, with why. Flows that reached a route are matched first, then
+ * those that served nothing, only to the scenarios still open, so one that served nothing never takes a scenario from a later
+ * flow that reached its route. Each scenario takes at most one flow.
+ */
+export function attributeWritten(written: Array<{ file: string; title: string; flow: ProvedFlow | undefined }>, open: GrowState['scenarios'], units: ChangeUnit[]): Map<string, GrowState['scenarios'][number]> {
+  const out = new Map<string, GrowState['scenarios'][number]>(); const taken = new Set<string>();
+  const unreached = (flow: ProvedFlow) => flow.served.length === 0 && writtenFlowResult('', flow).kind === 'scenario.not_run';
+  for (const pass of ['reached', 'unreached'] as const) {
+    for (const { file, title, flow } of written) {
+      if (!flow || out.has(file) || (pass === 'unreached') !== unreached(flow)) continue;
+      const said = termsOf(title);
+      const target = open.map((s) => { const u = units.find((y) => y.id === s.unit);
+        const reached = !!u && flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
+        const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
+        return { s, score: !taken.has(s.id) && (pass === 'unreached' || reached) && shared >= 2 ? shared : 0 }; }).filter((q) => q.score).sort((a, b) => b.score - a.score)[0]?.s;
+      if (target) { out.set(file, target); taken.add(target.id); }
+    }
+  }
+  return out;
+}
 
 async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | null) {
   const { emit, state } = ctx;
   const inRun = state.scenarios.filter((s) => MODE_RANK[s.mode] <= MODE_RANK[state.mode]);
   if (!config) { for (const s of inRun) emit({ kind: 'scenario.not_run', scenario: s.id, why: 'No tracegrove.config.yaml found; run tracegrove init, or pass --config' }); return; }
   const flows = loadFlows(config);
-  const results = new Map<string, { ok: boolean; ms: number; run: string | null; why: string }>();
+  /* `checked` is true when a check ran and did not hold: only that fails a scenario. A run that never reached its checks (the
+     app did not start, a fixture could not be set up, it was blocked or cancelled), or whose evidence did not verify, proves
+     nothing either way, and `why` says why it is not tested yet. */
+  type Ran = { ok: boolean; checked: boolean; ms: number; run: string | null; why: string; outcome?: string; hop?: string; after?: boolean };
+  const results = new Map<string, Ran>();
+  /* Where a failed run broke, so the tree can mark that hop: the route whose step failed, or, when a check on other evidence
+     failed (a stand-in's calls, say), the last route the flow called before it. */
+  const hopOf = (c: TestRunReport['cases'][number]): { hop?: string; after?: boolean } => {
+    const http = (x: { method: string }) => /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(x.method);
+    const i = c.failure ? c.steps.findIndex((x) => x.name === c.failure!.step || x.id === c.failure!.step) : -1;
+    const at = c.steps[i];
+    if (!at) return {};
+    if (http(at)) return { hop: `${at.method} ${at.path}` };
+    const before = c.steps.slice(0, i).reverse().find(http);
+    return before ? { hop: `${before.method} ${before.path}`, after: true } : {};
+  };
   const runFlow = async (caseId: string) => {
     const cached = results.get(caseId); if (cached) return cached;
     const flow = flows.find((f) => f.caseId === caseId);
     const t = Date.now();
-    let result: { ok: boolean; ms: number; run: string | null; why: string };
+    let result: Ran;
     try {
       const { report } = await runTests({ configPath: config, grep: flow?.file ?? caseId, ...(ctx.signal ? { signal: ctx.signal } : {}) });
       const c = report.cases.find((x) => x.caseId === caseId);
       const ok = !!c && c.outcome === 'passed' && report.bundleVerified === true;
-      result = { ok, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir),
-        why: ok ? '' : c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.bundleVerified === false ? 'the run evidence did not verify' : report.blockers[0]?.detail ?? 'the flow did not run' };
+      const checked = !ok && c?.outcome === 'assertion_failed';
+      const said = c?.failure ? `${c.failure.step}: ${c.failure.message}`.slice(0, 400) : report.blockers[0]?.detail ?? 'the run recorded no result for this flow';
+      result = { ok, checked, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir), outcome: c?.outcome ?? report.outcome,
+        why: ok ? '' : checked ? said : c?.outcome === 'passed' || (!c && report.bundleVerified === false) ? 'Not proven: the run evidence did not verify' : couldNotRun(said),
+        ...(checked ? hopOf(c) : {}) };
     } catch (error) {
-      result = { ok: false, ms: Date.now() - t, run: null, why: (error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400) };
+      result = { ok: false, checked: false, ms: Date.now() - t, run: null, why: couldNotRun((error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400)) };
     }
     results.set(caseId, result); return result;
   };
@@ -569,7 +860,8 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     emit({ kind: 'scenario.running', scenario: s.id, flow: s.flow! });
     const r = await runFlow(s.flow!);
     if (r.ok) { emit({ kind: 'scenario.passed', scenario: s.id, took: r.ms, run: r.run }); real(s); }
-    else emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why });
+    else if (r.checked) emit({ kind: 'scenario.failed', scenario: s.id, took: r.ms, run: r.run, why: r.why, ...(r.hop ? { hop: r.hop, after: !!r.after } : {}), outcome: 'assertion_failed' });
+    else emit({ kind: 'scenario.not_run', scenario: s.id, why: r.why, ...(r.run ? { run: r.run } : {}), ...(r.outcome ? { outcome: r.outcome } : {}) });
   }
   // Scenarios no flow proves: an agent may write flows for them, which tracegrove then runs.
   let open = inRun.filter((s) => !s.flow && !state.run[s.id]);
@@ -583,25 +875,21 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     try {
       const drafted = await draftWithAgent({ dir: root, branch: null, intent, overrides: { provider: agent.provider, model: agent.model }, prove: true,
         onActivity: (line) => emit({ kind: 'agent.said', agent: 'd1', line }), ...(ctx.signal ? { signal: ctx.signal } : {}) });
+      const written = drafted.agent.files.map((file) => ({ file, flow: drafted.prove?.flows.find((f) => f.file === file),
+        title: (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })() }));
+      const targets = attributeWritten(written, draftable.filter((s) => !state.run[s.id]), ctx.units);
       let x = 1;
-      for (const file of drafted.agent.files) {
+      for (const { file, flow } of written) {
         const ext = `x${++x}`;
-        const flow = drafted.prove?.flows.find((f) => f.file === file);
-        // A written flow speaks for a scenario only when it reached that scenario's route and says the same thing.
-        const title = (() => { try { return /^title:\s*(.+)$/m.exec(readFileSync(join(root, file), 'utf8'))?.[1] ?? ''; } catch { return ''; } })();
-        const said = termsOf(title);
-        const target = flow ? draftable.map((s) => { const u = ctx.units.find((y) => y.id === s.unit)!;
-          const reached = flow.served.some((sv) => sv.startsWith(`${u.method} `) && sameRoute(u, { method: u.method!, path: sv.slice(sv.indexOf(' ') + 1) }));
-          const shared = [...termsOf(`${s.title} ${s.proves}`)].filter((t) => said.has(t)).length;
-          return { s, score: !state.run[s.id] && reached && shared >= 2 ? shared : 0 }; }).filter((x) => x.score).sort((a, b) => b.score - a.score)[0]?.s : undefined;
+        const target = targets.get(file);
         emit({ kind: 'extension.written', ext, extKind: file.endsWith('.action.yaml') ? 'action' : 'flow', name: basename(file), path: relative(ctx.dir, join(root, file)),
           why: 'No existing flow proved this scenario.', state: 'unproven', need: 'Counts once its run passes end to end; review it before relying on it.', unit: target?.unit ?? null });
         if (!flow || !target) continue;
         const sc = state.scenarios.find((y) => y.id === target.id)!;
         sc.ext = [...new Set([...sc.ext, ext])];
         emit({ kind: 'scenario.running', scenario: target.id, flow: flow.caseIds[0] ?? file });
-        if (flow.outcome === 'proven') { emit({ kind: 'scenario.passed', scenario: target.id, took: 0, run: flow.run }); emit({ kind: 'extension.proven', ext, by: target.id }); }
-        else emit({ kind: 'scenario.failed', scenario: target.id, took: 0, run: flow.run, why: flow.detail ?? flow.outcome });
+        emit(writtenFlowResult(target.id, flow));
+        if (flow.outcome === 'proven') emit({ kind: 'extension.proven', ext, by: target.id });
       }
       emit({ kind: 'agent.done', agent: 'd1', ok: drafted.agent.exitCode === 0, note: `${drafted.agent.files.length} file${drafted.agent.files.length === 1 ? '' : 's'} written` });
     } catch (error) {

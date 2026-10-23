@@ -24,6 +24,7 @@ export const UI_HTML = String.raw`<!doctype html>
 @media (prefers-color-scheme:dark){:root{--stone:#0C1210;--paper:#121A17;--line:#1F2A25;--line2:#2E3B35;--sel:#1A2420;--ink:#ECE6D8;--ink2:#D5CFC1;--ink3:#A9A699;--muted:#8B8A7F;
  --trunk:#D5CFC1;--twig:#3D4A43;--moss:#A9D28A;--moss-bg:#18261C;--new:#D9EFC0;--gold:#D8B25E;--gold-bg:#2A2416;--verm:#EF6A5A;--verm-bg:#33191A;--verm-ink:#F6A79C;--ochre:#D77C55;--ochre-bg:#2E1E16;--ochre-ink:#EDB79D;
  --indigo:#9AAEE8;--indigo-bg:#1B2233;--forest:#ECE6D8;--on-forest:#0C1210;--bar:#1A2420;--code:#0F1613;--soil:#3D4A43}}
+:root{color-scheme:light dark}input[type=checkbox]{accent-color:var(--moss)}
 *{box-sizing:border-box}html,body{margin:0;background:var(--stone);color:var(--ink);font:15px/22px var(--sans)}
 button{font:inherit;color:inherit;cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}
 :focus-visible{outline:2px solid var(--moss);outline-offset:2px;border-radius:6px}
@@ -74,6 +75,13 @@ textarea{padding:12px;resize:vertical;min-height:88px;width:100%}
 .fix:hover,.fix[aria-pressed=true]{border-color:var(--twig)}
 .obs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:12px 0}.obs>div{min-width:0;overflow-wrap:anywhere;padding:10px 12px;border-radius:8px;background:var(--stone)}.obs .bad{background:var(--verm-bg)}.obs .good{background:var(--moss-bg)}
 .obs-long{grid-template-columns:minmax(0,1fr)}.obs .mono{white-space:pre-wrap}
+.answer{margin:0 0 12px}.answer .label{margin:0 0 4px}.answer pre{max-height:240px;overflow:auto}
+.checked{margin:0 0 12px}.checked .label{margin:0 0 4px}.cks{display:grid;gap:3px}
+.ck{display:grid;grid-template-columns:16px minmax(0,1fr);grid-template-areas:'m v' '. k';gap:0 8px;font-size:13px;line-height:19px;padding:2px 0}.ck .m{grid-area:m}.ck .v{grid-area:v}.ck .k{grid-area:k}
+.gw-drp .ck{grid-template-columns:16px minmax(0,1fr) minmax(0,1.25fr);grid-template-areas:'m k v';gap:2px 8px}.ck .m{font:600 13px/19px var(--mono);text-align:center}
+.ck.pass .m{color:var(--moss)}.ck.fail .m,.ck.fail .v{color:var(--verm-ink)}.ck.none .m{color:var(--ink3)}.ck .k{font:12px/19px var(--mono);color:var(--ink3);overflow-wrap:anywhere}.ck .v{overflow-wrap:anywhere}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.call{display:grid;gap:0;font-size:13px;line-height:19px;padding:3px 0}.call .mono{overflow-wrap:anywhere}.call .small{overflow-wrap:anywhere}
 pre{font:12px/1.6 var(--mono);background:var(--code);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .think{display:inline-flex;gap:5px;align-items:center}.think i{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:pulse 1.2s ease-in-out infinite}
 .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
@@ -153,8 +161,14 @@ const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;if(!Number.isF
 function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>openTab(t)}},t)));
  const g=state?state.git:null;const last=state&&state.runs[0];
  document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');try{ui.envs=await api('/api/environments');if(!ui.envs.environments.some(e=>e.name===ui.env))ui.env='local'}catch{ui.envs=null}try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api('/api/runs/'+encodeURIComponent(ui.runName))}catch{ui.run=null}}render()}
-function page(...nodes){document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false))}
+async function load(){state=await api('/api/overview');try{ui.envs=await api('/api/environments');if(!ui.envs.environments.some(e=>e.name===ui.env))ui.env='local'}catch{ui.envs=null}try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))&&!(ui.runAt&&ui.runAt.name===ui.runName)){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api(runApi(ui.runName))}catch{ui.run=null}}render()}
+/* A grow whose config is in a subfolder saved its runs beside that config: the run it opened (ui.runAt) is read from there */
+function runAtQuery(name){const a=ui.runAt;return a&&a.name===name&&a.config?'config='+encodeURIComponent(a.config):''}
+function runApi(name){const q=runAtQuery(name);return '/api/runs/'+encodeURIComponent(name)+(q?'?'+q:'')}
+/* The grow panel is the same element across a redraw: whatever in it had focus keeps it once it is placed again */
+function page(...nodes){const fa=document.activeElement,keep=fa&&fa!==document.body&&gw.el&&gw.el.contains(fa)?fa:null;
+ document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false));
+ if(keep&&keep.isConnected&&document.activeElement!==keep)keep.focus({preventScroll:true})}
 
 ${SOURCE_CONTROLS_JS}
 ${COMPARISON_JS}
@@ -165,7 +179,7 @@ ${BENCHMARK_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
- const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null}));
+ const live=flows.map(f=>{const c=byId.get(f.caseId);const unavailable=run&&run.bundleVerified===false;const steps=(unavailable?[]:c?c.steps.filter(s=>s.declared!==false):f.steps).map(s=>({id:s.id,name:s.name,method:s.method,path:s.path,as:s.as,expect:s.expectStatus,expectation:s.expectation,result:c?(s.checks==='fail'&&s.result==='completed'?'fail':kind(s.result)):'none',status:c?s.status:null,observedText:c?s.observedText:null,ms:c?s.durationMs:null,reason:c?s.reason:null,checks:c?s.checks||null:null,compared:c?s.compared||null:null,answer:c?s.answer||null:null,checked:c?s.checked||null:null,calls:c?s.calls||null:null}));
   return{id:f.caseId,title:c?c.title:f.title,file:f.file,editable:state.flows.some(flow=>flow.caseId===f.caseId),fixtures:c||unavailable?[]:f.fixtures,state:unavailable?'unavailable':c?kind(c.outcome):'none',ms:c?c.durationMs:null,failure:c?c.failure:null,requests:c?c.requests||[]:[],steps}});
  const cut=(state.pruned||[]).map(p=>({id:p.file.replace(/^.*\//,'').replace(/\.flow\.(?:ya?ml|ts)\.pruned$/,''),title:p.title,file:p.file,state:'pruned',steps:[],fixtures:[]}));
  return live.concat(cut)}
@@ -218,16 +232,18 @@ function runTab(){
   h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
  if(state.compileError&&!state.flows.length&&!ui.run)return[h('div',{class:'kpis',style:'margin:0 0 16px'},inputChip()),blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
- const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass').length;
+ const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass'&&s.checks!=='fail').length;
  if(ui.sel===null){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
  const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
- const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},state.runs.map(r=>h('option',{value:r.name,selected:r.name===ui.runName},r.bundleVerified===false?ago(r.startedAt)+' · evidence unavailable':ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
+ /* the run a grow opened from beside its own config is not in this folder's list: it is offered first, as itself */
+ const own=run&&!state.runs.some(r=>r.name===ui.runName)?[{name:ui.runName,startedAt:run.startedAt,outcome:run.outcome,bundleVerified:run.bundleVerified,totals:run.totals}]:[];
+ const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},own.concat(state.runs).map(r=>h('option',{value:r.name,selected:r.name===ui.runName},r.bundleVerified===false?ago(r.startedAt)+' · evidence unavailable':ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
  const kpi=(b,t,cls)=>h('div',{class:'kpi'},h('b',{class:cls||''},b),h('span',{},t));
  const drift=run&&(state.sourceDigest==null?'Current application source could not be resolved.':run.sourceDigest!==state.sourceDigest?'Application source differs from this recorded run.':null);
  const ev=run?(run.evidenceStatus==='verified'?'saved evidence freshly verified':'saved evidence '+(run.evidenceStatus||'unavailable')):null;const na=run&&run.bundleVerified===false;
  const hero=h('section',{style:'margin-bottom:24px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
    h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),run?envBadge(run.environment):null,h('h1',{style:'margin-top:6px'},headline)),
-   h('div',{class:'row'},envSwitch(),state.runs.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
+   h('div',{class:'row'},envSwitch(),state.runs.length||own.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
     [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError||!state.flows.some(f=>f.caseId===ui.sel),on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!state.hasConfig||!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
   h('div',{class:'kpis'},run?[kpi(na?'unavailable':held+' / '+ran.length,'scenarios held'),kpi(na?'unavailable':stepsHeld+' / '+allSteps.length,'steps held'),kpi(na?'unavailable':secs(new Date(run.finishedAt)-new Date(run.startedAt)),'wall time'),
     kpi(run.bundleVerified?'✓':'–',ev,run.bundleVerified?'c-pass':'c-warn')]:[kpi(String(state.flows.length),'scenarios'),kpi(String(state.flows.reduce((a,f)=>a+f.steps.length,0)),'steps')],inputChip()),
@@ -266,18 +282,34 @@ function recording(s){const c=ui.run&&(ui.run.cases||[]).find(c=>c.caseId===s.id
  const status=h('p',{class:'small muted',role:'status'},'Checking the recording evidence…');
  if(ui.run.bundleVerified===false)return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),h('p',{role:'alert'},'Recording unavailable: this run’s evidence failed verification.'));
  const key=ui.runName+':'+v.digest;let posed=false;
- const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id),
+ const player=h('video',{controls:true,playsinline:true,preload:'metadata','aria-label':'Browser recording for '+s.id,src:'/api/runs/'+encodeURIComponent(ui.runName)+'/media/'+v.digest+'?case='+encodeURIComponent(s.id)+(runAtQuery(ui.runName)?'&'+runAtQuery(ui.runName):''),
   on:{loadedmetadata:()=>{const at=ui.videoTimes[key],end=Number.isFinite(player.duration)?player.duration:0;if(Number.isFinite(at)&&at>0)player.currentTime=Math.min(at,end||at);else if(end>0.2){posed=true;player.currentTime=end-0.1}status.textContent='Recording loaded from verified evidence.'},play:()=>{if(posed){posed=false;player.currentTime=0}},timeupdate:()=>{if(!posed)ui.videoTimes[key]=player.currentTime},error:()=>{status.textContent='Recording unavailable or its evidence failed verification.'}}});
  return h('section',{class:'recording','aria-label':'Browser recording'},h('h2',{},'Browser recording'),player,status)}
+/* Every comparison a step's checks made, each with its mark, worded as the verdict words a failure ("Expected 2 charges, got 3"):
+   the Run tab's step and the grow page's drawer show the same rows. A comparison whose record cannot say whether it held is
+   said to be not recorded, never held. */
+function stepChecked(list){return h('div',{class:'cks'},(list||[]).map(c=>{const k=c.held===true?'pass':c.held===false?'fail':'none';
+ return h('div',{class:'ck '+k},h('span',{class:'m'},{pass:'✓',fail:'✗',none:'?'}[k],h('span',{class:'sr'},{pass:' held',fail:' failed',none:' not recorded'}[k])),h('span',{class:'k'},c.check),h('span',{class:'v'},c.held===null?'Not recorded whether it held: '+c.says.charAt(0).toLowerCase()+c.says.slice(1):c.says))}))}
+/* One call a stand-in recorded: what it was asked, and when, under which idempotency key, as the stand-in recorded it */
+const callLine=c=>c.standIn+' '+c.method+' '+c.path+(c.amount!=null?' · '+c.amount+(c.currency?' '+c.currency:''):'')+(c.description?' · '+c.description:'')+' → '+c.status;
+const callMeta=c=>'at '+String(c.at).slice(11,23)+' UTC · '+(c.key?'idempotency key '+c.key+(c.repeat?' (a repeat)':''):'no idempotency key')+(c.faulted?' · the stand-in faulted it':'');
+function stepCalls(list){return (list||[]).map(c=>h('div',{class:'call'},h('span',{class:'mono'},callLine(c)),h('span',{class:'small muted'},callMeta(c))))}
+/* a recorded value as the page writes it: text quoted, everything else as JSON */
+const shown=v=>typeof v==='string'?JSON.stringify(v):v===undefined?'nothing':JSON.stringify(v);
 function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':s.state==='unavailable'?'Recorded steps are unavailable until this run’s evidence can be verified.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
+ /* a step whose check failed shows what that check expected and what it got, from the run's recorded assertion */
+ const cmp=x.checks==='fail'&&x.compared?x.compared:null;
  return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},sameName(x)?x.reportedName:x.name),
   x.reportedName&&!sameName(x)?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
     h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
 
-  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono'},x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono'},x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono','data-testid':'step-expected'},cmp?cmp.check+': '+shown(cmp.expected):x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono','data-testid':'step-observed'},cmp?cmp.check+': '+shown(cmp.got)+(x.observedText!=null?'\n'+x.observedText:''):x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
+  x.answer!=null?h('div',{class:'answer'},h('div',{class:'label'},'the app answered'),h('pre',{'data-testid':'step-answer'},x.answer)):null,
+  x.checked&&x.checked.length?h('div',{class:'checked','data-testid':'step-checked'},h('div',{class:'label'},'we checked'),stepChecked(x.checked)):null,
+  x.calls&&x.calls.length?h('div',{class:'checked','data-testid':'step-calls'},h('div',{class:'label'},'the stand-in recorded'),stepCalls(x.calls)):null,
   s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
   recording(s),
   !current?h('p',{class:'small muted'},'This recorded scenario has no current flow to run or prune.'):null,
@@ -483,7 +515,7 @@ function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=a
  const draw=()=>{list.replaceChildren(...shown.slice(0,60).map((c,i)=>h('li',{role:'option','aria-selected':i===sel?'true':'false',on:{mousemove:()=>{if(sel!==i){sel=i;draw()}},click:()=>pick(i)}},h('span',{class:'grp'},c.grp),h('span',{},c.label),c.hint?h('span',{class:'hint'},c.hint):null)));const on=list.children[sel];if(on)on.scrollIntoView({block:'nearest'})};
  const pick=i=>{const c=shown[i];closeOverlay();if(c)c.run()};
  input.addEventListener('input',()=>{const q=input.value.trim();shown=all.map(c=>({c,s:Math.max(fuzzy(q,c.label),fuzzy(q,c.grp+' '+c.label)*.9)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).map(x=>x.c);sel=0;draw()});
- input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,shown.length-1);draw()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);draw()}else if(e.key==='Enter'){e.preventDefault();pick(sel)}else if(e.key==='Escape'){closeOverlay()}});
+ input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,shown.length-1);draw()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);draw()}else if(e.key==='Enter'){e.preventDefault();pick(sel)}else if(e.key==='Escape'){e.preventDefault();closeOverlay()}});
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade',role:'dialog','aria-modal':'true','aria-label':'Command palette'},input,list,
   h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'))));
  document.body.append(palette);draw();input.focus()}
@@ -547,6 +579,6 @@ function readinessTab(){const r=ui.ready;if(!r||ui.readyLoading){if(!r&&!ui.read
     c.assessment==='supported'?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'rejected')}},'Reject'):null,
     h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'challenged')}},'Challenge check'),
     h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=c.caseId;ui.step=null;render()}}},'Open scenario'))))]}
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());gwSyncHash();if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

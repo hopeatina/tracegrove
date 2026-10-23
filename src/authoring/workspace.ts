@@ -129,9 +129,18 @@ export type ProvedFlow = {
   /** repair rounds the agent took on this file */
   repairs: number;
   detail: string | null;
+  /** the outcome its run recorded for the first case that did not pass (assertion_failed for a check that did not hold), else
+   *  passed; null when nothing ran (it did not compile, say). Only assertion_failed is a failed check: any other outcome never
+   *  reached its checks. */
+  caseOutcome?: string | null;
+  /** where it broke and what it said, as "<step or stage>: <message>", such as "(app startup): application exited before becoming
+   *  ready"; null when it passed */
+  failure?: string | null;
   /** distinct METHOD path pairs the app served while this file ran */
   served: string[];
   run: string | null;
+  /** whether its run's evidence verified: false when it ran but its record did not verify; null when nothing ran */
+  verified?: boolean | null;
 };
 export type DraftResult = {
   agent: AgentRunResult; check: CheckResult;
@@ -222,15 +231,18 @@ async function proveFile(configPath: string, root: string, file: string, signal?
   try { ({ report } = await runTests({ configPath, grep: file, ...(signal ? { signal } : {}) })); }
   catch (error) {
     const detail = error instanceof Blocked ? error.reasons.map((r) => r.detail).join('; ') : (error as Error).message;
-    return { flow: { ...base, outcome: 'failed', detail: detail.slice(0, 400) }, failures: [{ file, caseId: '(compile)', step: '(compile)', message: detail.slice(0, 1000), observed: null }] };
+    return { flow: { ...base, outcome: 'failed', detail: detail.slice(0, 400), caseOutcome: null, failure: `(compile): ${detail}`.slice(0, 400) }, failures: [{ file, caseId: '(compile)', step: '(compile)', message: detail.slice(0, 1000), observed: null }] };
   }
   const cases = report.cases.filter((c) => c.file === file || c.file.endsWith(file));
   const served = [...new Set(cases.flatMap((c) => (c.requests ?? []).filter((r) => r.step !== null).map((r) => `${r.method} ${templateOfObserved(r.path)}`)))].sort();
-  const flow = { ...base, caseIds: cases.map((c) => c.caseId), served, run: basename(report.runDir) };
-  if (report.bundleVerified !== true) return { flow: { ...flow, outcome: 'failed', detail: 'the run evidence did not verify' }, failures: [] };
   const failed = cases.filter((c) => c.outcome !== 'passed');
+  const blocker = report.blockers[0];
+  const first = failed[0];
+  const caseOutcome = first?.outcome ?? (cases.length ? 'passed' : null);
+  const failure = first?.failure ? `${first.failure.step}: ${first.failure.message}`.slice(0, 400) : first ? first.outcome : cases.length ? null : blocker?.detail ?? 'no case from this file ran';
+  const flow = { ...base, caseIds: cases.map((c) => c.caseId), served, run: basename(report.runDir), caseOutcome, failure, verified: report.bundleVerified };
+  if (report.bundleVerified !== true) return { flow: { ...flow, outcome: 'failed', detail: 'the run evidence did not verify' }, failures: [] };
   if (cases.length > 0 && failed.length === 0) return { flow: { ...flow, outcome: 'proven', detail: null }, failures: [] };
   const failures = failed.map((c) => ({ file, caseId: c.caseId, step: c.failure?.step ?? '(setup)', message: c.failure?.message ?? c.outcome, observed: c.failure?.observed ?? null }));
-  const blocker = report.blockers[0];
   return { flow: { ...flow, outcome: 'failed', detail: failures[0]?.message.slice(0, 400) ?? blocker?.detail ?? 'no case ran' }, failures: failures.length ? failures : [{ file, caseId: '(run)', step: '(run)', message: blocker ? `${blocker.detail}; ${blocker.action}` : 'no case from this file ran', observed: null }] };
 }
