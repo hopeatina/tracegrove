@@ -287,7 +287,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('names every knot at rest, beside it or, on a phone only, as a lettered pip (journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of every bud and every shoot from its foot, so no hop of the headline journey goes unnamed and a burl holding its start is named for it, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
+  it('names every knot at rest, beside it or, on a phone only, as a lettered pip (journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of one another, of every bud and of every shoot from its foot, so no hop of the headline journey goes unnamed and a burl holding its start is named for it, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     let pips = 0;
@@ -351,7 +351,13 @@ describe('the names on the bonsai’s knots', () => {
               const sr = B.svg.getBoundingClientRect();
               if (bl < sr.left - .5 || br > sr.right + .5 || bt < sr.top - .5 || bb > sr.bottom + .5) out.push('the key runs out of the drawing');
             }
-            // a pip stands 8px clear of every count bud and graft bud
+            // a pip stands 8px clear of every other pip
+            const pips = Object.keys(B.klbl).map((id) => B.klbl[id].parentNode.querySelector('.kpip:not(.key)') as Element).filter((e) => vis(e)).map((e) => [e.textContent, e.querySelector('circle')!.getBoundingClientRect()] as const);
+            for (let a = 0; a < pips.length; a++) for (let b = a + 1; b < pips.length; b++) {
+              const p = pips[a]![1], q = pips[b]![1], gap = Math.hypot(Math.max(q.left - p.right, 0, p.left - q.right), Math.max(q.top - p.bottom, 0, p.top - q.bottom));
+              if (gap < 8 - .5) out.push('pips ' + pips[a]![0] + ' and ' + pips[b]![0] + ' ' + gap.toFixed(1) + ' px apart');
+            }
+            // and 8px clear of every count bud and graft bud
             const buds = (Array.from(B.svg.querySelectorAll('.shtag .sbud, .gb-gr .gsw')) as Element[]).filter(vis).map((e) => e.getBoundingClientRect());
             for (const id of Object.keys(B.klbl)) {
               const pc = B.klbl[id].parentNode.querySelector('.kpip:not(.key)') as Element;
