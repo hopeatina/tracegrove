@@ -2195,23 +2195,19 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
-  /** Where each branch of the headline journey's refusals or failures leaves the trunk: the knot most of its scenarios
-   *  broke at (the run's hop) or, where none broke, the last hop of their route. */
-  const refusals = () => {
-    const w = (0, eval)('({ gw, gbModel, gbWound })'), B = w.gw.B, M = w.gw.M || w.gbModel(), S = w.gw.state;
+  /** Where each branch of the headline journey's refusals or failures leaves the trunk, against the knot the fixture pins
+   *  for it by name: where most of its scenarios broke (the run's hop) or, where none broke, the last hop of their route, as
+   *  read off the recorded runs and routes, never worked out again by the drawing's own rule. */
+  const refusals = (pins: Record<string, string>) => {
+    const w = (0, eval)('({ gw, gbModel })'), B = w.gw.B, M = w.gw.M || w.gbModel(), S = w.gw.state;
     const out: Array<{ id: string; tree: number; end: string; d: number; ra: number; side: boolean; failed: number }> = [];
     B.L.trees.forEach((T: any, ti: number) => {
       for (const b of T.br.filter((x: any) => x.pol)) {
-        const j = b.j, P = B.pad[b.id], n = new Map<string, number>();
-        for (const x of P.leaves) {
-          const wd = w.gbWound(M, j, x), ix = j.units.indexOf(x.unit), real = j.units.filter((id: string) => !M.U[id]?.root);
-          const end = wd ?? (x.scenarioKind !== 'happy' && ix >= 0 ? x.unit : real[real.length - 1]);
-          n.set(end, (n.get(end) ?? 0) + 1);
-        }
-        const end = [...n].sort((a, c) => c[1] - a[1])[0]![0], q = T.knots.find((k: any) => k.on === 't' && k.ids.includes(end));
-        if (!q) { out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Infinity, ra: 0, side: false, failed: 0 }); continue; }
+        const P = B.pad[b.id], end = pins[b.id] ?? '', q = T.knots.find((k: any) => k.on === 't' && k.ids.some((id: string) => M.U[id]?.label === end));
+        const failed = P.leaves.filter((x: any) => S.run[x.id]?.st === 'fail').length;
+        if (!q) { out.push({ id: b.id, tree: ti, end, d: Infinity, ra: 0, side: false, failed }); continue; }
         const p0 = b.pts[0], conv = Math.sign(q.n[0] * q.side);
-        out.push({ id: b.id, tree: ti, end: M.U[end]?.label ?? end, d: Math.hypot(p0[0] - q.bp[0], p0[1] - q.bp[1]), ra: q.ra, side: conv === Math.sign(b.dir), failed: P.leaves.filter((x: any) => S.run[x.id]?.st === 'fail').length });
+        out.push({ id: b.id, tree: ti, end, d: Math.hypot(p0[0] - q.bp[0], p0[1] - q.bp[1]), ra: q.ra, side: conv === Math.sign(b.dir), failed });
       }
     });
     return out;
@@ -2223,18 +2219,22 @@ describe('Grow page', () => {
     const browser = await chromium.launch({ headless: true });
     try {
       let unbroken = 0;
+      // each fixture's branches of what its headline journey refuses, and the knot each grows from, read off its runs and
+      // routes: plotline's guard branch from POST /seats, the hop its failed scenario broke after; tracegrove's from
+      // POST /api/grow, where three of its four guards end; and the grown failure's from POST /refunds, the one route its
+      // scenarios call (past it lies only Stripe, a root)
+      const pinned: Record<string, Record<string, string>> = { plotline: { 'j1~guard': 'POST /seats' }, tracegrove: { 'j1~guard': 'POST /api/grow' }, failed: { 'j1~guard': 'POST /refunds' } };
       for (const [name, s] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['failed', state]] as const) {
         const page = await treePage(browser, server.url, s, { width: 1440, reduce: true });
         await page.waitForTimeout(400);
-        const got = await page.evaluate(refusals);
-        expect(got.length, name).toBeGreaterThan(0);
+        const got = await page.evaluate(refusals, pinned[name]!);
+        expect(got.map((r) => r.id).sort(), name).toEqual(Object.keys(pinned[name]!).sort());
         // its collar is that knot: the branch's first point within the knot's boss and six pixels, on the side the boss stands
         for (const r of got) {
           expect(r.d, name + ' ' + r.id + ' at ' + r.end).toBeLessThanOrEqual(r.ra + 6);
           expect(r.side, name + ' ' + r.id + ' on its knot\'s convex side').toBe(true);
           if (!r.failed) unbroken++;
         }
-        if (name === 'plotline') expect(got.find((r) => r.id === 'j1~guard')?.end, name).toBe('POST /seats');
         await page.close();
       }
       // and a branch none of whose scenarios failed sits at the last hop they run
