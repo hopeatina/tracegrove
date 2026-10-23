@@ -3022,6 +3022,9 @@ describe('Grow page', () => {
       out.calluses++;
       const cal = sc.querySelector('ellipse.cal'), cres = sc.querySelector('path.cres');
       if (!cal || !cres) return bad(what + ': a callus without its roll or its lit crescent');
+      // big enough to read as a cut that healed, not a speck: six by four at the least
+      const cx2 = 2 * Number(cal.getAttribute('rx')), cy2 = 2 * Number(cal.getAttribute('ry'));
+      if (cx2 < 6 || cy2 < 4) bad(what + ': a callus under six by four', [cx2, cy2]);
       const fc = getComputedStyle(cal), lip = getComputedStyle(cres).stroke;
       if (/url\(/.test(fc.fill) || fc.stroke === 'none') bad(what + ': callus shaded, or with no rim');
       if (Math.abs(lum(fc.fill) - lum(wood)) > 0.15) bad(what + ': callus not in the bark’s tones', [fc.fill, wood]);
@@ -3104,6 +3107,7 @@ describe('Grow page', () => {
       if (real) {
         if (!E.stub.classList.contains('on')) bad('no callus where a branch that grew was cut', pid);
         if (!E.stub.querySelector('ellipse.cal') || !E.stub.querySelector('path.cres')) bad('the branch’s callus has no roll or crescent', pid);
+        else if (2 * Number(E.stub.querySelector('ellipse.cal').getAttribute('rx')) < 6 || 2 * Number(E.stub.querySelector('ellipse.cal').getAttribute('ry')) < 4) bad('the branch’s callus under six by four', pid);
         if (moving && sc) bad('a branch that grew shrinks back instead of being cut and dropped', pid);
       } else {
         if (E.stub.classList.contains('on')) bad('a mark where a branch that never grew was', pid);

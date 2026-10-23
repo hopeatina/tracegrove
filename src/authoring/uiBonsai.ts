@@ -376,8 +376,9 @@ function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'
  return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.4,transform:T(.45*dx,.16*dy,.7*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
 /* What was only ever a preview's ghost was never grown, so a mode that drops it does not cut it: it shrinks back into p
    (its collar) as it fades, in GB_BACK ms on the same ease-in, and leaves no mark. */
-/* A healed cut: a small roll of callus at c, in the bark's own tones, rx along the grain t and ry across it, with a thin lit
-   crescent along its lip on the side n it was cut from. Never a pale disc: it reads as bark, and a knot always stands over it. */
+/* A healed cut: a small roll of callus at c, in the bark's own tones, rx along the grain t and ry across it (six by four at
+   the least, so it reads as a mark and not a speck), with a thin lit crescent along its lip on the side n it was cut from.
+   Never a pale disc: it reads as bark, and a knot always stands over it. */
 function gbCal(c,t,n,rx,ry,cls,...kids){const ang=Math.atan2(t[1],t[0])*180/Math.PI,cr=[];for(let i=0;i<=8;i++){const th=Math.PI*i/8;cr.push([c[0]+(t[0]*Math.cos(th)*rx+n[0]*Math.sin(th)*ry)*.8,c[1]+(t[1]*Math.cos(th)*rx+n[1]*Math.sin(th)*ry)*.8])}
  return sv('g',{class:'heal '+cls},sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(rx),ry:gbF(ry),transform:'rotate('+gbF(ang)+' '+gbP(c)+')',class:'cal'}),sv('path',{d:gbLine(cr),class:'cres'}),...kids)}
 function gbBackK(p){const T=k=>'translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) scale('+k+') translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';return [{offset:0,transform:T(1),opacity:1},{offset:1,transform:T(.04),opacity:0}]}
@@ -1316,8 +1317,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    /* where a pruning of it heals: cut flush where it left the trunk, no stub or peg, the cut rolled over with callus in the
       bark's own tones, a thin lit crescent on its outer lip; with how many scenarios the branch held */
    const pdl=T.pads[b.id].leaves.length;const cA=gbNear(b.acc,b.Tk/2),cq=pts[cA],cw=b.w[cA],cb=pts[Math.min(pts.length-1,cA+2)],cm=Math.hypot(cb[0]-cq[0],cb[1]-cq[1])||1,cn=[(cb[0]-cq[0])/cm,(cb[1]-cq[1])/cm];
-   const t1=tp[Math.min(tp.length-1,b.k+1)],t2=tp[Math.max(0,b.k-1)],tm=Math.hypot(t1[0]-t2[0],t1[1]-t2[1])||1,ctg=[(t1[0]-t2[0])/tm,(t1[1]-t2[1])/tm],cry=Math.max(1.6,cw*.26),cc=[cq[0]-cn[0]*cry*.5,cq[1]-cn[1]*cry*.5];
-   const stub=gbCal(cc,ctg,cn,Math.max(2.4,cw*.52),cry,'stub',sv('text',{x:gbF(cc[0]+b.dir*(cry+6)),y:gbF(cc[1]+4),'text-anchor':b.dir>0?'start':'end',class:'mlbl'},pdl+' pruned'),sv('circle',{cx:gbF(cc[0]),cy:gbF(cc[1]),r:14,class:'hitc'}));
+   const t1=tp[Math.min(tp.length-1,b.k+1)],t2=tp[Math.max(0,b.k-1)],tm=Math.hypot(t1[0]-t2[0],t1[1]-t2[1])||1,ctg=[(t1[0]-t2[0])/tm,(t1[1]-t2[1])/tm],cry=Math.max(2,cw*.26),cc=[cq[0]-cn[0]*cry*.5,cq[1]-cn[1]*cry*.5];
+   const stub=gbCal(cc,ctg,cn,Math.max(3,cw*.52),cry,'stub',sv('text',{x:gbF(cc[0]+b.dir*(cry+6)),y:gbF(cc[1]+4),'text-anchor':b.dir>0?'start':'end',class:'mlbl'},pdl+' pruned'),sv('circle',{cx:gbF(cc[0]),cy:gbF(cc[1]),r:14,class:'hitc'}));
    stub.setAttribute('data-k','j:'+b.j.id);stub.setAttribute('data-pad',b.id);gScar.append(stub);
    /* the cut a mode will make, shown while that mode is previewed */
    const qi=gbNear(b.acc,b.Tk/2+12),q=pts[qi],qn=gbNorm(pts,qi),qh=b.w[qi]/2+6;const cutmk=sv('path',{class:'cutmk',d:'M'+gbP([q[0]-qn[0]*qh,q[1]-qn[1]*qh])+' L'+gbP([q[0]+qn[0]*qh,q[1]+qn[1]*qh])});
@@ -1771,7 +1772,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     if(!on){if(sc)sc.classList.remove('on');continue}
     const sw=Math.max(cut?el.__lag||0:0,(el.__t0||0)-gbNow()),scIn=q=>{if(!quiet&&q.animate&&(cut||sw>0))q.animate([{opacity:0},{opacity:1}],{duration:60,delay:sw,fill:'backwards'})};
     if(sc&&!sc.classList.contains('on'))scIn(sc);
-    if(!sc){sc=gbCal(c,[-u[1],u[0]],u,2.3,1.5,'scar',sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:9,class:'hitc'}));sc.setAttribute('data-k','s:'+x.id);sc.setAttribute('data-pad',pid);sc.setAttribute('tabindex','-1');sc.setAttribute('role','button');const k1=P.jg.querySelector(':scope>.kn');if(k1)k1.before(sc);else P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
+    if(!sc){sc=gbCal(c,[-u[1],u[0]],u,3,2,'scar',sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:9,class:'hitc'}));sc.setAttribute('data-k','s:'+x.id);sc.setAttribute('data-pad',pid);sc.setAttribute('tabindex','-1');sc.setAttribute('role','button');const k1=P.jg.querySelector(':scope>.kn');if(k1)k1.before(sc);else P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
     sc.classList.add('on');sc.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t+(more?'; and '+more+' more pruned here':''))}}
    const falling=list.some(x=>B.leaf[x.id]&&B.leaf[x.id].classList.contains('cut'));const pruned=!!vis&&list.length>0&&!shown;const bare=!list.length;const cut=pruned&&!falling;const back=cut&&!!pv&&list.some(x=>gbRank[x.mode]<=gbRank[pv]);
    P.el.setAttribute('class','pad'+(P.crown?' crown':'')+(P.b&&P.b.back?' back':'')+(bare?' bare':'')+(gk!==kk?' pv-grow':'')+(failed?' failed':'')+(gw.pinned==='j:'+j.id?' sel':''));
@@ -1848,7 +1849,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   const stop=()=>{if(g.fade){g.fade.cancel();g.fade=null}if(g.cfade){g.cfade.cancel();g.cfade=null}};
   /* where a shoot that grew in a chosen mode heals once a mode drops it: a callus beside its knot (gbBuild's cal), under the boss */
   /* (laid just under its own knot, which may sit on a branch's wood above the scars layer: the knot stays a raised boss over it) */
-  if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,2.6,1.7,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
+  if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,3,2,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
   if(any&&(vis==='max'||(!vis&&!pv)))real.add('sh:'+g.kid);const fell=real.has('sh:'+g.kid);
   if(on){g.g.style.display='';stop()}
   /* (one cut before it has sprouted never sprouts; one cut while sprouting falls from where it got to) */
