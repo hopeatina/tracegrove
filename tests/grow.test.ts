@@ -2256,20 +2256,22 @@ describe('Grow page', () => {
       if (g.tip[1] - g.base[1] > 0.4 * Math.hypot(g.tip[0] - g.base[0], g.tip[1] - g.base[1])) bad('dormant bud hangs', g.kid);
       if ([0.5, 0.75, 1].some((f) => onWood(g.base[0] + (g.tip[0] - g.base[0]) * f, g.base[1] + (g.tip[1] - g.base[1]) * f))) bad('dormant bud grows back into the wood', g.kid);
     }
-    // its count of the checks its leaves do not show: a bud-shaped tag tied at its own tip
+    // its count of the checks its leaves do not show: the swollen tip of its own shoot (a dormant knot's, of the short stub it
+    // puts out), a bud set on the very end of the shoot's path and turned to its tangent there, with no tie
     for (const g of [...gs, ...rest]) {
       const t = g.g?.querySelector('.shtag'), shown = !!t && getComputedStyle(t).display !== 'none';
       out.counts.push({ parts: g.uids.map(label), leaves: g.g ? g.g.querySelectorAll('.gb-lf.bud:not(.gone)').length : 0, more: shown ? Number(String(t.querySelector('.shn').textContent).replace('+', '')) : 0 });
       if (!shown) continue;
       out.tags++;
-      const tie = (t.querySelector('.shtie')?.getAttribute('d') ?? '').match(/[-\d.]+/g)?.map(Number) ?? [], bud = t.querySelector('.sbud'), r = bud.getBBox();
-      if (Math.hypot(tie[0]! - g.tip[0], tie[1]! - g.tip[1]) > 3) bad('count tied off its shoot tip', g.kid);
-      if (tie[2]! < r.x - 1 || tie[2]! > r.x + r.width + 1 || tie[3]! < r.y - 1 || tie[3]! > r.y + r.height + 1) bad('tie ends off its tag', g.kid);
-      // tied in the open: the tie never runs over or behind the wood to a tag on the limb's far side
-      for (let i = 1; i <= 10; i++) { const f = i / 10; if (onWood(tie[0]! + (tie[2]! - tie[0]!) * f, tie[1]! + (tie[3]! - tie[1]!) * f)) { bad('count tied across the wood', g.kid); break; } }
-      // a bud, not a pill: round at the tie, drawn to a point away from it
+      for (const e of Array.from(t.querySelectorAll('.shtie')) as SVGPathElement[]) if (e.getAttribute('d') && e.getTotalLength() > 0) bad('count tied by a hairline', g.kid);
+      const bud = t.querySelector('.sbud'), r = bud.getBBox(), m = bud.transform.baseVal.consolidate()?.matrix, P = g.pts as number[][] | undefined;
+      if (!P || P.length < 2) { bad('count with no shoot of its own', g.kid); continue; }
+      const end = P[P.length - 1]!, prev = P[P.length - 3] ?? P[0]!;
+      if (!m || Math.hypot(m.e - end[0]!, m.f - end[1]!) >= 1) bad('count off its shoot’s tip', [g.kid, m ? [m.e, m.f] : null, end]);
+      else { let da = Math.abs(Math.atan2(m.b, m.a) - Math.atan2(end[1]! - prev[1]!, end[0]! - prev[0]!)) * 180 / Math.PI; if (da > 180) da = 360 - da; if (da > 12) bad('count not turned to its shoot’s tangent', [g.kid, Math.round(da)]); }
+      // a bud, not a pill: round at its foot on the tip, drawn to a point away from it, on along the shoot
       const d = bud.getAttribute('d') || '', nums = (d.match(/-?[\d.]+/g) || []).map(Number), apex = [nums[0]!, nums[1]!];
-      if (/[aA]/.test(d) || Math.hypot(apex[0]! - tie[2]!, apex[1]! - tie[3]!) < Math.max(r.width, r.height) * 0.8) bad('count tag is not a bud pointing away from its tie', g.kid);
+      if (/[aA]/.test(d) || Math.hypot(apex[0]!, apex[1]!) < Math.max(r.width, r.height) * 0.8 || apex[0]! <= 0) bad('count tag is not a bud pointing on from its shoot', g.kid);
     }
     const all = [...gs, ...rest];
     for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
@@ -2312,7 +2314,7 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('grows Max out of the wood: limbs from their parents, bosses on the bend, shoots apart and tied to their counts, existing flows as graft buds', async () => {
+  it('grows Max out of the wood: limbs from their parents, bosses on the bend, shoots apart and each count the swollen tip of its own shoot, existing flows as graft buds', async () => {
     const { dir, state } = await grownBushy();
     // four existing flows that reach one part on the first journey
     const j1 = state.journeys[0]!, unit = j1.units.find((id) => state.scenarios.some((x) => x.unit === id && x.mode === 'max' && !x.journey)) ?? j1.units[0]!;
@@ -2367,8 +2369,45 @@ describe('Grow page', () => {
         expect(g.counts.flatMap((c) => c.parts).filter((p) => rolled[p]).sort(), width + 'px').toEqual(Object.keys(rolled).sort());
         await page.close();
       }
+      // On the recorded trees in Max, every count shown is the tip of a shoot that grows from a knot's boss, or for a root's
+      // checks from the trunk above that root's flare: never from the soil, the root, bare trunk or the air, and never tied.
+      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, { ...folded(file), mode: 'max' }, width, width < 500);
+        await page.waitForTimeout(2500);
+        const t = await page.evaluate(() => {
+          const w = (0, eval)('({ gw })'), B = w.gw.B, L = B.L, out = { n: 0, bad: [] as string[] };
+          const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
+          const pt = (x: number, y: number) => new DOMPoint(x, y);
+          const trunks = (L.trees as any[]).map((T, ti) => (Array.from(B.svg.querySelectorAll('path.w')) as any[]).find((e) => e.__pts && e.__pts.length === T.tp.length && [0, L.xs[ti]].some((X) => Math.hypot(e.__pts[0][0] - T.tp[0][0] - X, e.__pts[0][1] - T.tp[0][1]) < .5))).filter(Boolean) as SVGGeometryElement[];
+          if (!trunks.length) bad('no trunk to measure against');
+          const inTrunk = (q: number[]) => trunks.some((e) => e.isPointInFill(pt(q[0]!, q[1]!)));
+          const knots = [...new Set(Object.values(B.knot))].map((e: any) => e.__geo).filter(Boolean);
+          for (const g of [...(B.shootGeo ?? []), ...(B.shootRest ?? [])] as any[]) {
+            const tag = g.g?.querySelector('.shtag');
+            if (!tag || getComputedStyle(tag).display === 'none' || g.g.closest('.gone')) continue;
+            out.n++;
+            for (const e of Array.from(tag.querySelectorAll('.shtie')) as SVGPathElement[]) if (e.getAttribute('d') && e.getTotalLength() > 0) bad('count tied by a hairline', g.kid);
+            const P = g.pts as number[][] | undefined, m = tag.querySelector('.sbud')?.transform.baseVal.consolidate()?.matrix;
+            if (!P || P.length < 2 || !m) { bad('count with no shoot of its own', g.kid); continue; }
+            const end = P[P.length - 1]!, base = P[0]!;
+            if (Math.hypot(m.e - end[0]!, m.f - end[1]!) >= 1) bad('count off its shoot’s tip', [g.kid, Math.round(Math.hypot(m.e - end[0]!, m.f - end[1]!))]);
+            if (!(m.f < L.sy(m.e) - 24)) bad('count within 24 px of the soil', [g.kid, Math.round(L.sy(m.e) - m.f)]);
+            const atKnot = knots.some((k: any) => Math.hypot(base[0]! - k.p[0], base[1]! - k.p[1]) <= k.ra + 2);
+            const onTrunk = inTrunk(base) && base[1]! < L.sy(base[0]!) - 24;
+            if (!atKnot && !onTrunk) bad('shoot from neither a knot nor the trunk above the flare', [g.kid, base.map(Math.round)]);
+            // no more than 3 px of it under the trunk's bark
+            let under = 0;
+            for (let i = 1; i < P.length; i++) { const a = P[i - 1]!, b = P[i]!, l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!), n = Math.max(1, Math.ceil(l / .25)); for (let k = 0; k < n; k++) { const f = (k + .5) / n; if (inTrunk([a[0]! + (b[0]! - a[0]!) * f, a[1]! + (b[1]! - a[1]!) * f])) under += l / n; } }
+            if (under > 3) bad('shoot runs under the trunk for', [g.kid, +under.toFixed(1)]);
+          }
+          return out;
+        });
+        expect(t.bad, name + ' ' + width + 'px').toEqual([]);
+        expect(t.n, name + ' ' + width + 'px counts shown').toBeGreaterThan(0);
+        await page.close();
+      }
     } finally { await browser.close(); }
-  }, 60000);
+  }, 120000);
 
   /** The wood a pad sits on, from the drawn page: each branch's girth where it leaves the trunk against the trunk's there, each
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the

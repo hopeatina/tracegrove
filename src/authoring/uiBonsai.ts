@@ -65,7 +65,7 @@ export const BONSAI_CSS = String.raw`
 /* a shoot a mode would cut is grey with the tick across its foot; one it would add is a ghost, stem and all */
 .gb .budg.pre .tw.shoot,.gb .budg.pv-out .tw.shoot{fill:color-mix(in srgb,var(--ink3) 40%,var(--paper))}.gb .budg.pre path.tipbud,.gb .budg.pv-out path.tipbud{fill:var(--paper);stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper))}.gb .budg.pre .bpet,.gb .budg.pv-out .bpet{stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper))}
 .gb .budg.pre .cutk,.gb .budg.pv-out .cutk{display:inline}.gb .budg.fall .cutk{display:none}.gb .budg.pv-add{opacity:.45}.gb path.tipbud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.8}.gb .tw.old{fill:var(--wood-old)}
-.gb .tipbud path{fill:var(--moss-bg);stroke:var(--moss);stroke-width:1}.gb .shn{font:500 9.5px var(--mono);fill:var(--ink3)}.gb .shtag .sbud{fill:color-mix(in srgb,var(--moss) 14%,var(--paper));stroke:var(--shoot);stroke-width:1;stroke-linejoin:round}.gb .shtag .shtie{fill:none;stroke:var(--shoot);stroke-width:1}.gb .shtag .shn{fill:var(--moss)}
+.gb .tipbud path{fill:var(--moss-bg);stroke:var(--moss);stroke-width:1}.gb .shn{font:500 9.5px var(--mono);fill:var(--ink3)}.gb .shtag .sbud{fill:color-mix(in srgb,var(--moss) 14%,var(--paper));stroke:var(--shoot);stroke-width:1;stroke-linejoin:round}.gb .shtag .shn{fill:var(--moss)}
 /* an existing flow Max re-checks: a graft bud ringed into the bark at its knot, in the state its run is in */
 .gb .gb-gr{cursor:pointer;transition:opacity .3s}.gb .gb-gr.gone{display:none}.gb .gb-gr:focus{outline:none}
 .gb .gb-gr .gring{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.6}.gb .gb-gr .ghalo{fill:var(--wood-shade);opacity:.32;filter:blur(.6px)}.gb .gb-gr .gcres{fill:color-mix(in srgb,var(--knot-lit) 55%,#fff);opacity:.85}
@@ -1079,12 +1079,15 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
  /* a shoot grows out from under the bark, so it is drawn before the wood */
  const gPot=lay('pots'),gBack=lay('back'),gRoot=lay('roots'),gJin=lay('jins'),gBud=lay('buds'),gWood=lay('wood');
  const gLight=sv('g',{'clip-path':'url(#'+clipId+')',filter:'url(#'+softId+')'}),gGrain=sv('g',{'clip-path':'url(#'+clipId+')'});svg.append(gLight,gGrain);
+ /* Max's shoots, and the stubs a crowded knot puts out, lie over the trunk: each leaves its knot's boss at the bark, out of a
+    small swollen collar, never from under the wood */
+ const gShoot=lay('shoots');
  /* a root that goes over the rim lies on the soil, but starts behind the trunk: the trunks mask it */
  const gSoil=lay('soil'),gRootX=lay('rootsx'),rxId='gb-rx'+N,rxMask=sv('mask',{id:rxId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));defs.append(rxMask);gRootX.setAttribute('mask','url(#'+rxId+')');
  /* the traced route is drawn over the wood, so it is never lost under a branch; inside a pad it shows faintly (the mask),
     as sap under foliage */
  const gFront=lay('front'),gScar=lay('scars'),gSap=sv('g',{class:'sapl',mask:'url(#'+rmId+')'});svg.append(gSap);B.gScar=gScar;const gKn=lay('knots'),gVein=lay('veins'),gLbl=lay('labels'),gKl=lay('klabels'),gCur=lay('cur');
- B.gCur=gCur;B.gBud=gBud;B.gWood=gWood;B.gKn=gKn;B.defs=defs;B.N=N;
+ B.gCur=gCur;B.gBud=gBud;B.gShoot=gShoot;B.gWood=gWood;B.gKn=gKn;B.defs=defs;B.N=N;
  /* the lit route inside the wood: its halo, its amber body, the grey dots past a break, the red wood where it broke, the cream
     core along its spine; and the red's own spine, unpainted, which a card keeps clear of (gbLight) */
  B.sapU=sv('path',{class:'sapu',d:''});B.sapR=sv('path',{class:'sapr',d:''});B.sap=sv('path',{class:'sap',d:''});B.sapX=sv('path',{class:'sap rest',d:''});B.gRed=sv('g',{class:'sapred','clip-path':'url(#'+clipId+')'});B.sapW=sv('path',{class:'sap bad',d:''});gSap.append(B.sapU,B.sapR,B.sapX,B.gRed,B.sap,B.sapW);
@@ -1327,11 +1330,14 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
    const grow1=(pl,k0,wd,uids,kid,routeOf,lo,pref,bs,tf,limb,dp)=>{let best=null;const n1=pl.length-1,acc=gbLen(pl),step=acc[n1]/n1,jA=(gbHash('sha:'+kid)-.5)*12,jL=1+(gbHash('shl:'+kid)-.5)*.3;
     const c=uids.reduce((a,id)=>a+own(id).length,0),nl=Math.max(1,Math.min(c,4));
     /* a knot's shoot comes from its boss; a sucker or a shoot on no knot from the trunk, as near where it was asked as it can */
+    /* (out of the boss's rim, at the bark; where nothing can grow from there, from a little deeper in the boss) */
+    const inPad=r=>padBox.slice(0,nPad).reduce((a,q)=>a+ov(r,q),0)>.2*(r[2]-r[0])*(r[3]-r[1]);
+    for(const bf of bs?[.8,.55]:[0]){if(best&&!best.o&&!inPad(best.r))break;best=null;
     for(const off of bs?[0]:[0,6,-6,12,-12,18,-18,24,-24,32,-32,40,-40,50,-50,60,-60,72,-72,84,-84]){const kk=Math.max(lo,Math.min(n1-2,k0+Math.round(off/step)));const a=pl[kk],n=gbNorm(pl,kk),wk=wd[kk];
      /* the outside of the bend: away from the middle of the chord across it; where the wood runs straight, the asked side */
      const ka=pl[Math.max(0,kk-6)],kb=pl[Math.min(n1,kk+6)],cv=(a[0]-(ka[0]+kb[0])/2)*n[0]+(a[1]-(ka[1]+kb[1])/2)*n[1];
      const side=bs?bs.side:Math.abs(cv)>1.2?Math.sign(cv):pref&&n[0]*pref<0?-1:1,ns=[n[0]*side,n[1]*side];
-     const b0=bs?[bs.p[0]+ns[0]*bs.rb*.55,bs.p[1]+ns[1]*bs.rb*.55]:[a[0]+ns[0]*(wk/2-2.4),a[1]+ns[1]*(wk/2-2.4)];
+     const b0=bs?[bs.p[0]+ns[0]*bs.rb*bf,bs.p[1]+ns[1]*bs.rb*bf]:[a[0]+ns[0]*(wk/2-1.2),a[1]+ns[1]*(wk/2-1.2)];
      if(fk.some(([f])=>Math.hypot(b0[0]-f[0],b0[1]-f[1])<1.5*wk+2)||limb&&acc[kk]<.15*acc[n1])continue;
      if((B.shootGeo||[]).some(g=>Math.hypot(g.base[0]-b0[0],g.base[1]-b0[1])<40*kq))continue;
      /* it leans to the side its boss faces (or, where that runs it into the wood, the other), out of the wood first, then up */
@@ -1342,18 +1348,55 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
       if(gbShootSlots(pts,Math.min(4,Math.max(3,c))).slice(0,nl).some(q=>{const th=q[2]*Math.PI/180,s=q[3]||1;return [4,8,12,15].some(d=>{const p=[q[0]+Math.cos(th)*d*s,q[1]+Math.sin(th)*d*s];return inW(p,1.2)||ribIn(p,1.2)||layIn(p,1.2)})}))continue;
       const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]),r=[Math.min(...xs)-9,Math.min(...ys)-9,Math.max(...xs)+9,Math.max(...ys)+5];
       const sc=hits(r)+out(r)*400+Math.abs(be-24)*.6+(1-lf)*40+Math.abs(off)*2+(sx===sx0?0:30);
-      if(!best||sc<best.sc)best={sc,pts,b0,tip,r,kk,ns,o:out(r)}}}
-    const inPad=r=>padBox.slice(0,nPad).reduce((a,q)=>a+ov(r,q),0)>.2*(r[2]-r[0])*(r[3]-r[1]);
-    /* no place to grow: a dormant bud, its checks' count tied to its tip, on its boss (or where it was asked) facing out and up */
+      if(!best||sc<best.sc)best={sc,pts,b0,tip,r,kk,ns,o:out(r)}}}}
+    /* no place to grow: a short stub of a shoot off its boss on the boss's own side (the outside of the bend), facing out and
+       up, its checks' count the swollen bud at its tip */
     if(!best||best.o>0||inPad(best.r)){const d=dp(),lift=(v,md)=>{const lim=[55,83,108][md]*Math.PI/180,a=Math.max(-lim,Math.min(lim,Math.atan2(v[0],-v[1])));return [Math.sin(a),-Math.cos(a)]};
-     /* (it faces out of its boss and up; on a limb's underside it turns aside and stands out about level, never back into the wood) */
-     /* (of the ways out, the one with most open ground ahead of it, for its count) */
-     let u=null;for(const md of [0,1,2]){let bs2=null;for(const th of [0,20,-20,40,-40,60,-60,80,-80,100,-100,120,-120,140,-140]){const a=th*Math.PI/180,v=lift([d.ns[0]*Math.cos(a)-d.ns[1]*Math.sin(a),d.ns[0]*Math.sin(a)+d.ns[1]*Math.cos(a)],md);
-      if([4,6,8,10].some(s=>inWF([d.q[0]+v[0]*s,d.q[1]+v[1]*s])))continue;const sc=[13,17,22,28].filter(s=>!inWF([d.q[0]+v[0]*s,d.q[1]+v[1]*s])).length*10-Math.abs(th)/20;if(!bs2||sc>bs2.sc)bs2={sc,v}}if(bs2){u=bs2.v;break}}if(!u)u=lift(d.ns,0);let cal=null;
+     /* (it faces out of its boss and up; on a limb's underside it turns aside and stands out about level, never back into the wood
+        nor along the bark: no more than sixty degrees off the boss's own facing where it can, else seventy) */
+     /* (of the ways out, and of a stub's few lengths, the one whose count, the bud at its tip, lies clearest: off the wood, the
+        cushions, the pad names, the knots, the other shoots and the counts already set; and where it can, out of the way
+        straight out from another knot's boss, where that knot's name leaves it) */
+     const sb0=d.b||[d.q[0]-d.ns[0]*1.2,d.q[1]-d.ns[1]*1.2],tg=[-d.ns[1],d.ns[0]],hw=gbCntHW(c,kq),oth=[...(B.shootGeo||[]),...(B.shootRest||[])].flatMap(g=>g.pts||[]),kps=T.knots.map(q=>[sh(q.bp),q.ra,q.id,[q.n[0]*q.side,q.n[1]*q.side]]);
+     const budHit=(sb,v,sl)=>{const e=[sb[0]+v[0]*sl,sb[1]+v[1]*sl],w=[-v[1],v[0]];let h=0;for(let s=0;s<=2.55*hw;s+=2.5)for(const o of s>.3*hw&&s<1.8*hw?[0,-.8*hw,.8*hw]:[0]){const p=[e[0]+v[0]*s+w[0]*o,e[1]+v[1]*s+w[1]*o];
+      if(inWF(p)||layIn(p,1)||padBox.slice(0,nPad).some(q=>inBox(p,q))||placed.some(q=>inBox(p,q))||oth.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<5)||kps.some(([q,r])=>Math.hypot(q[0]-p[0],q[1]-p[1])<r+2))h++;
+      else if(kps.some(([q,r,id,no])=>{const dx=p[0]-q[0],dy=p[1]-q[1],dd=Math.hypot(dx,dy);return id!==kid&&dd<r+30*kq&&dx*no[0]+dy*no[1]>.64*dd}))h+=.5}return h};
+     /* (on a knot it may leave the boss's rim a little along the grain, either way, staying on the boss) */
+     const sb1=bs?Math.hypot(sb0[0]-bs.p[0],sb0[1]-bs.p[1]):0,tm=bs&&bs.rb?Math.min(.5*(bs.ra||0),Math.sqrt(Math.max(0,Math.pow(bs.rb+.4,2)-sb1*sb1))):0;
+          /* (and of those, the best that leaves its own knot's name a place: somewhere its name would sit beside the boss, off the
+        wood, the cushions, the soil, the other shoots and counts and away from another knot's boss, that its count and stub keep
+        clear of, with its leader too; where no way out leaves one, the best way out) */
+     const kn2=bs&&T.knots.find(q=>q.id===kid),rts=(L.roots||[]).filter(r=>r.tree===undefined||r.tree===ti).flatMap(r=>r.pts.slice(1).map((q,i)=>[r.pts[i],q,Math.max(r.w[i]||1,r.w[i+1]||1)/2+2]));let nslots=null;
+     const slotsOf=()=>{if(nslots)return nslots;nslots=[];if(!kn2)return nslots;const p=sh(kn2.bp),p0=sh(kn2.p),hf=((gw.slots&&gw.slots.scroll&&gw.slots.scroll.clientWidth)||width)/W,fs=10*kq,tw=Math.max(...kn2.ids.map(id=>gbKnotTxt(M,kn2.ids,id).length))*.62*fs;
+      let v=[p[0]-p0[0],p[1]-p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[kn2.n[0],kn2.n[1]];const R=[p[0]+v[0]*kn2.ra,p[1]+v[1]*kn2.ra];
+      const D8=[[1,0],[.7071,-.7071],[0,-1],[-.7071,-.7071],[-1,0],[-.7071,.7071],[0,1],[.7071,.7071]],D16=[...D8,...D8.map((a,i)=>{const c=D8[(i+1)%8],m=Math.hypot(a[0]+c[0],a[1]+c[1]);return [(a[0]+c[0])/m,(a[1]+c[1])/m]})];
+      for(const len of [...new Set([8,13,19,26,35,46,59,74].map(l=>Math.min(l*kq,86/hf)))])for(const a of D16){if(a[0]*v[0]+a[1]*v[1]<(kn2.pinB?-.3:.2))continue;const A=[R[0]+a[0]*len,R[1]+a[1]*len],ax=Math.abs(a[0]);
+       for(const sd of ax>.38?(ax<.4?[1,0]:[1]):[0]){let x0,yb;if(sd){x0=a[0]>0?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{x0=A[0]-tw/2;yb=a[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
+        const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5],sy=x=>L.sy?L.sy(x):-3;if(r[0]<vx+3||r[2]>vx+W-3||r[1]<vy+2||r[3]>Math.min(sy(r[0]),sy(r[2]))-4||placed.some(q=>ov(r,q)>0)||padBox.slice(0,nPad).some(q=>ov(r,q)>0))continue;
+        nslots.push({r,R,A,a,len,om:3.5/hf,fo:Math.min(5,4.8/hf),ok:null})}}
+      return nslots};
+     /* (a place is open ground once: its leader off the wood past the boss, the name off the wood, the roots, the cushions, the
+        other shoots and the ground about another knot's boss, where that knot's name goes) */
+     const open=S=>{if(S.ok!==null)return S.ok;const {r,R,a,len}=S;let ok=true;for(let t=kn2.ra+1;t<=len&&ok;t+=2)if(inWF([R[0]+a[0]*t,R[1]+a[1]*t]))ok=false;
+      for(let x=r[0];x<=r[2]+.01&&ok;x+=Math.max(1,Math.min(6,(r[2]-r[0])/2)))for(const y of [r[1],(r[1]+r[3])/2,r[3]]){const q=[Math.min(x,r[2]),y];if(inWF(q)||layIn(q,0)||oth.some(o=>Math.abs(o[0]-q[0])<4&&Math.abs(o[1]-q[1])<4)||rts.some(([a,b,rr])=>gbSegD(q,q,a,b)<rr)||kps.some(([c,rr,id])=>id!==kid&&Math.hypot(q[0]-c[0],q[1]-c[1])<rr+30*kq)){ok=false;break}}
+      return S.ok=ok};
+     const room=c=>{const S0=slotsOf();if(!S0.length)return true;const v=c.v,w=[-v[1],v[0]],e=[c.b[0]+v[0]*c.l*kq,c.b[1]+v[1]*c.l*kq],P=[e[0]+v[0]*2.55*hw,e[1]+v[1]*2.55*hw],at=(o,y)=>[o[0]+w[0]*y,o[1]+w[1]*y];
+      /* (its count's box as the page measures it: the turned bud's own box, turned) */
+      const hp=[at(e,-hw),at(e,hw),at(P,-hw),at(P,hw)];
+      const bx=ps=>{let q=[1e9,1e9,-1e9,-1e9];for(const z of ps)q=[Math.min(q[0],z[0]),Math.min(q[1],z[1]),Math.max(q[2],z[0]),Math.max(q[3],z[1])];return q},cb=bx(hp),stb=bx([c.b,e]),grow=(q,m)=>[q[0]-m,q[1]-m,q[2]+m,q[3]+m];
+      const inCnt=z=>{const dx=z[0]-e[0],dy=z[1]-e[1],x=dx*v[0]+dy*v[1],y=Math.abs(-dx*v[1]+dy*v[0]);return Math.hypot(x-hw,y)<hw+1.6||x>=hw&&x<2.55*hw+1.6&&y<hw*(2.55*hw-x)/(1.55*hw)+1.6};
+      return S0.some(S=>{const g=grow(S.r,S.om);if(ov(g,cb)>0||ov(g,grow(stb,1.3))>0)return false;for(let t=S.fo;t<=S.len+.01;t+=1.2){const z=[S.R[0]+S.a[0]*t,S.R[1]+S.a[1]*t];if(inCnt(z)||gbSegD(z,z,c.b,e)<2)return false}return open(S)})};
+     let u=null,sl=9*kq,sb=sb0;for(const dm of [.5,.3,-1]){if(u)break;const seen=new Set(),cs=[];for(const md of [0,1,2])for(const th of [0,20,-20,40,-40,60,-60,80,-80,100,-100,120,-120,140,-140]){const a=th*Math.PI/180,v=lift([d.ns[0]*Math.cos(a)-d.ns[1]*Math.sin(a),d.ns[0]*Math.sin(a)+d.ns[1]*Math.cos(a)],md),ky=Math.round(Math.atan2(v[0],-v[1])*90/Math.PI);
+      if(seen.has(ky))continue;seen.add(ky);if(v[0]*d.ns[0]+v[1]*d.ns[1]<dm)continue;
+      for(const of of tm>.5?[0,1,-1]:[0]){const b=[sb0[0]+tg[0]*of*tm,sb0[1]+tg[1]*of*tm],q=[d.q[0]+tg[0]*of*tm,d.q[1]+tg[1]*of*tm];
+       for(const l of [9,13,17,21,25]){if([4,6,8,10,12,14,16,18,20,22,24,26].filter(s=>s<=l+1).some(s=>inWF([q[0]+v[0]*s*kq,q[1]+v[1]*s*kq])))break;const sc=budHit(b,v,l*kq)*10+md*2+Math.abs(th)/20+(l-9)*.4+Math.abs(of)*3;cs.push({sc,v,l,b})}}}
+      cs.sort((x,y)=>x.sc-y.sc);const bs2=cs.find(room)||cs[0];if(bs2){u=bs2.v;sl=bs2.l*kq;sb=bs2.b}}if(!u)u=lift(d.ns,0);let cal=null;
      /* (cut, it heals as a shoot does: a callus beside its knot along the grain, on the bark) */
      if(bs&&bs.ra){const k2=Math.max(1,Math.min(n1-1,k0+Math.max(1,Math.round((bs.ra+4.6)/step)))),a2=pl[k2],m2=gbNorm(pl,k2),sd=m2[0]*d.ns[0]+m2[1]*d.ns[1]<0?-1:1,o=Math.max(0,wd[k2]/2-2.2),g0=pl[k2+1],g1=pl[k2-1],gm=Math.hypot(g0[0]-g1[0],g0[1]-g1[1])||1;
       cal={c:[a2[0]+m2[0]*sd*o,a2[1]+m2[1]*sd*o],t:[(g0[0]-g1[0])/gm,(g0[1]-g1[1])/gm],n:[m2[0]*sd,m2[1]*sd]}}
-     (B.shootRest=B.shootRest||[]).push({uids,kid,c,dorm:1,base:d.q,tip:[d.q[0]+u[0]*8,d.q[1]+u[1]*8],u,ns:d.ns,tb:d.tb,cal,bid:bs&&bs.bid,boss:bs?{p:bs.p,ra:bs.ra,rb:bs.rb}:null});return}
+     const spts=gbBez([sb,[sb[0]+u[0]*sl*.35,sb[1]+u[1]*sl*.35],[sb[0]+u[0]*sl*.7,sb[1]+u[1]*sl*.7],[sb[0]+u[0]*sl,sb[1]+u[1]*sl]],6);
+     {const e=spts[spts.length-1],P=[e[0]+u[0]*2.55*hw,e[1]+u[1]*2.55*hw];placed.push([Math.min(e[0],P[0])-hw,Math.min(e[1],P[1])-hw,Math.max(e[0],P[0])+hw,Math.max(e[1],P[1])+hw])}
+     (B.shootRest=B.shootRest||[]).push({uids,kid,c,dorm:1,base:sb,pts:spts,tip:spts[spts.length-1],u,ns:d.ns,tb:d.tb,cal,bid:bs&&bs.bid,boss:bs?{p:bs.p,ra:bs.ra,rb:bs.rb}:null});return}
     if(!best)return;placed.push(best.r);
     /* where a cut of it heals: beside its knot along the grain, on the side it leans to and the side it grew out of, clear of
        the boss and on the bark; with no knot, at its collar */
@@ -1362,20 +1405,26 @@ function gbBuild(M,width,key,sap){const s=gw.state;let L=gbLayout(M,width,sap);
      const a2=pl[k2],m2=gbNorm(pl,k2),sd=m2[0]*best.ns[0]+m2[1]*best.ns[1]<0?-1:1,o=Math.max(0,wd[k2]/2-2.2);cal={c:[a2[0]+m2[0]*sd*o,a2[1]+m2[1]*sd*o],t:tgAt(k2),n:[m2[0]*sd,m2[1]*sd]}}
     (B.shootGeo=B.shootGeo||[]).push({uids,kid,pts:best.pts,base:best.b0,ns:best.ns,tip:best.tip,cal,bid:bs&&bs.bid,boss:bs?{p:bs.p,ra:bs.ra,rb:bs.rb}:null,route:[...best.pts.slice().reverse(),...routeOf(best.kk)],tb:now+(tf||tAt)(best.kk)})};
    const tdown=k=>tp.slice(0,k+1).reverse();
+   /* how far the bark stands off a boss's centre on its own side, where gbTree swells the outline over it */
+   const bkR=kn=>Math.max(kn.w/2+1.2+.3*kn.rb-Math.abs(kn.off),.92*kn.rb+1);
    /* when the growing trunk passes a point of it, so nothing grows out of wood that is not there yet */
    const tAt=k=>at(T.ty[k]);
    /* the knots with most checks first, so a crowded stretch keeps the shoot that holds most */
    const cnt=ids=>ids.reduce((n,id)=>n+own(id).length,0),ks=T.knots.map(kn=>({kn,uids:kn.ids.filter(id=>own(id).length)})).filter(o=>o.uids.length).sort((a,b)=>cnt(b.uids)-cnt(a.uids)||a.kn.t-b.kn.t||a.kn.k-b.kn.k);
-   for(const {kn,uids} of ks){const b=kn.bid?T.br.find(x=>x.id===kn.bid):null,bs={p:sh(kn.bp),side:kn.side,rb:kn.rb,ra:kn.ra,bid:kn.bid},ns=[kn.n[0]*kn.side,kn.n[1]*kn.side],dp=tf=>()=>({q:[bs.p[0]+ns[0]*bs.rb,bs.p[1]+ns[1]*bs.rb],ns,tb:now+tf(kn.k)});
+   for(const {kn,uids} of ks){const b=kn.bid?T.br.find(x=>x.id===kn.bid):null,bs={p:sh(kn.bp),side:kn.side,rb:kn.rb,ra:kn.ra,bid:kn.bid},ns=[kn.n[0]*kn.side,kn.n[1]*kn.side],e=bkR(kn)-1.2,dp=tf=>()=>({q:[bs.p[0]+ns[0]*bs.rb,bs.p[1]+ns[1]*bs.rb],b:[bs.p[0]+ns[0]*e,bs.p[1]+ns[1]*e],ns,tb:now+tf(kn.k)});
     if(b){const bp=b.pts.map(sh);grow1(bp,kn.k,b.w,uids,kn.id,kk=>[...bp.slice(0,kk+1).reverse(),...tdown(b.k)],2,0,bs,B.brAt[b.id],1,dp(B.brAt[b.id]||tAt))}
     else grow1(tp,kn.k,T.tw,uids,kn.id,tdown,2,0,bs,null,0,dp(tAt))}
-   /* never from the soil or the flare: a root's sucker leaves the trunk above a fifth of its height, on the root's side where
-      the trunk runs straight there */
-   const lowK=Math.round(.2*(tp.length-1));
+   /* never from the soil, the flare or the root itself: a root's checks grow from the trunk just above where that root flares
+      from it, at least 24 px over the soil, on the root's side */
+   const lowK=Math.round(.2*(tp.length-1)),sy=x=>L.sy?L.sy(x):0,fl=Math.max(24*kq,T.D||0)+2;let kF=0;while(kF<tp.length-3&&tp[kF][1]>sy(tp[kF][0])-fl)kF++;
    for(const r of L.roots){if(!r.id||r.tree!==ti||!own(r.id).length)continue;
-    grow1(tp,Math.round(.24*(tp.length-1)),T.tw,[r.id],r.id,kk=>[...tdown(kk),...r.pts.slice(0,Math.floor(r.pts.length*.6))],lowK,r.d,null,null,0,()=>{const q=r.pts[Math.floor(r.pts.length*.4)];return {q:[q[0],q[1]-r.w[Math.floor(r.w.length*.4)]/2],ns:[r.d*.3,-1],tb:now+tAt(0)}})}
-   /* a changed part on no journey has no knot: its shoot comes from the leader, under the crown */
-   const loose=Object.keys(M.buds).filter(id=>own(id).length&&![...B.shootGeo||[],...B.shootRest||[]].some(g=>g.uids.includes(id)));if(loose.length){const k0=Math.round(.86*(tp.length-1)),n=gbNorm(tp,k0);grow1(tp,k0,T.tw,loose,'lead:'+ti,tdown,lowK,0,null,null,0,()=>({q:[tp[k0][0]+n[0]*T.tw[k0]/2,tp[k0][1]+n[1]*T.tw[k0]/2],ns:n,tb:now+tAt(k0)}))}}
+    grow1(tp,kF,T.tw,[r.id],r.id,kk=>[...tdown(kk),...r.pts.slice(0,Math.floor(r.pts.length*.6))],kF,r.d,null,null,0,()=>{const n=gbNorm(tp,kF),sg=n[0]*r.d<0?-1:1,ns=[n[0]*sg,n[1]*sg],h=T.tw[kF]/2;return {q:[tp[kF][0]+ns[0]*h,tp[kF][1]+ns[1]*h],b:[tp[kF][0]+ns[0]*(h-1.2),tp[kF][1]+ns[1]*(h-1.2)],ns,tb:now+tAt(kF)}})}
+   /* a changed part on no journey has no knot of its own: its shoot comes from the boss of the leader's knot nearest under the
+      crown that has none yet (or the nearest, if all have) */
+   const loose=Object.keys(M.buds).filter(id=>own(id).length&&![...B.shootGeo||[],...B.shootRest||[]].some(g=>g.uids.includes(id)));if(loose.length){const k0=Math.round(.86*(tp.length-1));
+    const lk=T.knots.filter(q=>q.on==='t').sort((a,b)=>Math.abs(a.k-k0)-Math.abs(b.k-k0)),taken=q=>[...B.shootGeo||[],...B.shootRest||[]].some(g=>Math.hypot(g.base[0]-sh(q.bp)[0],g.base[1]-sh(q.bp)[1])<40*kq),kn=lk.find(q=>!taken(q))||lk[0];
+    if(kn){const bs={p:sh(kn.bp),side:kn.side,rb:kn.rb,ra:kn.ra,bid:null},ns=[kn.n[0]*kn.side,kn.n[1]*kn.side],e=bkR(kn)-1.2;grow1(tp,kn.k,T.tw,loose,'lead:'+ti,tdown,2,0,bs,null,0,()=>({q:[bs.p[0]+ns[0]*bs.rb,bs.p[1]+ns[1]*bs.rb],b:[bs.p[0]+ns[0]*e,bs.p[1]+ns[1]*e],ns,tb:now+tAt(kn.k)}))}
+    else{const n=gbNorm(tp,k0);grow1(tp,k0,T.tw,loose,'lead:'+ti,tdown,lowK,0,null,null,0,()=>({q:[tp[k0][0]+n[0]*T.tw[k0]/2,tp[k0][1]+n[1]*T.tw[k0]/2],ns:n,tb:now+tAt(k0)}))}}}
   T.knots.forEach((kn,ki)=>{const p0=sh(kn.p),n=kn.n;const many=kn.ids.length>1;const p=sh(kn.bp);
    /* A knot is a boss the wood grew round (gbTree sets it off the centre line on the outside of the bend, sizes it and swells
       the outline over it): the bark's own colour a step lighter, half again as long along the grain as across it, softly lit
@@ -1690,21 +1739,22 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  /* Max: each part's shoot, placed with the tree (gbBuild). Pointing at a smaller mode keeps the shoots where they are,
     faded, as everything else it would cut. */
  /* (a shoot is its wood and leaves, fl, which grow and fall together, and its count, which does neither) */
- if(!B.shoots){B.shoots={};for(const rec of B.shootGeo||[]){const el=sv('g',{class:'budg'}),fl=sv('g',{class:'shf'});el.append(fl);B.gBud.append(el);{const sw=rec.pts.map((_,i)=>2.4-1.7*i/10);const sd=gbRib(rec.pts,sw);
+ if(!B.shoots){B.shoots={};for(const rec of B.shootGeo||[]){const el=sv('g',{class:'budg'}),fl=sv('g',{class:'shf'});el.append(fl);B.gShoot.append(el);{const sw=rec.pts.map((_,i)=>2.4-1.7*i/10);const sd=gbRib(rec.pts,sw);
     /* this year's shoot: barked where it has hardened, green toward its tip, out of a small swollen collar on the bark */
     fl.append(sv('path',{d:sd,class:'tw shoot'}),sv('path',{d:gbRib(rec.pts.slice(0,7),sw.slice(0,7)),class:'tw'}),sv('ellipse',{cx:gbF(rec.pts[0][0]),cy:gbF(rec.pts[0][1]),rx:3.1,ry:2.4,class:'w'}));
     /* the tick across its foot: where a mode that drops it will cut */
     {const a=rec.pts[1],b=rec.pts[2],dd=Math.hypot(b[0]-a[0],b[1]-a[1])||1,tx=(b[0]-a[0])/dd,ty=(b[1]-a[1])/dd;fl.append(sv('path',{class:'cutk',d:'M'+gbP([a[0]+ty*3.2-tx*1.4,a[1]-tx*3.2-ty*1.4])+' L'+gbP([a[0]-ty*3.2+tx*1.4,a[1]+tx*3.2+ty*1.4])}))}if(B.rclip)B.rclip.append(sv('path',{d:gbRib(rec.pts,rec.pts.map(()=>3.2))}))}
-   {const q=rec.pts[rec.pts.length-1],q0=rec.pts[rec.pts.length-2],ang=Math.atan2(q[1]-q0[1],q[0]-q0[0])*180/Math.PI;fl.append(sv('path',{d:gbLeafD(5,2.4),class:'tipbud',transform:'translate('+gbP(q)+') rotate('+gbF(ang)+')'}))}
+   {const q=rec.pts[rec.pts.length-1],q0=rec.pts[rec.pts.length-2],ang=Math.atan2(q[1]-q0[1],q[0]-q0[0])*180/Math.PI;rec.tbud=sv('path',{d:gbLeafD(5,2.4),class:'tipbud',transform:'translate('+gbP(q)+') rotate('+gbF(ang)+')'});fl.append(rec.tbud)}
    rec.g=el;rec.fl=fl;for(const uid of rec.uids){B.shoots[uid]=rec;B.budG[uid]=rec}
    /* a shoot sprouts from its collar once the growing wood has passed its knot and the knot is there, never out of bare air;
       its leaves open after it, one by one, then its count */
    const now=gbNow(),kT=(B.kT||{})[rec.kid]!==undefined?B.kT[rec.kid]+300:0,ts=Math.max((rec.tb||0)+80,kT);rec.sp=ts+300;
    if(!quiet&&fl.animate&&now<ts+300){const b=rec.base,T=k=>'translate('+gbF(b[0])+'px,'+gbF(b[1])+'px) scale('+k+') translate('+gbF(-b[0])+'px,'+gbF(-b[1])+'px)';
     gbPlay(fl,[{transform:T(.05),opacity:0},{offset:.25,transform:T(.42),opacity:1},{transform:T(1),opacity:1}],{duration:300,easing:'cubic-bezier(.2,.7,.3,1)',fill:'backwards'},ts)}}
-  /* a knot whose checks found no place to grow holds them as a dormant bud: its count alone, tied to its boss, once the knot is there */
-  for(const rec of B.shootRest||[]){const el=sv('g',{class:'budg dorm'}),fl=sv('g',{class:'shf'});el.append(fl);B.gBud.append(el);rec.g=el;rec.fl=fl;rec.slots=[];
-   fl.append(sv('path',{d:gbLeafD(8.5,3.8),class:'tipbud',transform:'translate('+gbP(rec.base)+') rotate('+gbF(Math.atan2(rec.u[1],rec.u[0])*180/Math.PI)+')'}));
+  /* a knot whose checks found no place to grow puts out a short stub of a shoot off its boss, out of the same swollen collar,
+     its count the bud at its tip, once the knot is there */
+  for(const rec of B.shootRest||[]){const el=sv('g',{class:'budg dorm'}),fl=sv('g',{class:'shf'});el.append(fl);B.gShoot.append(el);rec.g=el;rec.fl=fl;rec.slots=[];
+   {const sw=rec.pts.map((_,i)=>2.2-.9*i/(rec.pts.length-1));fl.append(sv('path',{d:gbRib(rec.pts,sw),class:'tw shoot'}),sv('path',{d:gbRib(rec.pts.slice(0,4),sw.slice(0,4)),class:'tw'}),sv('ellipse',{cx:gbF(rec.pts[0][0]),cy:gbF(rec.pts[0][1]),rx:2.8,ry:2.2,class:'w'}))}
    for(const uid of rec.uids){B.shoots[uid]=rec;B.budG[uid]=rec}const kT=(B.kT||{})[rec.kid];rec.sp=Math.max((rec.tb||0)+80,kT!==undefined?kT+300:0);
    if(!quiet&&fl.animate&&gbNow()<rec.sp+200)gbPlay(fl,[{opacity:0},{opacity:1}],{duration:200,fill:'backwards'},rec.sp)}}
  for(const uid in M.buds){const g=B.budG[uid];if(!g)continue;g.list=g.list||[];}
@@ -1717,9 +1767,11 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       Outline rolls them up: a small bud past its own tip (a dormant bud's is all of them), tied to it, where the one placement
       pass put it (gbKnotNames); with no clear place it is left off, and the shoot's last leaf says how many more */
    if(!g.cnt){const at=g.cntAt;g.cnt=sv('text',{class:'shn',x:gbF(at?at.x:0),y:gbF(at?at.y:0),'text-anchor':'middle'},'');
-    g.ctag=at?sv('g',{class:'shtag'},sv('path',{class:'shtie',d:'M'+gbP(at.tie[0])+' L'+gbP(at.tie[1])}),sv('path',{class:'sbud',d:at.bud}),g.cnt):sv('g',{class:'shtag',style:'display:none'},g.cnt);g.g.append(g.ctag);
+    g.ctag=at?sv('g',{class:'shtag'},sv('path',{class:'sbud',d:at.bud,transform:'translate('+gbP(at.at)+') rotate('+gbF(at.ang)+')'}),g.cnt):sv('g',{class:'shtag',style:'display:none'},g.cnt);g.g.append(g.ctag);
     const now=gbNow(),t1=(g.sp||0)+(g.dorm?0:g.n*40+150);if(!quiet&&g.ctag.animate&&now<t1+200)gbPlay(g.ctag,[{opacity:0},{opacity:1}],{duration:200,fill:'backwards'},t1)}
-   const more=list.length-Math.min(list.length,g.slots.length);g.cnt.textContent=more>0?'+'+more:'';g.ctag.style.display=g.cntAt&&more>0?'':'none'}
+   const more=list.length-Math.min(list.length,g.slots.length);g.cnt.textContent=more>0?'+'+more:'';g.ctag.style.display=g.cntAt&&more>0?'':'none';
+   /* (where it shows, the count is the shoot's tip bud, swollen) */
+   if(g.tbud)g.tbud.style.display=g.cntAt&&more>0?'none':''}
   list.forEach((x,i)=>{let el=B.bud[x.id];if(i>=g.slots.length){if(el)el.classList.add('gone');return}
    const q=g.slots[i];if(el&&el.__q!==q){el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+gbF(q[3])+')':'');el.__q=q}
    if(!el){const fr=sv('g',{class:'gb-lfg'},sv('g',{class:'gb-lfi'},sv('circle',{r:gbF(Math.max(8,12/gbHf(B)/(q[3]||1))),cx:8.5,class:'hitc'}),sv('path',{d:'M0 0 L3.6 0',class:'bpet'}),sv('path',{d:gbLeafD(11,5.6),transform:'translate(9 0)',class:'blade'})));gbThumb(B,fr.firstChild,8.5,q[3]);el=sv('g',{class:'gb-lf bud','data-k':'s:'+x.id,tabindex:-1,role:'button'},fr);
@@ -2009,6 +2061,8 @@ function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
    the pot and the soil, the plant tags, and every other name and number. A count sits just off its shoot's tip. The names are
    placed once for the drawing (gbPutNames: per width, tree, and whether Max's shoots are on it), every file at once, so hover,
    focus and a pin only light a name or let it fade (gbLight) and none ever moves. */
+/* the half width of a count's bud for '+n' at a drawing's text scale k: its round body holds the number with a little room */
+function gbCntHW(n,k){return Math.max(5.6*k,('+'+n).length*.6*9.5*k/2+1.8*k)}
 function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0]+X,q[1]];
  const caps=[],rects=[V.potBox],labs=[],cush=[],lines=[],bases=[];const cap=(a,b,r,tag,own,lb)=>caps.push({a,b,r,tag,own,lb});
  /* each piece of wood knows its limb: a name's leader leaves its own knot's limb and crosses no other */
@@ -2025,6 +2079,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const own=id=>(M.buds[id]||[]).filter(x=>x.scenarioKind!=='regression'),nOn=g=>{const c=(g.uids||[]).reduce((a,id)=>a+own(id).length,0);return {c,n:Math.min(4,Math.max(3,c))}};
  /* (a shoot, its leaves, a dormant bud and a graft bud are there only while Max's shoots are; the callus a dropped shoot or
     bud leaves beside its knot always is) */
+ for(const g of rest)for(let i=0;i<g.pts.length-1;i++)cap(g.pts[i],g.pts[i+1],5,'shoot',g.kid);
  for(const g of shoots){g.slots=gbShootSlots(g.pts,nOn(g).n);for(let i=0;i<g.pts.length-1;i++)cap(g.pts[i],g.pts[i+1],6,'shoot',g.kid);for(const q of g.slots){cap([q[0],q[1]],[q[0],q[1]],11,'shoot',g.kid);const th=q[2]*Math.PI/180,sc=q[3]||1,at=d=>[q[0]+Math.cos(th)*d*sc,q[1]+Math.sin(th)*d*sc];cap(at(3.5),at(14.5),4.5*sc,'shoot',g.kid)}}
  for(const g of rest)cap(g.base,g.tip,4,'shoot',g.kid);
  for(const g of [...shoots,...rest]){const c=g.cal?g.cal.c:g.base;if(c)cap(c,c,4.5,'scar',g.kid)}
@@ -2041,7 +2096,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  const turned=(c,th,a0,a1,b0,b1)=>{const t=[Math.cos(th),Math.sin(th)],n=[-t[1],t[0]];return [[a0,b0],[a1,b0],[a1,b1],[a0,b1]].map(([a,b])=>[c[0]+t[0]*a+n[0]*b,c[1]+t[1]*a+n[1]*b])};
  for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid,p=>Math.hypot(p[0]-e[0],p[1]-e[1])<3.8||P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,()=>false);
   for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,inTurned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc))}}
- for(const g of rest){const th=Math.atan2(g.u[1],g.u[0]);bbx(turned(g.base,th,-4.3,4.3,-2.4,2.4),g.kid,inTurned(g.base,th,-4.3,4.3,-2.4,2.4))}
+ for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid,p=>P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,()=>false)}
  for(const r of B.graftR||[])if(r.tree===ti){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null);budB.push(aabb(sw));if(r.many&&!r.dup&&r.n){const q=[r.c[0]+r.n[0]*9.5,r.c[1]+r.n[1]*9.5],hw=(String(r.many).length+1)*2.6+1.5;obs.push({r:[q[0]-hw,q[1]-5.5,q[0]+hw,q[1]+4.5],own:null});
   /* (a bud and its count are one box to a leader: it never runs between them) */
   bbx([...sw,[q[0]-hw,q[1]-5.5],[q[0]+hw,q[1]+4.5]],null);budB.push(aabb([...sw,[q[0]-hw,q[1]-5.5],[q[0]+hw,q[1]+4.5]]))}}
@@ -2071,27 +2126,23 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   if(!soft)for(let i=1;i<10;i++){const t=i/10,p=[R[0]+(A[0]-R[0])*t,R[1]+(A[1]-R[1])*t];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2))return false}return true};
  const leadOK=(pts,id,soft)=>pts.every((p,i)=>{if(!i)return true;const R=p,A=pts[i-1];if(!segS(R,A,id,soft))return false;for(const q of labs)if(dSR(R,A,q)<1)return false;for(const l of lines)if(l[2]!==id&&segX(R,A,l[0],l[1]))return false;return true});
  const baseOK=(r,yb)=>!bases.some(([y2,r2])=>Math.abs(yb-y2)<7*k&&Math.max(r2[0]-r[2],r[0]-r2[2])<24*k);
- /* A shoot's count of the checks its leaves do not show (a dormant bud's, all its checks): a small bud just past its own tip,
-    tied to it by a hairline, on the open side, the number in its round body and its point away from the tie. It keeps clear
-    of every name, mark and leader like a name does */
- const fs2=9.5*k,cw2=.6*fs2;
- /* (the tie never crosses wood: a bud on the far side of a limb would be tied to nothing) */
- const tieW=(a,b)=>{for(let i=1;i<=8;i++){const t=i/8,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];for(const c of caps)if(c.tag==='wood'&&dPS(p,c.a,c.b)<c.r-2.5)return false}return true};
+ /* A shoot's count of the checks its leaves do not show (a stub's, all its checks): the shoot's own tip swollen into a small
+    bud, set on the very end of its path and turned along it, the number in its round body and its point on away from the
+    shoot. It is where the shoot ends, so it has no other place; names keep clear of it like any mark */
+ const fs2=9.5*k;
  const budD=(A,u,hw)=>{const v=[-u[1],u[0]],C=[A[0]+u[0]*hw,A[1]+u[1]*hw],P=[A[0]+u[0]*hw*2.55,A[1]+u[1]*hw*2.55],at=(o,a,b)=>[o[0]+u[0]*a+v[0]*b,o[1]+u[1]*a+v[1]*b],bk=[];
   for(let i=0;i<=8;i++){const t=Math.PI*i/8;bk.push(at(C,-hw*Math.sin(t),hw*Math.cos(t)))}
   return {d:'M'+gbP(P)+' C'+gbP(at(P,-.5*hw,.34*hw))+' '+gbP(at(C,.6*hw,hw))+' '+gbP(bk[0])+' L'+bk.slice(1).map(gbP).join(' L')+' C'+gbP(at(C,.6*hw,-hw))+' '+gbP(at(P,-.5*hw,-.34*hw))+' '+gbP(P)+' Z',C,
-   r:[Math.min(C[0]-hw,P[0]),Math.min(C[1]-hw,P[1]),Math.max(C[0]+hw,P[0]),Math.max(C[1]+hw,P[1])]}};
- for(const g of [...shoots,...rest]){const {c,n}=nOn(g),more=c-(g.dorm?0:Math.min(n,c));g.cntAt=false;if(more<=0)continue;
-  const txt='+'+more,tw=txt.length*cw2,hw=Math.max(5.6*k,tw/2+1.8*k),q=g.dorm?g.tip:g.pts[g.pts.length-1],q0=g.dorm?g.base:g.pts[Math.max(0,g.pts.length-3)],m=Math.hypot(q[0]-q0[0],q[1]-q0[1])||1,d=[(q[0]-q0[0])/m,(q[1]-q0[1])/m];
-  /* (where foliage crowds it, its tie may run behind leaves to a clear place; never across wood) */
-  for(const soft of [0,1]){for(const R of [3,6,10,15,21,28,36,46]){for(const a of [0,-30,30,-60,60,-95,95,-130,130]){const th=a*Math.PI/180,u=[d[0]*Math.cos(th)-d[1]*Math.sin(th),d[0]*Math.sin(th)+d[1]*Math.cos(th)],A=[q[0]+u[0]*(R+1)*k,q[1]+u[1]*(R+1)*k];if(u[1]>(g.dorm?.85:.6))continue;
-    /* the bud's foot sits on the end of the tie */
-    const bd=budD(A,u,hw),r=bd.r,yb=bd.C[1]+.33*fs2;
-    if(clearS(r,true)&&clearL(r,12)&&baseOK(r,yb)&&tieW(q,A)&&leadOK([A,[q[0]+u[0]*1.5,q[1]+u[1]*1.5]],g.kid,soft)){g.cntAt={x:bd.C[0],y:yb,anc:'middle',r,bud:bd.d,tie:[[q[0]+u[0]*1.2,q[1]+u[1]*1.2],A]};labs.push(r);bases.push([yb,r]);lines.push(g.cntAt.tie);break}}if(g.cntAt)break}if(g.cntAt)break}}
+   r:aabb([at(A,0,-hw),at(A,0,hw),at(P,0,-hw),at(P,0,hw)])}};
+ for(const g of [...shoots,...rest]){const {c,n}=nOn(g),more=c-(g.dorm?0:Math.min(n,c));g.cntAt=false;if(more<=0||!g.pts||g.pts.length<2)continue;
+  const hw=gbCntHW(more,k),q=g.pts[g.pts.length-1],q0=g.pts[Math.max(0,g.pts.length-3)],m=Math.hypot(q[0]-q0[0],q[1]-q0[1])||1,u=[(q[0]-q0[0])/m,(q[1]-q0[1])/m];
+  const bd=budD(q,u,hw),r=bd.r,yb=bd.C[1]+.33*fs2;
+  g.cntAt={x:bd.C[0],y:yb,anc:'middle',r,at:q,ang:Math.atan2(u[1],u[0])*180/Math.PI,bud:budD([0,0],[1,0],hw).d,
+   in:p=>{const dx=p[0]-q[0],dy=p[1]-q[1],a=dx*u[0]+dy*u[1],b=Math.abs(-dx*u[1]+dy*u[0]);return Math.hypot(a-hw,b)<hw+.8||a>=hw&&a<2.55*hw+.8&&b<hw*(2.55*hw-a)/(1.55*hw)+.8}};bases.push([yb,r])}
  /* (a count, placed, is a box a name keeps clear of as it does a shoot's) */
- for(const g of [...shoots,...rest])if(g.cntAt){obs.push({r:g.cntAt.r,own:g.kid});budB.push(g.cntAt.r)}
+ for(const g of [...shoots,...rest])if(g.cntAt){obs.push({r:g.cntAt.r,own:g.kid,inF:g.cntAt.in});budB.push(g.cntAt.r)}
  /* (the counts, and a graft bud's count, go with their shoots) */
- const cnt=[...shoots,...rest].filter(g=>g.cntAt),noBud=[labs.filter(r=>!budL.includes(r)&&!cnt.some(g=>g.cntAt.r===r)),lines.filter(l=>!cnt.some(g=>g.cntAt.tie===l)),[]],withBud=[labs.slice(),lines.slice(),bases.slice()];
+ const noBud=[labs.filter(r=>!budL.includes(r)),lines.slice(),[]],withBud=[labs.slice(),lines.slice(),bases.slice()];
  /* The names. A name sits beside its knot on a straight leader from the boss's outer side, 8 to 74 long and never past
     86 px on the screen, the near places first, turned away from the limb the knot is on. The leader is off its own limb by
     the boss's radius and never goes back onto it, and crosses no other limb, no cushion, leaf, shoot, bud, knot, name or
