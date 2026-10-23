@@ -10,9 +10,13 @@ steps:
     expect: { status: 200 }
   - name: open discover
     browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: write a test from a description
+    browser: { kind: click, target: { by: testId, name: disclosure-write-a-test-from-a-description } }
   - name: intent comes first
-    browser: { kind: read, target: { by: role, role: heading, name: What should be true after this change? } }
-    expect: { text: What should be true after this change? }
+    browser: { kind: read, target: { by: role, role: heading, name: What should your app do? } }
+    expect: { text: What should your app do? }
+  - name: explore routes and existing tests
+    browser: { kind: click, target: { by: testId, name: disclosure-explore-routes-and-existing-tests } }
   - name: routes and gaps are counted
     browser: { kind: read, target: { by: testId, name: route-summary } }
     expect: { text: 2 recognized · 0 served in a run · 1 untested }

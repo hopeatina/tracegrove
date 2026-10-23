@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -236,6 +236,26 @@ describe('grow', () => {
     expect(built).toContain('tracegrove-grow-');
     expect(git(dir, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
   });
+  it('proves a non-current branch when the system temp directory is a symlink', async () => {
+    const dir = temp();
+    cpSync(join(import.meta.dirname, '../src/samples/notes-api'), dir, { recursive: true });
+    git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Notes sample');
+    git(dir, 'checkout', '-qb', 'count');
+    const app = join(dir, 'app/app.mjs');
+    writeFileSync(app, readFileSync(app, 'utf8').replace('  const match = url.pathname.match(',
+      "  if (req.method === 'GET' && url.pathname === '/count') return send(res, 200, { count: 0 });\n  const match = url.pathname.match("));
+    write(dir, 'tracegrove/notes/count.flow.yaml', 'title: Count starts empty\nsteps:\n  - name: count\n    GET: /count\n    expect: { status: 200, json: { count: 0 } }\n');
+    git(dir, 'add', '-A'); git(dir, 'commit', '-qm', 'Count notes\n\n## Acceptance criteria\n- [ ] GET /count starts at zero');
+    git(dir, 'checkout', '-q', 'main');
+    const holder = temp(), physical = join(holder, 'physical'), alias = join(holder, 'alias');
+    mkdirSync(physical); symlinkSync(physical, alias, 'dir');
+    const previous = process.env.TMPDIR; process.env.TMPDIR = alias;
+    try {
+      const { state } = await grow({ dir, branch: 'count', base: 'main', mode: 'min', prove: true, gh: false, agent: { off: true } });
+      expect(Object.values(state.run).some(r => r.st === 'pass')).toBe(true);
+      expect(Object.values(state.run).filter(r => r.st === 'not_run' && /^Could not run/.test(r.why || ''))).toEqual([]);
+    } finally { if (previous === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = previous; }
+  }, 60000);
   it('cuts the minimum to at most three critical journeys without a spec; the rest grow in standard', async () => {
     const dir = fiveRoutes();
     const { state } = await grow({ dir, branch: 'five', base: 'main', mode: 'max', prove: false, gh: false, agent: { off: true }, save: false });

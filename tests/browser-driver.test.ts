@@ -57,6 +57,7 @@ describe('real isolated browser driver', () => {
       res.end(`<!doctype html><label>Note<input id="note"></label>
         <button onclick="fetch('/saved', {method:'POST'}).then(() => {document.querySelector('[role=status]').textContent=document.querySelector('input').value;document.querySelector('#visual').style.background='rgb(0,255,0)'})">Save</button>
         <div id="visual" style="position:absolute;left:300px;top:0;width:40px;height:40px;background:rgb(255,0,0)"></div>
+        <details><summary data-testid="options">More options</summary><p data-testid="inside-options">A useful next step</p></details>
         <p role="status" data-testid="result">Ready</p><a href="${outsideOrigin}">Outside</a>
         <label>Subscribe<input type="checkbox" onchange="document.querySelector('[role=status]').textContent=this.checked?'Subscribed':'Not subscribed'"></label>
         <button onclick="fetch('${outsideOrigin}').catch(() => {})">Fetch outside</button>
@@ -68,6 +69,13 @@ describe('real isolated browser driver', () => {
   afterEach(async () => {
     await driver?.dispose(); driver = undefined;
     await Promise.all([new Promise<void>(resolve => server.close(() => resolve())), new Promise<void>(resolve => outside.close(() => resolve()))]);
+  });
+
+  it.each(['pointer', 'keyboard', 'touch'] as const)('opens native disclosure with %s input', async inputMode => {
+    await start(inputMode);
+    await execute({ kind: 'navigate', path: '/' });
+    await execute({ kind: 'click', target: { by: 'testId', name: 'options' } });
+    expect((await execute({ kind: 'read', target: { by: 'testId', name: 'inside-options' } })).text).toBe('A useful next step');
   });
 
   it('changes a real app through semantic locators and flushes a WebM recording', async () => {

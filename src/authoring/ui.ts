@@ -56,7 +56,7 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   return text ? JSON.parse(text) as Record<string, unknown> : {};
 }
 
-export async function startUi(options: { dir: string; branch?: string | null; port?: number; token?: string }): Promise<UiServer> {
+export async function startUi(options: { dir: string; branch?: string | null; port?: number; token?: string; example?: string }): Promise<UiServer> {
   const dir = resolve(options.dir);
   // A fixed token is for harnesses that drive the UI over HTTP (the dogfood grove); the CLI never sets one.
   const token = options.token && options.token.length >= 16 ? options.token : randomBytes(18).toString('base64url');
@@ -166,7 +166,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         const { result, error } = compiled();
         let config: unknown = null;
         if (existsSync(configPath())) { try { config = loadAuthoringConfig(configPath()); } catch { config = null; } }
-        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), git: gitInfo(dir), running: running !== null, activeRunId: active?.id ?? null, cancelling: active?.cancelling ?? false, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
+        return send(200, { dir, hasConfig: existsSync(configPath()), config, compileError: error, flows: result?.flows ?? [], sourceDigest: result?.sourceDigest ?? null, sourceFiles: result?.sourceFiles.length ?? 0, runs: runs(), pruned: pruned(), example: options.example ?? null, git: options.example ? { isRepo: false, current: null, base: null, branches: [] } : gitInfo(dir), running: running !== null, activeRunId: active?.id ?? null, cancelling: active?.cancelling ?? false, agent: agentInfo(), verificationSource: sourceInfo(result, error) });
       }
       if (url.pathname === '/api/imports' || url.pathname.startsWith('/api/imports/')) {
         if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return send(403, { error: 'unexpected origin' });
@@ -292,11 +292,13 @@ export async function startUi(options: { dir: string; branch?: string | null; po
         finally { drafting = false; if (active === operation) { running = null; active = null; } }
       }
       if (req.method === 'GET' && url.pathname === '/api/grow/last') {
+        if (options.example) return send(200, null);
         const branch = url.searchParams.get('branch') || gitInfo(dir).current;
         let last = null; try { last = branch ? lastGrow(dir, safeRef(branch)) : null; } catch { last = null; }
         return send(200, last ? { ...last, view: growViewAt(last.state, dir, growFacts, growWords, growMore) } : null);
       }
       if (req.method === 'POST' && url.pathname === '/api/grow') {
+        if (options.example) return send(409, { error: 'This is a bundled example. Open tracegrove ui in your own project to compare a branch.' });
         // Live discovery of a change, streamed as server-sent events over a token-guarded POST:
         // `event` for every discovery event, `state` for the folded state (at most ten a second), `done` last.
         const body = z.object({ branch: z.string().max(200).nullable().default(null), base: z.string().max(200).nullable().default(null),

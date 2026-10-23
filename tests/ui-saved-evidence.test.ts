@@ -91,7 +91,7 @@ it('shows fresh status in the browser and uses current case mapping for mutation
     expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).not.toContain('tracegrove/unrelated.flow.yaml');
     let pruneFile: string | undefined;
     await page.route('**/api/prune', route => { pruneFile = route.request().postDataJSON().file; return route.fulfill({ status: 409, contentType: 'application/json', body: '{"error":"review only"}' }); });
-    await page.getByRole('button', { name: 'Prune current flow', exact: true }).click();
+    await page.getByText('Flow options', { exact: true }).click(); await page.getByRole('button', { name: 'Prune current flow', exact: true }).click();
     await expect.poll(() => pruneFile).toBe(first.cases[0]!.file);
     writeFileSync(join(root, 'tracegrove.config.yaml'), 'invalid: ['); await page.reload();
     await expect.poll(() => page.getByText('saved evidence freshly verified', { exact: true }).count()).toBe(1);

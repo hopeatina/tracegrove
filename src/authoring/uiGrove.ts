@@ -419,12 +419,12 @@ function gwWant(){const m=gwHASH.exec(location.hash);if(!m)return false;const n=
  gw.want={id:m[1],happened:m[2]==='happened'||m[2]==='steps',run:m[2]==='run',step:n?Math.max(0,Number(n)-1):null};return true}
 if(gwWant())tab='Discover';
 window.addEventListener('hashchange',()=>{if(!gwWant())return;if(tab!=='Discover'){tab='Discover';render()}else growPaint()});
-function growPanel(){if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
+function growPanel(){if(state.example)return emptyState('A small example. A real result.','This sample shows what ran and what the app recorded. To grow a change into a bonsai, open Tracegrove in your own project and compare a feature branch.',()=>openTab('Run'),'Explore this run',disclosure('Try it on your project',h('pre',{},'cd /path/to/your/project\nnpx tracegrove init\nnpx tracegrove ui')));if(!gw.el)gw.el=h('section',{class:'gw','aria-label':'Grow this change','data-testid':'grow'});
  const branch=ui.source||state.git.current||'';if(!gw.busy&&!gw.state&&state.git.isRepo&&branch&&gw.lastFor!==branch){gw.lastFor=branch;growLast(branch)}
  growPaint();return gw.el}
 /* A saved grow of this branch comes back on reload, marked as saved, instead of an empty start card. */
 async function growLast(branch){try{const r=await fetch('/api/grow/last?branch='+encodeURIComponent(branch));const d=r.ok?await r.json():null;
- if(d&&!gw.busy&&!gw.state){gw.state=d.state;gw.view=d.view;gw.log=d.log;gw.saved=d.at;growPaint()}}catch(e){}}
+ if(d&&!gw.busy&&!gw.state&&branch===(ui.source||state.git.current||'')){gw.state=d.state;gw.view=d.view;gw.log=d.log;gw.saved=d.at;growPaint()}}catch(e){}}
 async function growStart(mode){mode=typeof mode==='string'?mode:null;
  if(gw.busy)return;gw.busy=true;gw.picking=null;gw.saved=null;gw.error=null;gw.state=null;gw.view=null;gw.events=0;gw.id=null;gw.log=null;gw.pinned=null;gw.hov=null;gw.selCrit=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.t0=Date.now();growPaint();growTick();
  try{
@@ -706,12 +706,12 @@ function gwStartCard(){const g=state.git;const a=state.agent.settings;const name
  const branch=ui.source||g.current||'';
  return h('div',{class:'card gw-start','data-testid':'grow-start'},h('span',{class:'label'},'Grow a change'),
   h('h1',{style:'margin:0;font-size:26px;line-height:32px;max-width:none'},branch&&branch!==g.base?'What does '+branch+' change, and is it proved?':'Pick a branch to grow'),
-  h('p',{class:'small muted',style:'margin:0'},'tracegrove reads the branch and its spec, grows the change as a tree, traces every part five ways, drafts happy, sad and edge scenarios, and proves them with real flows.'),
-  h('div',{class:'opts'},h('label',{},h('input',{type:'checkbox','data-testid':'grow-prove',checked:gw.prove,on:{change:e=>{gw.prove=e.target.checked}}}),'Prove with real flows'),
+  h('p',{class:'small muted',style:'margin:0'},'See what this branch changes, which journeys it affects, and what still needs testing.'),
+  disclosure('Run options',h('div',{class:'opts'},h('label',{},h('input',{type:'checkbox','data-testid':'grow-prove',checked:gw.prove,on:{change:e=>{gw.prove=e.target.checked}}}),'Prove with real flows'),
    h('label',{title:available?'':'No agent installed; the rules trace everything'},h('input',{type:'checkbox','data-testid':'grow-agent',checked:gw.agent&&available,disabled:!available,on:{change:e=>{gw.agent=e.target.checked}}}),available?'Trace with '+name+' ('+(a.model||'CLI default')+')':'Rules only (no agent installed)'),
-   h('label',{},'against ',h('input',{class:'mono',style:'min-height:34px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:var(--paper);color:var(--ink);width:200px',value:gw.base||g.base||'',placeholder:g.base||'main',on:{input:e=>{gw.base=e.target.value}}}))),
+   h('label',{},'against ',h('input',{class:'mono',style:'min-height:34px;padding:0 8px;border:1px solid var(--line2);border-radius:6px;background:var(--paper);color:var(--ink);width:200px',value:gw.base||g.base||'',placeholder:g.base||'main',on:{input:e=>{gw.base=e.target.value}}})))),
   h('div',{class:'row'},h('button',{class:'btn','data-testid':'grow-go',disabled:gw.busy||!g.isRepo||!branch||branch===g.base,on:{click:growStart}},'Grow '+(branch||'this branch')),
-   !g.isRepo?h('span',{class:'small muted'},'Not a git repo: grow compares a branch with its base.'):branch===g.base?h('span',{class:'small muted'},'This is the base branch. Pick a feature branch below.'):null))}
+   !g.isRepo?h('span',{class:'small muted'},'Not a git repo: grow compares a branch with its base.'):branch===g.base?h('span',{class:'small muted'},'This is the base branch. Choose a feature branch above.'):null))}
 /* scenarios that did not run, in the tree's words: no flow yet when nothing proves them, to prove when one exists */
 /* A verdict's counts each stay whole on a line ("1 failed", never "1" ending one line and "failed" starting the next); the
    words are the same, so its text reads as before. */
@@ -833,7 +833,7 @@ function gwDrReveal(){const S=gw.slots,box=S&&S.ins,el=box&&box.querySelector('.
 function gwDrCopy(){const url=location.href;try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>toast('Copied the link to this step.'),()=>toast('Link: '+url));return}}catch(e){}toast('Link: '+url)}
 /* "Write this flow" puts the scenario's claim in the Intent box below the tree, where drafting writes flows */
 function gwDrWrite(x){ui.intent=gwPlain(x.proves||gwVia(x.title).title);gw.dr=null;render();const box=document.getElementById('intent');
- if(box){box.value=ui.intent;box.focus({preventScroll:true});box.scrollIntoView({block:'center'})}toast('Its claim is in the Intent box below. Draft it there to write the flow.')}
+ if(box){reveal(box);box.value=ui.intent;box.focus({preventScroll:true});box.scrollIntoView({block:'center'})}toast('Its claim is in the Intent box below. Draft it there to write the flow.')}
 /* The way into the drawer of a scenario with no run, wherever one is shown: why it is not tested yet. One that ran has "See what
    happened ›" (gwHappened) instead. */
 function gwDrEntry(x){if(!gwDrCan(x)||gwRan(x))return null;

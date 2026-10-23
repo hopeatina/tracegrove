@@ -66,18 +66,18 @@ it.each([['desktop', 1440, 1000], ['mobile', 375, 900]] as const)('reads, change
   await page.route('https://**/*', route => route.abort());
   try {
     await page.goto(server.url, { waitUntil: 'domcontentloaded' });
-    const nav = page.getByRole('button', { name: 'Benchmark', exact: true }); await nav.focus(); await nav.press('Enter');
-    await page.getByRole('heading', { name: 'Recorded benchmark evidence', exact: true }).waitFor();
+    await page.locator('.nav-tools > summary').click(); const nav = page.getByRole('button', { name: 'Benchmark', exact: true }); await nav.focus(); await nav.press('Enter');
+    await page.getByRole('heading', { name: 'Timing and usage', exact: true }).waitFor();
     expect(await page.getByRole('combobox', { name: 'Comparison axis' }).evaluate(el => el === document.activeElement)).toBe(true);
-    await page.getByRole('heading', { name: 'Evidence incomplete', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'More runs needed for comparison', exact: true }).waitFor();
     expect(await page.locator('#benchmark-result').innerText()).not.toMatch(/\bnull\b/);
-    expect(await page.getByText('Some charges are unpriced, unreconciled or unknown.', { exact: true }).isVisible()).toBe(true);
+    await page.getByText('What is missing for a fair comparison', { exact: true }).click(); expect(await page.getByText('Some charges are unpriced, unreconciled or unknown.', { exact: true }).isVisible()).toBe(true);
     await page.screenshot({ path: join(captures, label + '-runner-viewport.png'), animations: 'disabled' });
     await page.getByText('All admissions (5)', { exact: true }).click();
     expect(await page.getByText('finalized · Assertion failed', { exact: true }).isVisible()).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: join(captures, label + '-runner.png'), fullPage: true, animations: 'disabled' });
-    await page.getByRole('heading', { name: 'Recorded benchmark evidence', exact: true }).click();
+    await page.getByRole('heading', { name: 'Timing and usage', exact: true }).click();
     for (const key of ['r', 'R', 'h']) await page.keyboard.press(key);
     await page.getByRole('combobox', { name: 'Comparison axis' }).selectOption('model');
     await page.getByText('Observed model identity or recorded inference is missing.', { exact: true }).waitFor();
@@ -86,6 +86,7 @@ it.each([['desktop', 1440, 1000], ['mobile', 375, 900]] as const)('reads, change
     const download = await downloading, path = join(captures, label + '-captured.json'); await download.saveAs(path);
     expect(BenchmarkReport.parse(JSON.parse(readFileSync(path, 'utf8')))).toEqual(report('model'));
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText('What is missing for a fair comparison', { exact: true }).click();
     await page.getByText('Observed model identity or recorded inference is missing.', { exact: true }).waitFor();
     expect(await page.getByRole('combobox', { name: 'Comparison axis' }).inputValue()).toBe('model');
     await page.screenshot({ path: join(captures, label + '-model.png'), fullPage: true, animations: 'disabled' });
@@ -100,17 +101,17 @@ it('clears old evidence after connection failure, retries, and exposes corruptio
   const campaign = join(stateDir(), 'executions', f.failed.executionId!, 'campaign.json'), original = readFileSync(campaign);
   try {
     await page.goto(new URL('?benchmark-axis=runner', server.url).href, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: 'Evidence incomplete', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'More runs needed for comparison', exact: true }).waitFor();
     await page.route('**/api/benchmark?*', route => route.abort());
     await page.getByRole('button', { name: 'Refresh evidence', exact: true }).click();
     await page.getByRole('heading', { name: 'Benchmark evidence unavailable', exact: true }).waitFor();
     expect(await page.getByRole('button', { name: 'Download captured JSON', exact: true }).isEnabled()).toBe(false);
-    expect(await page.getByRole('heading', { name: 'Evidence incomplete', exact: true }).count()).toBe(0);
+    expect(await page.getByRole('heading', { name: 'More runs needed for comparison', exact: true }).count()).toBe(0);
     await page.screenshot({ path: join(captures, 'mobile-disconnected.png'), fullPage: true, animations: 'disabled' });
     await page.unroute('**/api/benchmark?*');
     writeFileSync(campaign, '{}');
     await page.getByRole('button', { name: 'Retry benchmark evidence', exact: true }).click();
-    await page.getByText('Some admissions have incomplete or unavailable evidence.', { exact: true }).waitFor();
+    if(!await page.getByText('Some admissions have incomplete or unavailable evidence.', { exact: true }).isVisible()) await page.getByText('What is missing for a fair comparison', { exact: true }).click(); await page.getByText('Some admissions have incomplete or unavailable evidence.', { exact: true }).waitFor();
     await page.getByText('All admissions (5)', { exact: true }).click();
     expect(await page.getByText('bundle invalid · No terminal outcome retained', { exact: true }).isVisible()).toBe(true);
     await page.screenshot({ path: join(captures, 'mobile-corrupt-admission.png'), fullPage: true, animations: 'disabled' });
@@ -124,6 +125,7 @@ it('ignores a late old-axis response after the selection changes', async () => {
   try {
     await page.goto(new URL('?benchmark-axis=runner', server.url).href, { waitUntil: 'domcontentloaded' }); await started;
     await page.getByRole('combobox', { name: 'Comparison axis' }).selectOption('model');
+    await page.getByText('What is missing for a fair comparison', { exact: true }).click();
     await page.getByText('Observed model identity or recorded inference is missing.', { exact: true }).waitFor();
     release(); await page.unroute('**/api/benchmark?axis=runner');
     expect(await page.getByRole('combobox', { name: 'Comparison axis' }).inputValue()).toBe('model');
@@ -137,7 +139,7 @@ it('renders a missing checkpoint as unavailable evidence without creating execut
   const page = await browser.newPage(); await page.route('https://**/*', route => route.abort());
   try {
     await page.goto(new URL('?benchmark-axis=runner', server.url).href, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: 'Checkpoint unavailable', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Run records unavailable', exact: true }).waitFor();
     expect(await page.getByText('Admission counts are unavailable until the checkpoint can be read.', { exact: true }).isVisible()).toBe(true);
     expect(await page.getByText('All admissions (0)', { exact: true }).count()).toBe(0);
     expect((await fetch(url())).status).toBe(200);
@@ -152,9 +154,9 @@ it('distinguishes a readable empty ledger from an unavailable checkpoint', async
   const page = await browser.newPage(); await page.route('https://**/*', route => route.abort());
   try {
     await page.goto(new URL('?benchmark-axis=runner', emptyServer.url).href, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: 'No admitted executions yet', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'No runs recorded yet', exact: true }).waitFor();
     expect(await page.getByText('This readable checkpoint contains no execution admissions. Importing a native report does not create execution usage.', { exact: true }).isVisible()).toBe(true);
-    expect(await page.getByRole('heading', { name: 'Checkpoint unavailable', exact: true }).count()).toBe(0);
+    expect(await page.getByRole('heading', { name: 'Run records unavailable', exact: true }).count()).toBe(0);
     await page.screenshot({ path: join(captures, 'empty-readable-checkpoint.png'), fullPage: true, animations: 'disabled' });
   } finally { await page.close(); await emptyServer.close(); }
 });

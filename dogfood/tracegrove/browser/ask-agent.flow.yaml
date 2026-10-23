@@ -11,6 +11,8 @@ steps:
     expect: { status: 200 }
   - name: open discover
     browser: { kind: click, target: { by: role, role: button, name: Discover } }
+  - name: explore routes and existing tests
+    browser: { kind: click, target: { by: testId, name: disclosure-explore-routes-and-existing-tests } }
   - name: the unreadable routing is named
     browser: { kind: read, target: { by: testId, name: ambiguities } }
     expect: { text: "Needs a decision1 place discovery cannot readunreadableapp/app.mjs:38 uses pattern-matched node:http paths, which the static scan cannot read.Ask ClaudeThe agent reads the code and writes flows; tracegrove runs them and keeps only what the app actually served." }
