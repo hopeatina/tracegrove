@@ -1331,7 +1331,7 @@ describe('Grow page', () => {
       await page.close();
     } finally { await browser.close(); }
   }, 120000);
-  it('runs a failed leaf’s lit route as one chain in hop order: its own wood, round its collar, then hop to hop, amber as far as it ran, red past the break, grey to the last hop’s knot, inside the wood and with no corner, pointed at or tapped', async () => {
+  it('runs a failed leaf’s lit route as one chain in hop order: its own wood, round its collar, then hop to hop, amber as far as it ran, red past the break, grey to the last hop’s knot, every lit knot on it, inside the wood and with no corner, pointed at or tapped', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1384,7 +1384,11 @@ describe('Grow page', () => {
           const before = first ? pieces.filter((q) => q.k !== 'amber' && along(q.p[0]!)[1] < first.s - .5).length : -1;
           const amberTo = first ? Math.max(...pieces.filter((q) => q.k === 'amber').map((q) => along(q.p[q.p.length - 1]!)[1])) : 0;
           const greyEnd = pieces.filter((q) => q.k === 'grey').map((q) => along(q.p[q.p.length - 1]!)[1]);
-          return { lit: String(w.gw.hov || w.gw.pinned), kinds: pieces.map((q) => q.k), gaps, turn, turnWhere, collar: at[ci]!, total, hops: hops.map((h: { id: string; s: number; i: number }) => [h.i, h.s]), brk, amberPast, out: out.slice(0, 8), nOut: out.length, nDrawn: drawn.length, sunk,
+          // every knot that lights is one the amber or the red runs through, within three pixels of its boss
+          const sapRuns = pieces.filter((q) => q.k !== 'grey').map((q) => q.p), segP = (p: number[], a: number[], b: number[]) => { const dx = b[0]! - a[0]!, dy = b[1]! - a[1]!, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p[0]! - a[0]!) * dx + (p[1]! - a[1]!) * dy) / l)); return Math.hypot(p[0]! - a[0]! - t * dx, p[1]! - a[1]! - t * dy); };
+          const near = (p: number[]) => Math.min(1e9, ...sapRuns.flatMap((P) => P.slice(1).map((q, i) => segP(p, P[i]!, q))));
+          const litOff = [...new Set(Object.values(B.knot))].filter((el: any) => el.classList.contains('on') && el.__geo && near(B.pos[el.__ids[0]]) > el.__geo.ra + 3).map((el: any) => (el.__ids as string[]).map((id) => (M.U[id] || {}).label || id).join('+'));
+          return { litOff, lit: String(w.gw.hov || w.gw.pinned), kinds: pieces.map((q) => q.k), gaps, turn, turnWhere, collar: at[ci]!, total, hops: hops.map((h: { id: string; s: number; i: number }) => [h.i, h.s]), brk, amberPast, out: out.slice(0, 8), nOut: out.length, nDrawn: drawn.length, sunk,
             hand: first ? { reached: reach.lit.has(first.id), s: first.s, before, amberTo } : null, last: last ? last.s + last.ra + 3 : 0, lastId: last ? last.id : '', greyEnd };
         }, leaf.id);
         const at = width + 'px';
@@ -1397,6 +1401,8 @@ describe('Grow page', () => {
         expect(r.hops.length, at).toBeGreaterThanOrEqual(2);
         for (let i = 1; i < r.hops.length; i++) { expect(r.hops[i]![0], at).toBeGreaterThan(r.hops[i - 1]![0]!); expect(r.hops[i]![1], at + ' hop order').toBeGreaterThan(r.hops[i - 1]![1]!); }
         for (const e of r.greyEnd) expect(e, at + ' grey past ' + r.lastId).toBeLessThanOrEqual(r.last);
+        // no knot glows that the sap does not run through
+        expect(r.litOff, at + ' a lit knot off the sap').toEqual([]);
         // no amber past the break
         expect(isFinite(r.brk), at).toBe(true);
         expect(r.amberPast, at + ' amber points past the break').toBe(0);
@@ -1415,6 +1421,49 @@ describe('Grow page', () => {
       }
     } finally { await browser.close(); }
   }, 120000);
+  it('runs a running journey’s sap up its wood from the soil to where its pad’s foliage begins: never under the soil, over a cushion or out of the wood', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+        const S0 = folded(file), page = await growPage(browser, server.url, S0, width);
+        const js = await page.evaluate(() => { const M = (0, eval)('gw').M; return M.J.map((j: { id: string }) => M.leaves[j.id].map((x: { id: string }) => x.id)) as string[][]; });
+        let seen = 0;
+        for (const ids of js) {
+          if (!ids.length) continue;
+          const s = { ...S0, run: { ...S0.run, ...Object.fromEntries(ids.map((id) => [id, { st: 'run' }])) } };
+          await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s, v: growView(s as never) });
+          await page.waitForTimeout(300);
+          const r = await page.evaluate(() => {
+            const B = (0, eval)('gw').B, L = B.L, svg = B.svg as SVGSVGElement, pt = svg.createSVGPoint();
+            const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => f.getBoundingClientRect().width > 0 && getComputedStyle(f.closest('.cush') ?? f).display !== 'none' && !f.closest('.off, .gone, .cut'));
+            const inEl = (e: SVGGeometryElement, x: number, y: number) => { const m = e.getScreenCTM()!.inverse().multiply(svg.getScreenCTM()!), q = new DOMPoint(x, y).matrixTransform(m); pt.x = q.x; pt.y = q.y; return e.isPointInFill(pt); };
+            const wood = [...Array.from(document.querySelector('#gb-wood' + B.N)!.children), ...Array.from(svg.querySelectorAll('path.tw'))] as SVGGeometryElement[];
+            const out = { n: 0, live: 0, sunk: [] as string[], over: [] as string[], off: [] as string[] };
+            for (const e of Array.from(svg.querySelectorAll('.vein.live')) as SVGPathElement[]) {
+              if (getComputedStyle(e).display === 'none' || !e.getAttribute('d')) continue;
+              out.live++;
+              const n = e.getTotalLength(), at = (q: DOMPoint) => Math.round(q.x) + ',' + Math.round(q.y);
+              for (let l = 0; l <= n; l += 0.5) {
+                const q = e.getPointAtLength(l); out.n++;
+                if (q.y >= L.sy(q.x)) out.sunk.push(at(q));
+                if (fills.some((f) => inEl(f, q.x, q.y))) out.over.push(at(q));
+                if (!wood.some((w) => w.isPointInFill(new DOMPoint(q.x, q.y)))) out.off.push(at(q));
+              }
+            }
+            return { ...out, sunk: out.sunk.slice(0, 6), over: out.over.slice(0, 6), off: out.off.slice(0, 6), nS: out.sunk.length, nO: out.over.length, nW: out.off.length };
+          });
+          const at = name + ' ' + width + 'px ' + ids[0];
+          seen += r.live;
+          expect(r.sunk, at + ' under the soil (' + r.nS + ' of ' + r.n + ')').toEqual([]);
+          expect(r.over, at + ' over a cushion (' + r.nO + ' of ' + r.n + ')').toEqual([]);
+          expect(r.off, at + ' out of the wood (' + r.nW + ' of ' + r.n + ')').toEqual([]);
+        }
+        expect(seen, name + ' ' + width + 'px').toBeGreaterThan(1);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 180000);
   /** The tree's foliage measured as drawn: every leaf, its twig and its cushion, from the SVG's own geometry. */
   const foliage = () => {
     const w = (0, eval)('({ gw, GB_PET })');
