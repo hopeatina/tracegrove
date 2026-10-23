@@ -2754,13 +2754,13 @@ describe('Grow page', () => {
   /** The leader's end, painted fresh in the page with this state: its last girth against its foot's, the outline round its end
    *  (each point of it past the end of the spine, as a fraction of the half-girth there, and how far the end bows out of
    *  a straight cut), and, with the trunk's reveal held at a quarter, a half and three quarters of its length, the wood that
-   *  shows along the spine: the front the last of it, its width a quarter of a caliper behind the front against one caliper
-   *  behind it, how far off the spine it sits there (against the width one caliper back, or 5 px on a thin sapling), and how
+   *  shows along the spine: the front the last of it, its width a quarter of a caliper behind the front against the wood's
+   *  own width there (a knot's boss and all), how far off the spine it sits there (against the width one caliper back, or 5 px on a thin sapling), and how
    *  much of its own girth shows one caliper back. */
   const tip = ({ s, v }: { s: unknown; v: unknown }) => {
     const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.gw.tree = 'grove'; w.growPaint();
     const B = w.gw.B, T = B.L.trees[0], el = (Array.from(B.svg.querySelectorAll('path.w')) as any[]).find((e) => e.__w === T.tw);
-    const out = { apex: T.tw.at(-1) / T.tw[0], cap: [] as number[], bow: 0, fronts: [] as Array<{ f: number; ratio: number; off: number; girth: number }> };
+    const out = { apex: T.tw.at(-1) / T.tw[0], r: T.tw.at(-1) / 2, cap: [] as number[], bow: 0, fronts: [] as Array<{ f: number; ratio: number; off: number; girth: number }> };
     const P: number[][] = el.__pts, e = P.at(-1)!, b = P.at(-2)!, m = Math.hypot(e[0]! - b[0]!, e[1]! - b[1]!) || 1, t = [(e[0]! - b[0]!) / m, (e[1]! - b[1]!) / m], r = T.tw.at(-1) / 2;
     const cap: number[][] = [];
     for (let l = 0, L = el.getTotalLength(); l <= L; l += 0.05) { const q = el.getPointAtLength(l), d = [q.x - e[0]!, q.y - e[1]!]; if (d[0]! * t[0]! + d[1]! * t[1]! > 0.02 && Math.hypot(d[0]!, d[1]!) < 2.5 * r + 0.5) cap.push([q.x, q.y]); }
@@ -2776,6 +2776,7 @@ describe('Grow page', () => {
     };
     const clip = document.createElementNS('http://www.w3.org/2000/svg', 'path'), pt = B.svg.createSVGPoint(); B.svg.append(clip);
     const shows = (x: number, y: number) => { pt.x = x; pt.y = y; return clip.isPointInFill(pt) && el.isPointInFill(pt); };
+    const wood = (x: number, y: number) => { pt.x = x; pt.y = y; return el.isPointInFill(pt); };
     for (const f of [0.25, 0.5, 0.75]) {
       if (!g || !g.a) break;
       const u = 1 - Math.pow(1 - Math.max(0, (f - g.f0) / (1 - g.f0)), 1 / 2.2);
@@ -2784,15 +2785,15 @@ describe('Grow page', () => {
       for (let i = 0; i + 1 < n.length; i += 2) q.push(n[i]! + vx + ' ' + (n[i + 1]! + vy));
       clip.setAttribute('d', 'M' + q.join(' L') + 'Z');
       let F = -1; for (let d = 0; d <= len; d += 0.25) { const o = at(d); if (shows(o.p[0]!, o.p[1]!)) F = d; else if (F >= 0 && d - F > 3) break; }
-      const side = (d: number, sd: number) => { const o = at(d); let k = 0; for (let h = 0.05; h < o.w; h += 0.05) { if (shows(o.p[0]! + o.n[0]! * h * sd, o.p[1]! + o.n[1]! * h * sd)) k = h; else break; } return k; };
-      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1);
-      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
+      const side = (d: number, sd: number, inn = shows) => { const o = at(d); let k = 0; for (let h = 0.05; h < o.w; h += 0.05) { if (inn(o.p[0]! + o.n[0]! * h * sd, o.p[1]! + o.n[1]! * h * sd)) k = h; else break; } return k; };
+      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1), own = side(F - c / 4, 1, wood) + side(F - c / 4, -1, wood);
+      out.fronts.push({ f, ratio: (nl + nr) / own, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
     }
     clip.remove();
     return out;
   };
 
-  it('ends the leader in a round tip a third of its foot or less, and grows it out with a rounded front that tapers along the curve, never a sawn-off stub', async () => {
+  it('ends the leader in a round tip a third of its foot or less, a true half circle, and grows it out with a front that is a half circle of the wood’s own girth along the curve, never a sawn-off stub or a sharpened stake', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a sapling: the plotline grow before its first journey is found; and the tree it grows into
@@ -2808,16 +2809,20 @@ describe('Grow page', () => {
         await page.getByTestId('grow').waitFor();
         const o = await page.evaluate(tip, { s, v: growView(s as never) });
         if (name === 'sapling') expect(o.apex, at + ' its tip against its foot').toBeLessThanOrEqual(0.35);
-        // the end is a half circle round the end of the spine, never a flat or slanted cut
+        // the end is a half circle round the end of the spine, never a flat or slanted cut, nor a ring of facets: a true arc,
+        // to within a hundredth of its radius, or the tenth of a pixel the outline is written to on a thin sapling's tip
+        const tol = Math.max(0.01, 0.075 / o.r);
         expect(o.cap.length, at).toBeGreaterThan(8);
-        expect(Math.min(...o.cap), at + ' its end inside a half circle').toBeGreaterThanOrEqual(0.85);
-        expect(Math.max(...o.cap), at + ' its end outside a half circle').toBeLessThanOrEqual(1.15);
+        expect(Math.min(...o.cap), at + ' its end inside a half circle').toBeGreaterThanOrEqual(1 - tol);
+        expect(Math.max(...o.cap), at + ' its end outside a half circle').toBeLessThanOrEqual(1 + tol);
         expect(o.bow, at + ' its end bows out of a straight cut').toBeGreaterThan(0.5);
-        // growing: a quarter of a caliper behind its front the wood is under two fifths as wide as one caliper behind it, where
-        // it shows its whole girth; and it is centred on the spine, so the front follows the curve
+        // growing: the front is a half circle of the wood's own girth, so a quarter of a caliper behind it the wood already
+        // shows over three quarters of its own width there (a taper to a point, a stake, shows under half), and one caliper
+        // behind it its whole girth; and it is centred on the spine, so the front follows the curve
         expect(o.fronts.length, at).toBe(3);
         for (const fr of o.fronts) {
-          expect(fr.ratio, at + ' at ' + fr.f).toBeLessThanOrEqual(0.4);
+          expect(fr.ratio, at + ' at ' + fr.f).toBeGreaterThanOrEqual(0.75);
+          expect(fr.ratio, at + ' at ' + fr.f).toBeLessThanOrEqual(1.02);
           expect(fr.girth, at + ' at ' + fr.f + ' one caliper back').toBeGreaterThanOrEqual(0.85);
           expect(fr.off, at + ' at ' + fr.f + ' off the spine').toBeLessThanOrEqual(0.2);
         }
@@ -2852,7 +2857,7 @@ describe('Grow page', () => {
   };
   const timing = () => {
     const B = (0, eval)('gw').B;
-    const out = { wood: 0, leaves: 0, cush: 0, labels: 0, shoots: 0, grafts: 0, bad: [] as string[] };
+    const out = { wood: 0, leaves: 0, cush: 0, labels: 0, shoots: 0, grafts: 0, forks: 0, bad: [] as string[] };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const log: Map<Element, Animation[]> = (window as any).__an, own = (el: Element | null | undefined) => (el && log.get(el)) || [];
     const start = (a: Animation) => Number(a.startTime ?? document.timeline.currentTime) + Number(a.effect!.getTiming().delay ?? 0);
@@ -2888,6 +2893,19 @@ describe('Grow page', () => {
       const t = woodAt(g.pts[0], 1, g); if (t === Infinity) continue;
       out.wood++;
       if (g.t0 < t - 2) bad('wood starts before the wood it grows from reaches it', Math.round(t - g.t0));
+    }
+    // a limb's collar, its fillets and the shade in its crotch come in once its own reveal starts and are whole by the time
+    // its front leaves its parent's edge, so the fork never shows the page or the parent's lit side as a seam
+    for (const g of B.grow) {
+      const el = g.el; if (!el || !el.__col || !el.__pw || !g.pts) continue;
+      const A = [0]; for (let i = 1; i < g.pts.length; i++) A.push(A[i - 1]! + Math.hypot(g.pts[i][0] - g.pts[i - 1][0], g.pts[i][1] - g.pts[i - 1][1]));
+      const Tk = el.__pw[el.__pk], fE = Math.min(1, Tk / 2 / (A[A.length - 1] || 1)), tE = g.t0 + g.ms * (1 - Math.pow(1 - Math.max(0, (fE - g.f0) / (1 - g.f0 || 1)), 1 / 2.2));
+      for (const x of [el.__col, ...(el.__on as Element[]).filter((f) => f.tagName === 'path' && !f.closest('clipPath'))]) {
+        const a = own(x)[0]; if (!a) continue;
+        out.forks++;
+        if (start(a) < g.t0 - 2) bad('fork filled before its limb starts', Math.round(g.t0 - start(a)));
+        if (start(a) + dur(a) > Math.max(tE, g.t0 + 40) + 2) bad('fork filled after its limb leaves its parent', Math.round(start(a) + dur(a) - Math.max(tE, g.t0 + 40)));
+      }
     }
     // a leaf opens out of its twig once the twig has grown and its cushion is all but whole
     for (const id in B.leaf) {
@@ -3162,7 +3180,7 @@ describe('Grow page', () => {
     return out;
   };
 
-  it('grows nothing ahead of its wood, and cuts what grew at the ask as it cuts what grew in a chosen mode: snipped at its collar, falling with its stalk and twig, each cut healed; only a preview’s ghosts go with no mark', async () => {
+  it('grows nothing ahead of its wood, fills each fork before its limb shows past its parent, and cuts what grew at the ask as it cuts what grew in a chosen mode: snipped at its collar, falling with its stalk and twig, each cut healed; only a preview’s ghosts go with no mark', async () => {
     const { dir, state } = await grownBushy();
     withMax(state);
     // asked, not yet chosen: the tree grows everything drafted, then Min is pointed at and picked; what grew is really cut
@@ -3177,7 +3195,7 @@ describe('Grow page', () => {
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         const t = await page.evaluate(timing);
         expect(t.bad, width + 'px').toEqual([]);
-        for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
+        for (const k of ['wood', 'leaves', 'cush', 'labels', 'shoots', 'grafts', 'forks'] as const) expect(t[k], width + 'px ' + k).toBeGreaterThan(0);
         // once it has grown, pointing at Min greys what it would cut; picking it snips them at their collars, and they fall
         // from that grey, the cuts healing with calluses in the bark's tones
         await settled(page);

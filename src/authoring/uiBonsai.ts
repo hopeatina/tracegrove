@@ -284,7 +284,8 @@ function gbNorm(pts,i){const n=pts.length-1;const a=pts[Math.max(0,i-1)],b=pts[M
 /* A piece of wood as a filled ribbon: width w[i] across the centreline, out along one edge and back along the other. On the
    inside of a bend the edge never reaches past the bend's centre, so a tight curve pinches instead of folding into a spike.
    bx swells one edge where a knot's boss grows out of it: positive on the side the normal points to, negative on the other.
-   Its end is a half circle round the end of the spine, as wide as the wood is there: never a flat or slanted cut. */
+   Its end is a half circle round the end of the spine, as wide as the wood is there, drawn as two true quarter arcs (the
+   edges' own half-widths across, its half-width along): never a flat or slanted cut, nor a ring of facets. */
 function gbRib(pts,w,from,to,floor,bx){from=from||0;to=to===undefined?pts.length-1:to;const N=pts.length-1,L=[],R=[];let el=0,er=0;
  for(let i=from;i<=to;i++){const n=gbNorm(pts,i),h=w[i]/2;let hl=h,hr=h;const a=pts[Math.max(0,i-3)],b=pts[i],c=pts[Math.min(N,i+3)];
   const t1=[b[0]-a[0],b[1]-a[1]],t2=[c[0]-b[0],c[1]-b[1]],m1=Math.hypot(t1[0],t1[1]),m2=Math.hypot(t2[0],t2[1]);
@@ -293,8 +294,9 @@ function gbRib(pts,w,from,to,floor,bx){from=from||0;to=to===undefined?pts.length
   L.push([b[0]+n[0]*hl,b[1]+n[1]*hl]);R.push([b[0]-n[0]*hr,b[1]-n[1]*hr]);el=hl;er=hr}
  const e=pts[to],n=gbNorm(pts,to),t=[n[1],-n[0]],r=w[to]/2,cap=[];
  for(let k=1;k<8;k++){const th=Math.PI/2-Math.PI*k/8,h=th>0?el:er;cap.push([e[0]+n[0]*h*Math.sin(th)+t[0]*r*Math.cos(th),e[1]+n[1]*h*Math.sin(th)+t[1]*r*Math.cos(th)])}
- if(floor!==undefined)for(const q of [...L,...cap,...R])q[1]=Math.min(q[1],floor);
- return 'M'+L.map(gbP).join(' L')+' L'+cap.map(gbP).join(' L')+' L'+R.reverse().map(gbP).join(' L')+'Z'}
+ if(floor!==undefined){for(const q of [...L,...cap,...R])q[1]=Math.min(q[1],floor);return 'M'+L.map(gbP).join(' L')+' L'+cap.map(gbP).join(' L')+' L'+R.reverse().map(gbP).join(' L')+'Z'}
+ const rot=gbF(Math.atan2(t[1],t[0])*180/Math.PI),tip=[e[0]+t[0]*r,e[1]+t[1]*r],R1=R.reverse();
+ return 'M'+L.map(gbP).join(' L')+' A'+gbF(r)+' '+gbF(Math.max(.01,el))+' '+rot+' 0 0 '+gbP(tip)+' A'+gbF(r)+' '+gbF(Math.max(.01,er))+' '+rot+' 0 0 '+gbP(R1[0])+(R1.length>1?' L'+R1.slice(1).map(gbP).join(' L'):'')+'Z'}
 /* A band between two fractions of the half-width: the side the light falls on, or the side away from it. */
 function gbBand(pts,w,k1,k2,from){const A=[],B=[];for(let i=from||0;i<pts.length;i++){const n=gbNorm(pts,i),h=w[i]/2;A.push([pts[i][0]+n[0]*h*k1,pts[i][1]+n[1]*h*k1]);B.push([pts[i][0]+n[0]*h*k2,pts[i][1]+n[1]*h*k2])}
  return 'M'+A.map(gbP).join(' L')+' L'+B.reverse().map(gbP).join(' L')+'Z'}
@@ -1053,10 +1055,10 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
 
 /* Wood grows out along its own spine: the finished, textured wood is uncovered from its base to its tip by one clip per
    piece (its fill, its light and its grain alike): a band down the centre line, sampled close enough to follow every bend,
-   whole up to where the grow's clock has the wood, and past that tapering over one caliper of the wood's girth to a round
-   tip a tenth of it, along the spine. So the growing front is a shoot's tip, rounded and tapered and following the curve,
-   never a flat or slanted cut, while whatever grows on the wood (a knot, a twig, a leaf, a name) still finds it at its
-   whole girth where the clock says it has grown. On the inside of a bend the band reaches no further than the bend's centre
+   whole up to where the grow's clock has the wood, and past that a half circle round the spine as wide as the wood is
+   there. So the growing front is a round cap of the wood's own girth following the curve, never a flat, slanted or
+   pointed cut, while whatever grows on the wood (a knot, a twig, a leaf, a name) still finds it at its whole girth where
+   the clock says it has grown. On the inside of a bend the band reaches no further than the bend's centre
    allows, as the wood's own edge does, so it never folds over itself.
    The clip is the element's own style, animated on the page clock, the same clock every leaf, cushion, knot and name keys
    on, so whatever frame the browser paints (a screenshot's too) shows the wood and what grows on it at one moment. (An SVG
@@ -1074,15 +1076,13 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
      wood's half-width, and how far out the band reaches on each side */
   const at=d=>{let j=1,hi=n;while(j<hi){const m=(j+hi)>>1;if(A[m]<d)j=m+1;else hi=m}
    const u=(d-A[j-1])/((A[j]-A[j-1])||1),a=g.pts[j-1],b=g.pts[j],m=Math.hypot(b[0]-a[0],b[1]-a[1])||1,t=[(b[0]-a[0])/m,(b[1]-a[1])/m],k=u<.5?j-1:j,w=g.w[j-1]+(g.w[j]-g.w[j-1])*Math.max(0,Math.min(1,u)),H=w*.62+4+(bx&&bx[k]?Math.abs(bx[k]):0);
-   return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1])}};
-  const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NT=6,NC=7,NP=2*NB+2*NT+NC;
+   return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
+  const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NC=15,NP=2*NB+NC;
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
    for(let i=0;i<NB;i++){const q=at(-2+(e+2)*i/(NB-1));L.push([q.p[0]+q.n[0]*q.hl,q.p[1]+q.n[1]*q.hl]);R.push([q.p[0]-q.n[0]*q.hr,q.p[1]-q.n[1]*q.hr])}
-   /* past the front: from the wood's own edge, over one caliper the band narrows to the tip's half-width, a little faster
-      near the tip */
-   const h0=at(e).w,rt=Math.max(.5,h0*.2),Lt=2*h0;
-   for(let k=0;k<NT;k++){const q=at(e+Lt*k/NT),h=rt+(h0+.4-rt)*Math.pow(1-k/NT,1.1);L.push([q.p[0]+q.n[0]*h,q.p[1]+q.n[1]*h]);R.push([q.p[0]-q.n[0]*h,q.p[1]-q.n[1]*h])}
-   const q=at(e+Lt),cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1);cap.push([q.p[0]+(q.n[0]*Math.sin(th)+q.t[0]*Math.cos(th))*rt,q.p[1]+(q.n[1]*Math.sin(th)+q.t[1]*Math.cos(th))*rt])}
+   /* past the front: a half circle round the spine there, the wood's own half-width and a little (across it, on the side a
+      knot's boss swells, the boss as well) */
+   const q=at(e),rt=q.w+.4,cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=(rt+(th>0?q.bl:q.br))*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
   const K=Math.max(24,Math.min(72,Math.ceil(T/6))),kf=[];for(let i=0;i<=K;i++){const u=i/K;kf.push({clipPath:"path('"+shape(i||g.f0?g.f0+(1-g.f0)*(1-Math.pow(1-u,2.2)):0)+"')",offset:u})}
   const cw=sv('g',{});g.el.before(cw);cw.append(g.el);g.cw=cw;g.an=[];
@@ -1168,10 +1168,13 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   /* (what it lays on its parent, kept as outlines too, so a shoot and its leaves keep off it: B.lay) */
   {const lay=B.lay||(B.lay=[]),q2=(a,bb,cc)=>{const m2=[(a[0]+bb[0])/2,(a[1]+bb[1])/2],ct=[cc[0]+(m2[0]-cc[0])*.45,cc[1]+(m2[1]-cc[1])*.45],P=[];for(let t=0;t<=1.001;t+=.125)P.push([(1-t)*(1-t)*a[0]+2*(1-t)*t*ct[0]+t*t*bb[0],(1-t)*(1-t)*a[1]+2*(1-t)*t*ct[1]+t*t*bb[1]]);P.push(at(pts,acc,w,sL).q,c);return P};
    lay.push(q2(...fA),q2(...fB));const cr=ca*Math.PI/180,E=[];for(let i=0;i<12;i++){const t=i*Math.PI/6,x=.5*b*Math.cos(t),y=.65*b*Math.sin(t);E.push([pts[eo][0]+x*Math.cos(cr)-y*Math.sin(cr),pts[eo][1]+x*Math.sin(cr)+y*Math.cos(cr)])}lay.push(E)}
-  const U=gU||fg,on=[col,sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'})];U.append(col);clip.append(on[1]);anim('col:'+id,col,delay+ms*.2,240,'fade');
-  for(const f of [fil(...fA),fil(...fB)]){const fp=sv('path',{d:f,class:cls}),fc=sv('path',{d:f});U.append(fp);clip.append(fc);on.push(fp,fc);anim('fil:'+id+f.length,fp,delay+ms*.25,240,'fade');
+  /* (the collar, the fillets and the crotch's shade come in as the limb starts and are whole by the time its front leaves
+     the parent's edge, so the fork never shows the page, or the parent's lit side, as a seam while the limb grows out) */
+  const r0=el.__r,fd=Math.max(40,Math.min(240,r0?gbWT(r0,Math.min(1,Tk/2/(acc[n0]||1)))-r0.t0:240));
+  const U=gU||fg,on=[col,sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'})];U.append(col);clip.append(on[1]);anim('col:'+id,col,delay,fd,'fade');
+  for(const f of [fil(...fA),fil(...fB)]){const fp=sv('path',{d:f,class:cls}),fc=sv('path',{d:f});U.append(fp);clip.append(fc);on.push(fp,fc);anim('fil:'+id+f.length,fp,delay,fd,'fade');
    /* the crotch sits in the shade of the limb above it, so the parent's lit side does not run on into it as a pale wedge */
-   if(gS){const fs=sv('path',{d:f,class:'filsh'});gS.append(fs);on.push(fs);anim('filsh:'+id+f.length,fs,delay+ms*.25,240,'fade')}}
+   if(gS){const fs=sv('path',{d:f,class:'filsh'});gS.append(fs);on.push(fs);anim('filsh:'+id+f.length,fs,delay,fd,'fade')}}
   el.__par=pp;el.__pw=P.w;el.__pk=k;el.__col=col;el.__on=on;return {el,wg,fg}};
  /* a branchlet that carries a cushion is bark like its limb: lit on one side, shaded on the other, growing with it */
  const barkOn=(tw,parent)=>{if(sap)return;clip.append(sv('path',{d:tw.getAttribute('d')}));const bl=sv('g',{'clip-path':'url(#'+clipId+')',filter:'url(#'+softId+')'}),lw=sv('g',{},bl);parent.append(lw);shade(tw.__pts,tw.__w,0,bl);tw.__also=[lw]};
