@@ -2917,8 +2917,8 @@ describe('Grow page', () => {
   /** The leader's end, painted fresh in the page with this state: its last girth against its foot's, the outline round its end
    *  (each point of it past the end of the spine, as a fraction of the half-girth there, and how far the end bows out of
    *  a straight cut), and, with the trunk's reveal held at a quarter, a half and three quarters of its length, the wood that
-   *  shows along the spine: the front the last of it, its width a quarter of a caliper behind the front against the wood's
-   *  own width there (a knot's boss and all), how far off the spine it sits there (against the width one caliper back, or 5 px on a thin sapling), and how
+   *  shows along the spine: the front the last of it, its width a quarter of a caliper behind the front against its width one
+   *  caliper behind the front, how far off the spine it sits there (against the width one caliper back, or 5 px on a thin sapling), and how
    *  much of its own girth shows one caliper back; held at a twentieth, a tenth and three twentieths, how wide the wood shows
    *  where a tip a third of the foot wide would be whole; how far the leader turns over its last ten steps; and how long
    *  the trunk's reveal runs. */
@@ -2943,7 +2943,6 @@ describe('Grow page', () => {
     };
     const clip = document.createElementNS('http://www.w3.org/2000/svg', 'path'), pt = B.svg.createSVGPoint(); B.svg.append(clip);
     const shows = (x: number, y: number) => { pt.x = x; pt.y = y; return clip.isPointInFill(pt) && el.isPointInFill(pt); };
-    const wood = (x: number, y: number) => { pt.x = x; pt.y = y; return el.isPointInFill(pt); };
     for (const f of [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]) {
       if (!g || !g.a) break;
       const u = 1 - Math.pow(1 - Math.max(0, (f - g.f0) / (1 - g.f0)), 1 / 2.2);
@@ -2952,18 +2951,18 @@ describe('Grow page', () => {
       for (let i = 0; i + 1 < n.length; i += 2) q.push(n[i]! + vx + ' ' + (n[i + 1]! + vy));
       clip.setAttribute('d', 'M' + q.join(' L') + 'Z');
       let F = -1; for (let d = 0; d <= len; d += 0.25) { const o = at(d); if (shows(o.p[0]!, o.p[1]!)) F = d; else if (F >= 0 && d - F > 3) break; }
-      const side = (d: number, sd: number, inn = shows) => { const o = at(d); let k = 0; for (let h = 0.05; h < o.w; h += 0.05) { if (inn(o.p[0]! + o.n[0]! * h * sd, o.p[1]! + o.n[1]! * h * sd)) k = h; else break; } return k; };
+      const side = (d: number, sd: number) => { const o = at(d); let k = 0; for (let h = 0.05; h < o.w; h += 0.05) { if (shows(o.p[0]! + o.n[0]! * h * sd, o.p[1]! + o.n[1]! * h * sd)) k = h; else break; } return k; };
       // early on, the growing end: how wide the wood shows where a tip a third of the foot wide would be whole, against that
       const most = Math.max(0.33 * T.tw[0], T.tw.at(-1)), h0 = F - most / 2 - 0.4;
       if (f < 0.2) { out.heads.push({ f, w: side(h0, 1) + side(h0, -1), most }); continue; }
-      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1), own = side(F - c / 4, 1, wood) + side(F - c / 4, -1, wood);
-      out.fronts.push({ f, ratio: (nl + nr) / own, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
+      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1);
+      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
     }
     clip.remove();
     return out;
   };
 
-  it('ends the leader in a round tip a third of its foot or less, a true half circle, running on into its crown with no hook, and grows it out, a sapling slowly, from a round shoot tip no wider than a third of its foot to a front that is a half circle of the wood’s own girth along the curve, never a sawn-off stub or a sharpened stake', async () => {
+  it('ends the leader in a round tip a third of its foot or less, a true half circle, running on into its crown with no hook, and grows it out, a sapling slowly, from a round shoot tip no wider than a third of its foot, its front a round tip that tapers along the curve to the wood’s whole girth a caliper behind it, never a sawn-off stub', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a sapling: the plotline grow before its first journey is found; and the tree it grows into
@@ -2994,13 +2993,12 @@ describe('Grow page', () => {
         // end), never the girth of the wood below pushed up as a stub
         expect(o.heads.length, at).toBe(3);
         for (const hd of o.heads) expect(hd.w, at + ' its growing end at ' + hd.f).toBeLessThanOrEqual(hd.most + 2.5);
-        // and from a quarter of the way on the front is a half circle of the wood's own girth, so a quarter of a caliper behind
-        // it the wood already shows over three quarters of its own width there (a taper to a point, a stake, shows under half),
-        // and one caliper behind it its whole girth; and it is centred on the spine, so the front follows the curve
+        // and at a quarter, a half and three quarters of the way the front still tapers: a quarter of a caliper behind it the
+        // wood shows no more than two fifths as wide as one caliper behind it, where it shows its whole girth; and it is
+        // centred on the spine, so the front follows the curve
         expect(o.fronts.length, at).toBe(3);
         for (const fr of o.fronts) {
-          expect(fr.ratio, at + ' at ' + fr.f).toBeGreaterThanOrEqual(0.75);
-          expect(fr.ratio, at + ' at ' + fr.f).toBeLessThanOrEqual(1.02);
+          expect(fr.ratio, at + ' at ' + fr.f + ' a quarter caliper behind the front, of one caliper behind').toBeLessThanOrEqual(0.4);
           expect(fr.girth, at + ' at ' + fr.f + ' one caliper back').toBeGreaterThanOrEqual(0.85);
           expect(fr.off, at + ' at ' + fr.f + ' off the spine').toBeLessThanOrEqual(0.2);
         }
