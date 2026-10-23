@@ -714,9 +714,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     (six parts in a hundred, eased over the joint), and the wood swells slightly where it leaves. */
  /* (the foot flares over the bottom seventh, smoothly, so it reads as the trunk spreading into its roots, measured where it
     shows, above the soil: one caliper up it is three quarters wider than the trunk above its flare, two calipers up a
-    quarter, so it narrows by more than a third over that one caliper, and by about a third more to the seventh's top;
-    under the soil it holds the width it has there) */
- const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},s0=9,fP=1.7,fX=Math.log(3)/(Math.pow(2,fP)-1),fL=D/Math.pow(fX,1/fP),fA=.75*Math.exp(fX),fF=t=>1+fA*Math.exp(-Math.pow(Math.max(0,t*Ht-s0)/fL,fP));
+    quarter, so it narrows by more than a third over that one caliper, and by about a third more to the seventh's top; and
+    where it meets the soil it spreads once more into its roots, half as wide again as one caliper up, over less than half a
+    caliper, so the foot flares at the soil, not above it; under the soil it holds the width it has there) */
+ const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},s0=9,fP=1.7,fX=Math.log(3)/(Math.pow(2,fP)-1),fL=D/Math.pow(fX,1/fP),fA=.75*Math.exp(fX),fS=.45*D,fF=t=>{const z=Math.max(0,t*Ht-s0);return 1+fA*Math.exp(-Math.pow(z/fL,fP))+.27*Math.exp(-Math.pow(z/fS,2))};
  const Tw=t=>{let w=D*base(t);
   if(!lit)for(const h of hs){const u=Math.max(0,Math.min(1,(t-h)/.05));w*=1-.06*u*u*(3-2*u)}
   for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));w*=fF(t);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};

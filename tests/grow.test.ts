@@ -785,11 +785,11 @@ describe('Grow page', () => {
     // the soil line, and where a store root that no journey uses lies against it
     const half = (T: { tp: number[][]; tw: number[] }) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -8) k++; return T.tw[k]! / 2; };
     const nebari = L.roots.filter((r: { id: string | null }) => !r.id).map((r: { tree: number; pts: number[][]; w: number[] }) => ({ tree: r.tree, G: 2 * half(L.trees[r.tree]), X: L.xs[r.tree], start: Math.max(...r.w.slice(0, 4)), tip: r.w.at(-1), reach: Math.abs(r.pts.at(-1)![0]! - L.xs[r.tree]), half: L.potL / 2 }));
-    // each trunk's foot, where it shows above the soil and its roots: how far it flares one caliper up against two calipers
-    // up, its girth there against the trunk's height, and its caliper against the pot
+    // each trunk's foot, where it shows above the soil and its roots: how far it flares at the soil against one caliper up,
+    // and one caliper up against two calipers up, its girth there against the trunk's height, and its caliper against the pot
     const trunk = L.trees.map((T: { tp: number[][]; tw: number[]; D: number; Ht: number }, i: number) => {
       const up = (y: number) => { let k = 0; while (k < T.tp.length - 1 && T.tp[k]![1]! > -y) k++; return T.tw[k]!; }, soil = -L.sy(L.xs[i]);
-      return { flare: up(soil + T.D) / up(soil + 2 * T.D), foot: up(soil + T.D), Ht: T.Ht, cal: up(T.D), D: T.D, potL: L.potL, lone: !!L.lone };
+      return { soil: up(soil) / up(soil + T.D), flare: up(soil + T.D) / up(soil + 2 * T.D), foot: up(soil + T.D), Ht: T.Ht, cal: up(T.D), D: T.D, potL: L.potL, lone: !!L.lone };
     });
     const lr = L.roots.find((r: { loose: boolean }) => r.loose);
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
@@ -812,10 +812,10 @@ describe('Grow page', () => {
   /** A foot a bonsai grower would keep: four to six radial surface roots per tree, each leaving the trunk three tenths
    *  to forty-five hundredths of its girth thick and thinning to a hair, out to six to nine tenths of the pot's half-length (five
    *  at most, as before);
-   *  the trunk's foot, where it shows one caliper above the soil, flared to about one and a half times its width a caliper
-   *  higher, and at least a ninth of the trunk's height thick there, so it never reads as a pole; and its caliper at least an
-   *  eighth of the pot. */
-  const footOk = (g: { trees: number; nebari: Array<{ tree: number; G: number; start: number; tip: number; reach: number; half: number }>; trunk: Array<{ flare: number; foot: number; Ht: number; cal: number; D: number; potL: number; lone: boolean }> }, at: string) => {
+   *  the trunk at the soil flared to about one and a half times its width one caliper up, and that foot, where it shows one
+   *  caliper above the soil, about one and a half times its width a caliper higher, and at least a ninth of the trunk's height
+   *  thick there, so it never reads as a pole; and its caliper at least an eighth of the pot. */
+  const footOk = (g: { trees: number; nebari: Array<{ tree: number; G: number; start: number; tip: number; reach: number; half: number }>; trunk: Array<{ soil: number; flare: number; foot: number; Ht: number; cal: number; D: number; potL: number; lone: boolean }> }, at: string) => {
     for (let i = 0; i < g.trees; i++) { const n = g.nebari.filter((q) => q.tree === i).length; expect(n, at).toBeGreaterThanOrEqual(4); expect(n, at).toBeLessThanOrEqual(5); }
     for (const q of g.nebari) {
       expect(q.start / q.G, at + ' root start').toBeGreaterThanOrEqual(.3);
@@ -827,6 +827,8 @@ describe('Grow page', () => {
       expect(q.reach / q.half, at + ' root reach').toBeLessThanOrEqual(.9);
     }
     for (const t of g.trunk) {
+      expect(t.soil, at + ' flare at the soil (Tw(soil) / Tw(soil + one caliper))').toBeGreaterThanOrEqual(1.4);
+      expect(t.soil, at + ' flare at the soil (Tw(soil) / Tw(soil + one caliper))').toBeLessThanOrEqual(1.6);
       expect(t.flare, at + ' flare').toBeGreaterThanOrEqual(1.4);
       expect(t.flare, at + ' flare').toBeLessThanOrEqual(1.6);
       expect(t.Ht / t.foot, at + ' slender').toBeLessThanOrEqual(9);
@@ -970,7 +972,7 @@ describe('Grow page', () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
-      for (const name of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) for (const width of [1440, 390]) {
+      for (const name of ['plotline-seats.jsonl', 'tracegrove-max.jsonl']) for (const width of [1440, 768, 390]) {
         const page = await growPage(browser, server.url, folded(name), width, width < 500);
         await page.waitForTimeout(400);
         footOk(await page.evaluate(ground), name + ' ' + width + 'px');
