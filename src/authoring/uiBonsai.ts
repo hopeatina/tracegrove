@@ -646,7 +646,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* (a crown in tiers stands its crest on its riser above its shoulders: the trunk grows that much taller, so the shoulders
     take no room from the upper trunk's knots) */
  const tl=cpd.geo.cs.some(c=>c.hap)?Math.max(0,-crc.bot):0;
- const Ht=Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);const D=sap?Ht*.05:Dd;
+ /* (and a trunk grown taller than its leaves alone would make it thickens with it: never more than fourteen girths tall, so
+    with its flare its foot is at least a ninth of its height and it never reads as a pole; a phone's trunk, grown taller for
+    its larger leaves, keeps the girth the drawing's height gives it) */
+ const Ht=Math.max(M.lmin?need:0,Math.min(.92*H+tl,sap?need:Math.max(need,12.5*Dd+tl)),sap||!dmin?0:12.1*Dd+tl);const D=sap?Ht*.05:Math.max(Dd,Math.min(Ht,M.lmin?.92*H+tl:Ht)/14);
  let cp;if(lit)cp=[[0,0],[.07,0],[.3,.1*S],[.62,-.03*S],[1,.12*S]];
  else{const mv=Math.min(1.5,H/Ht);cp=[[0,0],[.07,0],[h1*.55,-.02*S]];let last=-1;ord.forEach(i=>{if(back[i])return;cp.push([hs[i],side[i]*.05*Math.pow(1-hs[i],.7)*mv]);last=i});
   /* with one or two branches the apex leans a little away from the first, so the tree's mass stays over its roots: the
@@ -661,12 +664,14 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* the trunk tapers in one continuous line from a flared base into the crown, w = w0(1 - .68t)^.85, so the leader still has
     about a third of the base's girth where it enters the crown: never a wire. Each branch takes a little of the girth with it
     (six parts in a hundred, eased over the joint), and the wood swells slightly where it leaves. */
- /* (the foot flares over the bottom seventh, smoothly, so it reads as the trunk spreading into its roots: where it meets the
-    soil half again as wide as it is one caliper up, the flare's own amount A solved for that from the taper there) */
- const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},tF=.15,tC=Math.min(.6*tF,D/Ht),sF=Math.pow(1-tC/tF,2),rB=base(tC)/base(0),fA=Math.max(.2,(1.5*rB-1)/(1-1.5*rB*sF));
+ /* (the foot flares over the bottom seventh, smoothly, so it reads as the trunk spreading into its roots, measured where it
+    shows, above the soil: one caliper up it is three quarters wider than the trunk above its flare, two calipers up a
+    quarter, so it narrows by more than a third over that one caliper, and by about a third more to the seventh's top;
+    under the soil it holds the width it has there) */
+ const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},s0=9,fP=1.7,fX=Math.log(3)/(Math.pow(2,fP)-1),fL=D/Math.pow(fX,1/fP),fA=.75*Math.exp(fX),fF=t=>1+fA*Math.exp(-Math.pow(Math.max(0,t*Ht-s0)/fL,fP));
  const Tw=t=>{let w=D*base(t);
   if(!lit)for(const h of hs){const u=Math.max(0,Math.min(1,(t-h)/.05));w*=1-.06*u*u*(3-2*u)}
-  for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));if(t<tF)w*=1+fA*Math.pow(1-Math.max(0,t)/tF,2);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};
+  for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));w*=fF(t);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};
  const tw=ty.map(Tw);
  /* A branch leaves the trunk at a third of its width or less, carries its own parts as knots on the bare wood before its
     pad, and runs on under the pad, where three to five branchlets fork up into the foliage they carry. */
@@ -753,8 +758,9 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     under a wide pad can still put one out); the headline journey's own parts on the upper trunk. */
  /* knots keep their distance along the wood, about two of their own lengths; where more files share a stretch than fit, the
     last knot there swells into a burl that holds the rest, and its card names every one */
- /* (on the trunk a knot keeps about a girth and a quarter from the next, so two bosses never touch) */
- const knots=[],more={};const KG=21;const tacc=gbLen(tp);const KT=k=>Math.max(KG,1.25*tw[k]);
+ /* (on the trunk a knot keeps about a girth and a quarter from the next, the girth above the foot's flare, so two bosses never
+    touch and the flare spreads no knots up the trunk) */
+ const knots=[],more={};const KG=21;const tacc=gbLen(tp);const KT=k=>Math.max(KG,1.25*tw[k]/fF(ty[k]));
  const onTrunk=(ids,t)=>{const k=gbNear(ty,t);knots.push({id:ids[0],ids,on:'t',k,p:tp[k],n:gbNorm(tp,k),w:tw[k],t})};
  const fitN=(t0,t1)=>{const k0=gbNear(ty,t0),k1=gbNear(ty,t1);return Math.max(1,Math.floor((tacc[k1]-tacc[k0])/KT(Math.round((k0+k1)/2)))+1)};
  const group=(list,n)=>list.length<=n?list.map(id=>[id]):[...list.slice(0,n-1).map(id=>[id]),list.slice(n-1)];
@@ -1425,8 +1431,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     if(b){const bp=b.pts.map(sh);grow1(bp,kn.k,b.w,uids,kn.id,kk=>[...bp.slice(0,kk+1).reverse(),...tdown(b.k)],2,0,bs,B.brAt[b.id],1,dp(B.brAt[b.id]||tAt))}
     else grow1(tp,kn.k,T.tw,uids,kn.id,tdown,2,0,bs,null,0,dp(tAt))}
    /* never from the soil, the flare or the root itself: a root's checks grow from the trunk just above where that root flares
-      from it, at least 24 px over the soil, on the root's side */
-   const lowK=Math.round(.2*(tp.length-1)),sy=x=>L.sy?L.sy(x):0,fl=Math.max(24*kq,T.D||0)+2;let kF=0;while(kF<tp.length-3&&tp[kF][1]>sy(tp[kF][0])-fl)kF++;
+      from it, at least 24 px over the soil and a caliper and a quarter (above the flare's widest), on the root's side */
+   const lowK=Math.round(.2*(tp.length-1)),sy=x=>L.sy?L.sy(x):0,fl=Math.max(24*kq,1.25*(T.D||0))+2;let kF=0;while(kF<tp.length-3&&tp[kF][1]>sy(tp[kF][0])-fl)kF++;
    for(const r of L.roots){if(!r.id||r.tree!==ti||!own(r.id).length)continue;
     grow1(tp,kF,T.tw,[r.id],r.id,kk=>[...tdown(kk),...r.pts.slice(0,Math.floor(r.pts.length*.6))],kF,r.d,null,null,0,()=>{const n=gbNorm(tp,kF),sg=n[0]*r.d<0?-1:1,ns=[n[0]*sg,n[1]*sg],h=T.tw[kF]/2;return {q:[tp[kF][0]+ns[0]*h,tp[kF][1]+ns[1]*h],b:[tp[kF][0]+ns[0]*(h-1.2),tp[kF][1]+ns[1]*(h-1.2)],ns,tb:now+tAt(kF)}})}
    /* a changed part on no journey has no knot of its own: its shoot comes from the boss of the leader's knot nearest under the
