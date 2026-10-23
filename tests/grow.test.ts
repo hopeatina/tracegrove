@@ -2488,6 +2488,66 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
+  /** Every shown name's leader against every count drawn on the tree, in page pixels: the nearest each leader comes to the box
+   *  of any count, its own knot's included. */
+  const leadersByCounts = () => {
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement;
+    const boxes = (Array.from(svg.querySelectorAll('.shtag')) as SVGGraphicsElement[]).map((e) => e.getBoundingClientRect()).filter((q) => q.width > 0);
+    const near: Array<[string, number]> = [];
+    for (const id in B.klbl) {
+      const t = B.klbl[id] as Element & { __ld?: SVGPathElement }, ld = t.__ld;
+      if (!t.classList.contains('on') || !ld || !ld.getAttribute('d')) continue;
+      const m = ld.getScreenCTM()!, len = ld.getTotalLength();
+      let d = Infinity;
+      for (let s = 0; s <= len; s += 0.5) {
+        const q = ld.getPointAtLength(s), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f;
+        for (const o of boxes) d = Math.min(d, Math.hypot(Math.max(o.left - x, 0, x - o.right), Math.max(o.top - y, 0, y - o.bottom)));
+      }
+      near.push([t.textContent ?? '', Math.round(d * 10) / 10]);
+    }
+    return { counts: boxes.length, near };
+  };
+
+  it('keeps every name\u2019s leader two pixels or more off the box of every count, its own knot\u2019s too, in each tree the plotline grow paints as it drafts and on the recorded trees', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const bad: unknown[] = []; let met = 0;
+      const look = async (page: import('playwright').Page, at: string) => {
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const r = await page.evaluate(leadersByCounts);
+        if (r.counts && r.near.length) met++;
+        for (const [name, d] of r.near) if (d < 2) bad.push(at + ': ' + name + ' ' + d + 'px');
+      };
+      // the plotline grow as it comes in, each tree it paints on the way, at a desk and on a phone
+      for (const width of [1440, 390]) {
+        const page = await browser.newPage({ viewport: { width, height: 1000 }, hasTouch: width < 500, isMobile: width < 500 });
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Discover', exact: true }).first().click();
+        await page.getByTestId('grow').waitFor();
+        await page.evaluate(() => { (0, eval)('gw').tree = 'grove'; });
+        const s = freshGrow();
+        for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl'), 'utf8').split('\n')) {
+          if (!line.trim()) continue;
+          const ev = JSON.parse(line) as GrowEvent; applyGrow(s, ev);
+          if (!['unit.found', 'trunk.grown', 'journey.found', 'scenario.drafted', 'layer.needed', 'flows.checked', 'mode.asked', 'mode.chosen', 'scenario.passed', 'scenario.failed'].includes(ev.kind)) continue;
+          await paintState(page, s);
+          if (await page.locator('[data-testid="grow"] svg.gb[role=group]').count()) await look(page, 'plotline ' + width + 'px after ' + ev.seq + ' ' + ev.kind);
+        }
+        await page.close();
+        // and each recorded tree in Max
+        for (const [name, label] of recorded) {
+          const mx = { ...folded(name), asked: false, modeBy: 'you' as const, mode: 'max' as const };
+          const pg = await growPage(browser, server.url, mx, width, width < 500);
+          await look(pg, label + ' Max ' + width + 'px');
+          await pg.close();
+        }
+      }
+      expect(bad).toEqual([]);
+      expect(met).toBeGreaterThan(4);
+    } finally { await browser.close(); }
+  }, 180000);
+
   /** The wood a pad sits on, from the drawn page: each branch's girth where it leaves the trunk against the trunk's there, each
    *  limb's two collar fillets (how far each reaches along the parent past the limb's edge, and along the limb past the
    *  parent's edge, in the limb's own base girths), and under each cushion the twigs that show below its underside. */
