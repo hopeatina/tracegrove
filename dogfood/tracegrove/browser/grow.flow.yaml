@@ -6,16 +6,14 @@ browser:
   allowMethods: [GET, HEAD, POST]
   maxActions: 1000
 steps:
-  - name: open the UI
-    browser: { kind: navigate, path: / }
+  - name: open discovery on the feature branch
+    browser: { kind: navigate, path: "/?view=Discover&source=notes-count" }
     expect: { status: 200 }
-  - name: open discover
-    browser: { kind: click, target: { by: role, role: button, name: Discover } }
-  - name: pick the feature branch
-    browser: { kind: click, target: { by: role, role: button, name: notes-count } }
   - name: the start card names the branch
     browser: { kind: read, target: { by: testId, name: grow-go } }
     expect: { text: Grow notes-count }
+  - name: reveal run options
+    browser: { kind: click, target: { by: testId, name: disclosure-run-options } }
   - name: trace with the rules only, so the run is free and repeatable
     browser: { kind: click, target: { by: testId, name: grow-agent } }
   - name: grow it

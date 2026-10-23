@@ -1,3 +1,5 @@
+import { READINESS_JS } from './uiReadiness.ts';
+import { CHROME_CSS, CHROME_JS } from './uiChrome.ts';
 /**
  * The single page served by `tracegrove ui`, in the Grove design: a bonsai of scenarios (trunk,
  * branches, step twigs), pruning as a reversible rename, live progress from real run and agent
@@ -138,10 +140,12 @@ details.more>div{margin-top:8px;padding-left:18px;border-left:1px solid var(--li
 ${COMPARISON_CSS}
 ${GROVE_CSS}
 ${BENCHMARK_CSS}
+${CHROME_CSS}
 </style></head><body>
+<a class="skip btn" href="#main">Skip to content</a>
 <header><span class="brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M12 18c-.6-2.6 1.4-3.6.6-6.4" stroke="var(--ink)" stroke-width="1.8"/><path d="M12.4 13.4c-2-.4-3.6-1.4-4.6-2.6M12.8 11.6c1.6-.6 3-1.8 3.8-3" stroke="var(--ink)" stroke-width="1.1"/><g fill="var(--moss)"><circle cx="6.2" cy="10.2" r="1.7"/><circle cx="8.8" cy="9.6" r="1.7"/><circle cx="15.6" cy="7.4" r="1.7"/><circle cx="18.2" cy="8" r="1.7"/><circle cx="11.6" cy="6" r="1.9"/></g><path d="M3 18h18" stroke="var(--ink3)" stroke-width=".9"/><path d="M12 18c-1 1.6-2.6 2.6-4.4 3M12 18c1.2 1.4 2.8 2.2 4.6 2.4" stroke="var(--gold)" stroke-width=".9"/></svg>tracegrove</span>
 <nav id="tabs" aria-label="Sections"></nav><span class="ctx" id="ctx"></span><button class="kbtn" id="palbtn" type="button" aria-label="Open the command palette" aria-keyshortcuts="Control+K Meta+K">Commands <kbd>⌘K</kbd></button></header>
-<div class="page" id="main"></div>
+<main class="page" id="main" tabindex="-1"></main>
 <script>
 const TOKEN='__TOKEN__';const START_BRANCH=__BRANCH__;const DEFAULT_MODELS=__DEFAULT_MODELS__;
 const TABS=['Run','Readiness','Discover','Heal','History','Compare','Imports','Map','Benchmark','Environments','Settings'];
@@ -158,16 +162,19 @@ const LABEL={pass:'held',fail:'failed',warn:'blocked',none:'not run',pruned:'pru
 const kind=o=>OUT[o]||'none';
 const secs=ms=>ms==null?'':!Number.isFinite(ms)?'unavailable':ms<1000?ms+' ms':(ms/1000).toFixed(1)+' s';
 const ago=iso=>{const d=(Date.now()-new Date(iso).getTime())/1000;if(!Number.isFinite(d))return 'time unavailable';return d<60?'just now':d<3600?Math.round(d/60)+' min ago':d<86400?Math.round(d/3600)+' h ago':new Date(iso).toLocaleDateString()};
-function header(){document.getElementById('tabs').replaceChildren(...TABS.map(t=>h('button',{'aria-current':t===tab?'page':'false',on:{click:()=>openTab(t)}},t)));
+function header(){const nav=document.getElementById('tabs');if(nav.dataset.view!==tab){nav.replaceChildren(...sectionNav());nav.dataset.view=tab}
  const g=state?state.git:null;const last=state&&state.runs[0];
- document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),g&&g.isRepo?(g.current||'detached'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
-async function load(){state=await api('/api/overview');try{ui.envs=await api('/api/environments');if(!ui.envs.environments.some(e=>e.name===ui.env))ui.env='local'}catch{ui.envs=null}try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))&&!(ui.runAt&&ui.runAt.name===ui.runName)){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api(runApi(ui.runName))}catch{ui.run=null}}render()}
+ document.getElementById('ctx').textContent=state?[state.config?state.config.project:state.dir.split('/').pop(),state.example?'example':g&&g.isRepo?(g.current==='HEAD'?'detached checkout':g.current||'detached checkout'):null,last?'last run '+ago(last.startedAt):'never run'].filter(Boolean).join(' · '):''}
+async function load(){state=await api('/api/overview');try{ui.envs=await api('/api/environments');if(!ui.envs.environments.some(e=>e.name===ui.env))ui.env='local'}catch{ui.envs=null}try{ui.heals=await api('/api/heals')}catch{ui.heals=[]}if(!ui.heal&&ui.heals.length)ui.heal=ui.heals[0];ui.activeRunId=state.activeRunId;ui.cancelling=state.cancelling;if(state.running){ui.running=ui.running||'Verification is running';watchRun()}if(state.runs.length&&(!ui.runName||!state.runs.some(r=>r.name===ui.runName))&&!(ui.runAt&&ui.runAt.name===ui.runName)){ui.runName=state.runs[0].name;ui.run=null}if(ui.runName&&!ui.run){try{ui.run=await api(runApi(ui.runName))}catch{ui.run=null}}render();void loadReadiness()}
 /* A grow whose config is in a subfolder saved its runs beside that config: the run it opened (ui.runAt) is read from there */
 function runAtQuery(name){const a=ui.runAt;return a&&a.name===name&&a.config?'config='+encodeURIComponent(a.config):''}
 function runApi(name){const q=runAtQuery(name);return '/api/runs/'+encodeURIComponent(name)+(q?'?'+q:'')}
 /* The grow panel is the same element across a redraw: whatever in it had focus keeps it once it is placed again */
-function page(...nodes){const fa=document.activeElement,keep=fa&&fa!==document.body&&gw.el&&gw.el.contains(fa)?fa:null;
+let pageTab=null;const disclosureState=new Map();
+function page(...nodes){if(pageTab){for(const el of document.querySelectorAll('main details')){const key=el.dataset.disclosureKey||(el.id||el.querySelector('summary')?.textContent);if(key)disclosureState.set(el.dataset.disclosureKey?key:pageTab+':'+key,el.open)}}const fa=document.activeElement,reviewFocus=fa?.id==='review-reason'?{start:fa.selectionStart,end:fa.selectionEnd}:null,keep=fa&&fa!==document.body&&gw.el&&gw.el.contains(fa)?fa:null;
  document.getElementById('main').replaceChildren(...nodes.flat().filter(n=>n!==null&&n!==undefined&&n!==false));
+ pageTab=tab;for(const el of document.querySelectorAll('main details')){const key=el.dataset.disclosureKey||(el.id||el.querySelector('summary')?.textContent);const stored=el.dataset.disclosureKey?key:tab+':'+key;if(key&&disclosureState.has(stored))el.open=disclosureState.get(stored)}
+ if(reviewFocus){const field=document.getElementById('review-reason');if(field&&!field.disabled){field.focus({preventScroll:true});field.setSelectionRange(reviewFocus.start,reviewFocus.end)}}
  if(keep&&keep.isConnected&&document.activeElement!==keep)keep.focus({preventScroll:true})}
 
 ${SOURCE_CONTROLS_JS}
@@ -176,6 +183,8 @@ ${GROVE_JS}
 ${NATIVE_IMPORTS_JS}
 ${WORKFLOW_MAP_JS}
 ${BENCHMARK_JS}
+${CHROME_JS}
+${READINESS_JS}
 /* ---------- Run: the bonsai ---------- */
 function scenarios(){const run=ui.run;const byId=new Map((run?run.cases:[]).map(c=>[c.caseId,c]));
  const flows=state.flows.concat(run?run.cases.filter(c=>!state.flows.some(f=>f.caseId===c.caseId)).map(c=>({...c,fixtures:[],steps:[]})):[]);
@@ -202,7 +211,7 @@ function grove(sc){const W=640,SOIL=206,CX=W/2,n=sc.length;let minY=60;const svg
   const cut=c.state==='pruned';const mid=[(top[0]+px)/2,Math.min(top[1],py)+18];
   wood.append(cut?sv('path',{class:'cutwood',d:line([top,mid,[px,py+10]])}):sv('path',{class:'wood',d:ribbon([top,mid,[px,py+8]],4.5,1.6)}));
   const steps=cut?[{id:'',result:'pruned'},{id:'',result:'pruned'},{id:'',result:'pruned'}]:c.steps.length?c.steps:[{id:'',result:'none'}];
-  const perRow=Math.ceil(steps.length/(steps.length>4?2:1));const pad=sv('g',{class:'pad'+(ui.sel===c.id?' on':''),tabindex:'-1','data-pad':c.id,on:{click:()=>{ui.sel=c.id;ui.step=Math.max(0,c.steps.findIndex(x=>x.result==='fail'));render()}}},sv('title',{},c.id+' · '+LABEL[c.state]));
+  const perRow=Math.ceil(steps.length/(steps.length>4?2:1));const pad=sv('g',{class:'pad'+(ui.sel===c.id?' on':''),tabindex:'-1','data-pad':c.id,on:{click:()=>{ui.sel=c.id;ui.step=Math.max(0,c.steps.findIndex(x=>x.result==='fail'));render();inspectStep()}}},sv('title',{},c.id+' · '+LABEL[c.state]));
   steps.forEach((x,j)=>{const row=Math.floor(j/perRow),col=j%perRow,inRow=row===0?Math.min(perRow,steps.length):steps.length-perRow;
    const at=c.failure&&x.name&&(x.name===c.failure.step||x.reportedName===c.failure.step);pad.append(sv('circle',{cx:(px+(col-(inRow-1)/2)*gap).toFixed(1),cy:(py-row*gap*.86).toFixed(1),r:r,class:'lf-'+(at?'fail':x.result),'data-leaf':x.id||null},at?sv('title',{},'Case failed at '+c.failure.step):null))});
   pads.append(pad);
@@ -225,26 +234,27 @@ const slug=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_
 const sameName=x=>!!x.reportedName&&slug(x.reportedName)===x.name;
 function legend(){const it=(cls,t)=>h('span',{},h('i',{style:cls}),t);return h('div',{class:'legend'},it('background:var(--moss)','held'),it('background:var(--verm)','failed'),it('background:var(--ochre)','blocked'),it('border:1px dashed var(--twig)','not run or pruned'),it('background:var(--gold)','route the app served'))}
 function inputChip(){const src=state.verificationSource;const b=src.binding;
- return h('button',{class:'kpi chip',title:src.status==='blocked'?'Blocked — review selection':sourceDescription(b),on:{click:()=>{tab='Settings';render()}}},
-  h('b',{style:'font-size:14px'},src.status==='blocked'?'blocked':!b?'unknown':b.kind==='working_tree'?'working tree':'snapshot '+String(b.commit).slice(0,8)),h('span',{},'next run input · change'))}
+ return h('button',{class:'kpi chip',title:src.status==='blocked'?'Blocked — review selection':sourceDescription(b),on:{click:()=>{openTab('Settings');const details=document.getElementById('source-options');if(details){details.open=true;details.scrollIntoView({block:'nearest'});document.getElementById('snapshot-path')?.focus()}}}},
+  h('b',{style:'font-size:14px'},src.status==='blocked'?'blocked':!b?'unknown':b.kind==='working_tree'?'working tree':'snapshot '+String(b.commit).slice(0,8)),h('span',{},'app files · change'))}
 function runTab(){
- if(!state.hasConfig&&!ui.run)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'No tracegrove.config.yaml in this folder yet.'),
-  h('p',{class:'muted'},'Init detects FastAPI, Django or Node, writes a config and one example flow, and tells you the test-mode auth line to add.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
+ if(!state.hasConfig&&!ui.run)return[h('div',{class:'card fade',style:'max-width:640px'},h('span',{class:'label'},'Plant the first tree'),h('h1',{style:'margin:8px 0 12px'},'Plant your first test.'),
+  h('p',{class:'muted'},'Start with your app. Tracegrove finds its framework and creates a configuration and one example test for you to review.'),h('button',{class:'btn',on:{click:async()=>{try{await api('/api/init',{});toast('Config and example flow written');await load()}catch(e){page(blocked(e))}}}},'Initialize'))];
  if(state.compileError&&!state.flows.length&&!ui.run)return[h('div',{class:'kpis',style:'margin:0 0 16px'},inputChip()),blocked(state.compileError)];
  const sc=scenarios();const run=ui.run;const ran=sc.filter(s=>s.state!=='none'&&s.state!=='pruned');const held=ran.filter(s=>s.state==='pass').length;
  const allSteps=run?(run.cases||[]).flatMap(s=>s.steps):[];const stepsHeld=allSteps.filter(s=>kind(s.result)==='pass'&&s.checks!=='fail').length;
- if(ui.sel===null){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
- const headline=!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
+ if(ui.sel==null||!sc.some(s=>s.id===ui.sel)){const f=sc.find(s=>s.state==='fail');ui.sel=f?f.id:(sc[0]||{}).id;ui.step=f?Math.max(0,f.steps.findIndex(x=>x.result==='fail')):0}
+ const headline=ui.running?'Checking your scenarios…':!run?'Nothing has run yet. Run the grove to see which scenarios hold.':run.bundleVerified===false?'Evidence could not be verified for this run.':run.outcome==='passed'?'Every scenario held on this run.':held+' of '+ran.length+' scenarios held. '+(ran.length-held)+' need'+(ran.length-held===1?'s':'')+' a look.';
  /* the run a grow opened from beside its own config is not in this folder's list: it is offered first, as itself */
+ const selected=sc.find(s=>s.id===ui.sel);if(selected&&(!Number.isInteger(ui.step)||ui.step<0||ui.step>=selected.steps.length))ui.step=0;
  const own=run&&!state.runs.some(r=>r.name===ui.runName)?[{name:ui.runName,startedAt:run.startedAt,outcome:run.outcome,bundleVerified:run.bundleVerified,totals:run.totals}]:[];
  const pick=h('select',{'aria-label':'Run',on:{change:async e=>{ui.runName=e.target.value;ui.run=null;ui.sel=null;await load()}}},own.concat(state.runs).map(r=>h('option',{value:r.name,selected:r.name===ui.runName},r.bundleVerified===false?ago(r.startedAt)+' · evidence unavailable':ago(r.startedAt)+' · '+LABEL[kind(r.outcome)]+' · '+r.totals.passed+'/'+(r.totals.passed+r.totals.failed+r.totals.other))));
  const kpi=(b,t,cls)=>h('div',{class:'kpi'},h('b',{class:cls||''},b),h('span',{},t));
  const drift=run&&(state.sourceDigest==null?'Current application source could not be resolved.':run.sourceDigest!==state.sourceDigest?'Application source differs from this recorded run.':null);
  const ev=run?(run.evidenceStatus==='verified'?'saved evidence freshly verified':'saved evidence '+(run.evidenceStatus||'unavailable')):null;const na=run&&run.bundleVerified===false;
  const hero=h('section',{style:'margin-bottom:24px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
-   h('div',{},h('span',{class:'label'},run?'Run '+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),run?envBadge(run.environment):null,h('h1',{style:'margin-top:6px'},headline)),
+   h('div',{},h('span',{class:'label'},run?(ui.running?'Previous run ':'Run ')+run.runDir.split('/').pop():state.flows.length+' scenarios planted'),run?envBadge(run.environment):null,h('h1',{style:'margin-top:6px'},headline)),
    h('div',{class:'row'},envSwitch(),state.runs.length||own.length?pick:null,ui.running?h('div',{class:'row'},h('span',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),h('span',{id:'run-activity',role:'status','aria-live':'polite'},ui.running)),ui.activeRunId?h('button',{class:'btn ghost',disabled:ui.cancelling,on:{click:cancelRun}},ui.cancelling?'Waiting for run to settle':'Cancel run'):null):
-    [ui.sel&&sc.length>1?h('button',{class:'btn ghost',disabled:!!state.compileError||!state.flows.some(f=>f.caseId===ui.sel),on:{click:()=>runNow(ui.sel)}},'Run this scenario'):null,h('button',{class:'btn',disabled:!state.hasConfig||!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
+    [h('button',{class:'btn',disabled:!state.hasConfig||!!state.compileError,on:{click:()=>runNow('')}},'Run all')])),
   h('div',{class:'kpis'},run?[kpi(na?'unavailable':held+' / '+ran.length,'scenarios held'),kpi(na?'unavailable':stepsHeld+' / '+allSteps.length,'steps held'),kpi(na?'unavailable':secs(new Date(run.finishedAt)-new Date(run.startedAt)),'wall time'),
     kpi(run.bundleVerified?'✓':'–',ev,run.bundleVerified?'c-pass':'c-warn')]:[kpi(String(state.flows.length),'scenarios'),kpi(String(state.flows.reduce((a,f)=>a+f.steps.length,0)),'steps')],inputChip()),
   drift?h('p',{class:'small c-warn',role:'note',style:'margin:10px 0 0'},drift+' Rerun to check today’s code.'):null,
@@ -267,13 +277,13 @@ function branch(s){const open=ui.sel===s.id&&s.steps.length>0;const cut=s.state=
    h('span',{class:'pips','aria-label':s.steps.filter(x=>x.result==='pass').length+' of '+s.steps.length+' steps held'},s.steps.map(x=>h('i',{class:x.result}))),
    h('span',{class:'time'},secs(s.ms)))),
   open?h('div',{class:'twigs fade'},s.steps.map((x,j)=>{const left=at/total*100;at+=x.ms||0;return h('div',{class:'br'},h('span',{class:'twig'},h('i')),
-   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},sameName(x)?x.reportedName:x.name,x.reportedName&&!sameName(x)?h('span',{class:'tag',title:'Saved name (unsealed): '+x.reportedName},'renamed'):null),h('span',{class:'req'},x.method+' '+x.path),
+   h('button',{class:'step','data-step':x.id,'aria-pressed':ui.step===j?'true':'false',on:{click:()=>{ui.step=j;render();inspectStep()}}},h('span',{class:'dot s '+x.result,'aria-hidden':'true'}),h('span',{},sameName(x)?x.reportedName:x.name,x.reportedName&&!sameName(x)?h('span',{class:'tag',title:'Saved name (unsealed): '+x.reportedName},'renamed'):null),h('span',{class:'req'},x.method+' '+x.path),
     h('span',{class:'bar','aria-hidden':'true'},x.ms!=null?h('i',{class:x.result==='fail'?'fail':'',style:'left:'+left.toFixed(1)+'%;width:'+((x.ms||0)/total*100).toFixed(1)+'%'}):null),
     h('span',{class:'ms muted'},x.ms!=null?x.ms+' ms':''),h('span',{class:'res c-'+x.result},x.status!=null?x.status:x.result==='none'?'–':LABEL[x.result])))})):null)}
 function fixes(sc,run){const items=[];for(const s of sc)if(s.state==='fail'||s.state==='warn')items.push({s,title:s.failure?s.failure.message:'Did not complete',where:s.failure?'step "'+s.failure.step+'"':s.file});
  if(run&&run.bundleVerified===false&&!(run.blockers||[]).some(b=>b.code==='saved_evidence_unavailable'))items.push({s:null,title:'Exported evidence failed verification',where:'Inspect bundle-problems.txt before relying on this run.'});
  for(const b of (run&&run.blockers)||[])items.push({s:null,title:b.code==='saved_evidence_unavailable'?'Saved evidence is unavailable':b.code+': '+b.detail,where:b.action});
- if(!items.length)return h('section',{'aria-label':'Needs a fix',class:'row small muted',style:'gap:10px;padding:4px 2px'},h('span',{class:'dot s '+(run?'pass':'none')}),run?'Nothing needs a fix. Every scenario that ran held.':'Run the grove and failures land here, in the order they happened.');
+ if(!items.length)return h('section',{'aria-label':'Needs a fix',class:'row small muted',style:'gap:10px;padding:4px 2px'},h('span',{class:'dot s '+(run?'pass':'none')}),run?'Nothing needs a fix. Every scenario that ran held.':'Run the grove and failures land here, in the order they happened.',run&&ui.ready&&!ui.ready.error&&signoffCount()>0?h('button',{class:'btn ghost sm',on:{click:()=>openTab('Readiness')}},signoffCount()+' awaiting sign-off',icon('Arrow')):null);
  return h('section',{'aria-label':'Needs a fix'},h('div',{class:'rulehead'},h('h2',{},'Needs a fix'),h('span',{class:'rule'}),h('span',{class:'small muted'},items.length+' open'),
    !ui.running?h('button',{class:'btn sm',title:'Fix setup and drifted tests, prove each fix by re-running; product bugs are reported, never hidden (h)',on:{click:()=>startHeal(false)}},'Heal'):null),
   h('div',{style:'display:flex;flex-direction:column;gap:8px'},items.map(it=>h('button',{class:'fix','aria-pressed':it.s&&ui.sel===it.s.id?'true':'false',on:{click:()=>{if(!it.s)return;ui.sel=it.s.id;ui.step=Math.max(0,it.s.steps.findIndex(x=>x.result!=='pass'));render()}}},
@@ -296,26 +306,26 @@ const callMeta=c=>'at '+String(c.at).slice(11,23)+' UTC · '+(c.key?'idempotency
 function stepCalls(list){return (list||[]).map(c=>h('div',{class:'call'},h('span',{class:'mono'},callLine(c)),h('span',{class:'small muted'},callMeta(c))))}
 /* a recorded value as the page writes it: text quoted, everything else as JSON */
 const shown=v=>typeof v==='string'?JSON.stringify(v):v===undefined?'nothing':JSON.stringify(v);
-function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step];const current=state.flows.find(f=>f.caseId===s.id);
+function detail(sc){const s=sc.find(x=>x.id===ui.sel);if(!s)return null;const x=s.steps[ui.step==null?0:ui.step];const current=state.flows.find(f=>f.caseId===s.id);
  if(!x)return h('aside',{class:'card fade'},h('span',{class:'label'},s.id),h('h2',{style:'margin:6px 0'},s.title),h('p',{class:'muted'},s.state==='pruned'?'Pruned: the file is kept as '+s.file+' and the compiler skips it.':s.state==='unavailable'?'Recorded steps are unavailable until this run’s evidence can be verified.':'No steps.'),
   s.state==='pruned'?h('button',{class:'btn ghost',on:{click:()=>prune(s.file.replace(/\.pruned$/,''),true)}},'Graft back'):null);
  const bad=x.result==='fail';
  /* a step whose check failed shows what that check expected and what it got, from the run's recorded assertion */
  const cmp=x.checks==='fail'&&x.compared?x.compared:null;
- return h('aside',{class:'card fade','aria-label':'Step detail'},h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},sameName(x)?x.reportedName:x.name),
+ return h('aside',{class:'card fade','aria-label':'Step detail'},h('button',{class:'btn ghost sm step-return',on:{click:()=>{const step=document.querySelector('[data-step][aria-pressed=true]');step?.focus({preventScroll:true});step?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}}},'Back to steps'),h('span',{class:'label'},s.id+' › step '+(ui.step+1)+' of '+s.steps.length),h('h2',{style:'margin:6px 0 2px'},sameName(x)?x.reportedName:x.name),
   x.reportedName&&!sameName(x)?h('p',{class:'small muted'},'Saved name (unsealed): '+x.reportedName):null,
     h('p',{class:'mono small muted',style:'margin:0'},[x.method&&x.path?x.method+' '+x.path:null,x.as?'as '+x.as:null,x.ms!=null?x.ms+' ms':null].filter(Boolean).join(' · ')),
 
   h('div',{class:'obs'+(x.observedText&&x.observedText.length>120?' obs-long':'')},h('div',{},h('div',{class:'label'},'expected'),h('div',{class:'mono','data-testid':'step-expected'},cmp?cmp.check+': '+shown(cmp.expected):x.expectation||(x.expect!=null?'Status '+x.expect:'Step completes'))),h('div',{class:bad?'bad':x.result==='pass'?'good':''},h('div',{class:'label'},'observed'),(x.method==='VOICE'||x.method==='CHAT')&&x.observedText?transcript(x.observedText,x.method):h('div',{class:'mono','data-testid':'step-observed'},cmp?cmp.check+': '+shown(cmp.got)+(x.observedText!=null?'\n'+x.observedText:''):x.observedText!=null?x.observedText:x.status!=null?x.status:x.result==='none'?'not run':LABEL[x.result]))),
   x.answer!=null?h('div',{class:'answer'},h('div',{class:'label'},'the app answered'),h('pre',{'data-testid':'step-answer'},x.answer)):null,
-  x.checked&&x.checked.length?h('div',{class:'checked','data-testid':'step-checked'},h('div',{class:'label'},'we checked'),stepChecked(x.checked)):null,
+  x.checked&&x.checked.length?(bad?h('div',{class:'checked','data-testid':'step-checked'},h('div',{class:'label'},'we checked'),stepChecked(x.checked)):disclosure(x.checked.length+' checks passed',h('div',{'data-testid':'step-checked'},stepChecked(x.checked)))):null,
   x.calls&&x.calls.length?h('div',{class:'checked','data-testid':'step-calls'},h('div',{class:'label'},'the stand-in recorded'),stepCalls(x.calls)):null,
-  s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):h('p',{class:'small muted'},x.result==='pass'?'Step completed. See the recorded case outcome and checks.':'Run the scenario to observe this step.'),
+  s.failure?h('pre',{},'Recorded case failure at '+s.failure.step+': '+s.failure.message+(s.failure.observed?'\n'+s.failure.observed:'')):x.reason?h('p',{class:'small muted'},x.reason):x.result==='pass'?null:h('p',{class:'small muted'},'Run the scenario to observe this step.'),
   recording(s),
   !current?h('p',{class:'small muted'},'This recorded scenario has no current flow to run or prune.'):null,
   h('div',{class:'filepath',title:s.reportedFile||s.file},s.reportedFile?'Saved flow (unsealed): '+s.reportedFile:s.file),
   h('div',{class:'row',style:'margin-top:10px;justify-content:flex-end'},
-   current?h('button',{class:'btn ghost sm',on:{click:()=>prune(current.file,false)}},ui.run?'Prune current flow':'Prune'):null,h('button',{class:'btn sm',disabled:!current||!!ui.running||!!state.compileError,on:{click:()=>runNow(s.id)}},'Run current flow')))}
+   current?disclosure('Flow options',h('p',{class:'small muted'},'Pruning pauses this flow. Its file and recorded evidence are kept, and you can restore it later.'),h('button',{class:'btn ghost sm',on:{click:()=>prune(current.file,false)}},ui.run?'Prune current flow':'Prune')):null,h('button',{class:'btn sm',disabled:!current||!!ui.running||!!state.compileError,on:{click:()=>runNow(s.id)}},'Run current flow')))}
 let runWatch=null;
 function stopRunWatch(){if(runWatch!==null)clearInterval(runWatch);runWatch=null}
 /* Live progress comes from real run and agent events (/api/live), never from timers. */
@@ -338,10 +348,10 @@ function seed(){return sv('svg',{width:44,height:44,viewBox:'0 0 44 44','aria-hi
  sv('path',{d:'M22 30c0-5-1-8 1-12',stroke:'currentColor','stroke-width':1.6}),sv('circle',{cx:23,cy:14,r:4,stroke:'currentColor','stroke-dasharray':'2 2'}),sv('path',{d:'M22 30c-3 3-7 4-10 4M22 30c3 3 6 5 9 5',stroke:'var(--gold)','stroke-width':1.2}))}
 function discoverTab(){const g=state.git;const a=state.agent.settings;const name=a.provider==='claude'?'Claude':a.provider==='codex'?'Codex':null;const available=!!(name&&state.agent.detected[a.provider]);
  const sources=[{v:'',label:'working tree',note:'uncommitted files included'}].concat(g.branches.map(b=>({v:b,label:b,note:b===g.current?'checked out':b===g.base?'base':''})));
- const chips=h('div',{class:'chips',role:'group','aria-label':'Source'},(g.isRepo?sources:sources.slice(0,1)).map(s=>h('button',{'aria-pressed':ui.source===s.v?'true':'false',title:s.note||null,on:{click:()=>{ui.source=s.v;scan()}}},h('span',{class:'dot s '+(ui.source===s.v?'pass':'none')}),s.label)));
+ const chips=h('label',{class:'source-picker'},'Source',h('select',{'aria-label':'Source',on:{change:e=>{ui.source=e.target.value;if(!gw.busy){gw.state=null;gw.view=null;gw.lastFor=null;gw.svg=null;gw.B=null;gw.pinned=null}scan()}}},(g.isRepo?sources:sources.slice(0,1)).map(s=>h('option',{value:s.v,selected:ui.source===s.v},s.label+(s.note?' · '+s.note:'')))));
  const d=ui.disc;
- const intent=h('section',{class:'card','aria-label':'Intent'},h('span',{class:'label'},'Intent'),h('h1',{style:'margin:6px 0 14px;font-size:26px;line-height:32px;max-width:none'},'What should be true after this change?'),
-  h('textarea',{id:'intent',placeholder:'After Alice revokes a share, Bob can no longer read the note.','aria-label':'Intent'},ui.intent||''),
+ const intent=h('section',{class:'card','aria-label':'Intent'},h('span',{class:'label'},'Intent'),h('h2',{style:'margin:6px 0 14px'},'What should your app do?'),
+  h('textarea',{id:'intent',placeholder:'For example: cancelling a booking releases the appointment and sends a confirmation.','aria-label':'Intent',on:{input:e=>{ui.intent=e.target.value}}},ui.intent||''),
   h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn','aria-describedby':'agent-readiness',disabled:!available||ui.agentPhase>=0,on:{click:agentDraft}},name?'Draft with '+name:'Draft'),
    h('span',{id:'agent-readiness',class:'small muted',style:'flex:1;min-width:220px'},name?(available?name+' ('+(a.model||'CLI default')+') writes flows into tracegrove/discovered/; tracegrove runs each one end to end before you see it.':name+' is not installed. Executable detection does not establish sign-in.'):'No agent selected: route templates still work.'),
    h('button',{class:'btn ghost sm',on:{click:()=>{tab='Settings';render()}}},'Settings')),
@@ -352,16 +362,16 @@ function discoverTab(){const g=state.git;const a=state.agent.settings;const name
  const reach=h('section',{style:'margin-top:28px'},d&&d.ambiguities.length?unsure(d,available,name):null,
   h('div',{class:'rulehead'},h('span',{class:'label'},'Routes'),h('span',{class:'rule'}),d?h('span',{class:'small muted','data-testid':'route-summary'},d.routes.length+' recognized · '+seen+' served in a run · '+d.uncovered+' untested'+(d.branch&&d.base?' · '+d.changedFiles.length+' files changed':'')):null),
   d?h('p',{class:'small muted','data-testid':'observed-source',style:'margin:-4px 0 12px'},d.observed?('Served means the app answered that route during the verified run '+d.observed.run+(d.observed.stale?', before the latest source change. Run again to refresh.':'.')):'No verified run yet, so no route is confirmed by traffic. Run all to confirm them.'):null,
-  h('div',{class:'row',style:'margin-bottom:12px'},chips,g.isRepo?null:h('span',{class:'small muted'},'Not a git repo, so only the working tree.')),
+  g.isRepo?null:h('p',{class:'small muted'},'Scanning this project’s files.'),
   d&&d.coverage?coverageStrip(d):null,
-  !d?h('p',{class:'row muted'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?(d.events?areas(d):h('div',{},d.routes.map(r=>routeRow(r)))):
+  ui.scanError?h('div',{role:'alert'},h('p',{},'Routes could not be loaded.'),blocked(ui.scanError),h('button',{class:'btn ghost',on:{click:scan}},'Try again')):!d?h('p',{class:'row muted',role:'status'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Scanning routes'):d.routes.length?(d.events?areas(d):h('div',{},d.routes.map(r=>routeRow(r)))):
    h('div',{class:'empty'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},'No routes recognized here.'),h('div',{class:'small'},'Describe the behavior above and the agent drafts flows from the code instead.'))),
   d&&d.actions&&d.actions.length?library(d.actions):null,
   d&&d.events&&d.events.length?feed(d.events):null,
   h('details',{class:'more'},h('summary',{},'What this scan covers'),h('div',{class:'small muted'},h('p',{},'Two sources. The static scan reads FastAPI, Django, Express and plain node:http handlers from source text, which is a hint. The recording proxy in front of the app sees every request a run causes, including the ones a browser page makes, which is evidence.'),
    h('p',{},'Routes seen only in traffic have no source location yet. Routing the scan cannot read is listed above as a question for the agent.'),g.isRepo?h('p',{},'A branch shows routes in files it changed against '+(g.base||'the default branch')+' first.'):null)),
   ui.draft?draftCard():null);
- return[growPanel(),intent,reach]}
+ return[g.isRepo?h('div',{style:'margin-bottom:20px'},chips):null,growPanel(),disclosure('Write a test from a description',intent),disclosure('Explore routes and existing tests',reach)]}
 /* Coverage strip: where the app stands, and the riskiest routes nothing tests yet. */
 function coverageStrip(d){const c=d.coverage;const stat=(n,label,cls)=>h('span',{},h('b',{class:cls||null},String(n)),h('span',{class:'small muted'},label));
  return h('div',{'data-testid':'coverage-strip',style:'margin:0 0 16px'},h('div',{class:'stats',style:'margin-top:0'},stat(c.domains,c.domains===1?'area':'areas'),stat(c.surfaces,'routes'),stat(c.observed,'served in a run'),stat(c.declared,'declared'),stat(c.untested,'untested',c.untested?'c-fail':null),
@@ -400,8 +410,9 @@ function unsure(d,available,name){const items=d.ambiguities;
 function draftCard(){const d=ui.draft;return h('div',{class:'card fade',style:'margin-top:16px'},h('span',{class:'label'},'Draft'),h('h2',{class:'mono',style:'font-size:14px;margin:6px 0 12px'},'discovered/'+d.file),h('pre',{},d.yaml),
  h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn',on:{click:async()=>{try{const s=await api('/api/draft',{method:d.route.method,path:d.route.path,save:true});ui.draft=null;toast('Saved '+s.saved.split('/').slice(-3).join('/')+'. Fill the TODOs.');await load();scan()}catch(e){toast(e.error||'Could not save')}}}},'Plant it'),h('button',{class:'btn ghost',on:{click:()=>{ui.draft=null;render()}}},'Discard')))}
 async function draftOne(r){try{const d=await api('/api/draft',{method:r.method,path:r.path});ui.draft={...d,route:r};render()}catch(e){toast(e.error||'Could not draft')}}
-async function scan(){ui.scanning=true;ui.disc=null;ui.draft=null;render();try{ui.disc=await api('/api/discover?branch='+encodeURIComponent(ui.source||''))}catch(e){ui.scanning=false;page(blocked(e));return}ui.scanning=false;if(tab==='Discover')render()}
-async function agentDraft(){const box=document.getElementById('intent');if(box)ui.intent=box.value;ui.agent=null;ui.agentPhase=0;ui.live=null;render();watchRun();
+let scanSerial=0;
+async function scan(){const serial=++scanSerial;ui.scanning=true;ui.scanError=null;ui.disc=null;ui.draft=null;if(tab==='Discover')render();try{const result=await api('/api/discover?branch='+encodeURIComponent(ui.source||''));if(serial!==scanSerial)return;ui.disc=result}catch(e){if(serial!==scanSerial)return;ui.scanError=e}finally{if(serial===scanSerial){ui.scanning=false;if(tab==='Discover')render()}}}
+async function agentDraft(){const box=document.getElementById('intent');if(box){ui.intent=box.value;reveal(box)}ui.agent=null;ui.agentPhase=0;ui.live=null;render();watchRun();
  try{ui.agent=await api('/api/agent-draft',{intent:ui.intent||'',branch:ui.source})}catch(e){ui.agent={error:e}}finally{ui.agentPhase=-1;stopRunWatch()}await load();if(ui.disc)scan();
  if(ui.agent&&ui.agent.agent){const p=ui.agent.prove;const n=p?p.flows.filter(f=>f.outcome==='proven').length:0;toast(ui.agent.agent.files.length+' flow file(s) drafted'+(p&&p.flows.length?'; '+n+' proven end to end':ui.agent.check.ok?' and checked':'; check found issues'))}}
 const PROVE={proven:['proven','p-pass'],failed:['failed','p-fail'],product_bug:['product bug','p-fail'],not_run:['not run','p-none']};
@@ -422,9 +433,9 @@ function historyCell(run,id,open){
  const c=run.cases.find(x=>x.caseId===id);
  return h('td',{},c?h('button',{class:'cell',title:id+' · '+c.outcome+' · '+secs(c.durationMs),on:{click:()=>open(run.name,id)}},h('span',{class:'dot s '+kind(c.outcome)})):h('span',{class:'muted'},'·'));
 }
-function historyTab(){const runs=state.runs.slice(0,24);if(!runs.length)return[h('div',{class:'card'},h('h2',{},'No runs yet'),h('p',{class:'muted'},'Every run is kept under .tracegrove/runs/ with its evidence bundle.'))];
+function historyTab(){const runs=state.runs.slice(0,24);if(!runs.length)return[emptyState('Every run leaves a trace.','Run your first scenario. Its result and recorded evidence will be waiting here.',()=>openTab('Run'),'Go to Run')];
  const ids=[...new Set(state.flows.map(f=>f.caseId).concat(runs.flatMap(r=>r.cases.map(c=>c.caseId))))];
- const open=async(name,id)=>{ui.runName=name;ui.run=null;ui.sel=id||null;tab='Run';await load()};
+ const open=async(name,id)=>{ui.runName=name;ui.run=null;ui.runAt=null;ui.sel=id||null;ui.step=0;tab='Run';await load()};
  const wall=r=>Math.max(0,new Date(r.finishedAt)-new Date(r.startedAt));const walls=runs.map(wall);const max=Math.max(1,...walls);const sorted=[...walls].sort((x,y)=>x-y);
  const holdRate=Math.round(100*runs.filter(r=>r.outcome==='passed').length/runs.length);const cases=runs.flatMap(r=>r.cases);const flaky=ids.filter(id=>new Set(runs.map(r=>{const c=r.cases.find(x=>x.caseId===id);return c?kind(c.outcome):null}).filter(Boolean)).size>1).length;
  const kpi=(b,t)=>h('div',{class:'kpi'},h('b',{},b),h('span',{},t));
@@ -440,12 +451,12 @@ function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detect
  const model=h('input',{id:'model','aria-label':'Model',value:s.source.model==='default'?'':(s.model||''),placeholder:DEFAULT_MODELS[s.provider]||'No agent selected',style:'flex:1;min-width:200px'});
  const opt=(v,title,note,ok)=>h('button',{'aria-pressed':provider===v?'true':'false',on:{click:e=>{provider=v;model.value='';model.placeholder=DEFAULT_MODELS[v]||'No agent selected';for(const b of e.currentTarget.parentNode.children)b.setAttribute('aria-pressed',b===e.currentTarget?'true':'false')}}},h('b',{style:'font-weight:500'},title),h('span',{class:'small '+(ok?'c-pass':'muted')},note));
  const cfg=state.config;
- return[h('div',{class:'cols'},h('div',{class:'grow',style:'display:flex;flex-direction:column;gap:24px'},h('section',{class:'card'},h('span',{class:'label'},'Agent under the hood'),h('h2',{style:'margin:6px 0 14px'},'Who drafts and repairs your flows'),
+ return[taskHeading('Settings','Choose who helps write tests, and what your next run checks.'),h('div',{class:'cols'},h('div',{class:'grow',style:'display:flex;flex-direction:column;gap:24px'},h('section',{class:'card'},h('span',{class:'label'},'Test assistant'),h('h2',{style:'margin:6px 0 14px'},'Who helps write and repair tests'),
    h('div',{class:'seg'},opt('claude','Claude Code',det.claude?'installed · '+DEFAULT_MODELS.claude:'not installed',!!det.claude),opt('codex','Codex',det.codex?'installed · '+DEFAULT_MODELS.codex:'not installed',!!det.codex),opt('none','None','discovery and templates only',false)),
    h('div',{class:'row',style:'margin-top:16px'},model,h('button',{class:'btn',on:{click:async()=>{try{state.agent=await api('/api/settings',{agent:{provider,model:model.value}});toast('Saved');render()}catch(e){toast(e.reasons?e.reasons[0].detail:e.error)}}}},'Save')),
    h('p',{class:'small muted',style:'margin-top:12px'},'In effect: ',h('span',{class:'mono'},s.provider+' · '+(s.model||'CLI default')),' (provider from '+s.source.provider+', model from '+s.source.model+').'),
    h('details',{class:'more'},h('summary',{},'Where this is saved'),h('div',{class:'small muted'},h('p',{},'Saved to .tracegrove/settings.json for you alone. agent: in tracegrove.config.yaml sets the team default; --agent and --model on the CLI override both.'),
-    (!det.claude||!det.codex)?h('p',{},(!det.claude?'Claude Code: npm i -g @anthropic-ai/claude-code. ':'')+(!det.codex?'Codex: npm i -g @openai/codex.':'')):null))),sourceSettings()),
+    (!det.claude||!det.codex)?h('p',{},(!det.claude?'Claude Code: npm i -g @anthropic-ai/claude-code. ':'')+(!det.codex?'Codex: npm i -g @openai/codex.':'')):null))),h('details',{id:'source-options',class:'more task-section'},h('summary',{},'Application files for the next run'),sourceSettings())),
   h('section',{class:'side card'},h('span',{class:'label'},'Project'),cfg?h('table',{class:'kv'},h('tbody',{},
    h('tr',{},h('th',{},'Name'),h('td',{},cfg.project)),h('tr',{},h('th',{},'Adapter'),h('td',{class:'mono small'},cfg.app.adapter+' '+(cfg.app.entry||cfg.app.run||''))),
    h('tr',{},h('th',{},'Health'),h('td',{class:'mono small'},cfg.app.health)),h('tr',{},h('th',{},'Personas'),h('td',{class:'small'},Object.entries(cfg.personas).map(([k,v],i)=>(i?', ':'')+k+' → '+v.subject+(i===0?' (default)':'')).join(''))),
@@ -457,7 +468,7 @@ function settingsTab(){const a=state.agent;const s=a.settings;const det=a.detect
 const KIND={setup:['setup','p-warn'],authoring:['authoring','p-warn'],test_drift:['test drift','p-info'],product_bug:['product bug','p-fail'],assertion:['failing','p-fail'],evidence:['evidence','p-warn'],infrastructure:['infrastructure','p-warn']};
 const HEAL_TITLE={cancelled:'Heal cancelled',healthy:'Nothing to heal. Every scenario holds.',healed:'Healed. Every fix was proven by a re-run.',partly_healed:'Partly healed. Some findings still need you.',product_bugs:'Found product bugs. The tests stay red on purpose.',needs_human:'Needs you. Nothing was safe to fix automatically.'};
 function diffView(text){return h('div',{class:'diff'},text.split('\n').slice(2).map(l=>h('div',{class:l[0]==='+'?'add':l[0]==='-'?'del':'ctx'},l||' ')))}
-function healTab(){const r=ui.heal;const a=state.agent.settings;const name=a.provider==='claude'?'Claude Code':a.provider==='codex'?'Codex':null;const installed=name&&state.agent.detected[a.provider];
+function healTab(){const r=ui.heal;if(!r&&!ui.healing&&state.runs[0]?.outcome==='passed')return[emptyState('Nothing needs healing.','Your last run passed. If a future check fails, review a proposed repair here before keeping it.',()=>openTab('Run'),'Back to the run',h('button',{class:'btn ghost',on:{click:()=>startHeal(true)}},'Preview checks')),pastHeals()];const a=state.agent.settings;const name=a.provider==='claude'?'Claude Code':a.provider==='codex'?'Codex':null;const installed=name&&state.agent.detected[a.provider];
  const hero=h('section',{style:'margin-bottom:24px'},h('div',{class:'row',style:'justify-content:space-between;align-items:flex-start'},
   h('div',{style:'max-width:760px'},h('span',{class:'label'},'Self-healing'),h('h1',{style:'margin-top:6px'},ui.healing?'Healing the grove':r?HEAL_TITLE[r.outcome]:'Fix what broke, prove it, keep only what holds.'),
    null),
@@ -469,14 +480,14 @@ function healTab(){const r=ui.heal;const a=state.agent.settings;const name=a.pro
   !installed&&!ui.healing?h('p',{class:'small muted'},'No agent available: setup fixes still run. ',h('button',{class:'btn ghost sm',on:{click:()=>{tab='Settings';render()}}},'Choose an agent')):null,
   ui.healError?h('div',{style:'margin-top:16px'},blocked(ui.healError)):null);
  const last=state.runs[0];
- if(!r&&!ui.healing&&last)return[hero,h('div',{class:'empty',style:'margin-top:20px'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},last.outcome==='passed'?'The last run held. Nothing to heal right now.':(last.totals.failed+last.totals.other)+' scenario'+((last.totals.failed+last.totals.other)===1?'':'s')+' did not hold on the last run.'),h('div',{class:'small'},last.outcome==='passed'?'Preview checks the grove anyway and changes nothing.':'Heal now repairs drift and proves each fix by re-running.'))),pastHeals()];
+ if(!r&&!ui.healing&&last)return[hero,h('div',{class:'empty',style:'margin-top:20px'},seed(),h('div',{},h('b',{style:'font-weight:500;color:var(--ink)'},last.outcome==='passed'?'The last run passed. Nothing to heal right now.':(last.totals.failed+last.totals.other)+' scenario'+((last.totals.failed+last.totals.other)===1?'':'s')+' did not hold on the last run.'),h('div',{class:'small'},last.outcome==='passed'?'Preview checks the grove anyway and changes nothing.':'Heal now repairs drift and proves each fix by re-running.'))),pastHeals()];
  if(!r||ui.healing)return[hero,pastHeals()];
  const kept=r.changes.filter(c=>c.status==='kept');const other=r.changes.filter(c=>c.status!=='kept');const b=r.before.totals,af=r.after.totals;
  const findings=h('section',{class:'grow'},h('div',{class:'rulehead'},h('span',{class:'label'},'Findings'),h('span',{class:'rule'}),h('span',{class:'small muted'},r.findings.length+' · '+r.id)),
   r.findings.length?h('div',{style:'display:flex;flex-direction:column;gap:8px'},r.findings.map(f=>{const k=KIND[f.kind]||[f.kind,'p-none'];return h('div',{class:'finding fade'},
    h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill '+(f.status==='fixed'?'p-pass':k[1])},f.status==='fixed'?'fixed':k[0]),h('span',{class:'mono small'},f.caseId||f.file||'project'),f.step?h('span',{class:'small muted'},'· '+f.step):null),
    h('span',{},f.detail.split('\n')[0]),h('span',{class:'small muted'},f.status==='fixed'?'Fixed and verified.':f.fix),
-   f.caseId?h('div',{class:'row'},h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=f.caseId;ui.step=null;render()}}},'Open scenario')):null)})):h('p',{class:'muted'},'Nothing to fix.'));
+   f.caseId?h('div',{class:'row'},h('button',{class:'btn ghost sm',on:{click:()=>{showScenario(f.caseId)}}},'Open scenario')):null)})):h('p',{class:'muted'},'Nothing to fix.'));
  const changes=h('div',{class:'side'},h('section',{class:'card'},h('div',{class:'rulehead'},h('h2',{},'Kept changes'),h('span',{class:'rule'}),kept.length?h('button',{class:'btn ghost sm',on:{click:()=>undoHeal(r.id)}},'Undo all'):null),
    kept.length?kept.map(c=>h('div',{style:'margin-top:10px'},h('div',{class:'row',style:'gap:8px'},h('span',{class:'pill p-pass'},c.by),h('span',{class:'mono small',style:'overflow-wrap:anywhere'},c.file)),h('div',{class:'small muted',style:'margin-top:4px'},c.reason+(c.note?' · '+c.note:'')),diffView(c.diff))):h('p',{class:'muted small'},'No file was changed.'),
    b&&af?h('p',{class:'small muted',style:'margin-top:14px'},'Before: '+b.passed+' passed, '+b.failed+' failed, '+b.other+' other. After: '+af.passed+' passed, '+af.failed+' failed, '+af.other+' other.'):null),
@@ -502,29 +513,29 @@ function commands(){const list=[];const add=(grp,label,run,hint)=>list.push({grp
  if(ui.heal&&ui.heal.changes.some(c=>c.status==='kept'))add('Heal','Undo heal '+ui.heal.id,()=>undoHeal(ui.heal.id));
  if(state&&state.agent.settings.provider!=='none')add('Agent','Draft flows for uncovered routes',()=>{tab='Discover';render();agentDraft()});
  for(const t of TABS)add('Go','Open '+t,()=>openTab(t),String(TABS.indexOf(t)+1));
- for(const f of (state?state.flows:[]))add('Scenario',f.caseId,()=>{tab='Run';ui.sel=f.caseId;ui.step=null;render()},f.title);
+ for(const f of (state?state.flows:[]))add('Scenario',f.caseId,()=>{showScenario(f.caseId)},f.title);
  if(state&&state.git.isRepo)for(const b of state.git.branches)add('Branch','Discover on '+b,()=>{tab='Discover';ui.source=b;render();scan()});
  for(const f of (state?state.flows:[]))add('Prune','Prune '+f.caseId,()=>prune(f.file,false));
  add('Help','Keyboard shortcuts',shortcuts,'?');return list}
 function fuzzy(q,text){q=q.toLowerCase();text=text.toLowerCase();if(!q)return 1;if(text.includes(q))return 3-text.indexOf(q)/1000;let i=0;for(const ch of text)if(ch===q[i])i++;return i===q.length?1:0}
-let palette=null;
-function closeOverlay(){if(palette){palette.remove();palette=null}}
-function openPalette(){closeOverlay();const all=commands();let sel=0;let shown=all;
+let palette=null;let paletteReturn=null;
+function closeOverlay(){if(palette){palette.remove();palette=null;if(paletteReturn?.isConnected)paletteReturn.focus();else document.getElementById('palbtn').focus()}}
+function openPalette(){closeOverlay();paletteReturn=document.activeElement;const all=commands();let sel=0;let shown=all;
  const input=h('input',{type:'text',placeholder:'Type a command, a scenario or a branch','aria-label':'Command',role:'combobox','aria-expanded':'true','aria-controls':'pal-list',autocomplete:'off'});
  const list=h('ul',{id:'pal-list',role:'listbox'});
- const draw=()=>{list.replaceChildren(...shown.slice(0,60).map((c,i)=>h('li',{role:'option','aria-selected':i===sel?'true':'false',on:{mousemove:()=>{if(sel!==i){sel=i;draw()}},click:()=>pick(i)}},h('span',{class:'grp'},c.grp),h('span',{},c.label),c.hint?h('span',{class:'hint'},c.hint):null)));const on=list.children[sel];if(on)on.scrollIntoView({block:'nearest'})};
- const pick=i=>{const c=shown[i];closeOverlay();if(c)c.run()};
+ const draw=()=>{list.replaceChildren(...shown.slice(0,60).map((c,i)=>h('li',{role:'option','aria-selected':i===sel?'true':'false',on:{mousemove:()=>{if(sel!==i){sel=i;draw()}},click:()=>pick(i)}},h('span',{class:'grp'},c.grp),h('span',{},c.label),c.hint?h('span',{class:'hint'},c.hint):null)));const on=list.children[sel];if(!shown.length)list.append(h('li',{class:'no-results',role:'status'},'No matching command. Try a page or scenario name.'));if(on)on.scrollIntoView({block:'nearest'})};
+ const pick=i=>{const c=shown[i];if(!c)return;closeOverlay();c.run()};
  input.addEventListener('input',()=>{const q=input.value.trim();shown=all.map(c=>({c,s:Math.max(fuzzy(q,c.label),fuzzy(q,c.grp+' '+c.label)*.9)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).map(x=>x.c);sel=0;draw()});
  input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,shown.length-1);draw()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);draw()}else if(e.key==='Enter'){e.preventDefault();pick(sel)}else if(e.key==='Escape'){e.preventDefault();closeOverlay()}});
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade',role:'dialog','aria-modal':'true','aria-label':'Command palette'},input,list,
-  h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'))));
+  h('div',{class:'foot'},h('span',{},h('kbd',{},'↑↓'),' move'),h('span',{},h('kbd',{},'↵'),' run'),h('span',{},h('kbd',{},'esc'),' close'),h('span',{},h('kbd',{},'?'),' shortcuts'),h('button',{class:'btn ghost sm',on:{click:closeOverlay}},'Close'))));
  document.body.append(palette);draw();input.focus()}
-function shortcuts(){closeOverlay();const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['↵','open the selected scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1 to '+TABS.length,'switch tab'],['?','this list'],['esc','close']];
+function shortcuts(){closeOverlay();paletteReturn=document.activeElement;const keys=[['⌘K / Ctrl K','command palette'],['j / k','next / previous scenario'],['r','rerun the selected scenario'],['R','run all'],['h','heal'],['1–9','switch tab'],['?','this list'],['esc','close']];
  palette=h('div',{class:'pal-back',on:{click:e=>{if(e.target===palette)closeOverlay()}}},h('div',{class:'pal fade card',role:'dialog','aria-modal':'true','aria-label':'Keyboard shortcuts',style:'padding:20px'},h('h2',{},'Keyboard'),
-  h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)]))));document.body.append(palette)}
+  h('div',{class:'keys'},keys.flatMap(([k,v])=>[h('kbd',{},k),h('span',{class:'small'},v)])),h('button',{class:'btn ghost sm',style:'margin-top:20px',on:{click:closeOverlay}},'Close shortcuts')));document.body.append(palette);palette.querySelector('button').focus()}
 function moveSel(d){if(tab==='Map'){mapMove(d);return}if(tab==='Imports'){moveNative(d);return}if(tab!=='Run'||!state)return;const sc=scenarios();if(!sc.length)return;const i=sc.findIndex(s=>s.id===ui.sel);const n=sc[Math.max(0,Math.min(sc.length-1,(i<0?0:i+d)))];ui.sel=n.id;ui.step=Math.max(0,n.steps.findIndex(x=>x.result==='fail'));render();
  const el=document.querySelector('[data-case="'+CSS.escape(n.id)+'"]');if(el){el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'})}}
-document.addEventListener('keydown',e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement&&document.activeElement.tagName||'');
+document.addEventListener('keydown',e=>{if(palette&&e.key==='Tab'){const focusable=[...palette.querySelectorAll('input,button,[tabindex="0"]')];if(focusable.length){e.preventDefault();const index=focusable.indexOf(document.activeElement);focusable[(index+(e.shiftKey?-1:1)+focusable.length)%focusable.length].focus()}return}const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement&&document.activeElement.tagName||'');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palette?closeOverlay():openPalette();return}
  if(e.key==='Escape'&&palette){closeOverlay();return}
  if(typing||palette||e.metaKey||e.ctrlKey||e.altKey)return;
@@ -541,44 +552,21 @@ function envSwitch(){const list=ui.envs&&ui.envs.environments||[];if(list.length
   list.map(e=>h('option',{value:e.name,selected:e.name===ui.env},e.name+(e.class!=='isolated_candidate'?' · '+e.class.replace(/_/g,' '):'')))))}
 async function doctorEnv(name){ui.doctoring=name;render();try{const r=await api('/api/env-doctor',{env:name});ui.envs.doctor[name]=r;toast(name+': '+r.status)}catch(e){toast(e.reasons?e.reasons[0].detail:e.error||'Doctor failed')}ui.doctoring=null;render()}
 function envTab(){const list=ui.envs&&ui.envs.environments||[];
- if(!list.length)return[h('div',{class:'card'},h('h2',{},'Only local'),h('p',{class:'muted'},'Add an environment with tracegrove env add <name> --url https://… --persona owner=aws-sm://…'))];
- return[h('section',{style:'margin-bottom:20px'},h('span',{class:'label'},'Environments'),h('h1',{style:'margin-top:6px'},'Where flows can run, and with which identities.'),
+ if(!list.length)return[emptyState('Start close to home.','Set up your local app first. You can add staging environments after your first test runs.',()=>openTab('Run'),'Set up your app')];
+ return[h('section',{style:'margin-bottom:20px'},h('span',{class:'label'},'Environments'),h('h1',{style:'margin-top:6px'},'Where your tests run.'),
   h('p',{class:'small muted'},'Secrets are shown as references only. Deployed environments keep agents behind a person’s approval; production observation is read-only.')),
   ...list.map(e=>{const d=ui.envs.doctor[e.name];const checks=d&&d.checks||[];
    return h('div',{class:'card fade',style:'margin-bottom:12px'},
     h('div',{class:'row',style:'justify-content:space-between'},h('div',{class:'row',style:'gap:8px'},h('h2',{class:'mono',style:'margin:0'},e.name),envBadge({name:e.name,class:e.class,writes:e.writes})||h('span',{class:'pill p-info'},e.class.replace(/_/g,' ')),
-      d?h('span',{class:'pill '+(d.status==='ready'?'p-pass':'p-fail')},'doctor: '+d.status):h('span',{class:'pill p-none'},'not checked')),
-     h('div',{class:'row'},h('button',{class:'btn ghost sm',disabled:ui.doctoring!==null,on:{click:()=>doctorEnv(e.name)}},ui.doctoring===e.name?'Checking…':'Doctor'),
+      d?h('span',{class:'pill '+(d.status==='ready'?'p-pass':'p-fail')},'setup: '+d.status):h('span',{class:'pill p-none'},'not checked')),
+     h('div',{class:'row'},h('button',{class:'btn ghost sm',disabled:ui.doctoring!==null,on:{click:()=>doctorEnv(e.name)}},ui.doctoring===e.name?'Checking…':'Check setup'),
       h('button',{class:'btn sm',disabled:!!ui.running,on:{click:()=>{ui.env=e.name;try{localStorage.setItem('tracegrove.env',e.name)}catch{}tab='Run';render();runNow('')}}},'Run here'))),
     h('table',{class:'kv',style:'margin-top:8px'},h('tbody',{},
-     h('tr',{},h('th',{},'Target'),h('td',{class:'mono small'},e.target)),h('tr',{},h('th',{},'Writes'),h('td',{},e.writes)),h('tr',{},h('th',{},'Agents'),h('td',{},e.agents)),
+     h('tr',{},h('th',{},'Target'),h('td',{class:'mono small'},e.target)),h('tr',{},h('th',{},'Writes'),h('td',{},e.writes==='owned_namespace'?'Test-owned data only':e.writes==='none'?'Read only':e.writes.replaceAll('_',' '))),h('tr',{},h('th',{},'Agents'),h('td',{},e.agents==='allow'?'Allowed':e.agents==='ask'?'Ask before running':e.agents.replaceAll('_',' '))),
      ...e.personas.map(p=>h('tr',{},h('th',{},'as '+p.persona),h('td',{class:'mono small'},p.ref+' · '+p.auth+(p.subject?' · expects '+p.subject:'')))))),
     checks.filter(c=>c.state!=='pass').length?h('ul',{class:'small',style:'margin:8px 0 0;padding-left:18px'},checks.filter(c=>c.state!=='pass').map(c=>h('li',{},h('span',{class:c.required?'c-fail':'c-warn'},c.check+': '),c.detail,c.fix?h('div',{class:'mono muted'},'run: '+c.fix):null))):null)})]}
 function transcript(t,method){const lines=t.split(String.fromCharCode(10));return h('div',{class:'tx'},lines.map(l=>l.startsWith('caller: ')?h('div',{class:'tx-c'},h('span',{class:'who'},method==='VOICE'?'Caller':'Customer'),l.slice(8)):l.startsWith('agent: ')?h('div',{class:'tx-a'},h('span',{class:'who'},'Agent'),l.slice(7)):h('div',{class:'tx-t mono small'},l.trim())))}
-async function loadReadiness(){ui.readyLoading=true;try{ui.ready=await api('/api/readiness')}catch(e){ui.ready={error:e}}ui.readyLoading=false;if(tab==='Readiness')render()}
-async function decideClaim(c,decision){let reason='';if(decision!=='accepted'){reason=window.prompt(decision==='waived'?'Why is it OK to hand this off without this evidence?':decision==='rejected'?'What is wrong with the behavior?':'What is wrong with this check? (The check is not changed; the claim stays open.)')||'';if(!reason.trim())return}
- try{const r=await api('/api/decide',{case:c.caseId,decision,reason});toast(r.case+': '+r.decision)}catch(e){toast(e.reasons?e.reasons[0].detail:e.error||'Not recorded')}ui.ready=null;loadReadiness()}
-const STATE_TONE={supported:'p-pass',current:'p-pass',completed:'p-pass',accepted:'p-pass',auto:'p-pass',contradicted:'p-fail',rejected:'p-fail',challenged:'p-fail',none:'p-none',not_run:'p-none'};
-function statePill(v,label){return h('span',{class:'pill '+(STATE_TONE[v]||'p-warn')},label||v.replace(/_/g,' '))}
-function readinessTab(){const r=ui.ready;if(!r||ui.readyLoading){if(!r&&!ui.readyLoading)loadReadiness();return[h('p',{class:'muted'},'Checking claims…')]}
- if(r.error)return[blocked(r.error)];const open=r.claims.length-r.counts.ready;
- return[h('section',{style:'margin-bottom:20px'},h('span',{class:'label'},'Readiness'),h('h1',{style:'margin-top:6px'},r.ready?'Ready for handoff.':'Not ready: '+open+' of '+r.claims.length+' claims open.'),
-  h('p',{class:'small muted'},'Each flow is a claim with four separate answers: did it run, what does the evidence support, is that evidence still about this code and this check, and who signed off. Routine claims are accepted when supported; critical ones need a person.'),
-  h('div',{class:'row'},h('a',{class:'btn sm',href:'/api/handoff',target:'_blank',rel:'noopener'},'Open handoff report'),h('button',{class:'btn ghost sm',on:{click:()=>{ui.ready=null;loadReadiness()}}},'Refresh'))),
-  h('div',{class:'kpis',style:'margin-bottom:16px'},...[['Claims',r.counts.claims],['Supported',r.counts.supported],['Contradicted',r.counts.contradicted],['Out of date',r.counts.stale],['Awaiting sign-off',r.counts.pending]].map(([k,v])=>h('div',{class:'kpi'},h('b',{},String(v)),h('span',{},k)))),
-  ...r.claims.map(c=>h('div',{class:'card fade',style:'margin-bottom:12px'},
-   h('div',{class:'row',style:'justify-content:space-between;align-items:baseline'},h('h2',{style:'margin:0'},c.title),h('span',{class:'mono small muted'},c.caseId+' · '+c.risk)),
-   h('div',{class:'claim-states'},h('div',{},h('div',{class:'label'},'Ran'),statePill(c.execution)),h('div',{},h('div',{class:'label'},'Evidence'),statePill(c.assessment)),
-    h('div',{},h('div',{class:'label'},'Still valid'),statePill(c.validity)),h('div',{},h('div',{class:'label'},'Sign-off'),statePill(c.decision,c.decision==='auto'?'accepted by policy':null),c.decidedBy&&c.decision!=='auto'?h('span',{class:'small muted',style:'margin-left:6px'},c.decidedBy):null)),
-   c.reason?h('p',{class:'small'},c.reason):null,c.failure?h('p',{class:'small c-fail'},c.failure):null,
-   h('div',{class:'small muted'},'Evidence channels: '+c.channels.join(', ')+(c.run?' · run '+c.run:'')),
-   c.next?h('div',{class:'mono small',style:'margin-top:6px'},'next: '+c.next.command+'  ',h('span',{class:'muted'},c.next.why)):null,
-   h('div',{class:'row',style:'margin-top:10px;gap:8px'},
-    c.assessment==='supported'&&c.validity==='current'&&c.decision!=='accepted'?h('button',{class:'btn sm',on:{click:()=>decideClaim(c,'accepted')}},'Accept'):null,
-    !c.ready?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'waived')}},'Waive'):null,
-    c.assessment==='supported'?h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'rejected')}},'Reject'):null,
-    h('button',{class:'btn ghost sm',on:{click:()=>decideClaim(c,'challenged')}},'Challenge check'),
-    h('button',{class:'btn ghost sm',on:{click:()=>{tab='Run';ui.sel=c.caseId;ui.step=null;render()}}},'Open scenario'))))]}
-function render(){header();if(!state)return;syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());gwSyncHash();if(tab==='Discover'&&!ui.disc&&!ui.scanning)scan()}
+
+function render(){header();if(!state)return;syncPageLocation();const changing=renderedTab!==tab;renderedTab=tab;document.getElementById('main').classList.toggle('page-enter',changing);syncComparisonLocation();syncNativeLocation();syncMapLocation();syncBenchmarkLocation();const views={Run:runTab,Readiness:readinessTab,Discover:discoverTab,Heal:healTab,History:historyTab,Environments:envTab,Compare:comparisonTab,Imports:nativeImportsTab,Map:workflowMapTab,Benchmark:benchmarkTab,Settings:settingsTab};page(views[tab]());gwSyncHash();if(tab==='Discover'&&!ui.disc&&!ui.scanning&&!ui.scanError)scan()}
 load().catch(e=>page(blocked(e)));
 </script></body></html>`;

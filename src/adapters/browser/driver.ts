@@ -149,7 +149,7 @@ export class BrowserDriver {
             await locator.focus({ timeout });
             const key = await locator.evaluate(element => {
               if (element.matches('input[type=checkbox],input[type=radio],[role=checkbox],[role=radio],[role=switch]')) return 'Space';
-              if (element.matches('button,a,input[type=button],input[type=submit],input[type=reset],[role=button],[role=link]')) return 'Enter';
+              if (element.matches('button,a,summary,input[type=button],input[type=submit],input[type=reset],[role=button],[role=link]')) return 'Enter';
               return null; // A keyboard click on a text input means focus, not form submission.
             });
             if (key) await locator.press(key, { timeout });

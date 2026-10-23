@@ -128,7 +128,7 @@ it.each([1440,375])('finds cited browser workflows, inspects declarations and co
     await page.getByText('Declared landmark: role · button · Refresh',{exact:true}).waitFor();
     await page.getByRole('textbox',{name:'Find a workflow'}).fill('Refresh');expect(await page.getByRole('complementary',{name:'Recorded workflow detail'}).count()).toBe(0);
     await page.getByRole('button',{name:'Find workflows',exact:true}).click();await page.getByText('Declared route: /ui',{exact:true}).waitFor();
-    await page.getByRole('button',{name:'Map',exact:true}).focus();await page.keyboard.press('j');expect(await page.locator('[data-map-cell][aria-pressed=true]').count()).toBe(1);
+    await page.locator('.nav-tools > summary').focus();await page.keyboard.press('j');expect(await page.locator('[data-map-cell][aria-pressed=true]').count()).toBe(1);
     const link=await page.getByRole('link',{name:'Link to this workflow',exact:true}).getAttribute('href');expect(link).toContain('map-cell=');
     await page.goto(new URL(link!,server.url).href);await page.getByText('Declared landmark: testId · notes',{exact:true}).waitFor();
     await page.getByRole('combobox',{name:'Workflow source run'}).selectOption('failed');await page.getByText('Recorded outcome: assertion_failed',{exact:true}).waitFor();
@@ -156,7 +156,7 @@ it('ignores a late map response after navigation leaves the view',async()=>{
   let requests=0;await page.route('**/api/workflows?**',async route=>{if(++requests===1){entered();await gate}await route.continue()});
   try{await page.goto(new URL('?map-run=observed',server.url).href);await seen;
     await page.getByRole('button',{name:'Run',exact:true}).click();
-    await page.getByRole('button',{name:'Map',exact:true}).click();await page.getByRole('complementary',{name:'Recorded workflow detail'}).waitFor();
+    await page.locator('.nav-tools > summary').click();await page.getByRole('button',{name:'Map',exact:true}).click();await page.getByRole('complementary',{name:'Recorded workflow detail'}).waitFor();
     await page.getByRole('combobox',{name:'Workflow source run'}).selectOption('failed');await page.getByText('Recorded outcome: assertion_failed',{exact:true}).waitFor();
     const old=page.waitForResponse(response=>response.url().includes('/api/workflows?')&&response.url().includes('run=observed'));release();await (await old).finished();
     expect(await page.getByText('Recorded outcome: assertion_failed',{exact:true}).count()).toBe(1);

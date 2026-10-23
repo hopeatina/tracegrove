@@ -117,7 +117,7 @@ export async function tryExample(input: TryInput): Promise<number> {
   // With a bug on, a failing run is the expected result: exit 0 when the bug was caught.
   const exitCode = bug ? (caught ? 0 : 1) : report.exitCode;
   if (!input.open || !interactive) return exitCode;
-  const server = await startUi({ dir: folder, branch: null, ...(input.port ? { port: Number(input.port) } : {}) });
+  const server = await startUi({ dir: folder, example: example.name, branch: null, ...(input.port ? { port: Number(input.port) } : {}) });
   process.stdout.write(`\n${p.bold('Look around:')} ${server.url}  ${p.dim('(Ctrl+C to stop)')}\n`);
   openBrowser(server.url);
   await new Promise<void>((done) => {

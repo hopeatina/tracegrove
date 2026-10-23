@@ -89,7 +89,7 @@ it.each([1440,375])('inspects imports, filters, uses keyboard, downloads and rel
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const qa=resolve('artifacts/qa');mkdirSync(qa,{recursive:true});await page.screenshot({path:join(qa,'imports-'+width+'.png'),fullPage:true});
     await page.reload();await page.getByRole('textbox',{name:'Filter observations'}).waitFor();
-    await page.getByRole('button',{name:'Imports',exact:true}).focus();await page.keyboard.press('j');expect(await page.locator('[data-native-id][aria-pressed=true]').count()).toBe(1);
+    await page.locator('.nav-tools > summary').focus();await page.keyboard.press('j');expect(await page.locator('[data-native-id][aria-pressed=true]').count()).toBe(1);
     await page.getByRole('combobox',{name:'Report format'}).selectOption('junit_xml');await page.getByLabel('Report file',{exact:true}).setInputFiles(f.xml);
     await page.getByRole('button',{name:'Import report',exact:true}).click();await page.getByText('6 matching observations',{exact:true}).waitFor();
     expect(errors).toEqual([]);expect(existsSync(join(root,'.tracegrove/runs'))).toBe(false);

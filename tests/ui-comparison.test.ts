@@ -51,8 +51,8 @@ it.each([['desktop', 1440, 1000], ['mobile', 375, 900]] as const)('compares, swa
   await page.route('https://**/*', route => route.abort());
   try {
     await page.goto(server.url, { waitUntil: 'domcontentloaded' });
-    const nav = page.getByRole('button', { name: 'Compare', exact: true }); await nav.focus(); await nav.press('Enter');
-    await page.getByRole('heading', { name: 'Compare retained runs', exact: true }).waitFor();
+    await page.locator('.nav-tools > summary').click(); const nav = page.getByRole('button', { name: 'Compare', exact: true }); await nav.focus(); await nav.press('Enter');
+    await page.getByRole('heading', { name: 'Compare two runs', exact: true }).waitFor();
     expect(await page.getByRole('combobox', { name: 'Baseline run' }).evaluate(el => el === document.activeElement)).toBe(true);
     await page.getByRole('combobox', { name: 'Baseline run' }).selectOption(name(f.passed));
     await page.getByRole('combobox', { name: 'Candidate run' }).selectOption(name(f.failed));
@@ -69,7 +69,7 @@ it.each([['desktop', 1440, 1000], ['mobile', 375, 900]] as const)('compares, swa
     await page.getByRole('complementary', { name: 'Step detail' }).getByText('Status 200', { exact: true }).waitFor();
     expect(await page.getByRole('complementary', { name: 'Step detail' }).textContent()).toContain('299');
     expect(new URL(page.url()).searchParams.has('compare-baseline')).toBe(false);
-    await page.getByRole('button', { name: 'Compare', exact: true }).click();
+    await page.locator('.nav-tools > summary').click(); await page.getByRole('button', { name: 'Compare', exact: true }).click();
     await page.getByText('Assertion failed → passed', { exact: true }).waitFor();
     await page.getByRole('combobox', { name: 'Candidate run' }).selectOption(name(f.edited));
     await page.getByRole('button', { name: 'Compare runs', exact: true }).click(); await page.getByText('Contract changed', { exact: true }).waitFor();
@@ -127,7 +127,7 @@ it('has an accessible empty state and exposes comparison in the keyboard command
   try {
     await page.goto(empty.url, { waitUntil: 'domcontentloaded' }); await page.keyboard.press('Control+k');
     const dialog = page.getByRole('dialog', { name: 'Command palette' }); await dialog.getByRole('combobox').fill('Open Compare');
-    await dialog.getByRole('combobox').press('Enter'); await page.getByRole('heading', { name: 'Two retained runs are needed', exact: true }).waitFor();
+    await dialog.getByRole('combobox').press('Enter'); await page.getByRole('heading', { name: 'See what changed between runs.', exact: true }).waitFor();
     expect(await page.getByRole('button', { name: 'Compare runs', exact: true }).count()).toBe(0);
     await page.screenshot({ path: join(captures, 'desktop-empty.png'), fullPage: true, animations: 'disabled' });
   } finally { await page.close(); await empty.close(); }

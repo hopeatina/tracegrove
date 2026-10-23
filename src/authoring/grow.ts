@@ -9,7 +9,7 @@
  * scenario without a flow is "not proven yet", never green.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
@@ -105,7 +105,7 @@ async function run(dir: string, options: GrowOptions, state: GrowState, emit: (e
 }
 
 function worktreeFor(dir: string, branch: string): string | null {
-  const path = join(mkdtempSync(join(tmpdir(), 'tracegrove-grow-')), 'tree');
+  const path = join(mkdtempSync(join(realpathSync(tmpdir()), 'tracegrove-grow-')), 'tree');
   try { git(dir, ['worktree', 'add', '--detach', path, branch]); } catch { return null; }
   prepareWorktree(dir, path);
   return path;
