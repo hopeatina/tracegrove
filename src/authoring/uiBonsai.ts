@@ -1952,10 +1952,11 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  gbLight();if(!gw.hov)gbPinTip()}
 function gbWidth(){const S=gw.slots;const w=(S&&S.scroll&&S.scroll.clientWidth)||(gw.el&&gw.el.clientWidth)||window.innerWidth-48;return Math.max(320,Math.min(1240,Math.floor(w/40)*40))}
 
-/* a knot's name: its file's, or for a burl the file in it that is lit (else its first) and how many more grew into it. Where
-   there is no room for it whole it is said shorter (sh): 1, a burl's "parts" go and a lone file's name is cut to 14; 2, the
-   file's name is cut to 9 */
-const gbKnotTxt=(M,ids,lead,sh)=>{const u=M.U[lead]||{},n=ids.length,c=[[16,24],[16,14],[9,9]][sh||0];return gwCut(u.label||lead,n>1?c[0]:c[1])+(n>1?' +'+(n-1)+(sh?'':n>2?' parts':' part'):'')};
+/* a knot's name: its file's, or for a burl the file in it that is lit (else its first) and how many more grew into it. It is
+   said whole (sh -1) wherever its place beside its knot has room for that, measured (gbKnotNames); else shorter: 0, a burl's
+   file's name is cut to 16 and a lone file's to 24; 1, a burl's "parts" go and a lone file's name is cut to 14; 2, the file's
+   name is cut to 9 */
+const gbKnotTxt=(M,ids,lead,sh)=>{const u=M.U[lead]||{},n=ids.length,c=sh<0?[40,40]:[[16,24],[16,14],[9,9]][sh||0];return gwCut(u.label||lead,n>1?c[0]:c[1])+(n>1?' +'+(n-1)+(sh>0?'':n>2?' parts':' part'):'')};
 /* what a knot is, for who gets open ground first when it runs short: 0 where a journey starts, 1 an HTTP route, 2 a store or a
    job, 3 a helper file (a burl, its most important) */
 const gbKTier=(M,ids)=>Math.min(...ids.map(id=>{const u=M.U[id]||{},kd=String(u.unitKind||'');return M.J.some(j=>j.entry===id)?0:kd==='route'||u.layer==='api'?1:/job|table|store|queue|cron|worker/.test(kd)||u.layer==='jobs'||u.layer==='data'?2:3}));
@@ -2291,10 +2292,14 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   const inn0=inOwn(e,lb);let off=false,on=0;for(let d=0;d<=len+.01;d+=1){const p=[R[0]+u[0]*d,R[1]+u[1]*d],inn=inn0(p);if(!inn)off=true;else if(off||d>e.ra)return false;else on=d}if(!off)return false;
   for(let d=0;d<=len+.01;d+=2){const p=[R[0]+u[0]*d,R[1]+u[1]*d];for(const c of cush)if(cushHit(c,[p[0],p[1],p[0],p[1]],2.5))return false}
   return dSR(R,A,V.potBox)>=1?1+on:0};
- const cands=new Map(),candOf=(e,bud)=>{const key=e.id+'|'+bud;if(cands.has(key))return cands.get(key);const tw=twOf(e),out=[];
-  let v=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v[0],v[1]);v=vm>.5?[v[0]/vm,v[1]/vm]:[e.n[0],e.n[1]];
+ const cands=new Map(),candOf=(e,bud,sh)=>{sh=sh||0;const key=e.id+'|'+bud+'|'+sh;if(cands.has(key))return cands.get(key);const tw=twOf(e,sh),out=[];
+  let v0=[e.p[0]-e.p0[0],e.p[1]-e.p0[1]];const vm=Math.hypot(v0[0],v0[1]);v0=vm>.5?[v0[0]/vm,v0[1]/vm]:[e.n[0],e.n[1]];
   /* the leader leaves the boss on its outward side, from the knot's centre out along the normal by the boss's radius, and
-     runs out away from the wood, never across it; a stub along the normal ties its foot to the boss's edge */
+     runs out away from the wood, never across it; a stub along the normal ties its foot to the boss's edge. Where a shoot of
+     the knot's own leaves the boss, the leader leaves it at least 25 degrees round from where that shoot's stalk does, turned
+     off the normal the least way that is, so the two never share a foot */
+  const st=[...shoots,...rest].filter(g=>g.pts&&g.pts.length&&kIds(e).includes(g.kid)).map(g=>{const q=g.pts.find(t=>Math.hypot(t[0]-e.p[0],t[1]-e.p[1])>=e.ra-.5)||g.pts[g.pts.length-1],m=Math.hypot(q[0]-e.p[0],q[1]-e.p[1])||1;return [(q[0]-e.p[0])/m,(q[1]-e.p[1])/m]});
+  for(const ph of st.length?[0,.61,-.61,.87,-.87,1.13,-1.13]:[0]){const v=[v0[0]*Math.cos(ph)-v0[1]*Math.sin(ph),v0[0]*Math.sin(ph)+v0[1]*Math.cos(ph)];if(st.some(t=>t[0]*v[0]+t[1]*v[1]>.891))continue;
   const R=[e.p[0]+v[0]*e.ra,e.p[1]+v[1]*e.ra],S=[e.p[0]+v[0]*(e.rb-.4),e.p[1]+v[1]*(e.rb-.4)];
   /* (a leader near upright may carry its name beside its end or centred over it; a refusals' collar knot's may also leave it
      down and out, under the branch that grows from its boss) */
@@ -2302,7 +2307,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    for(const sd of sides){let anc,x0,yb;
     if(sd){anc=u[0]>0?'start':'end';x0=anc==='start'?A[0]+2:A[0]-2-tw;yb=A[1]+.28*fs}else{anc='middle';x0=A[0]-tw/2;yb=u[1]<0?A[1]-.22*fs-2:A[1]+.78*fs+2}
     const r=[x0-1.5,yb-.78*fs-1.5,x0+tw+1.5,yb+.22*fs+1.5];if(!clearS(r,bud)||!clearO(r))continue;if(lh===null)lh=intoO(R,A,e.id)?0:leadHard(e,R,A,u,bud);if(!lh)break;
-    const ang=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r,R,A,pts:[A,R,S],sc:len/k+14*ang+(anc==='middle'?5:0)+.8*(lh-1)/k})}}
+    const ang=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));out.push({anc,x:anc==='start'?x0:anc==='end'?x0+tw:x0+tw/2,yb,r,R,A,pts:[A,R,S],sh,sc:len/k+14*ang+(anc==='middle'?5:0)+.8*(lh-1)/k+6*Math.abs(ph)})}}}
   out.sort((a,b)=>a.sc-b.sc);cands.set(key,out);return out};
  /* who gets open ground first when it runs short: where a journey starts, then its HTTP routes, then its stores and jobs,
     then helper files; within each, the headline journey's hops (the crown's, gbHead: the first failing journey, else the first), then
@@ -2326,6 +2331,11 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
   /* a knot left without a place goes first, if that leaves less unplaced (by what matters) and the leaders no longer */
   for(let it=0;it<2;it++)for(const e of best.miss.slice().sort((a,b)=>wt(b)-wt(a)).slice(0,6)){const tr=lay([e,...best.order.filter(q=>q!==e)]);if(tr.cost<best.cost-.01)best=tr}
   best=lay(best.order);
+  /* a name is cut short only where its place has no room for it whole: set from the same leader, it takes its whole name
+     wherever that keeps as clear of everything as any name must (its own box and lines are lifted while it is measured) */
+  for(const [id,c] of best.slot){const e=Q.find(q=>q.id===id);if(!e||twOf(e,-1)<=twOf(e,0)+.01)continue;
+   const i=labs.indexOf(c.r),j=bases.findIndex(b=>b[1]===c.r),l=lines.findIndex(q=>q[0]===c.R&&q[1]===c.A);if(i<0||j<0||l<0)continue;labs.splice(i,1);bases.splice(j,1);lines.splice(l,1);
+   const f=candOf(e,bud,-1).find(q=>q.anc===c.anc&&Math.abs(q.A[0]-c.A[0])<.01&&Math.abs(q.A[1]-c.A[1])<.01&&dyn(q,id)),u=f||c;if(f)best.slot.set(id,f);labs.push(u.r);bases.push([u.yb,u.r]);lines.push([u.R,u.A,id])}
   /* A knot with no clean place gets a small pip on its boss (a number, or on a phone a letter, gbPipMark, so it is never read
      as a journey's numbered badge), and its name goes beside that mark in a key, in the order the journeys cross them; the
      card's path marks it the same way (gbTip). The key is one block, every row at one x and one row's height apart: in the

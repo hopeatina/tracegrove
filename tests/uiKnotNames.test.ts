@@ -182,7 +182,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('keeps every leader short and clear: off its own limb at the boss and for good, and across no cushion, leaf, shoot, bud, other limb, name or leader, tested against the shapes drawn, with at most five names by the trunk', async () => {
+  it('keeps every leader short and clear: off its own limb at the boss and for good, leaving its boss at least 25° round from its own shoot\'s stalk, and across no cushion, leaf, shoot, bud, other limb, name or leader, tested against the shapes drawn, with at most five names by the trunk, and a name cut short only where its whole name has no room', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -241,9 +241,31 @@ describe('the names on the bonsai’s knots', () => {
               // it leaves its own limb at the boss: no more of it on that wood than the boss's own radius and 2 px
               const m = ld.getScreenCTM()!, ra = e.ra * Math.hypot(m.a, m.b);
               if (inOwn > ra + 2) out.push(name + ': its leader runs ' + inOwn + ' px inside its own limb, past the boss (' + ra.toFixed(1) + ' px)');
+              // it leaves its boss at least 25° round from where a shoot of its own knot's leaves it, so the two never share a foot
+              for (const s of new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u]).filter(Boolean))) {
+                const sp = (s.pts as number[][]).map((q) => scr(ld, q)), q = sp.find((z) => Math.hypot(z[0]! - c[0]!, z[1]! - c[1]!) >= ra - .5) || sp[sp.length - 1]!;
+                let da = Math.abs(Math.atan2(q[1]! - c[1]!, q[0]! - c[0]!) - Math.atan2(R[1]! - c[1]!, R[0]! - c[0]!)) * 180 / Math.PI;
+                if (da > 180) da = 360 - da;
+                if (da < 25) out.push(name + ': its leader leaves its boss ' + da.toFixed(0) + '° round from its own shoot\'s stalk');
+              }
               for (const h of hit) out.push(name + ': its leader crosses ' + h);
               for (const b of boxes) if (b !== t && !g.contains(b) && thru(A, R, b.getBoundingClientRect())) out.push(name + ': its leader crosses "' + (b.textContent || 'a count') + '"');
               for (const [el, q] of lines) if (el !== ld) for (let i = 1; i < q.length; i++) if (meets(A, R, q[i - 1]!, q[i]!)) out.push(name + ': its leader crosses another leader');
+            }
+            // a name is cut short only where its whole name has no room: set whole where it stands, it would run off the drawing or
+            // into another word, a leader, the wood, a cushion, a leaf, a shoot or a bud
+            const sr = svg.getBoundingClientRect(), fills = [...wood, ...cushions, ...leaves, ...shoots, ...buds];
+            for (const id of Object.keys(B.klbl)) {
+              const t = B.klbl[id] as SVGTextElement & { __lead?: string }, txt = t.textContent || '', at = txt.indexOf('…');
+              if (at < 0 || !vis(t)) continue;
+              const u = (0, eval)('gw').M.U[t.__lead || id], whole = (u && u.label || t.__lead || id) + txt.slice(at + 1);
+              const w = t.cloneNode() as SVGTextElement; w.textContent = whole; t.parentNode!.append(w);
+              const r = w.getBoundingClientRect(); w.remove();
+              let hit = r.left < sr.left + 2 || r.right > sr.right - 2 || r.top < sr.top || r.bottom > sr.bottom;
+              for (const b of boxes) if (!hit && b !== t && !(t.parentNode as Element).contains(b)) { const q = b.getBoundingClientRect(); hit = r.left - 2 < q.right && r.right + 2 > q.left && r.top - 2 < q.bottom && r.bottom + 2 > q.top; }
+              for (const [el, q] of lines) if (!hit && el !== t.parentNode!.querySelector('.kld')) for (let i = 1; i < q.length; i++) if (thru(q[i - 1]!, q[i]!, r)) hit = true;
+              for (let x = r.left; !hit && x <= r.right; x += 3) for (let y = r.top; !hit && y <= r.bottom; y += 3) for (const f of fills) if (inside(f, [x, y])) { hit = true; break; }
+              if (!hit) out.push(txt + ': cut short though "' + whole + '" has room where it stands');
             }
             // the names that stand by the trunk on leaders, not in the key
             const trunk = Object.keys(B.klbl).filter((id) => B.knot[id].__on === 't' && B.klbl[id].classList.contains('on') && vis(B.klbl[id]) && (B.klbl[id].parentNode.querySelector('.kld').getAttribute('d') || '').length > 0).length;
