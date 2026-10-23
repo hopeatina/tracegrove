@@ -2286,6 +2286,45 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
+  it('draws a leaf with no flow yet as one in the paint its pad first says so: a mode chosen and nothing run yet, each such leaf is dashed and each pad counts as many as it draws', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      // the plotline grow as it stands the moment its mode is chosen, before any scenario runs
+      const s = freshGrow();
+      for (const line of readFileSync(join(import.meta.dirname, 'fixtures', 'grow-logs', 'plotline-seats.jsonl'), 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line) as GrowEvent; applyGrow(s, ev);
+        if (ev.kind === 'mode.chosen') break;
+      }
+      for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, s, width, width < 500);
+        await page.waitForTimeout(600);
+        const seen = await page.evaluate(() => {
+          const gw = (0, eval)('gw'), B = gw.B, S = gw.state, out: string[] = [];
+          let none = 0, drawn = 0;
+          for (const x of S.scenarios as Array<{ id: string; flow?: string | null }>) {
+            const el = B.leaf[x.id] as Element | undefined;
+            if (!el || el.classList.contains('gone') || el.classList.contains('pv-out')) continue;
+            drawn++;
+            const want = x.flow ? 'in' : 'none';
+            if (!el.classList.contains(want)) out.push(x.id + ' is drawn "' + el.getAttribute('class') + '" where its pad says ' + (x.flow ? 'to prove' : 'no flow yet'));
+            if (!x.flow) none++;
+          }
+          // the pads' words, where pads carry words (on a phone a pad wears its badge), count the same leaves
+          const said = (Object.values(B.lbl) as Array<{ el: Element }>).map((l) => l.el.textContent || '').join(' · ');
+          const counted = [...said.matchAll(/(\d+) no flow yet/g)].reduce((a, m) => a + Number(m[1]), 0);
+          return { none, drawn, counted, said, out, narrow: !!B.L.narrow };
+        });
+        expect(seen.drawn, width + 'px').toBeGreaterThan(2);
+        expect(seen.none, width + 'px a leaf with no flow yet').toBeGreaterThan(0);
+        if (!seen.narrow) expect(seen.counted, width + 'px ' + seen.said).toBe(seen.none);
+        expect(seen.out, width + 'px').toEqual([]);
+        await page.close();
+      }
+    } finally { await browser.close(); }
+  }, 60000);
+
   /** Max's growth on the wood, measured from the tree's own geometry: every limb, knot, shoot, count and graft bud. */
   const growth = () => {
     const w = (0, eval)('({ gw, GB_NK })');
