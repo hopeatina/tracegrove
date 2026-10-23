@@ -1376,6 +1376,8 @@ describe('Grow page', () => {
         });
         if (touch) await page.touchscreen.tap(leaf.x, leaf.y); else await page.mouse.move(leaf.x, leaf.y, { steps: 4 });
         await page.waitForTimeout(400);
+        // a lit knot's ring fades in over .2 s; on a busy runner that fade can still be running here, so measure it once it has run
+        await page.waitForFunction(() => Array.from(document.querySelectorAll('.gb .kn.on .halo')).every((h) => !h.getAnimations().some((a: Animation) => a.playState === 'running')), null, { timeout: 5000 });
         const r = await page.evaluate((sid) => {
           const w = (0, eval)('({ gw, gbSubs, gbReach })'), B = w.gw.B, M = w.gw.M, S = w.gw.state, L = B.L;
           const x = S.scenarios.find((q: { id: string }) => q.id === sid), j = M.J.find((q: { id: string }) => M.leaves[q.id].includes(x));
