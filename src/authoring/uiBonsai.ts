@@ -512,9 +512,10 @@ function gbTwFork(C,Cw,i,yl,h,a,dir,lean){const S=C[i],wc=Cw[i]||2,F=[S[0]+dir*l
  const main={pts:m,w:mw,bi:i,fi,fk:1};return [main,{pts:sp,w:sp.map((_,j)=>s0+(1-s0)*j/8),bi:fi,c:main,fk:2}]}
 /* Every leaf grows on a twig of its own, off the wood that carries its cushion, from the point of that wood it can rise most
    nearly straight at. A failure hangs beneath its cushion from a twig that shows, never on a thread: the twig leaves the
-   wood under the cushion and runs out four pixels under its underside to the leaf, and the leaf hangs from that twig's
-   underside on a stem of ten pixels, at thirty to forty-five degrees, out and down. Where no such place is clear of the
-   wood, the cushions and the other leaves, it sits on the cushion's lower rim instead: a short stem (about two fifths of a
+   wood under the cushion and runs out four pixels under its underside to the leaf, and the leaf's own stem of ten pixels
+   leaves that twig's underside, at thirty to forty-five degrees, out and down (the twig is wood of the pad's, the stem the
+   leaf's). Only where no such place is clear of the wood, the cushions and the other leaves, however long the twig runs,
+   does it sit on the cushion's lower rim instead: a short stem (about two fifths of a
    leaf, eight pixels beside a desktop tree) ends inside the cushion, so about three tenths of its blade lies over the rim,
    and the wood under the cushion rises to it behind the foliage. (A leaf's own twig leaves its wood where that runs no more
    than about nine pixels under the cushion, where it can, so no twig shows as a long stilt under the pad.) Either way the leaf and its twig stay inside the cushion's
@@ -530,13 +531,16 @@ function gbLeafTwigs(g,o,car){const out=[],r=g.L/2+GB_PET;
      if(f.i===undefined){let bd=1e9;for(let i=Wd.lo;i<C.length;i++){const dd=Math.hypot(C[i][0]-f.E[0],C[i][1]-f.E[1]);if(dd<bd){bd=dd;f.i=i}}}}
     out.push({id:f.id,k,...gbTwigTo(C,Wd.w,f.i,f.E,f.u)})}}
   const Wh=c.hang.length?car(k,1):null;if(!Wh)return;const C=Wh.pts,sp=Math.max(g.W+5,1.1*g.L);
-  c.hang.forEach((x,j)=>{const st=Math.min(.5*g.Hc,.42*g.L),fall=33+10*gbHash('hg:'+x.id),th=(Wh.dir>0?fall:180-fall)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],cv=q=>Math.max(-1,Math.min(1,(q-X)/c.a));
+  const n=c.hang.length;
+  /* one leaf's place at a stem's angle fall: where (q), and how well it hangs (lv: 0 to 2 beneath the cushion's flat
+     underside, 3 and 4 only inside its ends, 5 on its rim, 6 from the wood's end) */
+  const place1=(x,j,fall,pk)=>{const st=Math.min(.5*g.Hc,.42*g.L),th=(Wh.dir>0?fall:180-fall)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],cv=q=>Math.max(-1,Math.min(1,(q-X)/c.a));
    const yT=q=>o[1]+c.b+g.tY(c,cv(q)),yB=q=>o[1]+c.b+g.bY(c,cv(q)),inC=q=>Math.abs(q[0]-X)<c.a*.97&&q[1]>yT(q[0])+2.5&&q[1]<yB(q[0])-1.5,
     span=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+8&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-8},
     span0=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a&&Math.max(R[0][0],R[1][0])+hw<=X+c.a},
-    /* (one that hangs beneath it hangs under its flat underside, two pixels in from where each round end begins, never under
+    /* (one that hangs beneath it hangs under its flat underside, half a pixel in from where each round end begins, never under
        an end that has already turned up, where it would read as past the pad) */
-    spanB=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+c.rL*c.h+2&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-c.rR*c.h-2};
+    spanB=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+c.rL*c.h+.5&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-c.rR*c.h-.5};
    /* the stem ending at x=xe, lifted by t from just under the rim (0) to where its blade crosses the rim three tenths along
       (1); its start inside the cushion, joined to the nearest point of the wood under it behind the foliage */
    const at=(xe,t)=>{const lo=yB(xe)+1,hi=yB(xe+u[0]*(GB_PET+.3*g.L))-u[1]*(GB_PET+.3*g.L),E=[xe,lo+(Math.min(lo,hi)-lo)*t],S0=[xe-u[0]*st,E[1]-u[1]*st];
@@ -545,42 +549,61 @@ function gbLeafTwigs(g,o,car){const out=[],r=g.L/2+GB_PET;
    /* where: under the cushion (a crown's outer half), as far over the rim as it lies a blade's width clear of every other
       leaf, near its share of the way out (one at three fifths, more spread from three quarters in); else, as before, a step
       in from the wood's end for each, from the wood itself */
-   const n=c.hang.length,vt=n===1?.6:.75-.5*j/(n-1);
+   const vt=pk?2:n===1?.6:.75-.5*j/(n-1);
    /* (below: the twig's run four pixels under the cushion's lowest underside; it leaves the wood at least six pixels in from
       the leaf and no more than about four fifths of a leaf, so it never runs out under the pad as a bare wire, at the point
       nearest the leaf whose twig neither crosses that wood nor lies more than a quarter under a
       cushion, and neither the stem nor the blade touches the wood or a cushion, nor runs past the cushion's ends) */
    const inK=(p,m)=>g.cs.some(cc=>{const Xk=o[0]+cc.x,v=Math.max(-1,Math.min(1,(p[0]-Xk)/cc.a));return Math.abs(p[0]-Xk)<cc.a+m&&p[1]>o[1]+cc.b+g.tY(cc,v)-m&&p[1]<o[1]+cc.b+g.bY(cc,v)+m}),
     onW=(p,m)=>C.some((q,ii)=>Math.hypot(q[0]-p[0],q[1]-p[1])<(Wh.w[ii]||2)/2+m);
-   const below=(xs,cap,sp)=>{const wJ=1.3,yR=o[1]+c.b+4+wJ/2,E0=[xs,yR+wJ/2],E=[xs+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th);
-    if(!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))return null;
+   const below=(xs,cap,sp)=>{const wJ=1.3,yR=o[1]+c.b+4+wJ/2,E0=[xs,yR+wJ/2-.35],E=[xs+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th);
+    if(g.crown&&(m[0]-X)*Wh.dir<=.5||!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))return null;
     for(let f=0;f<=1.001;f+=.1){const p=[E0[0]+(R[1][0]-E0[0])*f,E0[1]+(R[1][1]-E0[1])*f];if(inK(p,1.5)||onW(p,1+(f*(10+g.L)>10?g.W/2:0)))return null}
     let best=null;for(let ii=C.length-1;ii>=Math.max(1,Wh.lo);ii--){const S=C[ii],dx=(xs-S[0])*Wh.dir;if(dx<6)continue;if(dx>cap)break;
-     const dy=yR-S[1],d=Math.min(.6*dx,Math.max(3,1.3*Math.abs(dy))),K=[S[0]+Wh.dir*d,yR],J=[xs-Wh.dir,yR];
+     const dy=yR-S[1],d=Math.min(.6*dx,Math.max(3,1.3*Math.abs(dy))),K=[S[0]+Wh.dir*d,yR],J=[xs+Wh.dir*.5,yR];
      const run=gbResample([...gbBez([S,[S[0]+Wh.dir*d*.35,S[1]+dy*.75],[K[0]-Wh.dir*d*.3,yR],K],8),J],Math.max(4,Math.round(dx/2)));
      const w0=Math.min(2.2,Math.max(1.6,.45*(Wh.w[ii]||3))),lim=(Wh.w[ii]||3)/2+2,far=run.filter(p=>Math.hypot(p[0]-S[0],p[1]-S[1])>lim);
      if(far.some(p=>onW(p,.6))||run.some(p=>Math.abs(p[0]-X)>c.a))continue;const hid=run.filter(p=>inK(p,0)).length/run.length;if(hid>.25)continue;
      best={i:ii,S,run,w0};break}
-    if(!best)return null;const stem=gbBez([E0,[E0[0]+u[0]*3.3,E0[1]+u[1]*3.3],[E0[0]+u[0]*6.6,E0[1]+u[1]*6.6],E],5),pts=[...best.run,...stem],nr=best.run.length;
-    return {i:best.i,S:best.S,E,S0:best.S,m,pts,w:pts.map((_,jj)=>jj<nr?best.w0+(wJ-best.w0)*jj/(nr-1):1.2-.25*(jj-nr)/(stem.length-1))}};
-   let q=null,qs=-1e9;const bel=(cap,sp)=>{for(let v=g.crown?.1:-.3;v<=1.001;v+=g.L/(4*c.a)){const p=below(X+Wh.dir*v*c.a,cap,sp);if(!p)continue;const sc=-Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}}};bel(Math.max(14,.8*g.L),spanB);
+    if(!best)return null;const stem=gbBez([E0,[E0[0]+u[0]*3.3,E0[1]+u[1]*3.3],[E0[0]+u[0]*6.6,E0[1]+u[1]*6.6],E],5),nr=best.run.length;
+    return {i:best.i,S:best.S,E,S0:best.S,m,run:best.run,rw:best.run.map((_,jj)=>best.w0+(wJ-best.w0)*jj/(nr-1)),stem,sw:stem.map((_,jj)=>1.2-.25*jj/(stem.length-1))}};
+   let q=null,qs=-1e9;const bel=(cap,sp,v0,dv)=>{for(let v=v0;v<=1.001;v+=dv||g.L/(4*c.a)){const p=below(X+Wh.dir*v*c.a,cap,sp);if(!p)continue;const sc=-Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}}},fd=pk?.25/c.a:g.L/(12*c.a),sB=pk===2?span0:spanB;bel(Math.max(14,.8*g.L),sB,g.crown?.1:-.3,pk?fd:0);
    const rim=(v0,v1,dv,sp,ts)=>{for(let v=v0;v<=v1;v+=dv){const xe=X+Wh.dir*v*c.a;for(const t of ts||[1,.75]){const p=at(xe,t);if(!ok(p,sp)||g.crown&&(p.m[0]-X)*Wh.dir<=0)continue;const sc=t-.05*Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}break}}};
-   if(!q)rim(g.crown?.1:-.3,.88,g.L/(4*c.a));
-   /* (where the cushion's ends leave no room there, further in, a finer step at a time; a crown's leaf still out from its
-      middle) */
-   if(!q)rim(-.88,(g.crown?.1:-.3)-1e-6,g.L/(12*c.a));
-   /* (and where the rim has no room either, beneath it on a longer run under its flat underside; else on its rim, well over
-      it, anywhere inside its ends; else, as before, beneath it anywhere inside them: a phone's small crown, where two
-      failures share one crest) */
-   if(!q)bel(1e9,spanB);if(!q)rim(-.88,.88,g.L/(12*c.a),span0,[1,.75]);if(!q)bel(1e9,span0);
+   /* (where there is no room for that, beneath it on a longer run under its flat underside, from as far in as its other end
+      where it must (a crown's still hanging out from its middle), a finer step at a time; else beneath it anywhere inside its ends: a phone's small
+      crown, where two failures share one crest) */
+   /* (or, where no twig can run out to it, on its stem straight off the wood under the cushion where that wood shows: the
+      stem leaving the wood's underside clear of every cushion, the leaf no further under the cushion than a leaf's length) */
+   const hangW=sp=>{const lowY=o[1]+c.b;for(let ii=Math.max(1,Wh.lo);ii<C.length;ii++){const S=C[ii],wS=Wh.w[ii]||2,E0=[S[0],S[1]+wS/2-.35],v=(S[0]-X)*Wh.dir/c.a;if(inK(E0,2))continue;
+     const E=[E0[0]+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th),nr=[-u[1],u[0]],top=Math.min(m[1]-Math.abs(u[1])*g.L/2,m[1]-Math.abs(nr[1])*g.W/2);
+     if(top-lowY>g.L-.5||g.crown&&(m[0]-X)*Wh.dir<=.5||!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))continue;
+     let cl=true;for(let f=0;f<=1.001&&cl;f+=.05){const p=[E0[0]+(R[1][0]-E0[0])*f,E0[1]+(R[1][1]-E0[1])*f];if(Math.hypot(p[0]-E0[0],p[1]-E0[1])<2)continue;if(inK(p,1.5)||onW(p,1+(f*(10+g.L)>10?g.W/2:0)))cl=false}
+     if(!cl)continue;const sc=-Math.abs(v-vt)*c.a/g.L-(top-lowY)/g.L;if(sc>qs){qs=sc;q={i:ii,S:E0,E,S0:E0,m}}}};
+   let lv=pk===2?3:0;if(!q){lv=Math.max(lv,1);bel(1e9,sB,-.88,fd)}if(!q){lv=pk===2?4:2;hangW(sB)}if(!q){lv=3;bel(1e9,span0,-.88,fd)}if(!q){lv=4;hangW(span0)}
+   /* (only where nothing can hang beneath it, on its rim; where the cushion's ends leave no room there, further in, a finer
+      step at a time, a crown's leaf still out from its middle; else well over it, anywhere inside its ends) */
+   if(!q){lv=5;rim(g.crown?.1:-.3,.88,g.L/(4*c.a))}if(!q)rim(-.88,(g.crown?.1:-.3)-1e-6,g.L/(12*c.a));if(!q)rim(-.88,.88,g.L/(12*c.a),span0,[1,.75]);
    /* (else from the wood itself; a leaf that then hangs clear beneath its cushion does so on a stem of ten pixels) */
-   if(!q){const tx=C[C.length-1][0]-Wh.dir*(.12*g.L+j*sp);let i=C.length-1;while(i>Wh.lo&&(C[i][0]-tx)*Wh.dir>0)i--;const S=C[i],put=l=>{const E=[S[0]+u[0]*l,S[1]+u[1]*l];return {i,S,E,S0:S,m:[E[0]+u[0]*r,E[1]+u[1]*r]}};
+   if(!q){lv=6;const tx=C[C.length-1][0]-Wh.dir*(.12*g.L+j*sp);let i=C.length-1;while(i>Wh.lo&&(C[i][0]-tx)*Wh.dir>0)i--;const S=C[i],put=l=>{const E=[S[0]+u[0]*l,S[1]+u[1]*l];return {i,S,E,S0:S,m:[E[0]+u[0]*r,E[1]+u[1]*r]}};
     q=put(st);const R=rib(q.m,th),inn=p=>Math.abs(p[0]-X)<c.a&&p[1]>yT(p[0])&&p[1]<yB(p[0]);let n0=0;for(let f=0;f<=1.001;f+=.1)if(inn([R[0][0]+(R[1][0]-R[0][0])*f,R[0][1]+(R[1][1]-R[0][1])*f]))n0++;if(!n0)q=put(10)}
-   const {i,S,E,S0}=q;ribs.push(rib(q.m,th));
-   g.slot.set(x.id,[E[0]+u[0]*r-o[0],E[1]+u[1]*r-o[1],th*180/Math.PI,1,1]);if(q.pts){out.push({id:x.id,k,pts:q.pts,w:q.w,bi:i,hang:1});return}
+   return {q,th,u,st,lv}};
+  /* and set there */
+  const set1=(x,P)=>{const {q,th,u,st}=P,{i,S,E,S0}=q;ribs.push(rib(q.m,th));
+   g.slot.set(x.id,[E[0]+u[0]*r-o[0],E[1]+u[1]*r-o[1],th*180/Math.PI,1,1]);if(q.run){const rr={k,pts:q.run,w:q.rw,bi:i,hang:1,sec:x.id};out.push(rr,{id:x.id,k,pts:q.stem,w:q.sw,bi:q.run.length-1,c:rr,hang:1});return}
    const stem=gbBez([S0,[S0[0]+u[0]*st*.33,S0[1]+u[1]*st*.33],[S0[0]+u[0]*st*.66,S0[1]+u[1]*st*.66],E],6);
    const pts=Math.hypot(S0[0]-S[0],S0[1]-S[1])>.5?[...gbBez([S,[S[0]+(S0[0]-S[0])*.3,S[1]+(S0[1]-S[1])*.6],[S0[0]-u[0]*2,S0[1]-u[1]*2],S0],4),...stem.slice(1)]:stem;
-   out.push({id:x.id,k,pts,w:pts.map((_,jj)=>1.9-.8*jj/(pts.length-1)),bi:i,hang:1})})});
+   out.push({id:x.id,k,pts,w:pts.map((_,jj)=>1.9-.8*jj/(pts.length-1)),bi:i,hang:1})};
+  /* each in turn at its own angle (thirty-three to forty-three degrees), or, where that leaves it no room beneath the
+     cushion's flat underside, as steep or as shallow as a stem may hang; and where one still finds none, the cushion's
+     failures set the other way round, if that hangs them better */
+  const lay=(ord,fa,pk)=>{let worst=0;for(const j of ord){const x=c.hang[j];let P=null;for(const f of pk?[ord.indexOf(j)?44:31]:fa?[fa]:[33+10*gbHash('hg:'+x.id),44,31]){const t=place1(x,j,f,pk);if(!P||t.lv<P.lv)P=t;if(P.lv<=2)break}worst=Math.max(worst,P.lv);set1(x,P)}return worst};
+  /* (and where they still crowd each other off it, all of them as steep as a stem may hang, which sets them closest; else
+     packed from the outside in, each as far out as it hangs clear of the last, a fraction of a pixel at a time: the first
+     as shallow as a stem may hang, the rest as steep, which lets each lie closest under the one before; and last so packed
+     anywhere beneath it inside its ends, as a phone's small crown may need) */
+  const r0=ribs.length,o0=out.length,ord=c.hang.map((_,j)=>j),rv=ord.slice().reverse();let w=lay(ord);
+  if(w>2&&n>1)for(const [od,fa,pk] of [[rv,0],[ord,44],[rv,44],[ord,0,1],[ord,0,2]]){const a={r:ribs.splice(r0),o:out.splice(o0),s:c.hang.map(x=>g.slot.get(x.id))},w2=lay(od,fa,pk);
+   if(w2<w){w=w2;if(w<=2)break}else{ribs.splice(r0);out.splice(o0);ribs.push(...a.r);out.push(...a.o);c.hang.forEach((x,jj)=>g.slot.set(x.id,a.s[jj]))}}});
  g.drop=Math.max(4,...[...g.slot.values()].filter(sl=>sl[4]).map(sl=>sl[1]+g.L/2+2));return out}
 /* Chaikin's corners, so a route through the wood bends like sap, not like a circuit trace. */
 function gbSmooth(pts,k){let p=pts;for(let it=0;it<(k||2);it++){if(p.length<3)return p;const o=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];o.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}o.push(p[p.length-1]);p=o}return p}
@@ -787,7 +810,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* The leader runs on into the crown and ends a third of the way up inside its crest, and the crest's leaves take their
     twigs from it. The crown's shoulders sit lower to either side, each on a branchlet the leader puts out just under it,
     rising at about forty degrees and levelling out through the cushion's foot; with no shoulders, its failures hang from a
-    short branchlet through the foot of its crest. */
+    short branchlet through the foot of its crest, cut where no more than three tenths of it lies inside, so most of it shows. */
  const cg=cpd.geo,te=tp[tp.length-1],co=[te[0]-crc.x,te[1]+crc.h*.32-crc.b];origin[apex.id]=co;
  const ctw=[],cc=[];const leaderAt=y=>{let ki=tp.length-1;for(let ii=tp.length-1;ii>0;ii--)if(tp[ii][1]>=y){ki=ii;break}return ki};
  /* The leader never ends in a blunt cap: it tapers on into its crest and, just under the cushion's foot, forks into fine twigs
@@ -800,20 +823,22 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   for(const sd of [-1,1]){const th=sd*(30+10*rf())*Math.PI/180,u=[(d0[0]*Math.cos(th)-d0[1]*Math.sin(th))/dm,(d0[0]*Math.sin(th)+d0[1]*Math.cos(th))/dm],len=crc.h*(.5+.16*rf())+9,S0=tp[kF];
    const E=[S0[0]+u[0]*len*.8,S0[1]+u[1]*len*.8-len*.25],fp=gbBez([S0,[S0[0]+u[0]*len*.4,S0[1]+u[1]*len*.4],[E[0]-u[0]*len*.1,E[1]+len*.15],E],10);
    ctw.push({pts:fp,w:fp.map((_,j)=>Math.max(1,wF*.3*(1-j/10)+j/10)),k:cg.cs.indexOf(crc),bi:kF,fork:1})}}
- cg.cs.forEach((c,k)=>{const cr=c===crc;if(cr&&!c.hang.length)return;const sd=cr?cg.d:c.sd,yb=co[1]+c.b,X=co[0]+c.x;
+ cg.cs.forEach((c,k)=>{const cr=c===crc;if(cr&&!c.hang.length)return;const sd=cr?cg.d:c.sd,yb=co[1]+c.b,X=co[0]+c.x,hg=c.hang.length>1;
   /* (a shoulder's branchlet runs out level under it, its top seven pixels under the cushion's foot, and turns up into it; two
      forked twigs rise from the level stretch into the foliage, and its leaves' twigs leave the branchlet where it has risen
-     into the cushion) */
-  let t2,ki;if(cr){ki=leaderAt(yb-2);const e=[X+sd*c.a*.62,yb+cg.bY(c,.62*sd)-3.5],a0=tp[ki],dx=e[0]-a0[0],dy=a0[1]-e[1];t2=gbBez([a0,[a0[0]+dx*.3,a0[1]-dy*.6],[e[0]-dx*.4,e[1]+dy*.05],e],12)}
-  else{ki=leaderAt(yb+9+11*Math.max(.7,cg.z));const a0=tp[ki],e=[X+sd*c.a*.35,yb-c.limf*c.h],m=[sd*Math.max(sd*(X-sd*.2*c.a),sd*a0[0]+8),yb+9],d1=Math.abs(m[0]-a0[0]),d2=Math.abs(e[0]-m[0]);
+     into the cushion; one that hangs two failures or more turns up into it on its inner side, so its outer underside is
+     clear for them) */
+  let t2,ki;if(cr){ki=leaderAt(yb+9);const e=[X+sd*c.a*.62,yb+cg.bY(c,.62*sd)-3.5],a0=tp[ki],dx=e[0]-a0[0],dy=a0[1]-e[1];const F=gbBez([a0,[a0[0]+dx*.3,a0[1]-dy*.6],[e[0]-dx*.4,e[1]+dy*.05],e],120),A=gbLen(F),i0=F.findIndex(q=>q[1]<yb+cg.bY(c,Math.max(-1,Math.min(1,(q[0]-X)/c.a)))),Lc=i0>0?Math.min(A[120],A[i0]/.7):A[120];
+   t2=gbResample(F.filter((_,jj)=>A[jj]<=Lc+1e-6),12)}
+  else{ki=leaderAt(yb+9+11*Math.max(.7,cg.z));const a0=tp[ki],e=[X+sd*c.a*(hg?-.6:.35),yb-c.limf*c.h],m=[sd*Math.max(sd*(X-sd*(hg?.95:.2)*c.a),sd*a0[0]+8),yb+9],d1=Math.abs(m[0]-a0[0]),d2=Math.abs(e[0]-m[0]);
    t2=gbResample([...gbBez([a0,[a0[0]+sd*d1*.35,a0[1]-(a0[1]-m[1])*.85],[m[0]-sd*d1*.3,m[1]],m],10),...gbBez([m,[m[0]+sd*d2*.45,m[1]],[e[0]-sd*d2*.1,e[1]+(m[1]-e[1])*.55],e],10).slice(1)],12)}
   const w2=t2.map((_,jj)=>Math.max(1.2,tw[ki]*.55*Math.pow(1-jj/12,.9)+jj/12*1.2));
   ctw.push({pts:t2,w:w2,k,bi:ki,lb:1});cc[k]={pts:t2,w:w2,bi:ki,dir:sd,lo:Math.max(0,t2.findIndex(q=>q[1]<yb-1))};
-  if(!cr){let V=[];t2.forEach((q,jj)=>{if(Math.abs(q[0]-X)<c.a*.7&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
+  if(!cr){let V=[];t2.forEach((q,jj)=>{if(Math.abs(q[0]-X)<(hg?c.a-Math.max(c.rL,c.rR)*c.h-1:c.a*.7)&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
    if(V.length){const pick=[V[Math.round(.15*(V.length-1))],V[Math.round(.85*(V.length-1))]].filter((v,j,A)=>A.indexOf(v)===j);
     (pick.length>1?pick.map((jj,j)=>[jj,2*j-1]):[[pick[0],-3],[pick[0],3]]).forEach(([jj,ln])=>{for(const t of gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,ln)){if(t.fk===1)t.c=cc[k];t.k=k;ctw.push(t)}})}}});
  /* the crest's leaves' twigs leave the leader inside it */
- for(const t of gbLeafTwigs(cg,co,(k,hang)=>{const c=cg.cs[k];if(c===crc&&!hang)return {pts:tp,w:tw,lo:leaderAt(co[1]+c.b-1),dir:1,gap:null};const q=cc[k];return q?{pts:q.pts,w:q.w,lo:hang?0:q.lo,dir:q.dir,gap:null}:null})){if(t.hang||cg.cs[t.k]!==crc)t.c=cc[t.k];ctw.push(t)}
+ for(const t of gbLeafTwigs(cg,co,(k,hang)=>{const c=cg.cs[k];if(c===crc&&!hang)return {pts:tp,w:tw,lo:leaderAt(co[1]+c.b-1),dir:1,gap:null};const q=cc[k];return q?{pts:q.pts,w:q.w,lo:hang?0:q.lo,dir:q.dir,gap:null}:null})){if(!t.c&&(t.hang||cg.cs[t.k]!==crc))t.c=cc[t.k];ctw.push(t)}
  const cdrop=cg.drop;
  /* Knots: parts the journeys share sit low on the trunk (most shared lowest, callee below caller); a journey's own parts sit
     on the bare wood of its branch, deepest nearest the trunk (a lone one toward the outer end of it, clear of the crotch,
@@ -1324,7 +1349,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     starts, the fork they leave the wood at and when the last ends (B.cuS); where a riser or branchlet has started, for the
     twigs off it (lbS); and where each growing branch has reached, by when (B.brAt). Times are the page clock's. */
  B.twEnd={};B.cuS={};B.brAt={};const lbS=new Map(),lbAt=(pts,i,d)=>{const r=lbS.get(pts),a=gbLen(pts);return r===undefined?d:gbWT(r,a[i]/(a[a.length-1]||1))-now};
- const twRec=(pid,t,r,tpp)=>{if(t.k===undefined||!t.id)return;B.twEnd[t.id]=r.t0+r.ms;const C=B.cuS[pid]=B.cuS[pid]||{},q=C[t.k]=C[t.k]||{s:Infinity,e:0,f:[],fh:[]};q.s=Math.min(q.s,r.t0);q.e=Math.max(q.e,r.t0+r.ms);(t.hang?q.fh:q.f).push(tpp[0])};
+ const twRec=(pid,t,r,tpp)=>{if(t.k===undefined)return;if(t.sec){t.r0=r;t.p0=tpp[0];return}if(!t.id)return;B.twEnd[t.id]=r.t0+r.ms;const C=B.cuS[pid]=B.cuS[pid]||{},q=C[t.k]=C[t.k]||{s:Infinity,e:0,f:[],fh:[]},rn=t.c&&t.c.sec&&t.c.r0?t.c:null;q.s=Math.min(q.s,rn?rn.r0.t0:r.t0);q.e=Math.max(q.e,r.t0+r.ms);(t.hang?q.fh:q.f).push(rn?rn.p0:tpp[0])};
  /* trees */
  L.trees.forEach((T,ti)=>{const X=L.xs[ti];const sh=q=>[q[0]+X,q[1]];const base=ti*250;const tp=T.tp.map(sh);
   /* every piece keeps its reveal by its own key for the whole grow, so a rebuild (a journey joined, a scenario was drafted)
@@ -1360,7 +1385,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     const ts=Math.max(0,t.c?lbAt(t.c.pts,t.bi,bF(t.c.bi)+320*t.bi/(t.c.pts.length-1)):bF(t.bi));
     /* the riser a raised crest stands on is a limb off the branch, grown the same way */
     if(t.lb)lbS.set(t.pts,limb('tw:'+id+':'+tk,tpp,t.w,{pts,w:b.w,k:t.bi},'w'+old,jg,lm.fg,b.back?null:wg,ts,320,{flat:b.back}).el.__r);
-    else{const k='tw:'+id+':'+(t.id||tk);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk?' fk':'')+old});tw.__pts=tpp;tw.__w=t.w;if(t.fk)tw.__k=t.k;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(!b.back&&!t.fk)barkOn(tw,jg);const r=anim(k,tw,ts,320,'grow');if(t.fk===1)lbS.set(t.pts,r);twRec(b.id,t,r,tpp)}});
+    else{const k='tw:'+id+':'+(t.id||(t.sec?'h'+t.sec:tk));const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk?' fk':'')+old});tw.__pts=tpp;tw.__w=t.w;if(t.fk)tw.__k=t.k;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else if(!b.back&&!t.fk)barkOn(tw,jg);const r=anim(k,tw,ts,320,'grow');if(t.fk===1||t.sec)lbS.set(t.pts,r);twRec(b.id,t,r,tpp)}});
    /* where a pruning of it heals: cut flush where it left the trunk, no stub or peg, the cut rolled over with callus in the
       bark's own tones, a thin lit crescent on its outer lip; with how many scenarios the branch held */
    const pdl=T.pads[b.id].leaves.length;const cA=gbNear(b.acc,b.Tk/2),cq=pts[cA],cw=b.w[cA],cb=pts[Math.min(pts.length-1,cA+2)],cm=Math.hypot(cb[0]-cq[0],cb[1]-cq[1])||1,cn=[(cb[0]-cq[0])/cm,(cb[1]-cq[1])/cm];
@@ -1374,10 +1399,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    B.brEl[b.id]={g:wg,jg,stub,cutmk,cuttag,col:cq,on:lm.el.__on}}
   /* the leader forks into the crown */
   /* a branchlet starts once the leader has grown to it, out from under its bark, and a leaf's twig once its own wood has */
-  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||tk)+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
+  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||(t.sec?'h'+t.sec:tk))+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
    /* the branchlets that carry the crown's shoulders, or hang its failures, are limbs off the leader like any branch */
    if(t.lb)lbS.set(t.pts,limb(ak,tpp,t.w,{pts:tp,w:T.tw,k:t.bi},'w',JG[T.apex.id],gWood,gGrain,t0,320).el.__r);
-   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
+   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id||t.sec?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork||t.sec)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
   /* knots: a raised boss on the bark, its file named beside it when its journey is lit */
   const padBox=T.padList.map(pd=>{const o=sh(T.origin[pd.id]),g=pd.geo;return [o[0]-g.PW/2,o[1]-g.PH-6,o[0]+g.PW/2,o[1]+g.drop+2]});const placed=L.rl.map(l=>{if(l.box)return l.box;const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;return [x0-2,l.y-L.fs,x0+w0+2,l.y+3]});
   T.knots.forEach(kn=>{const q=sh(kn.p);placed.push([q[0]-6,q[1]-6,q[0]+6,q[1]+6])});
@@ -1406,8 +1431,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    const own=id=>(M.buds[id]||[]).filter(x=>x.scenarioKind!=='regression');
    /* the wood a shoot and its leaves keep off, and the forks it keeps clear of: a limb's foot on its parent, a twig's on its limb */
    const wS=[],fk=[],ribs=[[tp,T.tw,T.bx]],addW=(pts,w,bx)=>{for(let k=0;k<pts.length;k++)wS.push([pts[k][0],pts[k][1],(w[k]||1)/2]);if(bx!==0)ribs.push([pts,w,bx])};addW(tp,T.tw,0);
-   for(const b of T.br){addW(b.pts.map(sh),b.w,b.bx);fk.push([tp[b.k],T.tw[b.k],b.w[0]]);for(const t of b.twigs||[]){addW(t.pts.map(sh),t.w);fk.push([sh(t.pts[0]),b.w[t.bi]||b.w[0],t.w[0]])}}
-   for(const t of T.ctw||[]){addW(t.pts.map(sh),t.w);fk.push([sh(t.pts[0]),T.tw[t.bi]||1,t.w[0]])}
+   for(const b of T.br){addW(b.pts.map(sh),b.w,b.bx);fk.push([tp[b.k],T.tw[b.k],b.w[0]]);for(const t of b.twigs||[]){addW(t.pts.map(sh),t.w);if(!(t.c&&t.c.sec))fk.push([sh(t.pts[0]),b.w[t.bi]||b.w[0],t.w[0]])}}
+   for(const t of T.ctw||[]){addW(t.pts.map(sh),t.w);if(!(t.c&&t.c.sec))fk.push([sh(t.pts[0]),T.tw[t.bi]||1,t.w[0]])}
    const inW=(p,m)=>wS.some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<q[2]+m);
    /* (the wood as drawn: each limb's outline with its swell over each boss, and the collar and fillets it lays on its parent) */
    const ribIn=(p,m)=>ribs.some(([P,w,bx])=>{for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1],dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;if(!l2)continue;const t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2;if(t<-.1||t>1.1)continue;
@@ -1615,7 +1640,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
       branchlet off it) and the trunk */
    /* (and how thick the wood it leaves is, where it leaves it: a cut there heals on that wood's bark) */
    const hwAt=(P,W,q)=>{let bd=Infinity,bw=2;P.forEach((p,i)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;bw=W[i]}});return bw/2};
-   const lts={};for(const t of pd.b?pd.b.twigs:T.ctw)if(t.id)lts[t.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null,hw:t.c?hwAt(t.c.pts,t.c.w,t.pts[0]):pd.b?hwAt(pd.b.pts,pd.b.w,t.pts[0]):hwAt(T.tp,T.tw,t.pts[0])};
+   const lts={};for(const t0 of pd.b?pd.b.twigs:T.ctw)if(t0.id){const t=t0.c&&t0.c.sec?{pts:[...t0.c.pts.slice(0,-1),...t0.pts],bi:t0.c.bi,c:t0.c.c}:t0;lts[t0.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null,hw:t.c?hwAt(t.c.pts,t.c.w,t.pts[0]):pd.b?hwAt(pd.b.pts,pd.b.w,t.pts[0]):hwAt(T.tp,T.tw,t.pts[0])}}
    const rt={tp,br:pd.b?pd.b.pts.map(sh):null,bw:pd.b?pd.b.w[pd.b.exit]:0,exit:pd.b?pd.b.exit:0,k:pd.b?pd.b.k:tp.length-1,lt:lts};
    B.pad[pd.id]={el:pg,jg,o,geo:g,jid,pol:pd.pol,crown:pd.crown,b:pd.b,lg,tg,leaves:pd.leaves,cS,lblAt,gk,tree:ti,shape,els,cu,mk,sk:'*',rt,q0};(B.padsOf[jid]=B.padsOf[jid]||[]).push(pd.id);
    if(!quiet)cu.forEach((u,k)=>{const c=cS[k];if(now<c.e)B.anim.push([u.gr,c.s-now,c.e-c.s,'cu',c.f])})
@@ -1793,7 +1818,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
     /* a leaf that has gone takes its twig and the tuft at its foot with it */
     /* (while it falls the twig falls with it; its copy seen through the cushion's foot is cut away at once) */
-    {const gone=cls.includes(' gone'),cut=cls.includes(' cut');((B.ltw||{})[x.id]||[]).forEach((e,k)=>e.classList.toggle('gone',gone||(cut&&k>0)));const tf=(B.tuft||{})[x.id];if(tf)tf.classList.toggle('gone',gone)}
+    {const gone=cls.includes(' gone'),cut=cls.includes(' cut');((B.ltw||{})[x.id]||[]).forEach((e,k)=>e.classList.toggle('gone',gone||(cut&&k>0)));{const rn=(B.ltwr||{})[x.id];if(rn)rn.classList.toggle('gone',gone)}const tf=(B.tuft||{})[x.id];if(tf)tf.classList.toggle('gone',gone)}
     if(im){shown++;if(s.run[x.id]&&s.run[x.id].st==='fail')failed=true}});
    /* a pad the mode keeps nothing of is cut back: once its leaves have fallen, the branch drops away and leaves a stub */
    /* a cushion stays while it holds a leaf the mode keeps, and shrinks away when it holds none; a previewed mode's extra
