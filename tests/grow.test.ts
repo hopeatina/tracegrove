@@ -2632,10 +2632,11 @@ describe('Grow page', () => {
     expect(risers).toBeGreaterThan(0);
   }, 60000);
 
-  /** Every leaf that hangs as drawn: how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten
-   *  pixels of that twig, leaves wood that shows. */
+  /** Every leaf that hangs as drawn: whether any of it runs past its cushion's ends; whether it sits on the cushion's rim, and
+   *  if not, how much of the twig it hangs from lies under a cushion, and whether its stem, the last ten pixels of that twig,
+   *  leaves wood that shows. */
   const hung = () => {
-    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, bad: [] as string[] };
+    const B = (0, eval)('gw').B, svg = B.svg as SVGSVGElement, out = { n: 0, rim: 0, bad: [] as string[] };
     const shown = (e: Element) => e.getBoundingClientRect().width > 0 && !e.closest('.off, .gone, .cut') && getComputedStyle(e).display !== 'none' && getComputedStyle(e).opacity !== '0';
     const fills = (Array.from(svg.querySelectorAll('.pfill')) as SVGGeometryElement[]).filter((f) => shown(f) && shown(f.closest('.cush') ?? f));
     const wood = (Array.from(svg.querySelectorAll('path.w, path.tw')) as SVGGeometryElement[]).filter(shown);
@@ -2648,6 +2649,16 @@ describe('Grow page', () => {
         if (!sl[4] || !tw || !leaf || !shown(tw) || leaf.classList.contains('cut') || leaf.classList.contains('gone')) continue;
         out.n++;
         const p: number[][] = tw.__pts, s: number[][] = [], A: number[] = [0];
+        // none of it trails past its cushion's ends: the twig and the blade inside them, the blade's middle a leaf's width in from each
+        const g = P.geo, k = g.cOf.get(id), c = g.cs[k], x0 = P.o[0] + c.x - c.a, x1 = P.o[0] + c.x + c.a, mx = P.o[0] + sl[0]!, th = sl[2]! * Math.PI / 180;
+        const hx = g.L / 2 * Math.abs(Math.cos(th)) + g.W / 2 * Math.abs(Math.sin(th)), xs = p.map((q) => q[0]!);
+        if (mx - hx < x0 - 0.5 || mx + hx > x1 + 0.5 || Math.min(...xs) < x0 - 0.5 || Math.max(...xs) > x1 + 0.5 || Math.min(mx - x0, x1 - mx) < g.W)
+          out.bad.push(pid + ' ' + id + ': past its cushion\'s ends ' + JSON.stringify([mx - hx - x0, x1 - mx - hx, Math.min(...xs) - x0, x1 - Math.max(...xs)].map(Math.round)));
+        // where there is no room for that beneath its cushion it sits on the cushion's lower rim instead, its blade over the rim by
+        // about three tenths, its twig behind the foliage; the rest hang from a twig that shows
+        const fill = P.cu[k].el.querySelector('.pfill') as SVGGeometryElement, my = P.o[1] + sl[1]!;
+        let over = 0; for (let i = 0; i <= 20; i++) { const f = i / 20 - 0.5; if (inEl(fill, mx + Math.cos(th) * f * g.L, my + Math.sin(th) * f * g.L)) over++; }
+        if (over) { out.rim++; if (over / 21 <= 0.12 || over / 21 >= 0.5) out.bad.push(pid + ' ' + id + ': on the rim, ' + Math.round(over / 21 * 100) + '% of its blade over it'); continue; }
         for (let i = 1; i < p.length; i++) { const a = p[i - 1]!, c = p[i]!, l = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!), n = Math.max(1, Math.ceil(l * 2)); A.push(A[i - 1]! + l); for (let j = 0; j < n; j++) s.push([a[0]! + (c[0]! - a[0]!) * j / n, a[1]! + (c[1]! - a[1]!) * j / n]); }
         // no more than two fifths of the twig it hangs from lies under a cushion
         const hid = s.filter((q) => under(q[0]!, q[1]!)).length / s.length;
@@ -2738,20 +2749,21 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
-  it('hangs each failure from a twig that shows: run out under its cushion to it, its stem leaving that twig\'s underside', async () => {
+  it('hangs each failure from a twig that shows: run out under its cushion to it, its stem leaving that twig\'s underside, none of it past the cushion\'s ends, or with no room for that on the cushion\'s rim', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
-      for (const [file, name] of recorded) for (const width of [1440, 390]) {
+      for (const [file, name] of recorded) for (const width of [1440, 768, 390]) {
         const page = await growPage(browser, server.url, folded(file), width);
         await page.waitForTimeout(2500);
         const h = await page.evaluate(hung);
         expect(h.n, name + ' ' + width).toBeGreaterThan(0);
+        expect(h.n - h.rim, name + ' ' + width + ' hanging beneath').toBeGreaterThan(0);
         expect(h.bad, name + ' ' + width).toEqual([]);
         await page.close();
       }
     } finally { await browser.close(); }
-  }, 60000);
+  }, 120000);
 
   /** The tree's own clocks, read off the motion it set going: when each piece of wood, leaf, cushion, name, shoot and graft
    *  bud first shows, against when the wood that carries it is there. */
