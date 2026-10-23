@@ -1097,6 +1097,12 @@ describe('Grow page', () => {
                 if (meet(c, r)) out.push(k + ': card covers ' + (t.classList.contains('kdim') ? 'the faded ' : '') + t.textContent);
                 for (let i = 1; i < lead.length; i++) if (t !== kl && cross(lead[i - 1]!, lead[i]!, r)) out.push(k + ': hairline crosses ' + t.textContent);
               }
+              // over the tree a card keeps 12 px off every knot's name but the thing's own (less a pixel, for rounding)
+              if (!L.narrow) for (const [t, r] of names) {
+                if (t === kl || !t.classList.contains('klbl')) continue;
+                const d = Math.hypot(Math.max(r.left - c.right, 0, c.left - r.right), Math.max(r.top - c.bottom, 0, c.top - r.bottom));
+                if (d < 11) out.push(k + ': card ' + d.toFixed(1) + ' px from ' + t.textContent);
+              }
               // and past its first 12 px the hairline keeps 12 px off every word but the thing's own name (less a pixel, for
               // where the line is rounded)
               const own = k.startsWith('u:') && B.root[k.slice(2)] ? Array.from(B.root[k.slice(2)].querySelectorAll('.rlbl') as NodeListOf<Element>) : [];

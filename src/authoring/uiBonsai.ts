@@ -2374,6 +2374,8 @@ const gbOwnSt=ids=>{const list=ids.flatMap(id=>gw.M.buds[id]||[]),u=ids.length==
    whole of it is the title */
 const gbMid=(t,n)=>t.length>n?t.slice(0,Math.ceil(n/2)-1)+'…'+t.slice(t.length-Math.floor(n/2)):t;
 const gbLocEl=loc=>loc?h('div',{class:'path',title:loc},...gwCodeText(String(loc).split('/').map(p=>gbMid(p,44)).join('/'))):null;
+/* the points from a to b, about 24 px apart, not counting either end (where a card's hairline may also turn into its side) */
+const gbSteps=(a,b)=>{const n=Math.floor((b-a)/24),o=[];for(let i=1;i<n;i++)o.push(a+(b-a)*i/n);return o};
 /* a name's box on the page, with its number in the key when it has one (the names never move for a card: it keeps off them) */
 const gbNameBox=(t,box)=>{const q=box(t.getBoundingClientRect());if(t.__key&&t.__kp){const p=box(t.__kp.getBoundingClientRect());return [Math.min(q[0],p[0]),Math.min(q[1],p[1]),Math.max(q[2],p[2]),Math.max(q[3],p[3])]}return q};
 /* A card beside the leaf, knot or root under the pointer: what it is, its state with evidence, and the path it crosses. */
@@ -2439,11 +2441,11 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
     itself. Nor does it cover any name, the faded ones too, any of a journey's words, a root's name, a cushion or a leaf, and
     it keeps 12 px off each of those and off the lit route where it can. It would rather not sit on the pot, on shoots and
     buds, on the hairlines of names or on foliage. No hairline crosses a name of any kind. */
- const G=12,own=[[x0-6,y0-6,x1+6,y1+6]],hard=[],mid=[],thin=[],soft=[],nox=[],txt=[];if(kb)own.push([kb[0]-4,kb[1]-4,kb[2]+4,kb[3]+4]);
+ const G=12,own=[[x0-6,y0-6,x1+6,y1+6]],hard=[],kn12=[],mid=[],thin=[],soft=[],nox=[],txt=[];if(kb)own.push([kb[0]-4,kb[1]-4,kb[2]+4,kb[3]+4]);
  /* a root is a long thin line: the card keeps off the line itself, not the whole box it spans, or it could never sit by the pot */
  const rpx=rr&&rr.pts?rr.pts.map((p,i)=>{const q=toPx(p),r=(rr.w[i]||2)*f/2+5;return [q[0]-r,q[1]-r,q[0]+r,q[1]+r]}):[];
  const rl=rid?[...B.root[rid].querySelectorAll('.rlbl')]:[];
- for(const t of Object.values(B.klbl))if(t.classList.contains('on')||t.classList.contains('kdim')||((t.classList.contains('wound')||t.classList.contains('brk'))&&!t.classList.contains('wmute'))){const q=gbNameBox(t,box);if(q[2]>q[0]&&!(t===kl&&kb)){hard.push(q);if(t!==kl){nox.push(q);txt.push(q)}}}
+ for(const t of Object.values(B.klbl))if(t.classList.contains('on')||t.classList.contains('kdim')||((t.classList.contains('wound')||t.classList.contains('brk'))&&!t.classList.contains('wmute'))){const q=gbNameBox(t,box);if(q[2]>q[0]&&!(t===kl&&kb)){hard.push(q);if(t!==kl){nox.push(q);txt.push(q);kn12.push(q)}}}
  for(const t of B.svg.querySelectorAll('.rlbl,.padlbl')){const q=t.getBoundingClientRect();if(q.width){const b=box(q);hard.push(b);nox.push(b);if(!rl.includes(t))txt.push(b)}}
  /* a journey's words line by line, a badge whole */
  for(const l of Object.values(B.lbl))for(const t of l.badge?[l.el]:l.el.querySelectorAll('text')){const q=t.getBoundingClientRect();if(q.width){const b=box(q);hard.push(b);nox.push(b);txt.push(b)}}
@@ -2469,15 +2471,16 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* the nearest points of two boxes, one on each */
  const near=(a,b)=>{const ax=(lo,hi)=>b[hi]<a[lo]?[a[lo],b[hi]]:b[lo]>a[hi]?[a[hi],b[lo]]:[(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2,(Math.max(a[lo],b[lo])+Math.min(a[hi],b[hi]))/2];const X=ax(0,2),Y=ax(1,3);return [[X[0],Y[0]],[X[1],Y[1]]]};
  /* The hairline back to what it explains, when the card is more than 16 px off: straight, or with one elbow (along, then
-    into the card's side, there or at either end of it) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
+    into the card's side, there, at either end of it or at any point between, about 24 px apart) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
     word and off the lit wood, and it would rather not cross a cushion, foliage or the pot. */
- const lead=CB=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]];
-  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4)opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
-  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
+ const lead=(CB,all)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
+  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1]));for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4)opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
+  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]]);for(const x2 of gbSteps(CB[0]+10,CB[2]-10))if(Math.abs(x2-pa[0])>4)more.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
   /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
      in a stacked key it runs clear of the lines above and below) */
   if(kb&&(pa[1]<CB[1]||pa[1]>CB[3])){const ym=(AB[1]+AB[3])/2;for(const [x0,sg] of [[AB[2],1],[AB[0],-1]])for(const x2 of [CB[0]+10,CB[2]-10,x0+sg*(G+4)])if((x2-x0)*sg>G&&x2>=CB[0]+4&&x2<=CB[2]-4)opts.push([[x0,ym],[x2,ym],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  let bestL=null;for(const pts of opts){let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear) */
+  let bestL=null;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL.ok)break;continue}let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
     for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
      if(off&&txt.some(q=>dB(p,q)<G)){pen+=150;ok=false}
@@ -2507,6 +2510,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  for(const q of cand){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4)),CB=[x,y,x+tw,y+th],CG=[x-G,y-G,x+tw+G,y+th+G];let sc=0,z=true;
   for(const b of own){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}}
   for(const b of hard){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}else if(ovB(CG,b)>0){sc+=300;z=false}}
+  for(const b of kn12)if(ovB(CG,b)>0){sc+=1e5;z=false}
   for(const b of mid){const o=ovB(CB,b);if(o>0){sc+=5e4+o*5;z=false}else if(ovB(CG,b)>0){sc+=200;z=false}}
   if(rpx.some(b=>ovB(CB,b)>0)){sc+=1e5;z=false}
   for(const b of firm){const o=ovB(CB,b);if(o>0){sc+=4e4+o*5;z=false}}
@@ -2516,7 +2520,8 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   const ko=ovB(CB,key);if(ko>0){sc+=4000+ko*.02;z=false}
   if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false}}
   const [pa,pc]=near(AB,CB);sc+=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05;if(!z&&best&&sc>=best.sc)continue;
-  const L2=lead(CB);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB}}
+  const L2=lead(CB);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
+ if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok)best.pts=L3.pts}
  return best};
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
     under 280 px nor under its longest piece: beside a pot or a crown there is often room for one but not the other */
