@@ -460,6 +460,20 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  .gw-cols>.gw-main{display:block}.gw-cols>.gw-main>.card{display:block;padding-top:10px}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
 }
+/* ---------- Round 14: the next step under the mode, the verdict's reasons, the state table's words ---------- */
+.gw-next{display:grid;gap:4px;padding:12px 0 4px;border-top:1px solid var(--line);min-width:0}
+.gw-next .gw-eyebrow{margin:0}
+.gw-next .gw-nh{margin:0;font:500 15px/21px var(--sans);color:var(--ink);overflow-wrap:break-word;text-wrap:pretty}
+.gw-next .gw-nl{margin:0;font:12.5px/18px var(--mono);color:var(--ink2);overflow-wrap:break-word}
+.gw-next .gw-nl .gw-stepno{font-weight:600;color:var(--verm-ink)}
+.gw-next .gw-cacts{margin-top:6px}
+.gw-hintrow>p:empty{display:none}
+.gw-next .gw-nshort{display:none}
+@media (min-width:1180px){.gw-side .gw-next .gw-nshort{display:inline}.gw-side .gw-next .gw-nfull{display:none}}
+.gb .rlbl.gw-flbl{pointer-events:none}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
+.gw-call .gw-vs{flex:1 1 100%;font:12.5px/18px var(--mono);color:var(--ink3);min-width:0}
+.gw-call .gw-vs .gw-facts{display:flex}
+@media (max-width:640px){.gw-call .gw-vs{order:3}}
 @media (min-width:1061px){
  .gw-insw.dr{position:fixed;top:0;right:0;bottom:0;width:min(640px,48vw);z-index:19;overflow-y:auto;overscroll-behavior:contain;background:var(--paper);border-left:1px solid var(--line2);box-shadow:-18px 0 40px rgba(0,0,0,.14);padding:0 18px 24px;contain:none}
  .gw-insw.dr .gw-drh{position:sticky;top:0;z-index:1;background:var(--paper);padding:12px 0 10px;border-bottom:1px solid var(--line)}
@@ -699,7 +713,7 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  if(!pin&&s.asked&&!s.modeBy&&M.J.length){gwPut(card,h('span',{class:'who'},'Before you choose'),h('h3',{},GB_W.modes),gwModeTable(),
    h('p',{class:'small muted',style:'margin:10px 0 0'},gwTouch()?'Tap a mode to see it on the tree: what it keeps stays, what it cuts fades. Tap it again to choose; nothing runs until you do.':'Point at a mode to see it on the tree: what it keeps stays, what it cuts fades. Nothing runs until you pick.'));return card}
   /* at rest on a finished grow the panel is empty (gwRest) */
- if(!pin&&s.done&&!s.blocked&&M.J.length){gwRest(M);return null}
+ if(!pin&&s.done&&!s.blocked&&M.J.length){gwRest(M);return gwNextBlock()}
  if(!pin){if(!s.done&&s.focus&&!(s.asked&&!s.modeBy)){pin='u:'+s.focus;live=true;const ag=s.agents.find(a=>!a.done&&a.unit===s.focus);who='Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')}
   else if(M.J.length){const hd=gbHead(M,M.J),failing=(M.leaves[hd.id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail');pin='j:'+hd.id;who=failing?'The first failing journey':'The headline journey'}}
  if(!pin){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},'Follows the tracer as it works. Select a journey, a leaf or a knot to pin it.'));return card}
@@ -919,6 +933,10 @@ document.addEventListener('focusin',e=>{if(!gw.dr||tab!=='Discover'||!gw.slots||
 function gwDrClose(){const d=gw.dr;if(!d)return;gw.dr=null;gw.refocus=d.from||'d:'+d.sid;growPaint()}
 /* Escape closes the open drawer wherever focus is, on the page body too (as when a link opened it); a key something else used,
    or one pressed while another dialog is open over the page, is left alone */
+/* with no drawer open, Escape lets go of what is pinned on the tree, and the panel under the mode says the next step again (a
+   list's own Escape, in the Outline, and a field's are left alone) */
+document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||gwOverlay(e.target)||gw.dr||!gw.pinned||tab!=='Discover'||gw.tree!=='grove')return;
+ const t=e.target;if(t&&t.closest&&t.closest('input,textarea,select,[contenteditable]'))return;gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;if(gw.B)gbTipOff(gw.B);growPaint()});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||gwOverlay(e.target)||!gw.dr||tab!=='Discover'||!gw.slots||!gw.slots.ins.isConnected||!gw.slots.ins.querySelector('.gw-dr'))return;e.preventDefault();gwDrClose()});
 /* The drawer's head and the step it opened on (with no run, its buttons) both come into view, and its actions under the answer
    too when all of them fit: the page scrolls as little as it can, and the panel beside the tree, or the sheet under its head,
@@ -1067,44 +1085,91 @@ function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.wan
  if(!k)return;gw.pinned=k;if(gw.tree==='outline')gw.pinList=k;
  if(w.run&&k.startsWith('s:'))gwOpenRun(w.id,w.step);
  else if(w.happened&&k.startsWith('s:'))gwDrOpen(w.id,w.step,true);else gw.dr=null}
+/* What a person does in a journey, in plain words. A journey the spec or an agent named says it already ("An owner adds a seat
+   ..."). One the rules named from where it starts names only a surface ("UI page in the browser", "tracegrove grow in a
+   terminal"), so it gets its actor and verb from that surface, and the first route it calls: "someone opens the UI page in the
+   browser, which calls POST /api/grow and 2 more routes"; "someone runs tracegrove grow in a terminal". */
+function gwJourneyDoes(j){const t=String(j&&j.title||'');if(!j||j.titleBy&&j.titleBy!=='rules')return t;
+ const M=gw.M||gbModel(),U=M.U||{},lc=x=>/^[A-Z][a-z]/.test(x)?x.charAt(0).toLowerCase()+x.slice(1):x;
+ const routes=(j.units||[]).filter(id=>id!==j.entry).map(id=>U[id]).filter(u=>u&&u.unitKind==='route'&&!u.root);
+ const via=routes.length?', which calls '+routes[0].label+(routes.length>1?' and '+(routes.length-1)+' more route'+(routes.length>2?'s':''):''):'';
+ let m;
+ if(j.surface==='browser'&&(m=/^(.*) in the browser$/.exec(t)))return 'someone opens the '+lc(m[1])+' in the browser'+via;
+ if(j.surface==='terminal'&&(m=/^(.*) in a terminal$/.exec(t)))return 'someone runs '+lc(m[1])+' in a terminal'+via;
+ if(j.surface==='job'&&(m=/^(.*) job$/.exec(t)))return 'the '+lc(m[1])+' job runs'+via;
+ if(j.surface==='http'&&/^(GET|POST|PUT|PATCH|DELETE) \//.test(t))return 'a client calls '+t+via;
+ return t}
+/* What the change does for its users: one sentence naming each journey, in the spec's words where it has them */
+function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;const N=['One','Two','Three','Four','Five','Six','Seven','Eight','Nine'];
+ const lc=t=>/^[A-Z][a-z]/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t,show=J.length>5?J.slice(0,4):J,parts=[];
+ show.forEach((j,i)=>{if(i)parts.push(i===show.length-1&&J.length===show.length?'; and ':'; ');parts.push(...gwRich(lc(gwJourneyDoes(j))))});
+ return h('p',{class:'gw-sum1','data-testid':'grow-summary'},(N[J.length-1]||String(J.length))+(J.length===1?' journey: ':' journeys: '),...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.')}
 /* The verdict, worked out once on the server (growVerdict) for this page, grow --json and the exit code: its own line above the
    tree, outside the result band. Its mark and word, then what it rests on: the first failure's promise and how it broke
    ("Removing a seat never charges the card" failed: expected 2 charges, got 3), with its promise; or what is not tested yet.
    Then the way to what happened. Until the scenarios have run its place is kept, saying so. */
-/* What the change does for its users: one sentence naming each journey, in the spec's words where it has them */
-function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;const N=['One','Two','Three','Four','Five','Six','Seven','Eight','Nine'];
- const lc=t=>/^[A-Z][a-z]/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t,show=J.length>5?J.slice(0,4):J,parts=[];
- show.forEach((j,i)=>{if(i)parts.push(i===show.length-1&&J.length===show.length?'; and ':'; ');parts.push(...gwRich(lc(String(j.title||''))))});
- return h('p',{class:'gw-sum1','data-testid':'grow-summary'},(N[J.length-1]||String(J.length))+(J.length===1?' journey: ':' journeys: '),...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.')}
 function gwCall(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||s.blocked)return null;
  if(!s.done)return h('div',{class:'gw-call wait','data-testid':'grow-verdict'},h('span',{class:'gw-vp'},'◌ No verdict yet'),h('span',{class:'gw-vt'},'It comes once the scenarios have run.'));
  const f=V.first,tone=V.verdict==='not ready'?'bad':V.verdict==='ready'?'ok':'open';
- const line=gwVerdict(V,f,tone),next=V.verdict==='not proven yet'?gwNext():null;
- /* Not proven yet has one next action beside its line, from why its scenarios are not tested yet */
- return next?h('div',{class:'gw-callrow'},line,next):line}
+ /* the one next action is the Next block's, in the panel under the mode (gwNextBlock), never a second button beside the verdict */
+ return gwVerdict(V,f,tone)}
 /* What to do about a grow that is not proven yet, from why its scenarios in the mode are not tested yet: a run that never reached
    its checks says why in the drawer; a flow that did not run is proved by growing again with proving on, in the same mode (as
    the start card's "Prove with real flows" does); a scenario no flow proves gets its flow written. */
 /* The scenario Not proven yet's next action and "Open the runs" open in the drawer: the first in the mode with no result whose run
    can be read there (one that never reached its checks, say) */
 function gwNextRan(){const s=gw.state;return s.scenarios.find(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail'))&&gwRan(x)&&gwDrCan(x))||null}
-function gwNext(){const s=gw.state;const open=s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail')));
+/* the next step for a grow not proven yet: [kind, scenario, button]; the riskiest (the smallest mode's) scenario first */
+function gwNextOf(){const s=gw.state;const open=gbOrd(s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail'))));
  const ran=gwNextRan(),flow=open.find(x=>gwFlowOf(x)),none=open.find(x=>!gwFlowOf(x)&&s.done);
  const b=(label,aria,go,off)=>h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-next','aria-label':aria,disabled:!!off,on:{click:go}},label);
  if(ran){const could=gwOpenKey(ran)==='could';const T=gwPlain(gwVia(ran.title).title);
-  return b(could?'See why it could not run ›':'See why it is not proven ›',(could?'See why it could not run: ':'See why it is not proven: ')+T,()=>{gwDrOpen(ran.id);if(gw.dr)gw.dr.from='t:grow-verdict-next'})}
- if(flow)return b('Prove it','Prove it: grow again with “Prove with real flows” on, in '+gwML(s.mode),()=>{gw.prove=true;if(!gw.base&&s.change&&s.change.base)gw.base=s.change.base;growStart(s.modeBy?s.mode:null)},gw.busy);
- if(none)return b('Write this flow','Write this flow: '+gwPlain(gwVia(none.title).title),()=>gwDrWrite(none));
+  return [could?'could':'ran',ran,b(could?'See why it could not run ›':'See why it is not proven ›',(could?'See why it could not run: ':'See why it is not proven: ')+T,()=>{gwDrOpen(ran.id);if(gw.dr)gw.dr.from='t:grow-verdict-next'})]}
+ if(flow)return ['ready',flow,b('Prove it','Prove it: grow again with “Prove with real flows” on, in '+gwML(s.mode),()=>{gw.prove=true;if(!gw.base&&s.change&&s.change.base)gw.base=s.change.base;growStart(s.modeBy?s.mode:null)},gw.busy)];
+ if(none)return ['nf',none,b('Write this flow','Write this flow: '+gwPlain(gwVia(none.title).title),()=>gwDrWrite(none))];
  return null}
-function gwVerdict(V,f,tone){
+function gwNext(){const n=gwNextOf();return n?n[2]:null}
+/* Why the scenarios with a reason were not run, in a few words, from the reasons grow --json gives them: "grow ran without
+   proving" when every one says to run grow without --no-prove, the cause after "Could not run:" or "Not proven:", else their
+   one reason when they share it */
+function gwCause(list){const ws=[...new Set(list.map(x=>String((gw.state.run[x.id]||{}).why||'').trim()).filter(Boolean))];if(!ws.length)return null;
+ const said=ws.map(w=>/without --no-prove/.test(w)?'grow ran without proving':/^(?:Could not run|Not proven):\s*/.test(w)?w.replace(/^(?:Could not run|Not proven):\s*/,''):w);const one=[...new Set(said)];
+ return one.length===1?gwCut(one[0].replace(/[.\s]+$/,''),60):null}
+/* Not tested yet, split by its reasons in the table's words, each with why when the grow knows it: "15 flow ready (not run): grow
+   ran without proving · 30 no flow yet" */
+function gwSplit(list){const by={};for(const x of list){const k=gwStKey(x);if(GW_OPEN.includes(k))(by[k]=by[k]||[]).push(x)}
+ return ['could','ready','nf'].filter(k=>by[k]).map(k=>{const c=k==='nf'?null:gwCause(by[k]);return by[k].length+' '+gwStW(k)+(c?': '+c:'')})}
+function gwVerdict(V,f,tone){const split=V.verdict==='not proven yet'?gwSplit(gwInView()):[];
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
   h('span',{class:'gw-vt'},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
-  /* the promise it breaks, in the spec's words; when those are the failure's own title, the line already says them */
-  f&&f.promise?(()=>{const ids=f.promise.split(/,\s*/),cs=ids.map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean),pl=x=>gwPlain(x).toLowerCase().replace(/[.\s]+$/,'');
-   const own=cs.length===1&&pl(cs[0].text)===pl(gwVia(f.title||'').title);
-   return h('span',{class:'gw-vc',title:ids.join(', ')},!cs.length?(ids.length>1?'breaks promises':'breaks a promise'):own?'breaks this promise':'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),70)).join('; '))})():null,
-  f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
-  f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
+  /* not proven yet says why, by reason, and why the flows that are ready did not run */
+  split.length>1||split.some(t=>t.includes(':'))?h('span',{class:'gw-vs','data-testid':'grow-verdict-split'},gwFacts(split.map(t=>[t]))):null,
+  /* the promise it breaks, in the spec's words, shortened; the whole of it in the title */
+  f&&f.promise?(()=>{const ids=f.promise.split(/,\s*/),cs=ids.map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean);
+   return h('span',{class:'gw-vc',title:cs.length?cs.map(c=>gwPlain(c.text)).join('; '):null},!cs.length?(ids.length>1?'breaks promises':'breaks a promise'):'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),cs.length>1?24:30)).join('; '))})():null,
+  f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null)}
+/* The first screen's next step, in the panel under the mode while nothing is selected, worst first: a failure's why, with its step
+   and what it expected and got, then See what happened, Rerun and Heal; for a grow not proven yet, why its next scenario could not
+   run, the flows that are ready to prove, or the riskiest scenario's flow to write. One primary action. Selecting a leaf or a row
+   puts its panel here instead; Escape, or a click on the empty drawing, brings this back. */
+function gwNextBlock(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||!s.done||s.blocked)return null;
+ const box=(head,line,acts)=>h('section',{class:'gw-next','data-testid':'grow-next','aria-label':'Next'},h('span',{class:'gw-eyebrow'},'Next'),h('p',{class:'gw-nh'},...head),line?h('p',{class:'gw-nl'},...[line].flat()):null,acts&&acts.length?h('div',{class:'gw-cacts'},acts):null);
+ const q=t=>{const T=gwVia(t).title;return T.includes(gwBT)?['“',...gwRich(T),'”']:['“'+gwPlain(T)+'”']};
+ const f=V.first,x=f&&gwScen(f.scenario);
+ if(V.verdict==='not ready'&&x){const r=s.run[x.id],flow=r&&r.flow||x.flow,cfg=s.flows&&s.flows.config||null,away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
+  const said=gw.view.said&&gw.view.said[x.id],n=gwStepNo(x);
+  /* beside the verdict, which names it, it is "it"; under the tree, far from the verdict, it is named */
+  return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],[n?h('b',{class:'gw-stepno'},'Step '+n+': '):null,said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
+   f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null,
+   flow&&gwRan(x)?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-rerun',disabled:away||!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(flow)}}},'Rerun'):null,
+   h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-heal',on:{click:()=>openTab('Heal')}},'Heal')])}
+ if(V.verdict==='not proven yet'){const n=gwNextOf();if(!n)return null;const [k,y,btn]=n;
+  if(k==='ready'){const m=gwInView().filter(z=>gwStKey(z)==='ready').length;return box(['Prove the '+(m===1?'flow that is ready':m+' ready flows')],null,[btn])}
+  if(k==='nf')return box(['Write the flow for ',...q(y.title)],y.proves?['It would prove: ',...gwRich(y.proves)]:null,[btn]);
+  return box([k==='could'?'See why ':'See why ',...q(y.title),k==='could'?' could not run':' is not proven'],gwCause([y]),[btn])}
+ if(V.verdict==='ready'){const up=GW.modes.find(m=>gbRank[m.id]===gbRank[s.mode]+1);const more=up?(gw.view.counts[up.id]||0)-(gw.view.counts[s.mode]||0):0;
+  return box(['Nothing failed in '+gwML(s.mode)+'.'],up&&more>0?gwML(up.id)+' proves '+more+' more.':null,null)}
+ return null}
 /* Under the verdict, one quiet line of counts in the page's words: scenarios passed, failed and not tested yet, and the promises
    that hold. The failure itself is said once, in the verdict; what to do about it is in the panel. */
 function gwResult(){const s=gw.state,v=gw.view,t=v.summary,P=v.verdict&&v.verdict.promises;
@@ -1154,11 +1219,15 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
  /* the choice opens with the whole drafted tree: no mode is chosen or previewed until the pointer moves onto a chip or a chip takes focus,
     so a pointer that happens to rest where a chip appears previews nothing */
  if(asked&&gw.askFor!==(gw.id||'saved')){gw.askFor=gw.id||'saved';gw.armed=false;if(gw.preview){gw.preview=null}}
- const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'Mode: '+lbl(s.mode)+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'You choose once scenarios are drafted.';
+ /* once chosen, the pressed button says the mode; who chose it is said to a reader of the page, in the group's name, not on the
+    first screen */
+ const who=locked?'Mode: '+lbl(s.mode)+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'';
+ const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'':'You choose once scenarios are drafted.';
  /* pointing at a mode previews it on the tree, and a line beside the hint says what it keeps and cuts; the hint itself stays.
     A finger cannot point: a tap previews a mode, and while the choice is open a second tap on the same mode chooses it */
  const touch=gwTouch();
- const idle=locked?(touch?'Tap another mode to preview it.':'Point at another mode to preview it.'):asked?(touch?'Tap a mode to see it on the tree; tap it again to choose it.':'Point at a mode to see it on the tree.'):'';
+ /* a mouse finds the preview by pointing, so the line says nothing at rest; a finger is told it can tap */
+ const idle=locked?(touch?'Tap another mode to preview it.':''):asked?(touch?'Tap a mode to see it on the tree; tap it again to choose it.':'Point at a mode to see it on the tree.'):'';
  /* what a mode proves, in its card's words: on a phone, where a chosen mode folds to a chip, the line under the chips says it */
  const blurb=id=>(GW.modes.find(m=>m.id===id)||{blurb:''}).blurb;const desc=id=>id?[h('b',{},lbl(id)+':'),' '+blurb(id),gwAdds(id)]:[];
  /* the mode pointed at lights its column in the panel's table, and its words under the chips; letting go puts back the chosen one */
@@ -1174,10 +1243,10 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   const c=v.counts[cur],more=s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[id]&&gbRank[x.mode]>gbRank[cur]),kind=gwKindOf();
   el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+', as ghosts on the tree.':n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(gw.preview){gw.preview=null;gbPaint();say(null)}};
- return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
+ return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'+(who?'. '+who:'')},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
    on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
    /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
-   gwModeIcon(m.id),h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label,s.scenarios.length?[' · ',h('span',{class:'mn','data-u':v.counts[m.id]===1?'scenario':'scenarios'},String(v.counts[m.id]))]:null),
+   gwModeIcon(m.id),h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label,s.scenarios.length?[' ',h('span',{class:'mn','data-u':v.counts[m.id]===1?'scenario':'scenarios'},String(v.counts[m.id]))]:null),
    /* while the choice is open each mode says what it proves; once chosen, the control is one line and pointing at a mode says it */
    asked||!locked?[h('span',{class:'gw-mb'},m.blurb),gwAdds(m.id)]:null))),
   h('div',{class:'gw-mpop','data-testid':'grow-mode-pop',role:'status',hidden:true}),
@@ -1263,7 +1332,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const cmp=s.modeBy?h('div',{class:'gw-lgcmp',role:'group','aria-label':GB_W.modes},h('h4',{class:'gw-lgh'},GB_W.modes),gwModeTable('key')):null;
  /* the drawing says what it is in one caption, and a key counts only the marks it draws, worst first; the full key (every kind
     of mark, the modes side by side, how to read a pad) opens on asking, and is built only then */
- const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change. Crown: its happy path; side branches: what it refuses and how it fails. Leaves: scenarios; failures hang under their pad.':'Trunk: your change. Branches: journeys. Leaves: scenarios; failures hang under their pad.');
+ const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails; leaves: scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change; branches: journeys; leaves: scenarios; a leaf hanging below its pad is a way the journey fails.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
  const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};
@@ -1324,6 +1393,33 @@ for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
   return x0<x1?{x:x0,y:y0,width:x1-x0,height:y1-y0}:g.getBBox()};
  for(const g of svg.querySelectorAll('[role=button]')){let bb;try{bb=still(g)}catch(e){continue}if(bb.width>=m&&bb.height>=m)continue;
   const W=Math.max(bb.width,m),H=Math.max(bb.height,m);g.append(sv('rect',{class:'gb-hit',x:bb.x+bb.width/2-W/2,y:bb.y+bb.height/2-H/2,width:W,height:H,fill:'transparent','aria-hidden':'true'}))}}
+/* The drawing says what a hanging leaf is without its caption: the worst leaf gets a small word beside it, in the mono of "trace
+   stops": "failed" beside the first failure's leaf, else "how it fails" beside the first leaf that hangs under its pad. It goes
+   on the first side of the leaf where it touches no name, leaf or count, and is placed again after every paint, once the leaf
+   has stopped moving; a leaf that is not drawn (cut, or hidden by a preview) has none. */
+function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw.tree!=='grove'||!s)return;
+ for(const e of svg.querySelectorAll('.gw-flbl'))e.remove();
+ const V=gw.view&&gw.view.verdict,f=V&&V.first;let leaf=f?svg.querySelector('.gb-lf.fail:not(.gone)[data-k="s:'+f.scenario+'"]'):null,word='failed';
+ if(!leaf)leaf=svg.querySelector('.gb-lf.fail:not(.gone):not(.bud)');
+ if(!leaf){leaf=svg.querySelector('.gb-lf.hang:not(.gone):not(.bud)');word='how it fails'}
+ if(!leaf||!s.done)return;
+ const run=leaf.getAnimations?leaf.getAnimations({subtree:true}).filter(a=>a.playState==='running'):[];
+ if(run.length){if(!gw.flWait){gw.flWait=true;Promise.all(run.map(a=>a.finished.catch(()=>null))).then(()=>{gw.flWait=false;gwFailLabel()})}return}
+ const inv=svg.getScreenCTM();if(!inv)return;const I=inv.inverse();
+ const box=el=>{const r=el.getBoundingClientRect();if(!r.width&&!r.height)return null;const a=new DOMPoint(r.left,r.top).matrixTransform(I),b=new DOMPoint(r.right,r.bottom).matrixTransform(I);return [a.x,a.y,b.x,b.y]};
+ const lb=box(leaf);if(!lb)return;const ref=svg.querySelector('text.rlbl');const fs=ref?parseFloat(ref.style.fontSize)||10.5:10.5;
+ const w=word.length*fs*.62,hh=fs,cy=(lb[1]+lb[3])/2,cx=(lb[0]+lb[2])/2,gap=fs*.45;
+ const others=[...svg.querySelectorAll('text, .gb-lf:not(.gone)')].filter(e=>e!==leaf&&!leaf.contains(e)).map(box).filter(Boolean);
+ const vb=svg.viewBox.baseVal;
+ /* the cushions are in the way too: a leaf that sits in one gets its word under the cushion, at the leaf */
+ const pads=[...svg.querySelectorAll('.pad')].map(box).filter(Boolean);others.push(...pads);
+ const home=pads.find(p=>cx>p[0]&&cx<p[2]&&cy>p[1]&&cy<p[3]);
+ const C=[[lb[2]+gap,cy+hh*.35,'start'],[lb[0]-gap,cy+hh*.35,'end'],[cx,lb[3]+hh+gap*.4,'middle'],[cx,lb[1]-gap,'middle']];
+ if(home)C.push([cx,home[3]+hh+gap,'middle'],[cx+w/2,home[3]+hh+gap,'middle'],[cx-w/2,home[3]+hh+gap,'middle']);
+ const rect=([x,y,a])=>{const x0=a==='start'?x:a==='end'?x-w:x-w/2;return [x0-2,y-hh,x0+w+2,y+3]};
+ const hit=r=>others.some(o=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1])||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height;
+ const at=C.find(c=>!hit(rect(c)));if(!at)return;
+ svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word'},word))}
 if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwBarHome();gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
@@ -1338,9 +1434,9 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
     lanes, the files) folds behind one line once it is done */
  const facts=c?gwFacts([c.pr?'#'+c.pr:null,c.files+' files','+'+c.adds+' −'+c.dels,c.untraced?c.untraced+' small parts not traced':null,s.spec?['spec: '+s.spec.source]:null]):'';
  const fold=s.done&&!s.blocked,railOn=!fold||gw.railOpen;
- gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},'Grow · '+(c?c.branch+' → '+c.base:'reading')),h('h2',{},c?c.title:'Reading the branch'),
+ gwSet(S.head,h('div',{class:'gw-head'},h('div',{style:'min-width:0'},h('span',{class:'label'},c?c.branch+' → '+c.base:'Grow · reading'),h('h2',{},c?c.title:'Reading the branch'),
    gwSummary()||h('div',{class:'sub'},facts)),
-  h('div',{class:'gw-meta'},fold?h('button',{class:'btn ghost sm gw-grew',type:'button','aria-expanded':String(!!gw.railOpen),'data-testid':'grow-how',title:gw.saved?'saved '+ago(gw.saved):null,on:{click:()=>{gw.railOpen=!gw.railOpen;growPaint()}}},'✓ grew in '+gwStep(s.ms)+(gw.railOpen?' ▾':' ▸'))
+  h('div',{class:'gw-meta'},fold?h('button',{class:'btn ghost sm gw-grew',type:'button','aria-expanded':String(!!gw.railOpen),'data-testid':'grow-how',title:gw.saved?'saved '+ago(gw.saved):null,on:{click:()=>{gw.railOpen=!gw.railOpen;growPaint()}}},'grew in '+gwStep(s.ms)+(gw.railOpen?' ▾':' ▸'))
    :h('div',{class:'gw-clock'},gw.saved?gwFacts(['saved '+ago(gw.saved),'took '+gwFmt(s.ms)]):gwFmt(s.done?s.ms:Date.now()-gw.t0)),s.done||!gw.busy?h('button',{class:'btn ghost sm',disabled:gw.busy,on:{click:()=>{gw.state=null;gw.saved=null;gw.svg=null;gw.B=null;gw.seen=new Set();gw.pinned=null;gw.railOpen=false;growPaint()}}},'New grow'):null)));
  gwSet(S.call,gwCall());
  gwSet(S.verdict,s.blocked?h('div',{class:'gw-result bad'},h('div',{},h('div',{class:'big'},'Stopped: '+s.blocked.code),h('div',{class:'sub'},s.blocked.detail+'. Fix: '+s.blocked.action))):null,s.done?gwResult():s.blocked?null:gwProving());
@@ -1372,7 +1468,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
   /* the tree is drawn for the width it gets, so it waits until it is on the page */
   if(!S.scroll.isConnected||!S.scroll.clientWidth){if(!gw.waiting){gw.waiting=true;requestAnimationFrame(()=>{gw.waiting=false;growPaint()})}}
   else{gbPaint();if(S.scroll.firstChild!==gw.svg)S.scroll.replaceChildren(gw.svg,gw.B.tip)}
-  gwSet(S.legend,s.scenarios.length?gwKey():null);gwFit();gwHits();clearTimeout(gw.hitT);gw.hitT=setTimeout(gwHits,500);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>gwHits())}
+  gwSet(S.legend,s.scenarios.length?gwKey():null);gwFit();gwHits();gwFailLabel();clearTimeout(gw.hitT);gw.hitT=setTimeout(()=>{gwHits();gwFailLabel()},500);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>gwHits())}
  else S.left.replaceChildren(gbOutline());
  /* the Outline already lists every journey and opens what is selected in place, so it stands alone at a readable width; only
     while the choice is open does the panel stay beside it, with what each mode proves */
