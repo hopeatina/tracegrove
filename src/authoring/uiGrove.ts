@@ -719,6 +719,13 @@ function gwModeTable(cls){const s=gw.state,v=gw.view,M=gw.M||gbModel();const ord
    fills when something is selected. The first failure's run is read now, so its card has its evidence the moment it is. */
 function gwRest(M){const s=gw.state,V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwScen(f.scenario);
  if(x&&s.run[x.id]&&s.run[x.id].st==='fail')gwHap(x)}
+/* Whether the Next block keeps its place while pin is selected: under the tree (a tablet or a phone) a journey, a scenario opened
+   from a list, or a phone's tapped leaf opens elsewhere, so the panel above the tree keeps Next and nothing over the tree moves.
+   The verdict reads the same answer, so it adds its own way to what happened only when Next has stepped aside. */
+function gwNextStays(pin){if(!pin)return true;const phone=!!(gw.B&&gw.B.L&&gw.B.L.narrow),fromList=gw.pinList===pin;
+ return gbNarrowList()&&(pin.startsWith('j:')||pin.startsWith('s:')&&(fromList||phone))}
+function gwNextShown(){const s=gw.state;if(!s||!s.done||s.blocked||gw.dr&&gwScen(gw.dr.sid))return false;
+ if(gw.tree==='outline'&&!(s.asked&&!s.modeBy))return !gw.pinned;return gwNextStays(gw.pinned)}
 function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  const card=h('aside',{class:'gw-ins','aria-label':'Inspector','data-testid':'grow-inspector'});
  let pin=gw.pinned,who='Pinned',live=false;
@@ -732,9 +739,9 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  if(!pin){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},'Follows the tracer as it works. Select a journey, a leaf or a knot to pin it.'));return card}
  /* under the tree (a tablet or a phone) the Journeys card comes straight after and opens a journey or a scenario in place, and
     a phone draws a tapped leaf's card under the tree: there the panel steps aside rather than say the same things again */
- const stacked=gbNarrowList(),phone=!!(gw.B&&gw.B.L&&gw.B.L.narrow),fromList=!!gw.pinned&&gw.pinList===gw.pinned;
+ const phone=!!(gw.B&&gw.B.L&&gw.B.L.narrow),fromList=!!gw.pinned&&gw.pinList===gw.pinned;
  /* (the Next block above the tree stays put, so the tree under it does not move when a leaf is tapped) */
- if(stacked&&!live&&(pin.startsWith('j:')||pin.startsWith('s:')&&(fromList||phone)))return s.done&&!s.blocked?gwNextBlock():null;
+ if(!live&&gwNextStays(pin))return s.done&&!s.blocked?gwNextBlock():null;
  /* a scenario opened in place in a list leaves the panel its journey */
  if(pin.startsWith('s:')&&fromList){const x=gwScen(pin.slice(2));const j=x&&M.J.find(q=>(M.leaves[q.id]||[]).includes(x));if(j){pin='j:'+j.id;who='Its journey'}}
  const head=h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},who),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.refocus=gw.pinned;gw.pinned=null;gw.pinList=null;growPaint()}}},s.done?'Unpin':'Follow'):null);
@@ -1124,7 +1131,10 @@ function gwRestore(){const w=gw.want,s=gw.state;if(!w||!s||gw.busy)return;gw.wan
    ..."). One the rules named from where it starts names only a surface ("UI page in the browser", "tracegrove grow in a
    terminal"), so it gets its actor and verb from that surface, and the first route it calls: "someone opens the UI page in the
    browser, which calls POST /api/grow and 2 more routes"; "someone runs tracegrove grow in a terminal". */
-function gwJourneyDoes(j){const t=String(j&&j.title||'');if(!j||j.titleBy&&j.titleBy!=='rules')return t;
+function gwJourneyDoes(j){const t=String(j&&j.title||'');
+ /* (a journey of the saved state names who titled it in titleBy, the tree's model in by: a title from the spec or an agent is
+    kept in its own words either way) */
+ const by=j&&(j.titleBy||j.by);if(!j||by&&by!=='rules')return t;
  const M=gw.M||gbModel(),U=M.U||{},lc=x=>/^[A-Z][a-z]/.test(x)?x.charAt(0).toLowerCase()+x.slice(1):x;
  const routes=(j.units||[]).filter(id=>id!==j.entry).map(id=>U[id]).filter(u=>u&&u.unitKind==='route'&&!u.root);
  const via=routes.length?', which calls '+routes[0].label+(routes.length>1?' and '+(routes.length-1)+' more route'+(routes.length>2?'s':''):''):'';
@@ -1190,7 +1200,7 @@ function gwVerdict(V,f,tone){const split=V.verdict==='not proven yet'?gwSplit(gw
    return h('span',{class:'gw-vc',title:cs.length?cs.map(c=>gwPlain(c.text)).join('; '):null},!cs.length?(ids.length>1?'breaks promises':'breaks a promise'):'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),cs.length>1?24:30)).join('; '))})():null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   /* while something is pinned the Next block steps aside, and the way to what happened stays with the verdict */
-  f&&f.run&&gw.pinned?h('button',{class:'gw-lnk gw-vopen',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
+  f&&f.run&&gw.pinned&&!gwNextShown()?h('button',{class:'gw-lnk gw-vopen',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
 /* The first screen's next step, in the panel under the mode while nothing is selected, worst first: a failure's why, with its step
    and what it expected and got, then See what happened, Rerun and Heal; for a grow not proven yet, why its next scenario could not
    run, the flows that are ready to prove, or the riskiest scenario's flow to write. One primary action. Selecting a leaf or a row
@@ -1203,7 +1213,7 @@ function gwNextBlock(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||!s.don
   const said=gw.view.said&&gw.view.said[x.id],n=gwStepNo(x);
   /* beside the verdict, which names it, it is "it"; under the tree, far from the verdict, it is named */
   return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],n?[h('b',{class:'gw-stepno'},'Broke at step '+n+'.')]:[said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
-   f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':gw.pinned?null:'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened'):null,
+   f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':gw.pinned&&!gwNextShown()?null:'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened'):null,
    flow&&gwRan(x)?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-rerun',disabled:away||!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(flow)}}},'Rerun'):null,
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-heal',on:{click:()=>openTab('Heal')}},'Heal')])}
  if(V.verdict==='not proven yet'){const n=gwNextOf();if(!n)return null;const [k,y,btn]=n;
@@ -1262,10 +1272,10 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
  /* the choice opens with the whole drafted tree: no mode is chosen or previewed until the pointer moves onto a chip or a chip takes focus,
     so a pointer that happens to rest where a chip appears previews nothing */
  if(asked&&gw.askFor!==(gw.id||'saved')){gw.askFor=gw.id||'saved';gw.armed=false;if(gw.preview){gw.preview=null}}
- /* once chosen, the pressed button says the mode; who chose it is said to a reader of the page, in the group's name, not on the
-    first screen */
+ /* once chosen, the hint under the buttons says the mode and who chose it (your choice, set at start, the default), and the
+    group's name says it to a reader of the page too */
  const who=locked?'Mode: '+lbl(s.mode)+(s.modeBy==='you'?', your choice.':s.modeBy==='flag'?', set at start.':', the default.'):'';
- const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?'':'You choose once scenarios are drafted.';
+ const said=asked?'Choose how much to prove. Tracing is done; nothing runs until you pick.':locked?who:'You choose once scenarios are drafted.';
  /* pointing at a mode previews it on the tree, and a line beside the hint says what it keeps and cuts; the hint itself stays.
     A finger cannot point: a tap previews a mode, and while the choice is open a second tap on the same mode chooses it */
  const touch=gwTouch();
@@ -1474,10 +1484,18 @@ function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw
  const wood=[...svg.querySelectorAll('path.w')].filter(e=>e.__pts&&e.__pts.length>1).map(e=>[e.__pts,e.__w||[]]);
  const onWood=r=>wood.some(([P,W])=>{for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],m=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2)),hw=(W[i-1]||2)/2+2;
   for(let k=0;k<=m;k++){const x=a[0]+(b[0]-a[0])*k/m,y=a[1]+(b[1]-a[1])*k/m;if(x>r[0]-hw&&x<r[2]+hw&&y>r[1]-hw&&y<r[3]+hw)return true}}return false});
- const hit=r=>others.some(o=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1])||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height||onWood(r);
+ /* and off the drawing's corners: where nothing beside a root, knot or leaf is open, its card stands in a corner of the
+    drawing (gbTip), so a word there would leave that card nowhere it covers no name. The corners are as wide as the narrowest
+    card and its 12 px margin, and as tall as a card commonly is; a phone opens its cards under the drawing and keeps them all */
+ const keep=[];if(gw.B&&gw.B.L&&!gw.B.L.narrow&&gw.B.tip&&gw.B.tip.parentNode){const c=gw.B.tip.parentNode.getBoundingClientRect(),sr=svg.getBoundingClientRect(),
+   x0=c.left,x1=Math.min(c.right,sr.right),y0=c.top,y1=sr.bottom,cw=280+12+4,ch=220,sb=(a,b2,c2,d)=>{const p=new DOMPoint(a,b2).matrixTransform(I),q=new DOMPoint(c2,d).matrixTransform(I);return [p.x,p.y,q.x,q.y]};
+  if(x1-x0>2*cw)keep.push(sb(x0,y0,x0+cw,y0+ch),sb(x1-cw,y0,x1,y0+ch),sb(x0,y1-ch,x0+cw,y1),sb(x1-cw,y1-ch,x1,y1))}
+ const meets=(r,o)=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1];
+ const hit0=r=>others.some(o=>meets(r,o))||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height||onWood(r),hit=r=>hit0(r)||keep.some(o=>meets(r,o));
  /* then the nearest free place round the leaf, ring by ring */
  for(let r=gap+4;r<=fs*7;r+=fs*.6)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[1,1],[-1,1],[0,-1],[1,-1],[-1,-1]])C.push([cx+dx*(lb[2]-lb[0])/2+dx*r,cy+dy*(lb[3]-lb[1])/2+dy*r+(dy>0?hh:dy<0?0:hh*.35),dx>0?'start':dx<0?'end':'middle']);
- const at=C.find(c=>!hit(rect(c)));if(!at)return;
+ /* (where every free place round the leaf is in a corner, it takes the nearest of those: a word is better than none) */
+ const at=C.find(c=>!hit(rect(c)))||C.find(c=>!hit0(rect(c)));if(!at)return;
  svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl pre'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':leaf.getAttribute('data-k'),'data-w':word},word));
  /* drawn unseen for a frame, then shown: no frame paints it before a frame's own reading of the tree has it */
  requestAnimationFrame(()=>requestAnimationFrame(()=>{const t=svg.querySelector('.gw-flbl.pre');if(t)t.classList.remove('pre')}))}
