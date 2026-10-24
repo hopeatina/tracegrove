@@ -432,8 +432,8 @@ describe('From a grown scenario to its run', () => {
     // a run whose evidence did not verify is still flow ready, with why; nothing could not run, so the key says only flow ready
     const unverified = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'passed', why: 'Not proven: the run evidence did not verify' } as GrowEvent : e));
     await pinned(page, unverified, 's10');
-    expect(await said(page, 's10')).toMatchObject({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['no flow yet', 'no flow yet', 'no flow yet', 'flow ready (not run)'], row: 'flow ready', card: 'flow ready', why: 'Not proven: the run evidence did not verify.', write: false,
-      leaf: 'flow ready: Not proven: the run evidence did not verify', mark: 'idle', key: ['flow ready'], live: ['3 no flow yet', '1 flow ready', '3 passed'] });
+    expect(await said(page, 's10')).toMatchObject({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['flow ready (not run)', 'no flow yet', 'no flow yet', 'no flow yet'], row: 'flow ready (not run)', card: 'flow ready (not run)', why: 'Not proven: the run evidence did not verify.', write: false,
+      leaf: 'flow ready (not run): Not proven: the run evidence did not verify', mark: 'idle', key: ['flow ready (not run)'], live: ['3 no flow yet', '1 flow ready (not run)', '3 passed'] });
     await page.close();
   });
 
