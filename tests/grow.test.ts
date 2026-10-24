@@ -3704,7 +3704,8 @@ describe('Grow page', () => {
     const under = (e: Element) => {
       const r = e.querySelector('.blade')!.getBoundingClientRect(), at = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2);
       return drawn.find((q) => q !== e && !!(e.compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) && (Array.from(q.querySelectorAll('.blade')) as SVGGeometryElement[]).some((b) => {
-        const m = b.getScreenCTM(); return !!m && getComputedStyle(b).display !== 'none' && b.isPointInFill(at.matrixTransform(m.inverse()));
+        // (a leaf still opening from its stalk at zero scale covers nothing, and its matrix has no inverse)
+        const m = b.getScreenCTM(); return !!m && m.a * m.d - m.b * m.c !== 0 && getComputedStyle(b).display !== 'none' && b.isPointInFill(at.matrixTransform(m.inverse()));
       }));
     };
     for (const e of Array.from(B.svg.querySelectorAll('.gb-lf.pv-add:not(.bud)')) as Element[]) if (seen(e)) {
