@@ -761,7 +761,9 @@ describe('Grow page', () => {
     const browser = await chromium.launch({ headless: true });
     try {
       const mouse = await growPage(browser, server.url, state, 1440);
-      expect(await mouse.getByTestId('grow-mode-preview').textContent()).toMatch(/^Point at another mode/);
+      // a mouse is told to point in the mode row's title, so the first screen spends no words on it
+      expect(await mouse.getByTestId('grow-mode-preview').textContent()).toBe('');
+      expect(await mouse.getByTestId('grow-modes').getAttribute('title')).toMatch(/^Point at another mode/);
       // The card previewed after the choice looks as the card previewed before it.
       // the look once its transition has run, however late a busy page starts it
       const ring = async (id: string) => { await mouse.getByTestId('grow-mode-' + id).focus(); await mouse.waitForTimeout(400); return mouse.getByTestId('grow-mode-' + id).evaluate(async (b) => { void getComputedStyle(b).boxShadow; await Promise.all(b.getAnimations().map((a) => a.finished.catch(() => null))); return { pv: b.classList.contains('pv'), shadow: getComputedStyle(b).boxShadow, edge: getComputedStyle(b).borderTopStyle + ' ' + getComputedStyle(b).borderTopColor }; }); };
@@ -2093,7 +2095,7 @@ describe('Grow page', () => {
 
   /** The tree's form as drawn: which journey the crown holds, how its wood is sized and set, and how its leaves sit. */
   const form = () => {
-    const w = (0, eval)('({ gw, gbHf, gbModel, gbOrderOf })'), B = w.gw.B, S = w.gw.state, hf: number = w.gbHf(B);
+    const w = (0, eval)('({ gw, gbHf, gbModel, gbOrderOf, gwJourneyTitle })'), B = w.gw.B, S = w.gw.state, hf: number = w.gbHf(B);
     const out = { bad: [] as string[], crown: '', head: '', failing: false, title: '', nL: 0, D: 0, Ht: 0, L: 0, h1: 0, lean: 0, sides: [0, 0], hung: 0, below: 0, over: [] as number[], halos: 0, stem: 0 };
     const bad = (what: string, v?: unknown) => out.bad.push(what + (v === undefined ? '' : ' ' + JSON.stringify(v)));
     const on = (el: any) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
@@ -2105,7 +2107,7 @@ describe('Grow page', () => {
     // the crown holds the headline journey: the first in the tree's numbering that failed, else the first
     const fails = (jid: string) => S.scenarios.some((x: any) => x.journey === jid && S.run[x.id]?.st === 'fail');
     const order = w.gbOrderOf(w.gw.M || w.gbModel()) as { id: string; title: string }[], head = order.find((j) => fails(j.id)) ?? order[0]!;
-    out.crown = crown.jid; out.head = head.id; out.failing = fails(head.id); out.title = head.title;
+    out.crown = crown.jid; out.head = head.id; out.failing = fails(head.id); out.title = w.gwJourneyTitle(head);
     if (S.journeys.some((j: { id: string }) => fails(j.id)) && !fails(crown.jid)) bad('a journey failed and the crown holds one that did not');
     // a scalene canopy: its crest at most three quarters across the widest cushion below it, and no pad wider than the one
     // below it (to 5%), the lowest the widest
