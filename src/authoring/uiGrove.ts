@@ -188,6 +188,7 @@ ${BONSAI_CSS}
 .gw-sp.agent,.gw-sp.run,.gw-sp.needs{background:var(--gold-bg);color:var(--gold)}.gw-sp.open{background:none;border-color:var(--line2);color:var(--ink3)}
 .gw-cdet .gw-sp{margin-top:1px}
 .gb-tip .k{text-transform:none;letter-spacing:0}
+.gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}
 .gw-olp{margin:0 0 14px}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
 .gb-hapr.gw-facts2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px}.gb-hapr.gw-facts2 .btn.sm{min-height:32px;padding:0 12px;font-size:13px}.gb-olin .gw-more,.gb-olin .gw-ev{margin:6px 0 0}
 .gw-chip.pr{white-space:normal;max-width:100%;font-family:var(--sans);text-align:left}.gw-chip.pr.f{background:var(--verm-bg);color:var(--verm-ink)}
@@ -794,15 +795,29 @@ function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
  return h('div',{class:'gw-lanes'},h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'mock · stand-in'),mock,h('span',{class:'note'},'Every PR. Can fail, slow down or hang up on purpose.')),h('div',{class:'gw-ln'},h('span',{class:'gw-chip'},'real · sandbox'),real,h('span',{class:'note'},note)))}
 /* Every scenario this mode leaves not tested yet, the smallest mode's (the riskiest) first, each with its reason in the one word the tree uses and the way
    to test it: Write this flow when it has none, Rerun when it has one. No truncation: the list is the answer to "what is left". */
-function gwUntested(){const s=gw.state;if(!s.done||!s.modeBy)return null;const rk={min:0,std:1,max:2};
- const xs=s.scenarios.filter(x=>gwIn(x)&&(!s.run[x.id]||s.run[x.id].st==='not_run')).map((x,i)=>({x,i})).sort((a,b)=>(rk[a.x.mode]??1)-(rk[b.x.mode]??1)||a.i-b.i).map(o=>o.x);
- if(!xs.length)return null;
- return h('section',{class:'card','aria-label':'Not tested yet','data-testid':'grow-untested'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Not tested yet · '+xs.length),
-  h('ul',{class:'gw-ulist'},xs.map(x=>{const w=gwOpenWord(x),fl=gwFlowOf(x),r=s.run[x.id];
-   return h('li',{'data-sid':x.id},h('button',{class:'t gw-lnk',type:'button',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},...gwRich(gwVia(x.title).title)),
-    h('span',{class:'w'+(gwOpenKey(x)==='nf'?' nf':''),title:r&&r.why||''},w),
-    !fl?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-write-'+x.id,on:{click:()=>gwDrWrite(x)}},'Write this flow'):
-     h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it'))})))}
+/* Not tested yet, in the Outline's order: journey by journey (then part checks, then existing flows), and in each by reason, in
+   the verdict's order (could not run, flow ready, no flow yet); a title said twice gets its part ("... — uiGrove.ts"). Past 8
+   rows the rest folds behind "Show all N". */
+function gwUntestedRows(){const s=gw.state,M=gw.M||gbModel(),rk=k=>['could','ready','nf'].indexOf(k);
+ const xs=s.scenarios.filter(x=>gwIn(x)&&(!s.run[x.id]||s.run[x.id].st==='not_run'));
+ const J=gbOrderOf(M),gOf=x=>{const n=J.findIndex(j=>(M.leaves[j.id]||[]).includes(x));return n>=0?n:J.length+(x.scenarioKind==='regression'?1:0)};
+ const ord=new Map(gbOrd(s.scenarios).map((x,i)=>[x.id,i]));
+ return xs.map(x=>({x,g:gOf(x),k:rk(gwOpenKey(x)),o:ord.get(x.id)})).sort((a,b)=>a.g-b.g||a.k-b.k||a.o-b.o)}
+function gwUntested(){const s=gw.state;if(!s.done||!s.modeBy)return null;
+ const rows=gwUntestedRows();if(!rows.length)return null;const M=gw.M||gbModel(),J=gbOrderOf(M);
+ const T=x=>gwPlain(gwVia(x.title).title),seen={};for(const r of rows)seen[T(r.x)]=(seen[T(r.x)]||0)+1;
+ const all=!!(gw.open&&gw.open.untested),show=all||rows.length<=8?rows:rows.slice(0,8);
+ const head=g=>g<J.length?'Journey '+(g+1)+': '+gwPlain(gwJourneyTitle(J[g])):g===J.length?'Part checks':'Existing flows';
+ const items=[];let last=-1;
+ for(const {x,g} of show){if(g!==last){items.push(h('li',{class:'gw-ugh'},head(g)));last=g}
+  const w=gwOpenWord(x),fl=gwFlowOf(x),r=s.run[x.id],t=T(x),u=(M.U[x.unit]||{}).label;
+  items.push(h('li',{'data-sid':x.id},h('button',{class:'t gw-lnk',type:'button',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},...gwRich(gwVia(x.title).title),seen[t]>1&&u?h('span',{class:'gw-uctx'},' — ',...gwCodeText(gwPlain(u))):null),
+   h('span',{class:'w'+(gwOpenKey(x)==='nf'?' nf':''),title:r&&r.why||''},w),
+   !fl?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-write-'+x.id,on:{click:()=>gwDrWrite(x)}},'Write this flow'):
+    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it')))}
+ return h('section',{class:'card','aria-label':'Not tested yet','data-testid':'grow-untested'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Not tested yet · '+rows.length),
+  h('ul',{class:'gw-ulist'},items),
+  rows.length>8?h('button',{class:'gw-lnk gw-umore',type:'button','data-testid':'grow-untested-all','aria-expanded':String(all),on:{click:()=>{(gw.open||(gw.open={})).untested=!all;growPaint()}}},all?'Show fewer':'Show all '+rows.length):null)}
 function gwExt(){const s=gw.state;if(!s.extOrder.length)return null;const ids=s.extOrder;const review=ids.filter(x=>s.ext[x].state==='review').length;
  return h('section',{class:'card','aria-label':'Built by the agent','data-testid':'grow-agent-written'},h('details',{class:'gw-notes',open:review?true:null},h('summary',{style:'margin:0;padding:0;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap'},h('span',{class:'gw-eyebrow',style:'margin:0;display:inline'},'Built by the agent · '+ids.length),
   h('span',{class:'small muted'},ids.filter(x=>s.ext[x].state==='proven').length+' proven · '+review+' need review · '+ids.filter(x=>['unproven','draft'].includes(s.ext[x].state)).length+' not used for proof')),
