@@ -188,6 +188,8 @@ ${BONSAI_CSS}
 .gw-sp.agent,.gw-sp.run,.gw-sp.needs{background:var(--gold-bg);color:var(--gold)}.gw-sp.open{background:none;border-color:var(--line2);color:var(--ink3)}
 .gw-cdet .gw-sp{margin-top:1px}
 .gb-tip .k{text-transform:none;letter-spacing:0}
+/* a card opening under the tree never scrolls the page: the browser does not anchor scrolling inside the grow page */
+.gw{overflow-anchor:none}
 .gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}
 .gw-olp{margin:0 0 14px}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
 .gb-hapr.gw-facts2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px}.gb-hapr.gw-facts2 .btn.sm{min-height:32px;padding:0 12px;font-size:13px}.gb-olin .gw-more,.gb-olin .gw-ev{margin:6px 0 0}
@@ -730,7 +732,8 @@ function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  /* under the tree (a tablet or a phone) the Journeys card comes straight after and opens a journey or a scenario in place, and
     a phone draws a tapped leaf's card under the tree: there the panel steps aside rather than say the same things again */
  const stacked=gbNarrowList(),phone=!!(gw.B&&gw.B.L&&gw.B.L.narrow),fromList=!!gw.pinned&&gw.pinList===gw.pinned;
- if(stacked&&!live&&(pin.startsWith('j:')||pin.startsWith('s:')&&(fromList||phone)))return null;
+ /* (the Next block above the tree stays put, so the tree under it does not move when a leaf is tapped) */
+ if(stacked&&!live&&(pin.startsWith('j:')||pin.startsWith('s:')&&(fromList||phone)))return s.done&&!s.blocked?gwNextBlock():null;
  /* a scenario opened in place in a list leaves the panel its journey */
  if(pin.startsWith('s:')&&fromList){const x=gwScen(pin.slice(2));const j=x&&M.J.find(q=>(M.leaves[q.id]||[]).includes(x));if(j){pin='j:'+j.id;who='Its journey'}}
  const head=h('div',{class:'row',style:'justify-content:space-between'},h('span',{class:'who'},who),gw.pinned?h('button',{class:'btn ghost sm',on:{click:()=>{gw.refocus=gw.pinned;gw.pinned=null;gw.pinList=null;growPaint()}}},s.done?'Unpin':'Follow'):null);
@@ -1431,12 +1434,20 @@ for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
    on the first side of the leaf where it touches no name, leaf or count, and is placed again after every paint, once the leaf
    has stopped moving; a leaf that is not drawn (cut, or hidden by a preview) has none. */
 function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw.tree!=='grove'||!s)return;
- for(const e of svg.querySelectorAll('.gw-flbl'))e.remove();
  const V=gw.view&&gw.view.verdict,f=V&&V.first;let leaf=f?svg.querySelector('.gb-lf.fail:not(.gone)[data-k="s:'+f.scenario+'"]'):null,word='failed';
  if(!leaf)leaf=svg.querySelector('.gb-lf.fail:not(.gone):not(.bud)');
  if(!leaf){leaf=svg.querySelector('.gb-lf.hang:not(.gone):not(.bud)');word='how it fails'}
+ /* placed once on a drawing, where the grown tree puts it, and never moved: a word on the tree stays where it was first drawn */
+ const had=svg.querySelector('.gw-flbl');if(had&&leaf&&had.getAttribute('data-for')===leaf.getAttribute('data-k')&&had.getAttribute('data-w')===word)return;
+ if(had)had.remove();
  if(!leaf||!s.done)return;
+ /* only once the tree has grown: a label is never ahead of its wood */
+ const B=gw.B,end=B&&B.grow?Math.max(0,...B.grow.map(q=>(q.t0||0)+(q.ms||0))):0,left=end-performance.now();
+ if(left>0){clearTimeout(gw.flT);gw.flT=setTimeout(gwFailLabel,left+60);return}
  const run=leaf.getAnimations?leaf.getAnimations({subtree:true}).filter(a=>a.playState==='running'):[];
+ /* and once its leaf shows: it and everything it hangs in drawn at full strength */
+ let shown=true;for(let e=leaf;e&&e!==svg;e=e.parentNode)if(Number(getComputedStyle(e).opacity)<.99){shown=false;break}
+ if(!shown){clearTimeout(gw.flT);gw.flT=setTimeout(gwFailLabel,160);return}
  if(run.length){if(!gw.flWait){gw.flWait=true;Promise.all(run.map(a=>a.finished.catch(()=>null))).then(()=>{gw.flWait=false;gwFailLabel()})}return}
  const inv=svg.getScreenCTM();if(!inv)return;const I=inv.inverse();
  const box=el=>{const r=el.getBoundingClientRect();if(!r.width&&!r.height)return null;const a=new DOMPoint(r.left,r.top).matrixTransform(I),b=new DOMPoint(r.right,r.bottom).matrixTransform(I);return [a.x,a.y,b.x,b.y]};
@@ -1448,11 +1459,17 @@ function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw
  const pads=[...svg.querySelectorAll('.pad')].map(box).filter(Boolean);others.push(...pads);
  const home=pads.find(p=>cx>p[0]&&cx<p[2]&&cy>p[1]&&cy<p[3]);
  const C=[[lb[2]+gap,cy+hh*.35,'start'],[lb[0]-gap,cy+hh*.35,'end'],[cx,lb[3]+hh+gap*.4,'middle'],[cx,lb[1]-gap,'middle']];
- if(home)C.push([cx,home[3]+hh+gap,'middle'],[cx+w/2,home[3]+hh+gap,'middle'],[cx-w/2,home[3]+hh+gap,'middle']);
+ if(home)C.push([cx,home[3]+hh+gap,'middle'],[cx+w/2,home[3]+hh+gap,'middle'],[cx-w/2,home[3]+hh+gap,'middle'],[home[2]+gap,cy+hh*.35,'start'],[home[0]-gap,cy+hh*.35,'end'],[home[2]+gap,home[3],'start'],[home[0]-gap,home[3],'end']);
  const rect=([x,y,a])=>{const x0=a==='start'?x:a==='end'?x-w:x-w/2;return [x0-2,y-hh,x0+w+2,y+3]};
- const hit=r=>others.some(o=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1])||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height;
+ /* and never on the wood: a word over a branch would hide where a pad joins it */
+ const wood=[...svg.querySelectorAll('path.w')].filter(e=>e.__pts&&e.__pts.length>1).map(e=>[e.__pts,e.__w||[]]);
+ const onWood=r=>wood.some(([P,W])=>{for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],m=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2)),hw=(W[i-1]||2)/2+2;
+  for(let k=0;k<=m;k++){const x=a[0]+(b[0]-a[0])*k/m,y=a[1]+(b[1]-a[1])*k/m;if(x>r[0]-hw&&x<r[2]+hw&&y>r[1]-hw&&y<r[3]+hw)return true}}return false});
+ const hit=r=>others.some(o=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1])||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height||onWood(r);
+ /* then the nearest free place round the leaf, ring by ring */
+ for(let r=gap+4;r<=fs*7;r+=fs*.6)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[1,1],[-1,1],[0,-1],[1,-1],[-1,-1]])C.push([cx+dx*(lb[2]-lb[0])/2+dx*r,cy+dy*(lb[3]-lb[1])/2+dy*r+(dy>0?hh:dy<0?0:hh*.35),dx>0?'start':dx<0?'end':'middle']);
  const at=C.find(c=>!hit(rect(c)));if(!at)return;
- svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word'},word))}
+ svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':leaf.getAttribute('data-k'),'data-w':word},word))}
 if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwBarHome();gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
