@@ -2487,7 +2487,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
   gwPut(tip,h('span',{class:'k'},(r=>r.charAt(0).toUpperCase()+r.slice(1))(j?gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')),h('b',{},x.title),
    /* a failure says where it broke, in the same words as the list, then where on the route */
-   r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140,x.id)):h('div',{class:'st '+w.c},w.t),
+   r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140,x.id,1)):h('div',{class:'st '+w.c},w.t),
    /* the hop it checks comes before the whole path; the hops it reaches are in ink and the rest faint, as the tree lights
       them (gbReach) */
    j&&j.units.includes(x.unit)?h('div',{class:'st hopl'},x.scenarioKind==='happy'?'Runs the whole journey, '+j.units.length+' hop'+(j.units.length===1?'':'s'):['Exercises ',h('b',{class:'m'},...gwCodeText((M.U[x.unit]||{}).label||x.unit)),' (hop '+(j.units.indexOf(x.unit)+1)+' of '+j.units.length+')']):null,
@@ -2689,7 +2689,7 @@ function gbJourneyCard(jid){const s=gw.state,M=gw.M;const j=M.J.find(q=>q.id===j
  return [h('h3',{class:'gw-jt'},...gwRich(j.title)),h('div',{class:'where'},gwFacts([n?'Journey '+n:null,gbStarts(j,M),j.by&&j.by!=='rules'?'named by '+(j.by==='spec'?'the spec':j.by):null])),
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,wound)),
   fails.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},fails.length===1?'Where it broke':fails.length+' failures'),
-   fails.flatMap(x=>[gbItem(x,{class:'gb-ols','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;gw.refocus='s:'+x.id;growPaint()}}},[gwBadge(x)]),h('div',{class:'err'},gwBroke(s.run[x.id],0,x.id)),gwHappened(x),gwDrEntry(x)])):null,
+   fails.flatMap(x=>[gbItem(x,{class:'gb-ols','data-sid':x.id,on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;gw.refocus='s:'+x.id;growPaint()}}},[gwBadge(x)]),h('div',{class:'err'},gwBroke(s.run[x.id],0,x.id,1)),gwHappened(x),gwDrEntry(x)])):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Scenarios'),h('div',{class:'gw-jst'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,gbToks(toks)),
    list.length&&gw.tree==='grove'?h('button',{class:'gw-lnk',on:{click:()=>{(gw.open||(gw.open={}))['j:'+jid]=true;gw.reveal='j:'+jid;gw.refocus='j:'+jid;growPaint()}}},'Listed under Journeys, below ↓'):null),
   crit.length?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Spec it answers'),h('div',{class:'gw-chips'},crit.map(gwCrit))):null]}
@@ -2733,7 +2733,7 @@ function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw
  if(s.modeBy&&!gwIn(x))return gbItem(x,{tag:'div',class:'gb-ols cut','data-sid':x.id},[h('span',{class:'gw-badge'},gwML(x.mode)+' grows it')]);
  return [gbItem(x,{class:'gb-ols'+(pin?' sel':'')+(hl?' hl':''),'data-sid':x.id,'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k),mouseenter:()=>gbLit2(k),mouseleave:()=>gbLit2(null)}},
    [x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)]),
-  r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180,x.id)):null,
+  r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180,x.id,1)):null,
   /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too; every
      row in this mode carries its one next action: Rerun its flow, Run a flow that never ran, or Write the flow it lacks */
   !open&&(gwRan(x)||gwRowAct(x))?h('div',{class:'gb-hapr'},gwRan(x)?gwHappened(x):null,gwRan(x)?gwDrEntry(x):null,gwRowAct(x)):null,open?gbRowBody(x):null]}
@@ -2750,7 +2750,7 @@ function gwRowStep(x){const D=gwHap(x),f=gw.view&&gw.view.verdict&&gw.view.verdi
  return h('div',{class:'gb-rstep','data-testid':'grow-row-step'},h('p',{},'Step '+(i+1)+' · '+st.name),a?h('p',{class:'muted'},'The app answered'+(a[0]!==i?' at step '+(a[0]+1):'')+': '+gwCut(String(a[1].answer),160)):null)}
 /* A row opened in place: where it broke first, when it broke; then the claim, said as what the run did with it; then its chips. */
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
- gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,r&&r.st==='fail'?gwRowStep(x):null,(a=>a?h('div',{class:'gb-hapr'},a):null)(gwRowAct(x)),
+ gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id,1)):null,r&&r.st==='fail'?gwRowStep(x):null,(a=>a?h('div',{class:'gb-hapr'},a):null)(gwRowAct(x)),
   x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null,
   h('div',{class:'gw-chips'},h('span',{class:'gw-chip'+(x.mode==='min'?' min':'')},gwML(x.mode)),x.criteria.map(id=>gwCrit(id,x)),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
    /* the row's badge already says "no flow yet"; the body names the flow when there is one, and why one that has a flow is not

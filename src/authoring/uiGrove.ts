@@ -172,7 +172,7 @@ ${BONSAI_CSS}
 .gw-ulist{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}.gw-ulist li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 12px;align-items:center;min-height:44px;border-top:1px solid var(--line);padding-top:6px}
 .gw-ulist .t{text-align:left;font:14px/20px var(--sans);color:var(--ink)}.gw-ulist .w{font:12px/18px var(--mono);color:var(--ink3);white-space:nowrap}.gw-ulist .w.nf{color:var(--muted)}
 @media (max-width:640px){.gw-ulist li{grid-template-columns:minmax(0,1fr) auto}.gw-ulist .w{grid-column:1}}
-@media (max-width:640px){.gw .gw-modes.set{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.gw .gw-modes.set button{padding:4px 6px!important;justify-content:center;white-space:nowrap;gap:5px}.gw .gw-modes.set button .gw-micon{display:none}
+@media (max-width:640px){.gw .gw-modes.set{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.gw .gw-modes.set button{padding:4px 4px!important;justify-content:center;white-space:nowrap;gap:1px;flex-direction:column;min-width:0}.gw .gw-modes.set button .gw-micon{display:block;width:20px;height:20px}.gw .gb-mode{margin-left:0;margin-right:0}
  .gw button,.gw summary,.gw a{min-height:44px!important;min-width:44px}.gw button.gw-lnk,.gw a.gw-lnk{display:inline-flex;align-items:center}.gw summary{display:flex;align-items:center}}
 .gw-ev{margin:8px 0 0;font:12px/18px var(--mono);color:var(--ink2)}.gw-ev p{margin:0}.gw-ev .muted{color:var(--ink3)}
 /* a criterion's state, in the leaf palette: proved moss, partly proved half moss, failed red, needs you a gold mark of its own */
@@ -576,7 +576,9 @@ function gwHops(labels,cls){return [h('ol',{class:'gw-hops gw-hp'},labels.map((l
    run names the hop, "On the route: at|after <hop>" on a line of its own. When the scenario's run (sid) recorded the check that
    broke, the message is what that check expected and got, in the verdict's words (view.said, from the server): a grow saved
    before its runs said it that way reads the same as the verdict above it. */
-function gwBroke(r,max,sid){const w=String(r&&r.why||'').trim();const i=w.indexOf(': ');const cut=t=>max?gwCut(t,max):t;
+/* (with step, the step it broke at leads: "Step 4 · Broke at check ...") */
+function gwBroke(r,max,sid,withStep){if(withStep){const x=sid&&gw.state.scenarios.find(q=>q.id===sid),n=x&&gwStepNo(x),b=gwBroke(r,max,sid);return n?[h('b',{class:'gw-stepno'},'Step '+n+' · '),...b]:b}
+ const w=String(r&&r.why||'').trim();const i=w.indexOf(': ');const cut=t=>max?gwCut(t,max):t;
  const said=sid&&gw.view&&gw.view.said&&gw.view.said[sid]||null;
  const route=r&&r.hop?h('span',{class:'gw-onroute'},'On the route: '+(r.after?'after ':'at '),...gwCodeText(r.hop)):null;
  if(!w&&!said)return [h('b',{},'Failed'),', with no reason recorded',route];
