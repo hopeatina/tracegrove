@@ -190,7 +190,7 @@ ${BONSAI_CSS}
 .gb-tip .k{text-transform:none;letter-spacing:0}
 /* a card opening under the tree never scrolls the page: the browser does not anchor scrolling inside the grow page */
 .gw{overflow-anchor:none}
-.gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}
+.gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}.gw-call .gw-vopen{justify-self:start;min-height:32px}.gw-urest{margin:10px 0 0;font:13px/20px var(--sans);color:var(--ink3)}.gw-urest b{font-weight:500;color:var(--ink2)}
 .gw-olp{margin:0 0 14px}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
 .gb-hapr.gw-facts2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px}.gb-hapr.gw-facts2 .btn.sm{min-height:32px;padding:0 12px;font-size:13px}.gb-olin .gw-more,.gb-olin .gw-ev{margin:6px 0 0}
 .gw-chip.pr{white-space:normal;max-width:100%;font-family:var(--sans);text-align:left}.gw-chip.pr.f{background:var(--verm-bg);color:var(--verm-ink)}
@@ -820,6 +820,10 @@ function gwUntested(){const s=gw.state;if(!s.done||!s.modeBy)return null;
     h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it')))}
  return h('section',{class:'card','aria-label':'Not tested yet','data-testid':'grow-untested'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Not tested yet · '+rows.length),
   h('ul',{class:'gw-ulist'},items),
+  /* folded, the rest are still named, in the same order, so nothing not tested is hidden: their actions come with Show all */
+  !all&&rows.length>8?h('p',{class:'gw-urest','data-testid':'grow-untested-rest'},(()=>{const out=[],rest=rows.slice(8);let g=-1;
+   for(const r of rest){if(r.g!==g){g=r.g;out.push(h('b',{},(out.length?' ':'')+(g<J.length?'Journey '+(g+1):head(g))+': '))}else out.push(' · ');
+    const t=T(r.x),u=(M.U[r.x.unit]||{}).label;out.push(t+(seen[t]>1&&u?' — '+gwPlain(u):'')+' ('+gwOpenWord(r.x)+')')}return out})()):null,
   rows.length>8?h('button',{class:'gw-lnk gw-umore',type:'button','data-testid':'grow-untested-all','aria-expanded':String(all),on:{click:()=>{(gw.open||(gw.open={})).untested=!all;growPaint()}}},all?'Show fewer':'Show all '+rows.length):null)}
 function gwExt(){const s=gw.state;if(!s.extOrder.length)return null;const ids=s.extOrder;const review=ids.filter(x=>s.ext[x].state==='review').length;
  return h('section',{class:'card','aria-label':'Built by the agent','data-testid':'grow-agent-written'},h('details',{class:'gw-notes',open:review?true:null},h('summary',{style:'margin:0;padding:0;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap'},h('span',{class:'gw-eyebrow',style:'margin:0;display:inline'},'Built by the agent · '+ids.length),
@@ -1183,7 +1187,9 @@ function gwVerdict(V,f,tone){const split=V.verdict==='not proven yet'?gwSplit(gw
   /* the promise it breaks, in the spec's words, shortened; the whole of it in the title */
   f&&f.promise?(()=>{const ids=f.promise.split(/,\s*/),cs=ids.map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean);
    return h('span',{class:'gw-vc',title:cs.length?cs.map(c=>gwPlain(c.text)).join('; '):null},!cs.length?(ids.length>1?'breaks promises':'breaks a promise'):'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),cs.length>1?24:30)).join('; '))})():null,
-  f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null)}
+  f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
+  /* while something is pinned the Next block steps aside, and the way to what happened stays with the verdict */
+  f&&f.run&&gw.pinned?h('button',{class:'gw-lnk gw-vopen',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
 /* The first screen's next step, in the panel under the mode while nothing is selected, worst first: a failure's why, with its step
    and what it expected and got, then See what happened, Rerun and Heal; for a grow not proven yet, why its next scenario could not
    run, the flows that are ready to prove, or the riskiest scenario's flow to write. One primary action. Selecting a leaf or a row
@@ -1195,8 +1201,8 @@ function gwNextBlock(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||!s.don
  if(V.verdict==='not ready'&&x){const r=s.run[x.id],flow=r&&r.flow||x.flow,cfg=s.flows&&s.flows.config||null,away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
   const said=gw.view.said&&gw.view.said[x.id],n=gwStepNo(x);
   /* beside the verdict, which names it, it is "it"; under the tree, far from the verdict, it is named */
-  return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],n?[h('b',{class:'gw-stepno'},'Broke at step '+n),'.']:[said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
-   f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null,
+  return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],n?[h('b',{class:'gw-stepno'},'Broke at step '+n+'.')]:[said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
+   f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':gw.pinned?null:'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened'):null,
    flow&&gwRan(x)?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-rerun',disabled:away||!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(flow)}}},'Rerun'):null,
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-heal',on:{click:()=>openTab('Heal')}},'Heal')])}
  if(V.verdict==='not proven yet'){const n=gwNextOf();if(!n)return null;const [k,y,btn]=n;
@@ -1368,7 +1374,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const cmp=s.modeBy?h('div',{class:'gw-lgcmp',role:'group','aria-label':GB_W.modes},h('h4',{class:'gw-lgh'},GB_W.modes),gwModeTable('key')):null;
  /* the drawing says what it is in one caption, and a key counts only the marks it draws, worst first; the full key (every kind
     of mark, the modes side by side, how to read a pad) opens on asking, and is built only then */
- const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'The crown is its happy path; side branches, what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Branches are journeys. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.');
+ const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change. Leaves are scenarios; one hanging below its pad is a way it fails.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
  const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};
