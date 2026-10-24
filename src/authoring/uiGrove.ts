@@ -1192,12 +1192,12 @@ function gwNextBlock(){const s=gw.state,V=gw.view&&gw.view.verdict;if(!V||!s.don
  if(V.verdict==='not ready'&&x){const r=s.run[x.id],flow=r&&r.flow||x.flow,cfg=s.flows&&s.flows.config||null,away=!state.hasConfig&&!!cfg&&cfg.indexOf('/')>0;
   const said=gw.view.said&&gw.view.said[x.id],n=gwStepNo(x);
   /* beside the verdict, which names it, it is "it"; under the tree, far from the verdict, it is named */
-  return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],[n?h('b',{class:'gw-stepno'},'Step '+n+': '):null,said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
+  return box([h('span',{class:'gw-nfull'},'See why ',...q(x.title),' failed'),h('span',{class:'gw-nshort'},'See why it failed')],n?[h('b',{class:'gw-stepno'},'Broke at step '+n),'.']:[said||gwPlain(String(r&&r.why||'')).replace(/^[^:]*:\s*/,'')],[
    f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null,
    flow&&gwRan(x)?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-rerun',disabled:away||!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(flow)}}},'Rerun'):null,
    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-next-heal',on:{click:()=>openTab('Heal')}},'Heal')])}
  if(V.verdict==='not proven yet'){const n=gwNextOf();if(!n)return null;const [k,y,btn]=n;
-  if(k==='ready'){const m=gwInView().filter(z=>gwStKey(z)==='ready').length;return box(['Prove the '+(m===1?'flow that is ready':m+' ready flows')],null,[btn])}
+  if(k==='ready'){const m=gwInView().filter(z=>gwStKey(z)==='ready').length;return box(['Prove '+(m===1?'the flow that is ready':m+' ready flows')],null,[btn])}
   if(k==='nf')return box(['Write the flow for ',...q(y.title)],y.proves?['It would prove: ',...gwRich(y.proves)]:null,[btn]);
   return box([k==='could'?'See why ':'See why ',...q(y.title),k==='could'?' could not run':' is not proven'],gwCause([y]),[btn])}
  if(V.verdict==='ready'){const up=GW.modes.find(m=>gbRank[m.id]===gbRank[s.mode]+1);const more=up?(gw.view.counts[up.id]||0)-(gw.view.counts[s.mode]||0):0;
@@ -1365,7 +1365,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const cmp=s.modeBy?h('div',{class:'gw-lgcmp',role:'group','aria-label':GB_W.modes},h('h4',{class:'gw-lgh'},GB_W.modes),gwModeTable('key')):null;
  /* the drawing says what it is in one caption, and a key counts only the marks it draws, worst first; the full key (every kind
     of mark, the modes side by side, how to read a pad) opens on asking, and is built only then */
- const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change; branches: journeys. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.');
+ const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'The crown is its happy path; side branches, what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Branches are journeys. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
  const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};

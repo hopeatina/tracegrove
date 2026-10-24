@@ -261,7 +261,9 @@ describe('From a grown scenario to its run', () => {
     const v = page.getByTestId('grow-verdict');
     const title = plainTitle(state.scenarios.find((x) => x.id === failed)!.title);
     // It names the promise that failed and how, from the run's recorded check: never the title alone, which says the opposite.
-    await expect(v.textContent()).resolves.toBe(`✗ Not ready“${title}” failed: expected body.count 0, got 1breaks: GET /notes/count returns how many notes the caller owns; Another user's notes are never countedSee what happened ›`);
+    await expect(v.textContent()).resolves.toBe(`✗ Not ready“${title}” failed: expected body.count 0, got 1breaks: GET /notes/count return…; Another user's notes ar…`);
+    // the chip is shortened; the promises it breaks are whole in its title
+    await expect(v.locator('.gw-vc').getAttribute('title')).resolves.toBe("GET /notes/count returns how many notes the caller owns; Another user's notes are never counted");
     const fit = () => page.evaluate(() => {
       const v = document.querySelector('[data-testid="grow-verdict"]') as HTMLElement, r = v.getBoundingClientRect();
       const tree = document.querySelector('[data-testid="grow"] .gw-tree')!.getBoundingClientRect();
@@ -275,12 +277,12 @@ describe('From a grown scenario to its run', () => {
     // The plotline grow's verdict fits the same way.
     const plot = plotline();
     await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot) });
-    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 calls, got 3breaks this promiseSee what happened ›');
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 calls, got 3breaks: Removing a seat never charges…');
     expect(await fit()).toEqual({ inBand: false, beside: true, overResult: true, inside: true, whole: true });
     // With its run's recorded check, as the server reads it, the count is said in the route's own word.
     const facts = { step: 4, stepName: 'only the Team upgrade and the added seat were charged', check: 'payments POST /v1/charges call count', expected: 2, got: 3 };
     await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot, facts) });
-    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 charges, got 3breaks this promiseSee what happened ›');
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 charges, got 3breaks: Removing a seat never charges…');
     expect(await fit()).toEqual({ inBand: false, beside: true, overResult: true, inside: true, whole: true });
     await page.close();
   });
@@ -329,7 +331,7 @@ describe('From a grown scenario to its run', () => {
     expect(await next.evaluate((b) => !b.closest('[data-testid="grow-verdict"]'))).toBe(true);
     await expect(next.textContent()).resolves.toBe('See why it could not run ›');
     await expect(page.getByTestId('grow-result').textContent()).resolves.toBe('3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs');
-    await expect(page.getByTestId('grow-untested').locator('li .w').allTextContents()).resolves.toEqual(['no flow yet', 'no flow yet', 'no flow yet', 'could not run']);
+    await expect(page.getByTestId('grow-untested').locator('li .w').allTextContents()).resolves.toEqual(['could not run', 'no flow yet', 'no flow yet', 'no flow yet']);
     await next.click();
     await page.locator('.gw-drerr').or(page.getByTestId('grow-happened-oneline')).waitFor();
     expect(await page.evaluate(() => (0, eval)('gw').dr.sid)).toBe('s10');
@@ -377,7 +379,7 @@ describe('From a grown scenario to its run', () => {
     expect(reasons(unverified).s10).toBe('Not proven: the run evidence did not verify');
     await show(page, unverified);
     await expect(big()).resolves.toBe('3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs');
-    await expect(words()).resolves.toEqual(['no flow yet', 'no flow yet', 'no flow yet', 'flow ready (not run)']);
+    await expect(words()).resolves.toEqual(['flow ready (not run)', 'no flow yet', 'no flow yet', 'no flow yet']);
     // s1 has no flow of its own; an agent wrote one and ran it, and the app did not start: it could not run, as grow --json says
     const s1 = plotline().scenarios.find((x) => x.id === 's1')!;
     expect(s1.flow).toBeFalsy();
@@ -422,8 +424,8 @@ describe('From a grown scenario to its run', () => {
     const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent : e));
     expect(reasonsOf(crashed).s10).toBe(APP);
     await pinned(page, crashed, 's10');
-    expect(await said(page, 's10')).toEqual({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['no flow yet', 'no flow yet', 'no flow yet', 'could not run'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
-      proof: ['seats.remove-seat'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready, or could not run'], live: ['3 no flow yet', '1 flow ready, or could not run', '3 passed'] });
+    expect(await said(page, 's10')).toEqual({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['could not run', 'no flow yet', 'no flow yet', 'no flow yet'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
+      proof: ['seats.remove-seat'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready (not run), or could not run'], live: ['1 could not run', '3 no flow yet', '3 passed'] });
     // one with no flow at all has none yet, everywhere, and offers to write it
     await pinned(page, crashed, 's5');
     expect(await said(page, 's5')).toMatchObject({ row: 'no flow yet', card: 'no flow yet', why: 'No flow proves this yet.', write: true, proof: ['no flow yet'], leaf: 'no flow yet', mark: 'none' });
@@ -445,7 +447,7 @@ describe('From a grown scenario to its run', () => {
     expect(reasonsOf(written).s1).toBe(APP);
     await pinned(page, written, 's1');
     expect(await said(page, 's1')).toEqual({ band: '3 passed · 1 failed · 3 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['could not run', 'no flow yet', 'no flow yet'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
-      proof: ['discovered.seats-panel'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready, or could not run'], live: ['1 failed', '2 no flow yet', '1 flow ready, or could not run', '3 passed'] });
+      proof: ['discovered.seats-panel'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready (not run), or could not run'], live: ['1 failed', '1 could not run', '2 no flow yet', '3 passed'] });
     const acts = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-inspector"] [data-testid="grow-card-actions"] button')).map((b) => b.textContent));
     expect(acts).toEqual(['Rerun', 'Copy link']);
     // its row in the Outline says the same, with the same reason when it is opened
@@ -464,6 +466,9 @@ describe('From a grown scenario to its run', () => {
     const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent
       : e.kind === 'scenario.passed' && e.scenario === 's4' ? { ...e, run: '2026-12-31T00-00-00Z_pass_newest' } as GrowEvent : e));
     await pinned(page, crashed, 's4');
+    // a pinned leaf takes the Next block's place; Escape brings it back
+    await expect(page.getByTestId('grow-verdict-next').count()).resolves.toBe(0);
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('grow-verdict-next').textContent()).resolves.toBe('See why it could not run ›');
     await page.getByTestId('grow-open-runs').click();
     expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: 's10' });
@@ -641,7 +646,8 @@ describe('One failure, worded one way everywhere', () => {
     await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain(`failed: ${words}`);
     await page.getByTestId('grow-view-outline').click();
     const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
-    expect(row.startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
+    expect(row, row).toMatch(/^Step \d+ · /);
+    expect(row.replace(/^Step \d+ · /, '').startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
     // The drawer, on the step that broke.
     await page.getByTestId('grow-verdict-open').click();
     await page.getByTestId('grow-happened-oneline').waitFor();
@@ -670,7 +676,8 @@ describe('One failure, worded one way everywhere', () => {
     await page.getByTestId('grow-view-outline').click();
     await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.run[id].why = 'the card was charged the Team price once: expected 1 call, got 2'; w.growPaint(); }, failed);
     const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
-    expect(row.startsWith('Broke at check “the card was charged the Team price once”: expected 1 charge, got 2')).toBe(true);
+    expect(row, row).toMatch(/^Step \d+ · /);
+    expect(row.replace(/^Step \d+ · /, '').startsWith('Broke at check “the card was charged the Team price once”: expected 1 charge, got 2')).toBe(true);
     // With no run to read, the recorded reason stands.
     expect(failureWords(state, mkdtempSync(join(tmpdir(), 'tracegrove-norun-')))).toEqual({});
     await page.close();
