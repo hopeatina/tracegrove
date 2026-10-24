@@ -169,18 +169,22 @@ describe('What happened, step by step', () => {
 
   it('opens beside the tree on the step that broke, the panel wider and the tree still drawn and lit', async () => {
     const page = await open(`#grow/${failed}`);
+    const tree = () => page.evaluate(() => { const w = (0, eval)('gw'), r = (w.svg as SVGSVGElement).getBoundingClientRect(); return { rect: [r.left, r.top, r.width, r.height].map(Math.round), narrow: w.B.L.narrow }; });
+    const was = await tree();
     await page.locator(`.gw-insw [data-dr="${failed}"]`).click();
     const d = await opened(page);
     expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('grow-happened-title');
     await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe('Removing a seat never charges the card');
     const box = await page.evaluate(() => {
       const w = (0, eval)('gw'), ins = document.querySelector('.gw-insw')!.getBoundingClientRect(), svg = (w.svg as SVGSVGElement).getBoundingClientRect();
-      return { ins: Math.round(ins.width), svg: svg.width > 200 && svg.right <= ins.left, pinned: w.pinned, lit: !!(w.svg as SVGSVGElement).querySelector('.pad.hl') };
+      return { ins: Math.round(ins.width), svg: svg.width > 200 && svg.left < ins.left, over: getComputedStyle(document.querySelector('.gw-insw')!).position === 'fixed' && Math.round(ins.right) === innerWidth, pinned: w.pinned, lit: !!(w.svg as SVGSVGElement).querySelector('.pad.hl') };
     });
     expect(box.ins).toBeGreaterThanOrEqual(600); expect(box.ins).toBeLessThanOrEqual(660);
-    expect(box).toMatchObject({ svg: true, pinned: `s:${failed}`, lit: true });
+    expect(box).toMatchObject({ svg: true, over: true, pinned: `s:${failed}`, lit: true });
+    // the drawer lies over the page at the right: the tree is not laid out again, every name stays where it was
+    expect(await tree()).toEqual(was); expect(was.narrow).toBe(false);
     // the tree keeps no card of its own for it beside the drawer, which says it once
-    expect(await page.evaluate(() => { const B = (0, eval)('gw').B; return { narrow: B.L.narrow, card: !B.tip.hidden }; })).toEqual({ narrow: true, card: false });
+    expect(await page.evaluate(() => { const B = (0, eval)('gw').B; return { narrow: B.L.narrow, card: !B.tip.hidden }; })).toEqual({ narrow: false, card: false });
     await expect(page.getByTestId('grow-happened-step-4').getAttribute('aria-pressed')).resolves.toBe('true');
     const step = (n: number) => page.getByTestId(`grow-happened-step-${n}`).textContent();
     await expect(step(4)).resolves.toContain('Expected 2 charges, got 3');
@@ -299,12 +303,12 @@ describe('What happened, step by step', () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
     await page.goto(server.url);
-    const go = page.getByTestId('grow-result-steps');
+    const go = page.getByTestId('grow-open-runs');
     await go.waitFor();
-    await expect(go.textContent()).resolves.toBe('Step by step ›');
+    await expect(go.textContent()).resolves.toBe('Open the runs');
     expect(await go.evaluate((b) => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
-    // it sits in the band beside Open the runs
-    expect(await go.evaluate((b) => b.closest('[data-testid="grow-result"]')?.contains(document.querySelector('[data-testid="grow-open-runs"]')))).toBe(true);
+    // it sits in the slim result line under the verdict
+    expect(await go.evaluate((b) => !!b.closest('[data-testid="grow-result"]'))).toBe(true);
     await go.click();
     await opened(page);
     await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe('Removing a seat never charges the card');
@@ -313,7 +317,7 @@ describe('What happened, step by step', () => {
     expect(await inView(page)).toEqual({ head: true, step: true });
     await page.keyboard.press('Escape');
     await expect(drawer(page).count()).resolves.toBe(0);
-    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('grow-result-steps');
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('grow-open-runs');
     await page.close();
   });
 
@@ -343,25 +347,36 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
-  it('does not preview a mode under a pointer that has not moved while the page scrolled to the drawer', async () => {
+  it('does not preview a mode under a pointer that has not moved while the drawer opened over the page', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
     await page.goto(server.url);
-    const go = page.getByTestId('grow-result-steps');
+    const go = page.getByTestId('grow-open-runs');
     await go.waitFor();
     const box = (await go.boundingBox())!;
     await page.mouse.move(box.x + 5, box.y + 5); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const before = await page.evaluate(() => scrollY);
     await page.mouse.down(); await page.mouse.up();
     await opened(page);
-    await page.waitForFunction((y) => scrollY !== y, before);
+    await page.waitForTimeout(400);
+    // the drawer opens over the page at the right, so the page does not scroll under the pointer
+    expect(await page.evaluate(() => scrollY)).toBe(before);
+    // the page itself moves, as a reader's scroll moves it, until a mode lies under the pointer that has not moved
+    const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const under = await page.evaluate(({ x, y }) => {
+      const b = Array.from(document.querySelectorAll('[data-testid="grow-modes"] [data-m]')).find((e) => { const r = e.getBoundingClientRect(); return r.left <= x && x <= r.right; });
+      if (!b) return null;
+      const r = b.getBoundingClientRect(); window.scrollBy({ top: Math.round((r.top + r.bottom) / 2 - y), behavior: 'instant' });
+      return document.elementFromPoint(x, y)?.closest('[data-testid="grow-modes"] [data-m]')?.getAttribute('data-m') ?? 'nothing';
+    }, at);
+    expect(under).toMatch(/^(min|std|max)$/);
+    expect(await page.evaluate(() => scrollY)).not.toBe(before);
     await page.waitForTimeout(400);
     const said = () => page.evaluate(() => ({ preview: (0, eval)('gw').preview, line: document.querySelector('[data-testid="grow-mode-preview"]')?.textContent ?? '' }));
     expect(await said()).toEqual({ preview: null, line: expect.not.stringMatching(/^Preview/) });
-    // a real move of the pointer previews again
-    const max = (await page.getByTestId('grow-mode-max').boundingBox())!;
-    await page.mouse.move(max.x + 10, max.y + 10); await page.mouse.move(max.x + 20, max.y + 12);
-    await page.waitForFunction(() => (0, eval)('gw').preview === 'max');
+    // a real move of the pointer previews the mode it rests on
+    await page.mouse.move(at.x + 2, at.y + 1);
+    await page.waitForFunction((m) => (0, eval)('gw').preview === m, under);
     await page.close();
   });
 
@@ -472,12 +487,12 @@ describe('What happened, step by step', () => {
     const page = await open(`#grow/${failed}`);
     const card = page.locator('.gw-insw'), acts = card.getByTestId('grow-card-actions');
     await expect(acts.locator('button').allTextContents()).resolves.toEqual(['Rerun', 'Heal', 'Copy link']);
-    // right under the answer and the way to what happened, before what the scenario checks
+    // right under the answer, beside the way to what happened, before what the scenario checks
     expect(await card.evaluate((c) => {
       const a = c.querySelector('[data-testid="grow-card-actions"]')!, hap = c.querySelector('[data-hap]')!, broke = c.querySelector('.gw-broke')!;
       const after = (x: Element, y: Element) => !!(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
       const checks = Array.from(c.querySelectorAll('*')).find((e) => e.childElementCount === 0 && e.textContent === 'What it checks')!;
-      return { order: after(broke, hap) && after(hap, a) && after(a, checks), gap: Math.round(a.getBoundingClientRect().top - hap.getBoundingClientRect().bottom) <= 16 };
+      return { order: after(broke, a) && after(a, hap) && after(hap, checks), gap: Math.round(hap.getBoundingClientRect().top - a.getBoundingClientRect().bottom) <= 16 };
     })).toEqual({ order: true, gap: true });
     await expect(acts.getByTestId('grow-card-rerun').isDisabled()).resolves.toBe(false);
     await acts.getByTestId('grow-card-copy').click();
@@ -578,7 +593,7 @@ describe('What happened, step by step', () => {
     const before = await open(`#grow/${failed}`, 390);
     const ways = () => before.evaluate(() => Array.from(document.querySelectorAll('[data-dr],[data-hap]')).filter((b) => (b as HTMLElement).offsetParent && b.getBoundingClientRect().width > 0)
       .map((b) => { const q = b.getBoundingClientRect(); return { t: b.textContent, w: q.width, h: q.height }; }));
-    expect(await before.getByTestId('grow-result-steps').evaluate((b) => b.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    expect(await before.getByTestId('grow-open-runs').evaluate((b) => b.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     const grove = await ways();
     expect(grove.length).toBeGreaterThan(0);
     expect(grove.filter((q) => q.w < 44 || q.h < 44)).toEqual([]);
