@@ -1453,50 +1453,65 @@ for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
    on the first side of the leaf where it touches no name, leaf or count, and is placed again after every paint, once the leaf
    has stopped moving; a leaf that is not drawn (cut, or hidden by a preview) has none. */
 function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw.tree!=='grove'||!s)return;
- const V=gw.view&&gw.view.verdict,f=V&&V.first;let leaf=f?svg.querySelector('.gb-lf.fail:not(.gone)[data-k="s:'+f.scenario+'"]'):null,word='failed';
- if(!leaf)leaf=svg.querySelector('.gb-lf.fail:not(.gone):not(.bud)');
- if(!leaf){leaf=svg.querySelector('.gb-lf.hang:not(.gone):not(.bud)');word='how it fails'}
+ /* the leaves the word may stand by, the likeliest first: "failed" by the first failure's leaf, else by another failed leaf;
+    "how it fails" by any leaf that hangs under its pad, all of which say the same thing */
+ const V=gw.view&&gw.view.verdict,f=V&&V.first,ff=f?svg.querySelector('.gb-lf.fail:not(.gone)[data-k="s:'+f.scenario+'"]'):null;
+ let word='failed',leaves=ff?[ff]:[...svg.querySelectorAll('.gb-lf.fail:not(.gone):not(.bud)')];
+ if(!leaves.length){leaves=[...svg.querySelectorAll('.gb-lf.hang:not(.gone):not(.bud)')];word='how it fails'}
+ const leaf=leaves[0]||null;
  /* placed once on a drawing, where the grown tree puts it, and never moved: a word on the tree stays where it was first drawn */
- const had=svg.querySelector('.gw-flbl');if(had&&leaf&&had.getAttribute('data-for')===leaf.getAttribute('data-k')&&had.getAttribute('data-w')===word)return;
+ const had=svg.querySelector('.gw-flbl');if(had&&leaf&&leaves.some(l=>had.getAttribute('data-for')===l.getAttribute('data-k'))&&had.getAttribute('data-w')===word)return;
  if(had)had.remove();
  if(!leaf||!s.done)return;
  /* only once the tree has grown: a label is never ahead of its wood */
  const B=gw.B,end=B&&B.grow?Math.max(0,...B.grow.map(q=>(q.t0||0)+(q.ms||0))):0,left=end-performance.now();
  if(left>0){clearTimeout(gw.flT);gw.flT=setTimeout(gwFailLabel,left+60);return}
- const run=leaf.getAnimations?leaf.getAnimations({subtree:true}).filter(a=>a.playState==='running'):[];
- /* and once its leaf shows: it and everything it hangs in drawn at full strength */
- let shown=true;for(let e=leaf;e&&e!==svg;e=e.parentNode)if(Number(getComputedStyle(e).opacity)<.99){shown=false;break}
+ const run=leaves.flatMap(l=>l.getAnimations?l.getAnimations({subtree:true}).filter(a=>a.playState==='running'):[]);
+ /* and once its leaves show: each and everything it hangs in drawn at full strength */
+ let shown=true;for(const l of leaves)for(let e=l;e&&e!==svg;e=e.parentNode)if(Number(getComputedStyle(e).opacity)<.99){shown=false;break}
  if(!shown){clearTimeout(gw.flT);gw.flT=setTimeout(gwFailLabel,160);return}
  if(run.length){if(!gw.flWait){gw.flWait=true;Promise.all(run.map(a=>a.finished.catch(()=>null))).then(()=>{gw.flWait=false;gwFailLabel()})}return}
  const inv=svg.getScreenCTM();if(!inv)return;const I=inv.inverse();
  const box=el=>{const r=el.getBoundingClientRect();if(!r.width&&!r.height)return null;const a=new DOMPoint(r.left,r.top).matrixTransform(I),b=new DOMPoint(r.right,r.bottom).matrixTransform(I);return [a.x,a.y,b.x,b.y]};
- const lb=box(leaf);if(!lb)return;const ref=svg.querySelector('text.rlbl');const fs=ref?parseFloat(ref.style.fontSize)||10.5:10.5;
- const w=word.length*fs*.62,hh=fs,cy=(lb[1]+lb[3])/2,cx=(lb[0]+lb[2])/2,gap=fs*.45;
- const others=[...svg.querySelectorAll('text, .gb-lf:not(.gone)')].filter(e=>e!==leaf&&!leaf.contains(e)).map(box).filter(Boolean);
- const vb=svg.viewBox.baseVal;
- /* the cushions are in the way too: a leaf that sits in one gets its word under the cushion, at the leaf */
- const pads=[...svg.querySelectorAll('.pad')].map(box).filter(Boolean);others.push(...pads);
- const home=pads.find(p=>cx>p[0]&&cx<p[2]&&cy>p[1]&&cy<p[3]);
- const C=[[lb[2]+gap,cy+hh*.35,'start'],[lb[0]-gap,cy+hh*.35,'end'],[cx,lb[3]+hh+gap*.4,'middle'],[cx,lb[1]-gap,'middle']];
- if(home)C.push([cx,home[3]+hh+gap,'middle'],[cx+w/2,home[3]+hh+gap,'middle'],[cx-w/2,home[3]+hh+gap,'middle'],[home[2]+gap,cy+hh*.35,'start'],[home[0]-gap,cy+hh*.35,'end'],[home[2]+gap,home[3],'start'],[home[0]-gap,home[3],'end']);
+ const ref=svg.querySelector('text.rlbl');const fs=ref?parseFloat(ref.style.fontSize)||10.5:10.5;
+ const w=word.length*fs*.62,hh=fs,gap=fs*.45,vb=svg.viewBox.baseVal;
  const rect=([x,y,a])=>{const x0=a==='start'?x:a==='end'?x-w:x-w/2;return [x0-2,y-hh,x0+w+2,y+3]};
+ /* the cushions are in the way too: a leaf that sits in one gets its word under the cushion, at the leaf */
+ const pads=[...svg.querySelectorAll('.pad')].map(box).filter(Boolean);
  /* and never on the wood: a word over a branch would hide where a pad joins it */
  const wood=[...svg.querySelectorAll('path.w')].filter(e=>e.__pts&&e.__pts.length>1).map(e=>[e.__pts,e.__w||[]]);
  const onWood=r=>wood.some(([P,W])=>{for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],m=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2)),hw=(W[i-1]||2)/2+2;
   for(let k=0;k<=m;k++){const x=a[0]+(b[0]-a[0])*k/m,y=a[1]+(b[1]-a[1])*k/m;if(x>r[0]-hw&&x<r[2]+hw&&y>r[1]-hw&&y<r[3]+hw)return true}}return false});
- /* and off the drawing's corners: where nothing beside a root, knot or leaf is open, its card stands in a corner of the
-    drawing (gbTip), so a word there would leave that card nowhere it covers no name. The corners are as wide as the narrowest
-    card and its 12 px margin, and as tall as a card commonly is; a phone opens its cards under the drawing and keeps them all */
- const keep=[];if(gw.B&&gw.B.L&&!gw.B.L.narrow&&gw.B.tip&&gw.B.tip.parentNode){const c=gw.B.tip.parentNode.getBoundingClientRect(),sr=svg.getBoundingClientRect(),
+ /* and off the drawing's foot corners, beside the pot: a root's card stands within reach of where its root leaves the pot
+    (gbTip), and where nothing there is open it takes a bottom corner of the drawing, so a word there would leave that card
+    nowhere it covers no name. The corners are as wide as the narrowest card and its 12 px margin, and as tall as a card
+    commonly is; a phone opens its cards under the drawing and keeps them all */
+ const keep=[];if(B&&B.L&&!B.L.narrow&&B.tip&&B.tip.parentNode){const c=B.tip.parentNode.getBoundingClientRect(),sr=svg.getBoundingClientRect(),
    x0=c.left,x1=Math.min(c.right,sr.right),y0=c.top,y1=sr.bottom,cw=280+12+4,ch=220,sb=(a,b2,c2,d)=>{const p=new DOMPoint(a,b2).matrixTransform(I),q=new DOMPoint(c2,d).matrixTransform(I);return [p.x,p.y,q.x,q.y]};
-  if(x1-x0>2*cw)keep.push(sb(x0,y0,x0+cw,y0+ch),sb(x1-cw,y0,x1,y0+ch),sb(x0,y1-ch,x0+cw,y1),sb(x1-cw,y1-ch,x1,y1))}
+  if(x1-x0>2*cw)keep.push(sb(x0,y1-ch,x0+cw,y1),sb(x1-cw,y1-ch,x1,y1))}
  const meets=(r,o)=>r[0]<o[2]&&r[2]>o[0]&&r[1]<o[3]&&r[3]>o[1];
- const hit0=r=>others.some(o=>meets(r,o))||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height||onWood(r),hit=r=>hit0(r)||keep.some(o=>meets(r,o));
- /* then the nearest free place round the leaf, ring by ring */
- for(let r=gap+4;r<=fs*7;r+=fs*.6)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[1,1],[-1,1],[0,-1],[1,-1],[-1,-1]])C.push([cx+dx*(lb[2]-lb[0])/2+dx*r,cy+dy*(lb[3]-lb[1])/2+dy*r+(dy>0?hh:dy<0?0:hh*.35),dx>0?'start':dx<0?'end':'middle']);
- /* (where every free place round the leaf is in a corner, it takes the nearest of those: a word is better than none) */
- const at=C.find(c=>!hit(rect(c)))||C.find(c=>!hit0(rect(c)));if(!at)return;
- svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl pre'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':leaf.getAttribute('data-k'),'data-w':word},word));
+ const into=r=>keep.reduce((a,o)=>a+Math.max(0,Math.min(r[2],o[2])-Math.max(r[0],o[0]))*Math.max(0,Math.min(r[3],o[3])-Math.max(r[1],o[1])),0);
+ /* Where the word goes by one leaf, and how well it sits there: 0 beside the leaf and clear of the corners, 1 beside it taking
+    no more than a quarter of the word's room in a corner, 2 further out (the nearest free place, ring by ring) clear of the
+    corners, 3 the nearest free place at all, a word being better than none */
+ const spot=lf=>{const lb=box(lf);if(!lb)return null;const cy=(lb[1]+lb[3])/2,cx=(lb[0]+lb[2])/2;
+  const others=[...svg.querySelectorAll('text, .gb-lf:not(.gone)')].filter(e=>e!==lf&&!lf.contains(e)).map(box).filter(Boolean);others.push(...pads);
+  const home=pads.find(p=>cx>p[0]&&cx<p[2]&&cy>p[1]&&cy<p[3]);
+  const C=[[lb[2]+gap,cy+hh*.35,'start'],[lb[0]-gap,cy+hh*.35,'end'],[cx,lb[3]+hh+gap*.4,'middle'],[cx,lb[1]-gap,'middle']];
+  if(home)C.push([cx,home[3]+hh+gap,'middle'],[cx+w/2,home[3]+hh+gap,'middle'],[cx-w/2,home[3]+hh+gap,'middle'],[home[2]+gap,cy+hh*.35,'start'],[home[0]-gap,cy+hh*.35,'end'],[home[2]+gap,home[3],'start'],[home[0]-gap,home[3],'end']);
+  const hit0=r=>others.some(o=>meets(r,o))||r[0]<vb.x||r[2]>vb.x+vb.width||r[1]<vb.y||r[3]>vb.y+vb.height||onWood(r);
+  /* (the places beside it and the first ring round it are "beside" the leaf) */
+  const nAt=C.length+8;
+  for(let r=gap+4;r<=fs*7;r+=fs*.6)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[1,1],[-1,1],[0,-1],[1,-1],[-1,-1]])C.push([cx+dx*(lb[2]-lb[0])/2+dx*r,cy+dy*(lb[3]-lb[1])/2+dy*r+(dy>0?hh:dy<0?0:hh*.35),dx>0?'start':dx<0?'end':'middle']);
+  const near=C.slice(0,nAt).filter(c=>!hit0(rect(c))).map(c=>[c,into(rect(c))]);
+  const a=near.find(q=>q[1]===0);if(a)return [a[0],0];
+  const b=near.filter(q=>q[1]<=w*hh*.25).sort((p,q)=>p[1]-q[1])[0];if(b)return [b[0],1];
+  const c2=C.find(c=>!hit0(rect(c))&&!into(rect(c)));if(c2)return [c2,2];
+  const d=C.find(c=>!hit0(rect(c)));return d?[d,3]:null};
+ /* the leaf where it sits best, the likeliest first among equals */
+ let best=null;for(const l of leaves){const p=spot(l);if(p&&(!best||p[1]<best[1]))best=[p[0],p[1],l];if(best&&best[1]===0)break}
+ if(!best)return;const at=best[0];
+ svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl pre'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':best[2].getAttribute('data-k'),'data-w':word},word));
  /* drawn unseen for a frame, then shown: no frame paints it before a frame's own reading of the tree has it */
  requestAnimationFrame(()=>requestAnimationFrame(()=>{const t=svg.querySelector('.gw-flbl.pre');if(t)t.classList.remove('pre')}))}
 if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwBarHome();gwFit();gwHits()}},{passive:true})}
