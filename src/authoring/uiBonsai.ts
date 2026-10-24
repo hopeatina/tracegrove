@@ -836,9 +836,12 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* The leader never ends in a blunt cap: it tapers on into its crest and, just under the cushion's foot, forks into fine twigs
     that fan up into the foliage, the leader itself the middle one, each from about a third of its girth there down to a hair;
     the fork stands as far under the crest as a branch's twigs stand under theirs, so the crest sits on ramified wood too. */
- if(!sap){const n1=tp.length-1,yc=co[1]+crc.b,kB=Math.max(2,Math.min(n1-2,leaderAt(yc+.3*crc.h+9))),kF=Math.max(kB+1,Math.min(n1-1,leaderAt(yc+4))),wF=tw[kB],acL=gbLen(tp),aB=acL[kB],aF=acL[kF],aE=(acL[n1]-aF)||1;
-  for(let i=kB+1;i<=kF;i++)tw[i]=Math.min(tw[i],wF*(1-.38*(acL[i]-aB)/((aF-aB)||1)));
-  for(let i=kF+1;i<=n1;i++){const u=(acL[i]-aF)/aE;tw[i]=Math.max(1.1,wF*.38*(1-u)+1.1*u)}
+ if(!sap){const n1=tp.length-1,yc=co[1]+crc.b,kB=Math.max(2,Math.min(n1-2,leaderAt(yc+.3*crc.h+9))),kF=Math.max(kB+1,Math.min(n1-1,leaderAt(yc+4))),wF=tw[kB],acL=gbLen(tp),aB=acL[kB];
+  /* (one smooth taper, three of its girths long at least, from the foot of the crest to a narrow round tip, never a step where the twigs fork: while the crest
+     has not yet come out, the leader's end shows, and it reads as a growing shoot, not a split spike) */
+  let kS=kB;while(kS>2&&acL[n1]-acL[kS]<3*tw[kS])kS--;
+  const wS=tw[kS],aS=acL[kS],aN=(acL[n1]-aS)||1,wt=Math.max(1.4,.2*wF);
+  for(let i=kS+1;i<=n1;i++){const u=(acL[i]-aS)/aN;tw[i]=Math.min(tw[i],wt+(wS-wt)*(1-u*u))}
   const d0=[tp[kF+1][0]-tp[kF-1][0],tp[kF+1][1]-tp[kF-1][1]],dm=Math.hypot(d0[0],d0[1])||1,rf=gbRng(gbHash(key+':fork'));
   for(const sd of [-1,1]){const th=sd*(30+10*rf())*Math.PI/180,u=[(d0[0]*Math.cos(th)-d0[1]*Math.sin(th))/dm,(d0[0]*Math.sin(th)+d0[1]*Math.cos(th))/dm],len=crc.h*(.5+.16*rf())+9,S0=tp[kF];
    const E=[S0[0]+u[0]*len*.8,S0[1]+u[1]*len*.8-len*.25],fp=gbBez([S0,[S0[0]+u[0]*len*.4,S0[1]+u[1]*len*.4],[E[0]-u[0]*len*.1,E[1]+len*.15],E],10);
@@ -1170,13 +1173,14 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
    return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
   const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NT=12,NC=15,NP=2*(NB+NT)+NC;
   /* the growing end is a shoot's tip a tenth of the wood's girth there across, never the girth of the wood below pushed up
-     as a stub: behind it the wood widens smoothly to its whole girth over one caliper of it (that girth, eased in and out,
-     so neither the tip nor where the taper meets the whole wood shows a corner) */
+     as a stub: behind it the wood widens to its whole girth over one and a half calipers of it, widening at once from the
+     rounded tip (so the tip reads as a narrow point and not a nub on a flat end) and easing into the whole wood, so where
+     the taper meets it shows no corner */
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
-   const q=at(e),Lt=Math.max(2,2*q.w),rt=Math.min(q.w+.4,Math.max(.5,.2*q.w));
+   const q=at(e),Lt=Math.max(3,3*q.w),rt=Math.min(q.w+.4,Math.max(.5,.2*q.w));
    /* (the band's points: NB along the whole wood behind the taper, and NT across the taper itself, so it keeps its shape) */
    const ts=Math.max(-2,e-Lt),ds=[];for(let i=0;i<NB;i++)ds.push(-2+(ts+2)*i/(NB-1));for(let i=1;i<=NT;i++)ds.push(ts+(e-ts)*i/NT);
-   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*u*u*(3-2*u);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
+   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*u*(2-u);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
    /* past the front: a half circle round the spine there, the tip's half-width */
    const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=rt*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
