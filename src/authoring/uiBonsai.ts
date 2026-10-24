@@ -424,6 +424,10 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
  /* a journey's failures hang under its outer shoulder, or under its crest when it has none; a crown's under its shoulders, or
     from a branchlet just under its crest */
  if(!one){const hc=crown&&shs.length?[sOut,sIn].filter(Boolean):[sOut||crest];g.failure.forEach((x,i)=>hc[i%hc.length].hang.push(x))}
+ /* and a scenario whose run failed hangs too, under the cushion it grew in, as the caption says: never among the leaves that
+    passed (a cushion keeps at least one leaf, so a cushion all of whose leaves failed keeps them) */
+ const ran=gw.state&&gw.state.run||{},bad=x=>{const r=ran[x.id];return !!r&&r.st==='fail'};
+ for(const c of cs){const f=c.lv.filter(bad);if(!f.length||f.length===c.lv.length)continue;c.lv=c.lv.filter(x=>!bad(x));c.ids=c.lv.map(x=>x.id);c.hang.push(...f)}
  for(const c of cs){c.hs=c.role==='shoulder'?c.sd:d;c.limf=c.role==='shoulder'?(crown?.14:.1):shs.length||crown?null:.1}
  /* A cushion's shape, its own from its pad's id so no two are stamped alike: each end a round cap (about three tenths of
     its height across, each its own), an underside that bows down slightly between them (six to ten hundredths of its
@@ -1766,7 +1770,7 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
 function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;const width=gbWidth();
- const pc=list=>['happy','guard','failure'].map(p=>list.filter(x=>gbPol(x)===p).length).join('.');
+ const pc=list=>['happy','guard','failure'].map(p=>list.filter(x=>gbPol(x)===p).length).join('.')+list.filter(x=>s.run[x.id]&&s.run[x.id].st==='fail').map(x=>'!'+x.id).join('');
  /* Max's shoots and graft buds are laid out with the wood, so the parts with checks of their own and the flows each re-checks key it too */
  const bk=Object.keys(M.buds).sort().map(u=>{const l=M.buds[u],r=l.filter(x=>x.scenarioKind==='regression').length;return u+(l.length>r?'o':'')+Math.min(5,r)}).join(',');
  const key=(sap?'sap:'+s.units.map(u=>u.id).join(','):M.trees.map(t=>t.js.map(j=>j.id+'='+j.units.join('+')+'#'+pc(M.leaves[j.id])).join(';')).join('|'))+'|jin='+M.jin.map(u=>u.id).join(',')+'|'+M.strays.map(u=>u.id).join(',')+'|'+(s.stops.map(x=>x.unit).join(','))+'|b='+bk+'|w='+width;
