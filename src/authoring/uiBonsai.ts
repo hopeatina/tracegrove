@@ -19,6 +19,8 @@
 
 export const BONSAI_CSS = String.raw`
 .gb-wrap{position:relative;min-width:0}
+/* a phone's card opens under the key, and what follows the key makes room for it (gbTip) */
+.gw-tree .gw-keyrow{margin-bottom:var(--gb-tiph,0px)}
 .gw-svg.gb{display:block;width:100%;height:auto;overflow:visible;-webkit-tap-highlight-color:transparent;
  --wood:#6E5E50;--wood-lit:#8F7D6B;--wood-shade:#4C4037;--wood-old:color-mix(in srgb,#6E5E50 68%,var(--muted));--knot:#57493E;--knot-lit:#9C8975;--cut:#DCC8A6;--cutc:color-mix(in srgb,var(--ink3) 82%,var(--paper));--shoot:color-mix(in srgb,#9BBF5A 82%,var(--wood));--graft:var(--moss);
  --pad:color-mix(in srgb,var(--moss) 44%,var(--paper));--pad-lit:color-mix(in srgb,var(--moss) 30%,var(--paper));--pad-shade:color-mix(in srgb,var(--moss) 70%,var(--paper));
@@ -195,6 +197,7 @@ export const BONSAI_CSS = String.raw`
 /* A card is as wide as its longest piece that cannot break (a file and line, a route), within 280 to 380 px (gbTip); its
    prose is set in the page's sans and only paths and routes in mono, so no word ever runs past its edge */
 .gb-tip{position:absolute;z-index:3;width:280px;max-width:380px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 12px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font:13px/18px var(--sans);color:var(--ink);overflow-wrap:break-word}
+.gb-tip.short>.path{max-height:36px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 50%,transparent);mask-image:linear-gradient(180deg,#000 50%,transparent)}
 .gb-tip.below{width:auto;max-width:none;right:0;box-shadow:none;pointer-events:auto}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gb-tip>.k{display:block}
 .gb-tip .st{font:12.5px/17px var(--sans);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
 .gb-tip .m,.gb-tip .gw-onroute>.nw{font-family:var(--mono);font-size:.92em}.gb-tip b.m{font-weight:500}.gb-tip .st b.m{font-weight:600}
@@ -2468,15 +2471,13 @@ const gbOwnSt=ids=>{const list=ids.flatMap(id=>gw.M.buds[id]||[]),u=ids.length==
    whole of it is the title */
 const gbMid=(t,n)=>t.length>n?t.slice(0,Math.ceil(n/2)-1)+'…'+t.slice(t.length-Math.floor(n/2)):t;
 const gbLocEl=loc=>loc?h('div',{class:'path',title:loc},...gwCodeText(String(loc).split('/').map(p=>gbMid(p,44)).join('/'))):null;
-/* the points from a to b, about 24 px apart, not counting either end (where a card's hairline may also turn into its side) */
-const gbSteps=(a,b)=>{const n=Math.floor((b-a)/24),o=[];for(let i=1;i<n;i++)o.push(a+(b-a)*i/n);return o};
 /* a name's box on the page, with its number in the key when it has one (the names never move for a card: it keeps off them) */
 const gbNameBox=(t,box)=>{const q=box(t.getBoundingClientRect());if(t.__key&&t.__kp){const p=box(t.__kp.getBoundingClientRect());return [Math.min(q[0],p[0]),Math.min(q[1],p[1]),Math.max(q[2],p[2]),Math.max(q[3],p[3])]}return q};
 /* A card beside the leaf, knot or root under the pointer: what it is, its state with evidence, and the path it crosses. */
 function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid=el&&el.getAttribute&&el.getAttribute('data-pad');const P=pid&&B.pad[pid];
  /* a card docked in the side panel stands in for the panel's own content while it shows, never over it */
  const undock=()=>{const ins=tip.parentNode&&tip.parentNode.parentNode&&tip.parentNode.parentNode.nextElementSibling;if(ins)ins.classList.remove('gb-docked');tip.style.width=''};undock();
- const hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom=''};
+ const lg=()=>{const w=tip.parentNode;return w?w.nextElementSibling:null},kr=()=>{const l=lg();return l?l.querySelector('.gw-keyrow'):null},hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom='';const l=lg();if(l)l.style.removeProperty('--gb-tiph')};
  /* the scenario open in the drawer beside the tree has no card as well: the drawer says it once */
  if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))||(gw.dr&&k==='s:'+gw.dr.sid)){hide();return}
  const s=gw.state,M=gw.M;/* a path breaks only between its hops */
@@ -2513,12 +2514,12 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  if(narrow&&k===gw.pinned&&k.startsWith('s:')){const x=gwScen(k.slice(2));gwPut(tip,gwMore(x),gwHappened(x),gwDrEntry(x),gwWriteEntry(x),gwCardActs(x))}
  tip.hidden=false;const wrap=tip.parentNode;if(!wrap)return;
  /* on a phone there is no room beside anything: the card sits under the drawing, full width, and the drawing stays clear. It
-    sits under what the drawing holds (the pot, the names in its ground and a key under the pot), not under the empty margin
-    below them, so a root's card stays near where the root crosses the rim */
- tip.classList.toggle('below',narrow);tip.classList.remove('dock');tip.style.maxWidth='';tip.style.width='';
- if(narrow){const sr=B.svg.getBoundingClientRect(),c0=wrap.getBoundingClientRect(),lo=[...B.svg.querySelectorAll('.rlbl,.pot-ft,.kpip.key:not(.none)')].map(e=>e.getBoundingClientRect()).filter(q=>q.height).reduce((a,q)=>Math.max(a,q.bottom),-1e9),yb=lo>-1e9?Math.min(sr.bottom,lo+4):sr.bottom;
-  tip.style.left='0px';tip.style.top=gbF(yb-c0.top+4)+'px';wrap.style.paddingBottom=gbF(Math.max(0,tip.offsetHeight+12-(sr.bottom-yb)))+'px';return}
- wrap.style.paddingBottom='';const c=wrap.getBoundingClientRect();
+    sits under the drawing's caption and key */
+ tip.classList.toggle('below',narrow);tip.classList.remove('dock','short');tip.style.maxWidth='';tip.style.width='';
+ /* (under the caption and the key, so neither they nor the drawing move when a card opens: what follows the key makes room) */
+ if(narrow){const c0=wrap.getBoundingClientRect(),r=kr(),sr=B.svg.getBoundingClientRect(),yb=r?r.getBoundingClientRect().bottom:sr.bottom;
+  tip.style.left='0px';tip.style.top=gbF(yb-c0.top+8)+'px';wrap.style.paddingBottom='';const l=lg();if(r&&l)l.style.setProperty('--gb-tiph',gbF(tip.offsetHeight+16)+'px');else wrap.style.paddingBottom=gbF(tip.offsetHeight+12)+'px';return}
+ wrap.style.paddingBottom='';{const l=lg();if(l)l.style.removeProperty('--gb-tiph')}const c=wrap.getBoundingClientRect();
  /* as wide as its longest piece that cannot break, within 280 to 380 px */
  tip.style.width='min-content';const mc=Math.min(380,Math.max(280,Math.ceil(tip.offsetWidth)));tip.style.width=mc+'px';const tw=tip.offsetWidth,th=tip.offsetHeight;
  const sr=B.svg.getBoundingClientRect(),vb=B.svg.viewBox.baseVal,f=sr.width/vb.width;const toPx=p=>[sr.left-c.left+(p[0]-vb.x)*f,sr.top-c.top+(p[1]-vb.y)*f],toSv=q=>[vb.x+(q[0]-(sr.left-c.left))/f,vb.y+(q[1]-(sr.top-c.top))/f];
@@ -2529,18 +2530,21 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const rid=k.startsWith('u:')&&B.root[k.slice(2)]?k.slice(2):null,rr=rid?B.L.roots.find(q=>q.id===rid):null,P0=B.L.potC-B.L.potL/2,P1=B.L.potC+B.L.potL/2;
  const xo=rr&&rr.pts?rr.pts.find(p=>p[0]<P0||p[0]>P1):null,rim=xo?toPx(xo):rid&&B.pos[rid]?toPx(B.pos[rid]):null;
  const kn=k.startsWith('u:')?B.knot[k.slice(2)]:null,klk=kn?Object.keys(B.klbl).find(q=>B.knot[q]===kn):null,kl=klk?B.klbl[klk]:null,kb=kl&&kl.__fit&&kl.classList.contains('on')?gbNameBox(kl,box):null;
- const me=rim?[rim[0]-6,rim[1]-6,rim[0]+6,rim[1]+6]:box(el.getBoundingClientRect()),AB=rim?[rim[0],rim[1],rim[0],rim[1]]:kb?box(kl.getBoundingClientRect()):me;
+ /* (a store's root in the pot is named on its plant tag: its card points at the tag, as a knot's does at its name, and stands
+    by it) */
+ const tgE=rr&&!rr.ext?[...B.root[rid].querySelectorAll('.ptag .tag,.rlbl.tg')].map(e=>e.getBoundingClientRect()).filter(q=>q.width):[],tgB=tgE.length?tgE.map(box).reduce((a,q)=>[Math.min(a[0],q[0]),Math.min(a[1],q[1]),Math.max(a[2],q[2]),Math.max(a[3],q[3])]):null;
+ const me=rim?[rim[0]-6,rim[1]-6,rim[0]+6,rim[1]+6]:box(el.getBoundingClientRect()),AB=tgB||(rim?[rim[0],rim[1],rim[0],rim[1]]:kb?box(kl.getBoundingClientRect()):me);
  const x0=me[0],y0=me[1],x1=me[2],y1=me[3],cx=(x0+x1)/2,cy=(y0+y1)/2;
  /* The card never covers what it explains: the thing pointed at and its name, the route it lights or (for a root) the root
     itself. Nor does it cover any name, the faded ones too, any of a journey's words, a root's name, a cushion or a leaf, and
     it keeps 12 px off each of those and off the lit route where it can. It would rather not sit on the pot, on shoots and
     buds, on the hairlines of names or on foliage. No hairline crosses a name of any kind. */
- const G=12,own=[[x0-6,y0-6,x1+6,y1+6]],hard=[],kn12=[],mid=[],thin=[],soft=[],nox=[],txt=[];if(kb)own.push([kb[0]-4,kb[1]-4,kb[2]+4,kb[3]+4]);
+ const G=12,own=[[x0-6,y0-6,x1+6,y1+6]],hard=[],kn12=[],mid=[],thin=[],soft=[],nox=[],txt=[];if(kb)own.push([kb[0]-4,kb[1]-4,kb[2]+4,kb[3]+4]);if(tgB)own.push([tgB[0]-4,tgB[1]-4,tgB[2]+4,tgB[3]+4]);
  /* a root is a long thin line: the card keeps off the line itself, not the whole box it spans, or it could never sit by the pot */
  const rpx=rr&&rr.pts?rr.pts.map((p,i)=>{const q=toPx(p),r=(rr.w[i]||2)*f/2+5;return [q[0]-r,q[1]-r,q[0]+r,q[1]+r]}):[];
  const rl=rid?[...B.root[rid].querySelectorAll('.rlbl')]:[];
  for(const t of Object.values(B.klbl))if(t.classList.contains('on')||t.classList.contains('kdim')||((t.classList.contains('wound')||t.classList.contains('brk'))&&!t.classList.contains('wmute'))){const q=gbNameBox(t,box);if(q[2]>q[0]&&!(t===kl&&kb)){hard.push(q);if(t!==kl){nox.push(q);txt.push(q);kn12.push(q)}}}
- for(const t of B.svg.querySelectorAll('.rlbl,.padlbl')){const q=t.getBoundingClientRect();if(q.width){const b=box(q);hard.push(b);nox.push(b);if(!rl.includes(t))txt.push(b)}}
+ for(const t of B.svg.querySelectorAll('.rlbl,.padlbl')){const q=t.getBoundingClientRect();if(q.width&&!(tgB&&rl.includes(t))){const b=box(q);hard.push(b);nox.push(b);if(!rl.includes(t))txt.push(b)}}
  /* a journey's words line by line, a badge whole */
  for(const l of Object.values(B.lbl))for(const t of l.badge?[l.el]:l.el.querySelectorAll('text')){const q=t.getBoundingClientRect();if(q.width){const b=box(q);hard.push(b);nox.push(b);txt.push(b)}}
  /* the leaves it lights are what it explains, so neither the card nor its hairline crosses them */
@@ -2553,8 +2557,8 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  for(const e of B.svg.querySelectorAll('.seal text,.shtag,.gsw,.kpip.on:not(.key),.kpip.kdim:not(.key)')){if(kl&&kl.parentNode.contains(e))continue;const q=e.getBoundingClientRect();if(q.width)txt.push(box(q))}
  /* the route, as points 4 px apart along it */
  const rp=[];for(const pe of [B.sap,B.sapX,B.sapW]){try{const n=pe.getAttribute('d')?pe.getTotalLength():0;if(n>0)for(let s2=0;s2<=n;s2+=4/f){const p=pe.getPointAtLength(s2);rp.push(toPx([p.x,p.y]))}}catch(e){}}
- /* it stays inside the drawing, never past the panel's edge; only a root's card, whose root lies at the foot of the drawing,
-    may hang below it over the key, and only when nothing near the rim is open (the key costs more than a little distance) */
+ /* it stays inside the drawing, never past the panel's edge nor below the drawing over its caption and key: a root's card
+    too, whose root lies at the foot of the drawing, stands beside the pot or above the rim */
  const W2=Math.min(c.width,sr.right-c.left),H0=sr.bottom-c.top;
  const inB=(p,b)=>p[0]>b[0]&&p[0]<b[2]&&p[1]>b[1]&&p[1]<b[3],ovB=(a,b)=>Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));
  const dB=(p,q)=>Math.hypot(Math.max(q[0]-p[0],0,p[0]-q[2]),Math.max(q[1]-p[1],0,p[1]-q[3]));
@@ -2567,39 +2571,40 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* the twigs as drawn, each piece as wide as the twig is there */
  const twg=[];for(const e of B.svg.querySelectorAll('path.tw')){if(!e.__pts||e.closest('.budg'))continue;const q=e.getBoundingClientRect(),m=e.getScreenCTM();if(!q.width||!m)continue;const P=e.__pts.map(p=>[m.a*p[0]+m.c*p[1]+m.e-c.left,m.b*p[0]+m.d*p[1]+m.f-c.top]),W=e.__w||[],sc=Math.hypot(m.a,m.b);
   for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],r=Math.max(W[i-1]||1,W[i]||1)*sc/2+1.5;twg.push([a,b,r,[Math.min(a[0],b[0])-r,Math.min(a[1],b[1])-r,Math.max(a[0],b[0])+r,Math.max(a[1],b[1])+r]])}}
- /* The hairline back to what it explains, when the card is more than 16 px off: straight, or with one elbow (along, then
-    into the card's side, there, at either end of it or at any point between, about 24 px apart) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
-    word and off the lit wood, it crosses no twig once it is off the thing it leaves (so it ends at a leaf's nearest edge,
-    never across the twigs it hangs among), and it would rather not cross a cushion, foliage or the pot. */
+ /* and the wood itself, trunk, limbs and roots, each piece as thick as the wood is there and a pixel more: a hairline that
+    leaves what it explains never crosses wood (the root a root's card explains is its own, and is left out) */
+ /* (wood under a cushion is hidden by its foliage: a line over the foliage there does not cross the wood) */
+ const cuE=[...B.svg.querySelectorAll('.pfill')].filter(e=>e.getBoundingClientRect().width),underCu=p=>cuE.some(e=>{const m=e.getScreenCTM();if(!m)return false;const q=m.inverse(),x=p[0]+c.left,y=p[1]+c.top;return e.isPointInFill(new DOMPoint(q.a*x+q.c*y+q.e,q.b*x+q.d*y+q.f))});
+ const wdg=[];for(const e of B.svg.querySelectorAll('path.w')){if(!e.__pts||e.closest('.budg,.stub')||(rid&&B.root[rid].contains(e)))continue;const q=e.getBoundingClientRect(),m=e.getScreenCTM();if(!q.width||!m)continue;const P=e.__pts.map(p=>[m.a*p[0]+m.c*p[1]+m.e-c.left,m.b*p[0]+m.d*p[1]+m.f-c.top]),W=e.__w||[],sc=Math.hypot(m.a,m.b);
+  for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],r=Math.max(W[i-1]||1,W[i]||1)*sc/2+1;wdg.push([a,b,r,[Math.min(a[0],b[0])-r,Math.min(a[1],b[1])-r,Math.max(a[0],b[0])+r,Math.max(a[1],b[1])+r]])}}
+ /* The hairline back to what it explains, when the card is more than 16 px off: one straight segment. It never crosses a
+    name; past where it leaves, it keeps 12 px off every word and off the lit wood, it crosses no wood and no twig once it
+    is off the thing it leaves (so it ends at a leaf's nearest edge, never across the twigs it hangs among), and it would
+    rather not cross a cushion, foliage or the pot. */
  const nearAny=(A,p)=>{for(const q of A)if(dB(p,q)<G)return true;return false},ptAny=(A,p)=>{for(const r of A)if(Math.hypot(r[0]-p[0],r[1]-p[1])<5)return true;return false},inAny=(A,p)=>{for(const q of A)if(inB(p,q))return true;return false},
   twAny=(A,p)=>{for(const s of A)if(p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])return true;return false};
  const lead=(CB,all,cap=Infinity,zc=Infinity)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
-  if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1])),mx=(AB[0]+AB[2])/2;for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4){opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);
-   /* (or, below the thing, from the middle of its foot: so a leaf hung among twigs is reached from under it) */
-   if(!kb&&y2>AB[3]+4)opts.push([[mx,AB[3]],[mx,y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
-  if(pa[1]<CB[1]||pa[1]>CB[3]){const mx=Math.max(CB[0]+10,Math.min(CB[2]-10,pa[0]));for(const x2 of [mx,CB[0]+10,CB[2]-10])if(Math.abs(x2-pa[0])>4)opts.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]]);for(const x2 of gbSteps(CB[0]+10,CB[2]-10))if(Math.abs(x2-pa[0])>4)more.push([pa,[x2,pa[1]],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
-     in a stacked key it runs clear of the lines above and below) */
-  if(kb&&(pa[1]<CB[1]||pa[1]>CB[3])){const ym=(AB[1]+AB[3])/2;for(const [x0,sg] of [[AB[2],1],[AB[0],-1]])for(const x2 of [CB[0]+10,CB[2]-10,x0+sg*(G+4)])if((x2-x0)*sg>G&&x2>=CB[0]+4&&x2<=CB[2]-4)opts.push([[x0,ym],[x2,ym],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear;
-     and a way is given up as soon as it costs as much as the best way found, or as would keep its place from winning, since
-     it could only cost more: the way chosen is the same, found sooner. For a place that covers nothing, which wins at once
-     on a clear way, only a way that is not clear is given up so, and should a clear way that costs that much or more be the
-     best left, every way is tried again in full) */
-  let bestL=null,cut=false;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  /* (one straight segment, always, from the card's nearest edge to the thing: never an elbow or a bracket round a name.
+     Where that line is not clear, the card moves, not the line) */
+  /* (a way is given up as soon as it costs as much as would keep its place from winning, since it could only cost more) */
+  let bestL=null,cut=false;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true,wd=false;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
-    const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
+    const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1])),wd2=wdg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
     /* (only what lies near this piece of it can be too near a point on it, and a piece near nothing is not walked at all) */
     const nr=(q,r)=>q[0]<Math.max(a[0],b[0])+r&&q[2]>Math.min(a[0],b[0])-r&&q[1]<Math.max(a[1],b[1])+r&&q[3]>Math.min(a[1],b[1])-r,txt2=txt.filter(q=>nr(q,G+1)),rp2=rp.filter(r=>nr([r[0],r[1],r[0],r[1]],6)),fm2=firm.filter(q=>!inB(p0,q)&&nr(q,1)),cu2=cus.filter(q=>!inB(p0,q)&&nr(q,1)),so2=soft.filter(q=>!inB(p0,q)&&nr(q,1));
-    if(txt2.length||rp2.length||tw2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
+    let inW=false;if(txt2.length||rp2.length||tw2.length||wd2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
      if(off&&txt2.length&&nearAny(txt2,p)){pen+=150;ok=false}
      if(off&&rp2.length&&ptAny(rp2,p)){pen+=400;ok=false}
      if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){pen+=300;ok=false}
+     /* (wood crossed costs once a crossing, however thick the trunk there: a line across the trunk is worse than one beside
+        a name, but not worse than a card over one) */
+     if(wd2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=8&&twAny(wd2,p)&&!underCu(p)){if(!inW)pen+=2e4;inW=true;ok=false;wd=true}else inW=false
      if(fm2.length&&inAny(fm2,p)){pen+=300;ok=false}else if(cu2.length&&inAny(cu2,p)){pen+=60;ok=false}else if(so2.length&&inAny(so2,p))pen+=60}}
-   if(!ok&&pen>=zc){cut=true;continue}if(pen<lim)bestL={pts,pen,ok}}if(cut&&bestL&&bestL.ok&&bestL.pen>=zc)return lead(CB,all);return bestL||{pts:null,pen:Infinity,ok:false}};
- /* (a root's card stays within 84 px of where its root crosses the rim, or of where a root in the pot starts) */
- const rd=rr&&rr.pts&&rr.pts.length?toPx(xo||rr.pts[0]):rim,rimB=rd?[rd[0],rd[1],rd[0],rd[1]]:null;
- const fit=(tw,th)=>{const H2=rid?H0+th+12:Math.max(H0,th+8),key=[0,H0,W2,H2];
+   if(!ok&&pen>=zc){cut=true;continue}if(pen<lim)bestL={pts,pen,ok,wood:wd}}if(cut&&bestL&&bestL.ok&&bestL.pen>=zc)return lead(CB,all);return bestL||{pts:null,pen:Infinity,ok:false}};
+ /* (a root's card stays within 84 px of where its root crosses the rim, or of its tag in the pot, or else of where a root in
+    the pot starts) */
+ const rd=rr&&rr.pts&&rr.pts.length?toPx(xo||rr.pts[0]):rim,rimB=tgB||(rd?[rd[0],rd[1],rd[0],rd[1]]:null);
+ const fit=(tw,th)=>{const H2=Math.max(H0,th+8),key=[0,H0,W2,H2];
  /* Where it may go, in this order: the open gutter right of everything the drawing holds, the one left of it, the ground
     under the pot, each slid along to stand as level with what it explains as it can; then beside what it explains on the
     right or the left, or above or below it, nearest first, out to the open ground of the drawing (a root's card also tries
@@ -2614,6 +2619,10 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  ring(AB,[10,24,40],12,20);if(AB!==me)ring(me,[10,24,40],12,20);ring(AB,[64,100,150,220,300],24,40);
  if(rim&&firm[0]){const pb=firm[0],sd=xo?(xo[0]>P1?1:-1):(rim[0]<(pb[0]+pb[2])/2?-1:1),side=s2=>{for(const gp of [10,24,40,64,100])for(let yy=Math.min(rim[1],pb[1])-th-gp;yy<=pb[3]+gp;yy+=12)by.push([s2<0?pb[0]-tw-gp:pb[2]+gp,yy])};
   side(sd);for(const gp of [10,24,40])for(let xx=pb[0]-tw;xx<=pb[2];xx+=20)by.push([xx,pb[3]+gp]);side(-sd)}
+ /* and, where nothing beside it is open, the drawing's corners, the emptiest winning, the hairline running out to it */
+ for(const q of [[4,4],[W2-tw-4,4],[4,H0-th-4],[W2-tw-4,H0-th-4]])by.push(q);
+ /* (and last, on a crowded tree, any open ground of the drawing at all, nearest first) */
+ for(let yy=4;yy<=H2-th-4;yy+=16)for(let xx=4;xx<=W2-tw-4;xx+=24)by.push([xx,yy]);
  const far=q=>{const [pa,pc]=near(AB,[q[0],q[1],q[0]+tw,q[1]+th]);return Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+(Math.abs(q[0]+tw/2-cx)+Math.abs(q[1]+th/2-cy))*.02};
  cand.push(...by.map(q=>[q,far(q)]).sort((a,b)=>a[1]-b[1]).map(q=>q[0]));
  let best=null;
@@ -2631,16 +2640,24 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   for(const b of soft)sc+=ovB(CB,b)*2;if(lost())continue;
   for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3){sc+=2e4;z=false}else if(inB(p,CG)){sc+=40;z=false}
   const ko=ovB(CB,key);if(ko>0){sc+=4000+ko*.02;z=false}
-  if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false}}
+  let far=false;if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false;far=true}}
   sc+=D;if(!z&&best&&sc>=best.sc)continue;
-  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
- if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok)best.pts=L3.pts}
+  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok,wood:!!L2.wood,far}}
+ if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok){best.pts=L3.pts;best.wood=false}}
  return best};
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
     under 280 px nor under its longest piece: beside a pot or a crown there is often room for one but not the other */
  let best=fit(tw,th);best.w=mc;if(!best.zero)for(const w of [280,330,380]){if(w===mc||w<mc)continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.sc+=Math.abs(tw-w)*8;b2.w=w;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2}
+ /* and where a crowded tree leaves no open ground for the whole card, the card leaves out the path, which the tree lights in
+    any case, after its first two lines, and is short enough to stand clear */
+ if(!best.zero&&tip.querySelector(':scope>.path')){tip.classList.add('short');for(const w of [mc,330,380]){if(w<mc)continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.w=w;b2.short=true;b2.sc+=Math.abs(tw-w)*8+200;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2;if(best.zero)break}tip.classList.toggle('short',!!best.short)}
  tip.style.width=best.w+'px';
  tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
+ /* (a root's card with no clear ground within reach of its root stands where the drawing is open, its hairline running out
+    to it: said on the card, for whoever checks where it went) */
+ if(best.far)tip.setAttribute('data-far','');else tip.removeAttribute('data-far');
+ /* (and where a crowded crown leaves no place in the drawing whose straight hairline crosses no wood, the card says so too) */
+ if(best.pts&&best.wood)tip.setAttribute('data-crowd','');else tip.removeAttribute('data-crowd');
  /* the hairline, drawn in the drawing; a rim point's starts just off the point */
  let lp=null;if(best.pts&&B.lead){lp=best.pts.map(toSv);if(rim){const a=lp[0],b=lp[1],u=Math.hypot(b[0]-a[0],b[1]-a[1])||1;lp[0]=[a[0]+(b[0]-a[0])/u*3,a[1]+(b[1]-a[1])/u*3]}B.lead.setAttribute('d','M'+lp.map(gbP).join(' L'))}else if(B.lead)B.lead.setAttribute('d','');
 }

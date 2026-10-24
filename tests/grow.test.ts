@@ -1095,7 +1095,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 180000);
 
-  it('sets each card by what it explains, never over a name or with a hairline across one or, past its first 12 px, across a twig, and has the card and the tree agree on what a leaf runs', async () => {
+  it('sets each card by what it explains, inside the drawing and never over a name, its caption or key, its hairline one straight line across no name and, past its first 12 px, across no twig or wood, and has the card and the tree agree on what a leaf runs', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     try {
@@ -1106,8 +1106,8 @@ describe('Grow page', () => {
           await page.waitForTimeout(2500);
           const ins = page.getByTestId('grow-inspector'), inspector = await ins.count() ? await ins.textContent() : null;
           // every leaf, root and knot in turn, and later the same with a leaf pinned; at 1440 a card also keeps off every cushion
-          const cards = () => page.evaluate((wide: boolean) => {
-            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, out: string[] = [];
+          const cards = () => page.evaluate(({ wide, crowdOk }: { wide: boolean; crowdOk: boolean }) => {
+            const w = (0, eval)('({ gw, gbHover })'), B = w.gw.B, L = B.L, out: string[] = [], crowded: string[] = [], tip = B.tip as HTMLElement;
             const m = (B.svg as SVGSVGElement).getScreenCTM()!, px = (p: number[]) => [m.a * p[0]! + m.c * p[1]! + m.e, m.b * p[0]! + m.d * p[1]! + m.f];
             // does the segment a-b pass through the box r (Liang-Barsky)?
             const cross = (a: number[], b: number[], r: DOMRect) => {
@@ -1165,6 +1165,30 @@ describe('Grow page', () => {
                 }
               }
               if (twig) out.push(k + ': hairline crosses a twig');
+              // the hairline is one straight segment, never an elbow or a bracket, and past its first 8 px it crosses no wood
+              // (trunk, limb or root; a root's card leaves its own root)
+              if (lead.length > 2) out.push(k + ': hairline bends ' + (lead.length - 2) + ' times');
+              const cushions = Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<SVGGeometryElement>).filter((e) => e.getBoundingClientRect().width);
+              const woods = Array.from(B.svg.querySelectorAll('path.w') as NodeListOf<SVGGeometryElement & { __pts?: unknown }>).filter((e) => e.__pts && !e.closest('.stub, .budg') && !(k.startsWith('u:') && B.root[k.slice(2)] && B.root[k.slice(2)].contains(e)) && e.getBoundingClientRect().width);
+              let wood = false;
+              for (let i = 1; i < lead.length && !wood; i++) {
+                const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                for (let s = 0; s <= n && !wood; s += 1) {
+                  const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                  // (wood under a cushion is hidden by its foliage, so a line there runs over leaves, not wood)
+                  if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 8) wood = woods.some((e) => inFill(e, x, y)) && !cushions.some((e) => inFill(e, x, y));
+                }
+              }
+              // (only a card that says its crown left it no place with a clear straight line may cross, on the crowded
+              // tracegrove crown alone: plotline's and notes' trees always have one)
+              if (wood && !(tip.hasAttribute('data-crowd') && crowdOk)) out.push(k + ': hairline crosses the wood');
+              if (tip.hasAttribute('data-crowd')) crowded.push(k);
+              // and a card over the tree stays inside the tree's card, over the drawing: never down over its caption or key
+              if (!L.narrow && !k.endsWith(' pinned')) {
+                const st = (B.svg as Element).closest('.gw-tree')!.getBoundingClientRect(), sv = (B.svg as Element).getBoundingClientRect();
+                if (c.left < st.left - .5 || c.right > st.right + .5 || c.top < st.top - .5 || c.bottom > sv.bottom + .5) out.push(k + ': card outside the drawing');
+                for (const id of ['grow-caption', 'grow-key']) { const e = document.querySelector('[data-testid="' + id + '"]'); if (e && meet(c, e.getBoundingClientRect())) out.push(k + ': card covers the ' + id.slice(5)); }
+              }
               if (wide) for (const e of Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<Element>)) { const r = e.getBoundingClientRect(); if (r.width && meet(c, r)) out.push(k + ': card on a cushion of ' + (e.closest('[data-pad]') || e).getAttribute('data-pad')); }
             };
             for (const [k, el] of things) {
@@ -1184,22 +1208,31 @@ describe('Grow page', () => {
                 const r = kl.getBoundingClientRect(), a = lead[0]!;
                 if (a[0]! < r.left - 3 || a[0]! > r.right + 3 || a[1]! < r.top - 3 || a[1]! > r.bottom + 3) out.push(k + ': second line to the knot');
               }
-              // a root's card sits by where the root crosses the rim
+              // a root's card sits by where the root crosses the rim; a store's in the pot, by its plant tag, which names it
               const rr = k.startsWith('u:') && B.root[k.slice(2)] ? L.roots.find((q: { id: string }) => q.id === k.slice(2)) : null;
-              if (rr) {
+              // (on a phone every card opens under the caption and key, so neither moves: there it sits right under the key row)
+              if (rr && L.narrow) {
+                const kr = document.querySelector('[data-testid="grow"] .gw-keyrow');
+                if (kr && (c.top < kr.getBoundingClientRect().bottom - .5 || c.top > kr.getBoundingClientRect().bottom + 16)) out.push(k + ': card not right under the key');
+              } else if (rr) {
                 const P0 = L.potC - L.potL / 2, P1 = L.potC + L.potL / 2, rim = px(rr.pts.find((p: number[]) => p[0]! < P0 || p[0]! > P1) || rr.pts[0]);
-                const dx = Math.max(c.left - rim[0]!, 0, rim[0]! - c.right), dy = Math.max(c.top - rim[1]!, 0, rim[1]! - c.bottom);
-                if (Math.hypot(dx, dy) > 90) out.push(k + ': card ' + Math.round(Math.hypot(dx, dy)) + 'px from its rim');
+                const tag = !rr.ext ? B.root[k.slice(2)].querySelector('.ptag .tag') : null, tr = tag ? tag.getBoundingClientRect() : null;
+                const dx = tr ? Math.max(c.left - tr.right, 0, tr.left - c.right) : Math.max(c.left - rim[0]!, 0, rim[0]! - c.right), dy = tr ? Math.max(c.top - tr.bottom, 0, tr.top - c.bottom) : Math.max(c.top - rim[1]!, 0, rim[1]! - c.bottom);
+                // (only where the card says the ground within reach of it is taken, now that no card may hang down over the
+                // caption and key, does it stand further off, clear of every cushion and name, its straight hairline run out to it)
+                if (Math.hypot(dx, dy) > 90 && !(tip.hasAttribute('data-far') && Array.from(B.svg.querySelectorAll('.pfill') as NodeListOf<Element>).every((e) => !meet(c, e.getBoundingClientRect())) && lead.length === 2)) out.push(k + ': card ' + Math.round(Math.hypot(dx, dy)) + 'px from its ' + (tr ? 'tag' : 'rim'));
               }
             }
             w.gbHover(null);
             // on a phone the pinned thing's card stays under the drawing, and covers nothing in it either
             if (w.gw.pinned && !(B.tip as HTMLElement).hidden) look(w.gw.pinned + ' pinned', B.tip.getBoundingClientRect(), null, []);
-            return { cards, out };
-          }, width >= 1440);
+            return { cards, out, crowded };
+          }, { wide: width >= 1440, crowdOk: name === 'tracegrove' });
           const seen = await cards();
           expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
           expect(seen.out, name + ' ' + width).toEqual([]);
+          // (and few of them: plotline's tree has none, tracegrove's crowded crown at most 9 of its cards, as many as it has at 1440 now)
+          expect(seen.crowded.length, name + ' ' + width + ' crowded cards ' + seen.crowded.join(' ')).toBeLessThanOrEqual(name === 'tracegrove' ? 9 : 0);
           // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
           if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
           // a leaf pinned as a click pins it, then every card again
