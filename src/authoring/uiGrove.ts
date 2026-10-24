@@ -1278,10 +1278,17 @@ function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!sv
 /* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
    round its centre (the last drawn wins where two meet), so nothing in the drawing moves */
 function gwHits(){const svg=gw.svg;if(!svg||!svg.isConnected||gw.tree!=='grove')return;
- if(!svg.gwHitOn){svg.gwHitOn=true;const later=()=>{clearTimeout(gw.hitT3);gw.hitT3=setTimeout(gwHits,60)};svg.addEventListener('animationend',later);svg.addEventListener('transitionend',later)}
 for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
- if(innerWidth>640)return;const vb=svg.viewBox&&svg.viewBox.baseVal,w=svg.getBoundingClientRect().width;if(!vb||!vb.width||!w)return;const k=w/vb.width,m=45/k;
- for(const g of svg.querySelectorAll('[role=button]')){let bb;try{bb=g.getBBox()}catch(e){continue}if(bb.width>=m&&bb.height>=m)continue;
+ if(innerWidth>640)return;
+ /* the tree grows in: measure again once whatever is still moving has settled */
+ const run=svg.getAnimations?svg.getAnimations({subtree:true}).filter(a=>a.playState==='running'):[];
+ if(run.length&&!gw.hitWait){gw.hitWait=true;Promise.all(run.map(a=>a.finished.catch(()=>null))).then(()=>{gw.hitWait=false;gwHits()})}
+ const vb=svg.viewBox&&svg.viewBox.baseVal,w=svg.getBoundingClientRect().width;if(!vb||!vb.width||!w)return;const k=w/vb.width,m=45/k;
+ /* a mark still growing in is measured by its parts that are not (its final size), so the hit area fits the mark as it rests */
+ const still=g=>{const kids=[...g.children].filter(c=>!c.classList.contains('gb-hit')&&!(c.getAnimations&&c.getAnimations({subtree:true}).some(a=>a.playState==='running')));
+  if(kids.length===g.children.length)return g.getBBox();let x0=1/0,y0=1/0,x1=-1/0,y1=-1/0;for(const c of kids){let b;try{b=c.getBBox()}catch(e){continue}if(!b.width&&!b.height)continue;x0=Math.min(x0,b.x);y0=Math.min(y0,b.y);x1=Math.max(x1,b.x+b.width);y1=Math.max(y1,b.y+b.height)}
+  return x0<x1?{x:x0,y:y0,width:x1-x0,height:y1-y0}:g.getBBox()};
+ for(const g of svg.querySelectorAll('[role=button]')){let bb;try{bb=still(g)}catch(e){continue}if(bb.width>=m&&bb.height>=m)continue;
   const W=Math.max(bb.width,m),H=Math.max(bb.height,m);g.append(sv('rect',{class:'gb-hit',x:bb.x+bb.width/2-W/2,y:bb.y+bb.height/2-H/2,width:W,height:H,fill:'transparent','aria-hidden':'true'}))}}
 if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
