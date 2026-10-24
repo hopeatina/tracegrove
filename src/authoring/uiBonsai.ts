@@ -1951,7 +1951,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    const q=g.slots[i];if(el&&el.__q!==q){el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+gbF(q[3])+')':'');el.__q=q}
    if(!el){const fr=sv('g',{class:'gb-lfg'},sv('g',{class:'gb-lfi'},sv('circle',{r:gbF(Math.max(8,12/gbHf(B)/(q[3]||1))),cx:8.5,class:'hitc'}),sv('path',{d:'M0 0 L3.6 0',class:'bpet'}),sv('path',{d:gbLeafD(11,5.6),transform:'translate(9 0)',class:'blade'})));gbThumb(B,fr.firstChild,8.5,q[3]);el=sv('g',{class:'gb-lf bud','data-k':'s:'+x.id,tabindex:-1,role:'button'},fr);
     el.style.transform='translate('+gbF(q[0])+'px,'+gbF(q[1])+'px) rotate('+gbF(q[2])+'deg)'+(q[3]&&q[3]!==1?' scale('+gbF(q[3])+')':'');el.__q=q;el.__u=g.uids[0];el.__base=g.base;g.fl.append(el);B.bud[x.id]=el;
-    const now=gbNow(),t1=(g.sp||0)+i*40;if(!quiet&&fr.animate&&now<t1+170)gbPlay(fr,[{transform:'scale(0)'},{transform:'scale(1)'}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t1)}
+    const now=gbNow(),t1=(g.sp||0)+i*40;if(!quiet&&fr.animate&&now<t1+170)gbPlay(fr,[{transform:'scale(.001)'},{transform:'scale(1)'}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t1)}
    /* while a dropped shoot fades, its leaves stay on it */
    const fad=!showBuds&&!!(g.fade||(g.on===undefined?gw.prevBuds:g.on));const im=(showBuds||fad)&&(inMode(x)||pv==='max'||fad);const cut=!!pv&&pv!=='max'&&inMode(x);
    el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)&&!fad?' pv-add':'')+(im&&(cut||fad)?' pv-out':''));
