@@ -174,7 +174,7 @@ it('shows an explicit cancelled heal result through the real 375px browser UI', 
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 375, height: 760 } }); const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-    await page.goto(ui.url); await page.getByRole('button', { name: 'Heal', exact: true }).first().click(); await page.getByRole('button', { name: 'Heal now', exact: true }).click();
+    await page.goto(ui.url); await page.locator('.nav-tools > summary').click(); await page.getByRole('button', { name: 'Heal', exact: true }).first().click(); await page.getByRole('button', { name: 'Heal now', exact: true }).click();
     await expect.poll(() => existsSync(join(control, 'ready')), { timeout: 10000 }).toBe(true);
     await page.getByRole('button', { name: 'Cancel heal', exact: true }).click();
     await expect.poll(() => page.getByRole('heading', { name: 'Heal cancelled', exact: true }).count(), { timeout: 10000 }).toBe(1);
