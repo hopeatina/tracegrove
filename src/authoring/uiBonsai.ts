@@ -467,6 +467,9 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
  /* the smallest size at which every cushion holds its leaves, or the larger one the tree asks for (K); never so small that a
     leaf stands more than about a third of its crest's height */
  let k=Math.max(K||0,L*1.22);const fit=k=>{for(const c of cs)size(c,k);return cs.every(place)};for(let i=0;i<48&&!fit(k);i++)k*=1.05;
+ /* (the canopy is a scalene triangle to its tip: a crest, the highest cushion of its pad, is the smallest, each shoulder under
+    it a fifth again as wide at the least, its leaves set out again across it) */
+ if(crest&&shs.length)for(const c of shs)if(c.a<crest.a*1.2){c.a=crest.a*1.2;c.h=c.a*ar(c);place(c)}
  /* the clumps a cushion is heaped from: a row along its crest, two more than its leaves (three to seven), each a little
     larger or smaller than the next, whose tops scallop its edge; and a lower row in front */
  for(const c of cs){const r=gbRng(gbHash('cl:'+seed+':'+c.role+c.sd)),kt=Math.max(3,Math.min(7,c.lv.length+2)),sp=1.56*c.a/(kt-1),R=Math.min(c.h*.5,.64*sp);c.body=[];

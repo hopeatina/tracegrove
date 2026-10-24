@@ -2153,13 +2153,13 @@ describe('Grow page', () => {
     const ca = (P: any) => Math.max(...P.geo.cs.map((c: any) => c.a));
     if (!B.L.narrow) for (let i = 1; i < up.length; i++) { const lo = Math.max(...up.slice(0, i).map(ca)); if (ca(up[i]) > lo + 0.01) bad('a cushion wider than any of a pad below it', [up[i].id, Math.round(2 * ca(up[i])), Math.round(2 * lo)]); }
     // the crown in tiers: its crest on its riser above its shoulders, and (beside a desktop tree; on a phone it stays one
-    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each narrower than its crest
-    // where they hold its happy paths
+    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each wider than its crest, which
+    // is the smallest cushion at the apex of a scalene canopy
     const cshs = crown.geo.cs.filter((c: any) => c.role === 'shoulder'), mid = (c: any) => c.b - c.h / 2;
     for (const c of cshs) if (mid(crest) >= mid(c)) bad('the crown crest not above its shoulder', [mid(crest), mid(c)]);
     if (!B.L.narrow && crown.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0) >= 3) {
       if (cshs.length < 1 || cshs.length > 2) bad('a crown of three or more leaves with no tier', cshs.length);
-      for (const c of cshs) if (c.lv.every((x: any) => x.polarity === 'happy') && c.a >= crest.a) bad('a crown shoulder as wide as its crest', [c.a, crest.a]);
+      for (const c of cshs) if (c.a <= crest.a) bad('a crown shoulder no wider than its crest', [c.a, crest.a]);
     }
     // the wood sized from the data: the trunk's girth from the leaves the tree carries, and about twelve girths tall
     out.nL = mine.reduce((a, P) => a + P.leaves.length, 0); out.D = T.D; out.Ht = T.Ht;

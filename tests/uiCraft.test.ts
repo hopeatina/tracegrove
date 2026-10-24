@@ -63,4 +63,39 @@ describe('the bonsai as drawn', () => {
       }
     } finally { await browser.close(); }
   }, 120000);
+
+  it('draws the canopy as a scalene triangle: the lowest pad the widest, none wider than a pad under it, and the crown\u2019s crest the smallest cushion, on plotline, tracegrove and notes', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const file of ['plotline-seats.jsonl', 'tracegrove-max.jsonl', 'notes-count.jsonl']) {
+        for (const width of [1440, 1024]) {
+          const page = await grown(browser, server.url, folded(file), width);
+          const r = await page.evaluate(() => {
+            const B = (0, eval)('gw').B, out: string[] = [], ratios: number[] = [];
+            for (const T of B.L.trees) {
+              // the pads by height, lowest first, each as wide as its cushions span as drawn
+              const pads = (T.padList as Array<{ id: string; crown: boolean }>).map((pd) => {
+                const cs = Array.from(B.svg.querySelectorAll('[data-pad="' + pd.id + '"] .pfill') as NodeListOf<Element>).map((e) => e.getBoundingClientRect()).filter((q) => q.width);
+                return { id: pd.id, crown: pd.crown, cs, w: cs.length ? Math.max(...cs.map((q) => q.right)) - Math.min(...cs.map((q) => q.left)) : 0, y: cs.length ? Math.max(...cs.map((q) => q.bottom)) : 0 };
+              }).filter((pd) => pd.w);
+              pads.sort((a, b) => b.y - a.y);
+              for (let i = 1; i < pads.length; i++) for (let j = 0; j < i; j++) if (pads[i]!.w > pads[j]!.w * 1.05) out.push(pads[i]!.id + ' (' + Math.round(pads[i]!.w) + ' px) wider than ' + pads[j]!.id + ' under it (' + Math.round(pads[j]!.w) + ' px)');
+              const crown = pads.find((pd) => pd.crown);
+              if (crown && pads.length > 1) ratios.push(pads[0]!.w / crown.w);
+              // the crest: the crown's highest cushion, narrower than every other cushion on the tree
+              if (crown) {
+                const crest = crown.cs.reduce((a, q) => q.top < a.top ? q : a), others = pads.flatMap((pd) => pd.cs).filter((q) => q !== crest);
+                for (const q of others) { const k = crest.width / q.width; ratios.push(k); if (k > 0.9) out.push('the crest ' + Math.round(crest.width) + ' px against a cushion of ' + Math.round(q.width) + ' px'); }
+              }
+            }
+            return { out, ratios };
+          });
+          expect(r.ratios.length, file + ' ' + width).toBeGreaterThan(0);
+          expect(r.out, file + ' ' + width).toEqual([]);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 180000);
 });
