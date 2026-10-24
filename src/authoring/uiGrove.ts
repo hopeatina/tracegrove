@@ -426,8 +426,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-ins .gw-cacts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .gw-ins .gw-lnk{display:inline-block;margin-top:6px}
 @media (min-width:761px){
- .gw-tree .gw-bar{position:absolute;top:10px;right:12px;z-index:3;margin:0}
- .gw-tree>.gw-stage{padding-top:40px}
+ .gw-tree .gw-bar{position:absolute;top:10px;right:12px;z-index:3;margin:0}.gw-tree>.gw-stage{padding-top:40px}
  .gw-modearea{margin:0}.gb-mode{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:0 4px}
  .gw-modes.set{flex-wrap:nowrap;gap:6px}.gw-modes.set button{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:4px 14px 4px 10px}
  .gb-mode .gw-hintrow{flex:1 1 220px}
@@ -445,19 +444,19 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-live{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0;list-style:none;font:12.5px/18px var(--mono);color:var(--ink3)}.gw-live li{display:inline-flex;align-items:center;gap:6px}
 .gw-howto{margin:2px 6px 0}.gw-howto[open]{margin-bottom:8px}
 .gb-wrap>svg.gb{display:block;margin:0 auto}
-.gw-lay{display:flex;flex-direction:column}.gw-side{display:contents}
+.gw-cols{display:flex;flex-direction:column}.gw-side{display:contents}
 .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
-.gw-side>:nth-child(1){order:1}.gw-side>:nth-child(2){order:2}.gw-side>:nth-child(3){order:3}.gw-lay>.gw-main{order:4}.gw-side>:nth-child(4){order:5}
+.gw-side>:nth-child(1){order:1}.gw-side>:nth-child(2){order:2}.gw-side>:nth-child(3){order:3}.gw-cols>.gw-main{order:4}.gw-side>:nth-child(4){order:5}
 .gw-tree{position:relative}
 @media (min-width:1180px){
- .gw-lay{display:grid;grid-template-columns:minmax(330px,380px) minmax(0,1fr);gap:0 22px;align-items:start}
+ .gw-cols{display:grid;grid-template-columns:minmax(330px,380px) minmax(0,1fr);gap:0 22px;align-items:start}
  .gw-side{display:block;min-width:0}.gw-side>*+*{margin-top:0}
  .gw-side .gw-call{flex-wrap:wrap;gap:6px 10px;padding:12px 14px}.gw-side .gw-call .gw-vt{flex:1 1 100%;font-size:19px;line-height:25px}.gw-side .gw-call .gw-vgo{margin-left:0}
  .gw-side .gw-result.slim{padding-left:16px;margin:8px 0 14px}
  .gw-side .gb-mode{display:block;margin:0 0 12px}.gw-side .gw-modes.set{display:flex;gap:6px}.gw-side .gw-modes.set button{flex:1 1 auto;padding:4px 8px;gap:6px;justify-content:center;white-space:nowrap}.gw-side .gw-modes.set button b{white-space:nowrap}
  .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:block;margin-top:6px}.gw-side .gw-hintrow .gw-more{display:block}
  .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
- .gw-lay>.gw-main{display:block}.gw-lay>.gw-main>.card{display:block;padding-top:10px}
+ .gw-cols>.gw-main{display:block}.gw-cols>.gw-main>.card{display:block;padding-top:10px}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
 }
 @media (min-width:1061px){
@@ -1266,7 +1265,7 @@ function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start
  S.ins.addEventListener('scroll',gwInsFade,{passive:true});try{new ResizeObserver(gwInsFade).observe(S.ins)}catch(e){}
  /* on a wide screen the first screen is two columns: on the left what to know and do (the verdict, its counts, the mode, the
     panel), on the right the tree at its own size; narrower, the same slots stack in reading order */
- S.side=h('div',{class:'gw-side'});S.lay=h('div',{class:'gw-lay'});
+ S.side=h('div',{class:'gw-side'});S.lay=h('div',{class:'gw-cols'});
  S.card.append(S.bar,S.stage);S.stage.append(S.left);S.left.append(S.scroll,S.legend);S.tree.append(S.card);S.tree.classList.add('gw-main');
  S.side.append(S.call,S.verdict,S.mode,S.ins);S.lay.append(S.side,S.tree);
  gw.el.append(S.start,S.head,S.rail,S.agents,S.lay,S.two,S.error);return gw.slots=S}
@@ -1280,7 +1279,8 @@ function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!sv
  /* never so small that a leaf reads under 18 px */
  const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.5/(Math.min(...Ls)*W/vb.width):.6;
  const k=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));
- svg.style.width=k<1?Math.round(W*k)+'px':''}
+ svg.style.width=k<1?Math.round(W*k)+'px':'';
+ if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.5)svg.style.width=Math.min(W,Math.ceil(w*18.5/lo))+'px'}}
 /* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
    round its centre (the last drawn wins where two meet), so nothing in the drawing moves */
 function gwHits(){const svg=gw.svg;if(!svg||!svg.isConnected||gw.tree!=='grove')return;

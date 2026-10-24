@@ -4,7 +4,7 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlin
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 import { scanSource } from '../src/authoring/discover.ts';
 import { grow } from '../src/authoring/grow.ts';
 import { criteriaFrom, harnessOf, isPatternSource, isTestFile, matchCriterion, readChange, roleOf, routesOf, scaffoldsOf, unitsOf } from '../src/authoring/growChange.ts';
@@ -12,6 +12,13 @@ import { applyGrow, criterionStatus, freshGrow, growView, type GrowEvent } from 
 import { startUi, type UiServer } from '../src/authoring/ui.ts';
 import { growCommand } from '../src/cli/grow.ts';
 import { plainLine, renderGrove } from '../src/cli/renderGrove.ts';
+
+/** Opens "Explain the drawing", the closed details that holds the full legend, and waits for the legend it paints. */
+async function explain(page: Page) {
+  const how = page.locator('[data-testid="grow"] details.gw-howto');
+  if (!(await how.evaluate((d) => (d as HTMLDetailsElement).open))) await how.locator(':scope > summary').click();
+  await page.locator('[data-testid="grow"] .gw-legend').first().waitFor();
+}
 
 const temps: string[] = [];
 const servers: UiServer[] = [];
@@ -528,11 +535,12 @@ describe('Grow page', () => {
       await page.getByTestId('grow').waitFor();
       await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
       const ins = page.getByTestId('grow-inspector');
-      await ins.waitFor();
       const step = why.slice(0, why.indexOf(': '));
-      // The inspector opens on the first failing journey: where it broke, not the claim the scenario makes.
-      await expect.poll(() => ins.textContent()).toContain('Broke at check “' + step + '”: ');
-      expect(await ins.textContent()).not.toContain(failed.proves);
+      // At rest the verdict says what broke, not the claim the scenario makes; the inspector stays empty until something is selected.
+      const verdict = page.getByTestId('grow-verdict');
+      await expect.poll(() => verdict.textContent()).toContain('failed: ' + why.slice(why.indexOf(': ') + 2));
+      expect(await verdict.textContent()).not.toContain(failed.proves);
+      expect(await ins.count()).toBe(0);
       const check = async () => {
         const found = await page.evaluate(claims, failed.proves);
         expect(found.length).toBeGreaterThan(0);
@@ -540,6 +548,7 @@ describe('Grow page', () => {
       };
       // Pinned from the tree, the inspector holds the scenario's card.
       await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = 's:' + id; w.gw.pinList = null; w.growPaint(); }, failed.id);
+      await expect.poll(() => ins.textContent()).toContain('Broke at check “' + step + '”: ');
       await check();
       // Chosen in the Journeys card, the row opens in place, and the inspector keeps only its journey.
       await page.evaluate(() => { const w = (0, eval)('({ gw, growPaint })'); w.gw.pinned = null; w.growPaint(); });
@@ -570,6 +579,7 @@ describe('Grow page', () => {
         await page.getByTestId('grow').waitFor();
         await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.gw.saved = Date.now(); w.growPaint(); }, { s: state, v: growView(state) });
         await page.getByTestId('grow-view-grove').click();
+        await explain(page);
         const legend = page.locator('[data-testid="grow"] .gw-legend');
         await expect.poll(() => legend.locator('.gw-li').count()).toBeGreaterThan(8);
         // Each item's right edge, its box or the ink of its words (a word that cannot wrap spills past its box), against the
@@ -709,6 +719,7 @@ describe('Grow page', () => {
     try {
       for (const width of [1440, 768, 390]) {
         const page = await growPage(browser, server.url, state, width);
+        await explain(page);
         const rows = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow"] .gw-tree .gw-legend > .gw-lg')).map((row) => ({
           head: row.querySelector(':scope > .lh')?.textContent ?? '',
           lefts: Array.from(row.querySelectorAll(':scope > .lgi > *')).map((it) => Math.round(it.getBoundingClientRect().left)),
@@ -736,6 +747,7 @@ describe('Grow page', () => {
       one.journeys = one.journeys.slice(0, 1);
       for (const x of one.scenarios) if (x.journey && x.journey !== one.journeys[0]!.id) x.journey = one.journeys[0]!.id;
       const page = await growPage(browser, server.url, one, 1440);
+      await explain(page);
       const where = page.locator('[data-testid="grow"] .gw-tree .gw-legend .gw-lg.where');
       expect(await where.locator('.lh').textContent()).toBe('Where a leaf sits');
       expect(await where.textContent()).toContain('happy path, on the crown');
@@ -1239,6 +1251,7 @@ describe('Grow page', () => {
       expect(rest).toBeGreaterThanOrEqual(3);
       // Never reached is drawn as small grey dots with no ring, the key's swatch the same; a cut is marked in neutral ink, never
       // in the red that means failed.
+      await explain(page);
       const look = await page.evaluate(() => {
         const w = (0, eval)('({ gw })'), B = w.gw.B, rgb = (c: string) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
         const dots = getComputedStyle(B.sapX), key = document.querySelector('[data-testid="grow"] .gw-legend path.rdots');
@@ -1802,7 +1815,7 @@ describe('Grow page', () => {
         await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
         await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
         expect(await pinned(), name).toBe(l.k);
-        await page.locator('.gw-legend .lh').last().tap(); await page.waitForTimeout(60);
+        await page.getByTestId('grow-caption').tap(); await page.waitForTimeout(60);
         expect(await pinned(), name).toBe(null);
         expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
         await page.close();
@@ -1847,6 +1860,7 @@ describe('Grow page', () => {
       const state = folded('tracegrove-max.jsonl');
       const page = await growPage(browser, server.url, state, 1440);
       await page.waitForTimeout(2500);
+      await explain(page);
       const key = await page.evaluate(() => {
         const lg = document.querySelector('.gw-legend')!, rows = Array.from(lg.querySelectorAll(':scope > .gw-lg')), cmp = lg.querySelector(':scope > .gw-lgcmp');
         const last = rows.at(-1)!.getBoundingClientRect(), c = cmp ? cmp.getBoundingClientRect() : null, first = rows[0]!.getBoundingClientRect();
@@ -1872,6 +1886,7 @@ describe('Grow page', () => {
       // a shoot that really grew and was then cut is keyed in the next test)
       const pl = await growPage(browser, server.url, folded('plotline-seats.jsonl'), 1440);
       await pl.waitForTimeout(2500);
+      await explain(pl);
       const scar = await pl.evaluate(() => ({ shown: Array.from(document.querySelectorAll('svg.gb .shscar')).some((e) => (e as HTMLElement).style.display !== 'none' && e.getBoundingClientRect().width > 0), keyed: Array.from(document.querySelectorAll('.gw-legend .gw-li')).some((e) => e.textContent === 'where a shoot was cut') }));
       expect(scar.shown).toBe(false);
       expect(scar.keyed).toBe(scar.shown);
@@ -1890,12 +1905,14 @@ describe('Grow page', () => {
     try {
       const page = await treePage(browser, server.url, max, { width: 1440 });
       await settled(page);
+      await explain(page);
       // grown in Max, nothing is cut yet: no scar, and none keyed
       const grown = await page.evaluate(scars);
       expect(grown.shown).toBe(false);
       expect(grown.keyed).toBe(grown.shown);
       await paintState(page, min);
       await settled(page);
+      await explain(page);
       const cut = await page.evaluate(scars);
       expect(cut.shown).toBe(true);
       expect(cut.keyed).toBe(true);
@@ -2202,10 +2219,12 @@ describe('Grow page', () => {
             seen[name] = { nL: f.nL, D: f.D };
             expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(18);
             expect(f.stem, at + ' stem').toBeLessThanOrEqual(8.5);
-            // the side panel's first failing or headline journey is the crown's
-            const ins = page.getByTestId('grow-inspector');
-            await expect.poll(() => ins.textContent()).toContain(f.failing ? 'The first failing journey' : 'The headline journey');
-            expect(await ins.locator('h3').first().textContent()).toBe(f.title.replace(/`/g, ''));
+            // at rest the side panel is empty, and the journey the Journeys card opens first, failing or headline, is the crown's
+            expect(await page.getByTestId('grow-inspector').count(), at + ' panel at rest').toBe(0);
+            const lead = page.locator('[data-testid="grow-scenarios"] details.gb-jr[open]').first();
+            await lead.waitFor();
+            expect(await lead.evaluate((d) => d.classList.contains('failed')), at + ' lead journey failing').toBe(f.failing);
+            expect(await lead.locator('.gb-hd .tt').evaluate((e) => { const c = e.cloneNode(true) as Element; c.querySelectorAll('.by').forEach((b) => b.remove()); return c.textContent; })).toBe(f.title.replace(/`/g, ''));
           } else if (width < 500) expect(f.L, at + ' leaf length').toBeGreaterThanOrEqual(11);
           // each failure hangs just beneath its cushion's underside, on a twig that shows (form's bad list); none sits on the
           // cushion's rim, where its stem would leave wood the cushion hides
@@ -2332,6 +2351,7 @@ describe('Grow page', () => {
         }
         // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as the tree
         // does too: a pale leaf under a dashed rim, never a hole
+        await explain(page);
         const marks = await page.evaluate(() => {
           const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
           // (what a mark sits on: the nearest box under it that paints a background)
@@ -3602,6 +3622,7 @@ describe('Grow page', () => {
         expect(b.bad, width + 'px').toEqual([]);
         expect(b.cut, width + 'px').toBeGreaterThan(0);
         // and the key names the mark the tree shows, drawn as it is: a callus on bark, never a pale disc
+        await explain(page);
         const key = await page.evaluate(() => { const sw = document.querySelector('.gw-legend [aria-label="Pruned"] .gw-sw'); return sw ? { cal: !!sw.querySelector('.cal'), cres: !!sw.querySelector('.cres'), cf: !!sw.querySelector('.cf') } : null; });
         expect(key, width + 'px').toEqual({ cal: true, cres: true, cf: false });
         await page.close();
@@ -3676,6 +3697,7 @@ describe('Grow page', () => {
     try {
       for (const [width, scheme] of [[1440, 'light'], [390, 'dark']] as const) {
         const page = await treePage(browser, server.url, min, { width, scheme, reduce: true, height: 1400 });
+        await explain(page);
         expect(await page.evaluate(() => ({ marks: (0, eval)('gw').B.svg.querySelectorAll('.heal.on').length, key: document.querySelectorAll('.gw-legend [aria-label="Pruned"] .gw-sw').length })), width + 'px').toEqual({ marks: 0, key: 0 });
         const point = async (m: string) => {
           await page.getByTestId('grow-mode-' + m).scrollIntoViewIfNeeded();
