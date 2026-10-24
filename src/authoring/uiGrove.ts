@@ -477,7 +477,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-hintrow>p:empty{display:none}
 .gw-next .gw-nshort{display:none}
 @media (min-width:1180px){.gw-side .gw-next .gw-nshort{display:inline}.gw-side .gw-next .gw-nfull{display:none}}
-.gb .rlbl.gw-flbl{pointer-events:none;animation:gwFlIn .24s ease-out both}@keyframes gwFlIn{from{opacity:0}to{opacity:1}}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
+.gb .rlbl.gw-flbl{pointer-events:none}.gb .rlbl.gw-flbl.pre{opacity:0}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
 .gw-call .gw-vs{flex:1 1 100%;font:12.5px/18px var(--mono);color:var(--ink3);min-width:0}
 .gw-call .gw-vs .gw-facts{display:flex}
 @media (max-width:640px){.gw-call .gw-vs{order:3}}
@@ -1475,7 +1475,9 @@ function gwFailLabel(){const svg=gw.svg,s=gw.state;if(!svg||!svg.isConnected||gw
  /* then the nearest free place round the leaf, ring by ring */
  for(let r=gap+4;r<=fs*7;r+=fs*.6)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[1,1],[-1,1],[0,-1],[1,-1],[-1,-1]])C.push([cx+dx*(lb[2]-lb[0])/2+dx*r,cy+dy*(lb[3]-lb[1])/2+dy*r+(dy>0?hh:dy<0?0:hh*.35),dx>0?'start':dx<0?'end':'middle']);
  const at=C.find(c=>!hit(rect(c)));if(!at)return;
- svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':leaf.getAttribute('data-k'),'data-w':word},word))}
+ svg.append(sv('text',{x:gwF(at[0]),y:gwF(at[1]),'text-anchor':at[2],class:'rlbl nt gw-flbl pre'+(word==='failed'?' f':''),style:'font-size:'+gwF(fs)+'px','aria-hidden':'true','data-testid':'grow-leaf-word','data-for':leaf.getAttribute('data-k'),'data-w':word},word));
+ /* drawn unseen for a frame, then shown: no frame paints it before a frame's own reading of the tree has it */
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{const t=svg.querySelector('.gw-flbl.pre');if(t)t.classList.remove('pre')}))}
 if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwBarHome();gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
