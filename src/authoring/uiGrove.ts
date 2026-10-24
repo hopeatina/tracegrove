@@ -354,7 +354,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-call .gw-vt{flex:0 1 auto;min-width:0;font:300 20px/28px var(--serif);overflow-wrap:break-word}
 @media (max-width:1100px){.gw-call{flex-wrap:wrap}.gw-call .gw-vt{flex:1 1 360px}}
 .gw-call.wait .gw-vt{font:14px/20px var(--sans);color:var(--ink3)}
-.gw-call .gw-vc{flex:none;display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:nowrap}
+.gw-call .gw-vc{flex:0 1 auto;display:inline-flex;align-items:center;min-height:20px;max-width:100%;padding:2px 7px;border-radius:5px;border:1px solid var(--line2);font:500 11.5px/16px var(--mono);white-space:normal;overflow-wrap:anywhere}
 .gw-call .gw-vm{flex:none;font-size:13px;color:var(--ink3);white-space:nowrap}
 .gw-call .gw-vgo{flex:none;margin-left:auto}
 /* a verdict with its next action beside it: the line keeps its own look, and the action sits at its right end */
@@ -517,7 +517,12 @@ const gwDur=ms=>ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(1)+' s';
 const gwCut=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
 const gwQuiet=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
 /* A pointer resting where a control appears is not pointing at it: a mode is previewed on hover only once the pointer has moved. */
-document.addEventListener('pointermove',e=>{if(e.movementX||e.movementY)gw.armed=true},{passive:true});
+document.addEventListener('pointermove',e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}},{passive:true});
+/* the page moving under a pointer that has not (a wheel, a key, a link that scrolls) previews nothing it now rests on: only the
+   pointer's own move arms the preview again */
+addEventListener('scroll',()=>{gw.armed=false},{passive:true});
+/* armed, and the page has not moved since the pointer last did (a scroll's own event can come after the hover it causes) */
+const gwArmed=()=>!!gw.armed&&gw.armY===scrollY;
 /* ---------- Words and marks the whole page shares ---------- */
 const gwBT=String.fromCharCode(96);
 /* A file path or a route breaks only after a slash between two of its segments: never inside a name, and never between a
@@ -1085,7 +1090,7 @@ function gwVerdict(V,f,tone){
   /* the promise it breaks, in the spec's words; when those are the failure's own title, the line already says them */
   f&&f.promise?(()=>{const ids=f.promise.split(/,\s*/),cs=ids.map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean),pl=x=>gwPlain(x).toLowerCase().replace(/[.\s]+$/,'');
    const own=cs.length===1&&pl(cs[0].text)===pl(gwVia(f.title||'').title);
-   return h('span',{class:'gw-vc',title:ids.join(', ')},!cs.length?'breaks '+(ids.length>1?'promises ':'a promise'):own?'breaks this promise':'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),70)).join('; '))})():null,
+   return h('span',{class:'gw-vc',title:ids.join(', ')},!cs.length?(ids.length>1?'breaks promises':'breaks a promise'):own?'breaks this promise':'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),70)).join('; '))})():null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
 /* Under the verdict, one quiet line of counts in the page's words: scenarios passed, failed and not tested yet, and the promises
@@ -1156,7 +1161,7 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+', as ghosts on the tree.':n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(gw.preview){gw.preview=null;gbPaint();say(null)}};
  return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
-   on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gw.armed)look(m.id)},pointermove:e=>{if(e.movementX||e.movementY)gw.armed=true;if(gw.armed&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
+   on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
    /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
    gwModeIcon(m.id),h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label,s.scenarios.length?[' · ',h('span',{class:'mn','data-u':v.counts[m.id]===1?'scenario':'scenarios'},locked&&m.id!==s.mode&&v.counts[m.id]>v.counts[s.mode]?'+'+(v.counts[m.id]-v.counts[s.mode]):String(v.counts[m.id]))]:null),
    /* while the choice is open each mode says what it proves; once chosen, the control is one line and pointing at a mode says it */
