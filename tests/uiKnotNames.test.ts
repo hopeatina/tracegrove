@@ -158,24 +158,24 @@ describe('the names on the bonsai’s knots', () => {
             if (!vis(t)) continue;
             const r = t.getBoundingClientRect();
             for (const m of marks) if (Math.min(r.right, m.r.right + 2) - Math.max(r.left, m.r.left - 2) > 0 && Math.min(r.bottom, m.r.bottom + 2) - Math.max(r.top, m.r.top - 2) > 0) out.push(name + ' touches ' + m.what);
-            // its leader, from the knot out: only its own knot's shoot may stand at its foot, and past its foot the leader may run
-            // beside that shoot, under its arc, but never into the shoot itself (it leaves the boss where the shoot rises, gbKnotNames)
+            // its leader, from the knot out, keeps 2 px clear of every mark's box as the name does: only its own knot's shoot may
+            // stand at its foot, its first 6 px, where it leaves the boss beside the shoot rising from it (gbKnotNames), and past
+            // its foot the leader keeps clear of that shoot's box too
             const ld = g.querySelector('.kld') as SVGPathElement, v = (ld.getAttribute('d') || '').match(/-?[\d.]+/g)?.map(Number) || [];
             if (v.length < 4) continue;
             const A = scr(ld, [v[0]!, v[1]!]), R = scr(ld, [v[2]!, v[3]!]), len = Math.hypot(A[0]! - R[0]!, A[1]! - R[1]!);
             const mine = new Set((B.knot[id].__ids as string[]).map((u) => B.shoots && B.shoots[u] && B.shoots[u].g).filter(Boolean));
-            const inShape = (el: SVGGraphicsElement, q: number[]) => { const m = el.getScreenCTM()!.inverse(); return (el as SVGGeometryElement).isPointInFill(new DOMPoint(m.a * q[0]! + m.c * q[1]! + m.e, m.b * q[0]! + m.d * q[1]! + m.f)); };
             const hit = new Set<string>();
             for (let d = 0; d <= len; d += .5) {
               const q = [R[0]! + (A[0]! - R[0]!) * d / len, R[1]! + (A[1]! - R[1]!) * d / len];
-              for (const m of marks) if (q[0]! > m.r.left && q[0]! < m.r.right && q[1]! > m.r.top && q[1]! < m.r.bottom && !(mine.has(m.e.closest('.budg')) && (d < 6 || !inShape(m.e, q)))) hit.add(m.what);
+              for (const m of marks) if (q[0]! > m.r.left - 2 && q[0]! < m.r.right + 2 && q[1]! > m.r.top - 2 && q[1]! < m.r.bottom + 2 && !(mine.has(m.e.closest('.budg')) && d < 6)) hit.add(m.what);
             }
             for (const h of hit) out.push(name + ': its leader runs into ' + h);
           }
           return { out, kinds: [...kinds].sort() };
         });
-        // (Max's shoots and their ghost leaves are there to keep clear of)
-        expect(clear.kinds, at).toEqual(expect.arrayContaining(['a ghost leaf', 'a shoot']));
+        // (Max's shoots, their ghost leaves, its counts and its graft buds are all there to keep clear of)
+        expect(clear.kinds, at).toEqual(expect.arrayContaining(['a count', 'a ghost leaf', 'a graft bud', 'a shoot']));
         expect(clear.out, at).toEqual([]);
         await page.close();
       }
@@ -287,7 +287,7 @@ describe('the names on the bonsai’s knots', () => {
     } finally { await browser.close(); }
   }, 240000);
 
-  it('names every knot at rest, beside it or, on a phone only, as a lettered pip (journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of every bud and every shoot from its foot, so no hop of the headline journey goes unnamed and a burl holding its start is named for it, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
+  it('names every knot at rest, beside it or, on a phone only, as a lettered pip (journeys wear numbered badges) with its name in the key, one block of rows at one x and one step off the wood, cushions and pot, the pips 8px clear of one another, of every bud and of every shoot from its foot, so no hop of the headline journey goes unnamed and a burl holding its start is named for it, with a journey’s start, then routes, then stores and jobs first for a place; the card numbers its path the same way; and a name comes in after its knot', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     let pips = 0;
@@ -351,7 +351,13 @@ describe('the names on the bonsai’s knots', () => {
               const sr = B.svg.getBoundingClientRect();
               if (bl < sr.left - .5 || br > sr.right + .5 || bt < sr.top - .5 || bb > sr.bottom + .5) out.push('the key runs out of the drawing');
             }
-            // a pip stands 8px clear of every count bud and graft bud
+            // a pip stands 8px clear of every other pip
+            const pips = Object.keys(B.klbl).map((id) => B.klbl[id].parentNode.querySelector('.kpip:not(.key)') as Element).filter((e) => vis(e)).map((e) => [e.textContent, e.querySelector('circle')!.getBoundingClientRect()] as const);
+            for (let a = 0; a < pips.length; a++) for (let b = a + 1; b < pips.length; b++) {
+              const p = pips[a]![1], q = pips[b]![1], gap = Math.hypot(Math.max(q.left - p.right, 0, p.left - q.right), Math.max(q.top - p.bottom, 0, p.top - q.bottom));
+              if (gap < 8 - .5) out.push('pips ' + pips[a]![0] + ' and ' + pips[b]![0] + ' ' + gap.toFixed(1) + ' px apart');
+            }
+            // and 8px clear of every count bud and graft bud
             const buds = (Array.from(B.svg.querySelectorAll('.shtag .sbud, .gb-gr .gsw')) as Element[]).filter(vis).map((e) => e.getBoundingClientRect());
             for (const id of Object.keys(B.klbl)) {
               const pc = B.klbl[id].parentNode.querySelector('.kpip:not(.key)') as Element;

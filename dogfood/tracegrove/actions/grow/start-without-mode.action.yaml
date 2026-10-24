@@ -10,13 +10,11 @@ sources:
   - src/authoring/ui.ts
   - src/authoring/uiGrove.ts
 steps:
-  - name: open the UI
-    browser: { kind: navigate, path: / }
+  - name: open discovery on the branch
+    browser: { kind: navigate, path: "/?view=Discover&source={branch}" }
     expect: { status: 200 }
-  - name: open discover
-    browser: { kind: click, target: { by: role, role: button, name: Discover } }
-  - name: pick the branch
-    browser: { kind: click, target: { by: role, role: button, name: "{branch}" } }
+  - name: reveal run options
+    browser: { kind: click, target: { by: testId, name: disclosure-run-options } }
   - name: trace with the rules only, so the run is free and repeatable
     browser: { kind: click, target: { by: testId, name: grow-agent } }
   - name: grow it
