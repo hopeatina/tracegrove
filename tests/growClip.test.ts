@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { clipFrame, clipPlayerHtml, clipTimeline, parseEventLog } from '../src/authoring/growClip.ts';
@@ -32,6 +33,28 @@ function events(): GrowEvent[] {
 }
 
 describe('grow clip', () => {
+  it('keeps recording status off the JSONL event stream and preserves allow-unproven', () => {
+    const root = mkdtempSync(join(tmpdir(), 'tracegrove-clip-jsonl-')); temps.push(root);
+    const repo = join(import.meta.dirname, '..');
+    cpSync(join(repo, 'src/samples/notes-api'), root, { recursive: true });
+    const git = (...args: string[]) => {
+      const result = spawnSync('git', ['-C', root, '-c', 'user.name=Clip test', '-c', 'user.email=clip-test@example.invalid', ...args], { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    };
+    git('init', '-q', '-b', 'main'); git('add', '-A'); git('commit', '-qm', 'Sample'); git('checkout', '-qb', 'clip-smoke');
+    const app = join(root, 'app/app.mjs'); writeFileSync(app, readFileSync(app, 'utf8') + '\n// Clip recording regression\n');
+    git('add', '-A'); git('commit', '-qm', 'Clip smoke');
+    const result = spawnSync(process.execPath, ['--import', join(repo, 'node_modules/tsx/dist/esm/index.mjs'), join(repo, 'src/cli/main.ts'), 'grow', '--dir', root, '--base', 'main', '--branch', 'clip-smoke', '--mode', 'minimum', '--no-agent', '--no-prove', '--no-gh', '--yes', '--allow-unproven', '--jsonl', '--record'], {
+      encoding: 'utf8', timeout: 25000, maxBuffer: 4 * 1024 * 1024,
+      env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: join(root, 'uninstalled-browsers') },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const events = result.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every(event => event.v === 'tracegrove.discovery-event/v1')).toBe(true);
+    expect(result.stderr).toContain('grove clip for clip-smoke');
+    expect(existsSync(join(root, '.tracegrove/clips/clip-smoke/grove.svg'))).toBe(true);
+  });
   it('turns a leaf green only where a real run passed', () => {
     const tl = clipTimeline(events());
     const end = Object.fromEntries(tl.leaves.map((l) => [l.id, l.end]));

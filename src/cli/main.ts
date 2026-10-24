@@ -510,7 +510,7 @@ async function main(argv: string[]): Promise<number> {
         ? await recordGrove(result.events, { out: clipDir(resolve(flag(args, 'dir') ?? '.'), result.events) })
         : null;
       if (args.flags.json === true) out(args, { log: result.log, state: result.state, summary: result.summary, ...(clip ? { clip: { files: clip.files, video: clip.video, note: clip.note } } : {}) }, '');
-      else if (clip) process.stdout.write(`\n${recordSummary(clip, process.cwd())}\n`);
+      else if (clip) (args.flags.jsonl === true ? process.stderr : process.stdout).write(`\n${recordSummary(clip, process.cwd())}\n`);
 
       return result.code;
     }
