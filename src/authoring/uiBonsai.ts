@@ -1832,7 +1832,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
      if(!quiet&&el.__g.animate){const ck=g.cOf.get(x.id),c=P.cS&&P.cS[ck],ci=list.slice(0,i).filter(q=>g.cOf.get(q.id)===ck).length;
       const t0=el.__t0=Math.max((B.twEnd||{})[x.id]||0,c?c.s+gbCuAt(.85)*(c.e-c.s):0)+ci*30;
       if(now<t0+170){const ps=-g.L/2-GB_PET,T=k=>'translate('+gbF(ps)+'px,0px) scale('+k+') translate('+gbF(-ps)+'px,0px)',tf=(B.tuft||{})[x.id];
-       gbPlay(el.__g,[{transform:T(0)},{transform:T(1)}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t0);gbPlay(el.__nick,[{opacity:0},{opacity:1}],{duration:120,fill:'backwards'},t0+150);
+       gbPlay(el.__g,[{transform:T(.001)},{transform:T(1)}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t0);gbPlay(el.__nick,[{opacity:0},{opacity:1}],{duration:120,fill:'backwards'},t0+150);
        if(tf&&tf.animate)gbPlay(tf,[{opacity:0},{opacity:1}],{duration:170,fill:'backwards'},t0)}}}
     el.style.transform='translate('+gbF(P.o[0]+sl[0])+'px,'+gbF(P.o[1]+sl[1])+'px) rotate('+gbF(sl[2])+'deg)'+(sl[3]&&sl[3]!==1?' scale('+sl[3]+')':'');el.__x=x;el.__y=P.o[1]+sl[1];
     const im=inMode(x);const was=el.__in;el.__in=im;let cls='gb-lf '+gbLeafState(x)+(sl[4]?' hang':'');const add=!im&&!!pv&&gbRank[x.mode]<=gbRank[pv];
