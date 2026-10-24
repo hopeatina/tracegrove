@@ -34,9 +34,9 @@ export const GROVE_CSS = String.raw`
 @media (max-width:1060px){.gw-stage{grid-template-columns:minmax(0,1fr)}}
 .gw-tree{padding:14px 12px 8px;min-width:0}
 .gw-tree .gw-bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin:0 4px 6px}
-.gw-tree .seg2{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
-.gw-tree .seg2 button{border:0;background:var(--paper);min-height:32px;padding:0 12px;font-size:13px;color:var(--ink3)}
-.gw-tree .seg2 button[aria-pressed=true]{background:var(--sel);color:var(--ink);font-weight:500}
+.gw .seg2{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.gw .seg2 button{border:0;background:var(--paper);min-height:32px;padding:0 12px;font-size:13px;color:var(--ink3)}
+.gw .seg2 button[aria-pressed=true]{background:var(--sel);color:var(--ink);font-weight:500}
 .gw-ol{width:100%;border-collapse:collapse;font-size:13px}
 .gw-ol th{font:500 11px/16px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 .gw-ol td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -454,8 +454,9 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  .gw-side .gw-call{flex-wrap:wrap;gap:6px 10px;padding:12px 14px}.gw-side .gw-call .gw-vt{flex:1 1 100%;font-size:19px;line-height:25px}.gw-side .gw-call .gw-vgo{margin-left:0}
  .gw-side .gw-result.slim{padding-left:16px;margin:8px 0 14px}
  .gw-side .gb-mode{display:block;margin:0 0 12px}.gw-side .gw-modes.set{display:flex;gap:6px}.gw-side .gw-modes.set button{flex:1 1 auto;padding:4px 8px;gap:6px;justify-content:center;white-space:nowrap}.gw-side .gw-modes.set button b{white-space:nowrap}
- .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:block;margin-top:6px}.gw-side .gw-hintrow .gw-more{display:block}
+ .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;margin-top:6px}.gw-side .gw-hintrow>:not(.gw-barw){grid-column:1}.gw-side .gw-hintrow>.gw-barw{grid-column:2;grid-row:1/span 2;align-self:start}.gw-side .gw-hintrow .gw-more{display:block}
  .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
+ .gw-side .gw-bar{margin:0}.gw-cols .gw-tree>.gw-stage{padding-top:0}
  .gw-cols>.gw-main{display:block}.gw-cols>.gw-main>.card{display:block;padding-top:10px}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
 }
@@ -1259,7 +1260,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
 /* The page, top down: the verdict once there is one, the phases (quiet when done), the tracers, the tree with its inspector, then the journeys and the spec side by side, then what the agent built.
    Everything paints into fixed slots so the tree's SVG stays where it is between paints: moving a node resets its transitions, and the limbs would snap instead of grow. */
 function gwSlots(){if(gw.slots)return gw.slots;const S={};for(const k of ['start','head','call','verdict','rail','agents','tree','two','error'])S[k]=h('div',{});
- S.card=h('section',{class:'card gw-tree','aria-label':'Tree'});S.bar=h('div',{});S.mode=h('div',{class:'gw-modearea'});S.stage=h('div',{class:'gw-stage'});S.left=h('div',{style:'min-width:0'});S.scroll=h('div',{class:'gb-wrap'});S.legend=h('div',{});S.ins=h('div',{class:'gw-insw'});
+ S.card=h('section',{class:'card gw-tree','aria-label':'Tree'});S.bar=h('div',{class:'gw-barw'});S.mode=h('div',{class:'gw-modearea'});S.stage=h('div',{class:'gw-stage'});S.left=h('div',{style:'min-width:0'});S.scroll=h('div',{class:'gb-wrap'});S.legend=h('div',{});S.ins=h('div',{class:'gw-insw'});
  /* the tree is drawn for its width: when the space it has changes enough, draw it again */
  try{new ResizeObserver(()=>{if(gw.state&&gw.tree==='grove'&&gw.B&&gbWidth()!==gw.B.width)growPaint()}).observe(S.scroll)}catch(e){}
  S.ins.addEventListener('scroll',gwInsFade,{passive:true});try{new ResizeObserver(gwInsFade).observe(S.ins)}catch(e){}
@@ -1274,22 +1275,17 @@ const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
    name moves against the wood. A phone or a narrow window scrolls to it as before. */
 function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!svg.isConnected)return;
  const vb=svg.viewBox&&svg.viewBox.baseVal,W=S.scroll.clientWidth;if(!vb||!vb.width||!W)return;
- gwBarRoom(svg,0);
- if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';gwBarRoom(svg);return}
+ if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';return}
  const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16;
  /* never so small that a leaf reads under 18 px */
  const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.1/(Math.min(...Ls)*W/vb.width):.6;
  const k=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));
  svg.style.width=k<1?Math.round(W*k)+'px':'';
- if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.1)svg.style.width=Math.min(W,Math.ceil(w*18.1/lo))+'px'}
- gwBarRoom(svg)}
-/* Grove | Outline stands in the tree card's top right corner, over the drawing's empty top where it can: the drawing moves
-   down only as far as keeps every word, cushion and limb under that corner 8 px clear of it */
-function gwBarRoom(svg,v){const st=svg.closest('.gw-stage'),tr=svg.closest('.gw-tree'),bar=tr&&tr.querySelector('.gw-bar');if(!st||!bar)return;
- if(v!=null||innerWidth<641){st.style.paddingTop=innerWidth<641?'':v+'px';return}
- const b=bar.getBoundingClientRect();if(!b.width)return;let top=1/0;
- for(const e of svg.querySelectorAll('text,.pfill,path.w,.gb-lf,.kpip')){const q=e.getBoundingClientRect();if((q.width||q.height)&&q.right>b.left-8&&q.left<b.right+8)top=Math.min(top,q.top)}
- st.style.paddingTop=top<1/0?Math.max(0,Math.ceil(b.bottom+8-top))+'px':'0px'}
+ if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.1)svg.style.width=Math.min(W,Math.ceil(w*18.1/lo))+'px'}}
+/* beside a wide tree Grove | Outline is set in the left column, beside what the mode says, so the drawing keeps the card's
+   full height; narrower it stands in the tree card's top right corner */
+function gwBarHome(){const S=gw.slots;if(!S)return;const hr=innerWidth>=1180&&S.mode.querySelector('.gw-hintrow'),to=hr||S.card;
+ if(S.bar.parentNode!==to){if(hr)hr.append(S.bar);else S.card.prepend(S.bar)}}
 /* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
    round its centre (the last drawn wins where two meet), so nothing in the drawing moves */
 function gwHits(){const svg=gw.svg;if(!svg||!svg.isConnected||gw.tree!=='grove')return;
@@ -1305,7 +1301,7 @@ for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
   return x0<x1?{x:x0,y:y0,width:x1-x0,height:y1-y0}:g.getBBox()};
  for(const g of svg.querySelectorAll('[role=button]')){let bb;try{bb=still(g)}catch(e){continue}if(bb.width>=m&&bb.height>=m)continue;
   const W=Math.max(bb.width,m),H=Math.max(bb.height,m);g.append(sv('rect',{class:'gb-hit',x:bb.x+bb.width/2-W/2,y:bb.y+bb.height/2-H/2,width:W,height:H,fill:'transparent','aria-hidden':'true'}))}}
-if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwFit();gwHits()}},{passive:true})}
+if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwBarHome();gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
 function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
@@ -1339,7 +1335,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  const nj=(s.journeys||[]).length;
  gwSet(S.bar,h('div',{class:'gw-bar'},
   h('span',{class:'row',style:'gap:10px'},
-   h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,'data-ol':'v:'+t,on:{click:()=>{if(gw.tree!==t)gwCalm();gw.tree=t;gw.refocus='v:'+t;gw.reveal=t==='outline'?gw.pinned:null;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));
+   h('span',{class:'seg2',role:'group','aria-label':'View'},['grove','outline'].map(t=>h('button',{'aria-pressed':String(gw.tree===t),'data-testid':'grow-view-'+t,'data-ol':'v:'+t,on:{click:()=>{if(gw.tree!==t)gwCalm();gw.tree=t;gw.refocus='v:'+t;gw.reveal=t==='outline'?gw.pinned:null;try{localStorage.setItem('gw-tree',t)}catch(e){}growPaint()}}},t==='grove'?'Grove':'Outline'))))));gwBarHome();
  /* the mode area holds one height from the first paint of a grow to its verdict: its three cards are there (waiting) while the
     tree grows, asked when it is drafted, and stay once one is chosen, so nothing above the tree moves it. Only on a phone,
     where the cards stack, does a choice fold them into chips: the area keeps its height while the dropped leaves fall, then
@@ -1381,6 +1377,8 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  if(gw.drScroll&&!gw.dr.loading){gw.drScroll=false;const d=gw.dr;requestAnimationFrame(()=>{if(gw.dr===d)gwDrReveal()})}
  /* switching to the Outline with something pinned brings its row into view */
  if(gw.reveal){const el=find(gw.reveal);gw.reveal=null;if(el)el.scrollIntoView({block:'nearest'})}
- gwSyncHash()}
+ /* a row picked in the Outline opens under it: what it opened comes into view with it */
+ if(gw.olShow){const el=find(gw.olShow),box=el&&(el.closest('li')||el.parentElement);gw.olShow=null;if(box&&box.getBoundingClientRect().bottom>innerHeight)box.scrollIntoView({block:'nearest'})}
+ gwBarHome();gwSyncHash()}
 ${BONSAI_JS}
 `;
