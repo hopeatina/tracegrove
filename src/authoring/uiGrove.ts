@@ -1274,13 +1274,22 @@ const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
    name moves against the wood. A phone or a narrow window scrolls to it as before. */
 function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!svg.isConnected)return;
  const vb=svg.viewBox&&svg.viewBox.baseVal,W=S.scroll.clientWidth;if(!vb||!vb.width||!W)return;
- if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';return}
+ gwBarRoom(svg,0);
+ if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';gwBarRoom(svg);return}
  const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16;
  /* never so small that a leaf reads under 18 px */
- const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.5/(Math.min(...Ls)*W/vb.width):.6;
+ const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.1/(Math.min(...Ls)*W/vb.width):.6;
  const k=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));
  svg.style.width=k<1?Math.round(W*k)+'px':'';
- if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.5)svg.style.width=Math.min(W,Math.ceil(w*18.5/lo))+'px'}}
+ if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.1)svg.style.width=Math.min(W,Math.ceil(w*18.1/lo))+'px'}
+ gwBarRoom(svg)}
+/* Grove | Outline stands in the tree card's top right corner, over the drawing's empty top where it can: the drawing moves
+   down only as far as keeps every word, cushion and limb under that corner 8 px clear of it */
+function gwBarRoom(svg,v){const st=svg.closest('.gw-stage'),tr=svg.closest('.gw-tree'),bar=tr&&tr.querySelector('.gw-bar');if(!st||!bar)return;
+ if(v!=null||innerWidth<641){st.style.paddingTop=innerWidth<641?'':v+'px';return}
+ const b=bar.getBoundingClientRect();if(!b.width)return;let top=1/0;
+ for(const e of svg.querySelectorAll('text,.pfill,path.w,.gb-lf,.kpip')){const q=e.getBoundingClientRect();if((q.width||q.height)&&q.right>b.left-8&&q.left<b.right+8)top=Math.min(top,q.top)}
+ st.style.paddingTop=top<1/0?Math.max(0,Math.ceil(b.bottom+8-top))+'px':'0px'}
 /* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
    round its centre (the last drawn wins where two meet), so nothing in the drawing moves */
 function gwHits(){const svg=gw.svg;if(!svg||!svg.isConnected||gw.tree!=='grove')return;
