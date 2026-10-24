@@ -188,6 +188,8 @@ ${BONSAI_CSS}
 .gw-sp.agent,.gw-sp.run,.gw-sp.needs{background:var(--gold-bg);color:var(--gold)}.gw-sp.open{background:none;border-color:var(--line2);color:var(--ink3)}
 .gw-cdet .gw-sp{margin-top:1px}
 .gb-tip .k{text-transform:none;letter-spacing:0}
+.gw-olp{margin:0 0 14px}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
+.gb-hapr.gw-facts2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px}.gb-hapr.gw-facts2 .btn.sm{min-height:32px;padding:0 12px;font-size:13px}.gb-olin .gw-more,.gb-olin .gw-ev{margin:6px 0 0}
 .gw-chip.pr{white-space:normal;max-width:100%;font-family:var(--sans);text-align:left}.gw-chip.pr.f{background:var(--verm-bg);color:var(--verm-ink)}
 .gw-chip .gw-sd{margin-right:5px;flex:none;width:8px;height:8px}.gw-chip .gw-sd.needs{width:9px;height:8px}
 /* the table that helps choose a mode: fixed columns, numbers under their headers */
@@ -892,7 +894,9 @@ async function gwOpenRuns(){const s=gw.state;if(!s){openTab('Run');return}
  openTab('Run')}
 /* The link every place a scenario is shown gives it once it has a run: its card, its row opened in place, a phone's card. It
    opens what happened in that run in the drawer beside the tree, on the step that broke. */
-function gwHappened(x){return gwRan(x)?h('button',{class:'gw-lnk gw-hap gw-dre',type:'button','data-hap':x.id,'data-dr':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'See what happened ›'):null}
+/* A failed row's actions: See what happened first, the one primary; then Rerun and Heal */
+function gwFailActs(x){return h('div',{class:'gb-hapr gw-facts2'},gwHappened(x,1),gwRowAct(x),h('button',{class:'gw-lnk gb-ract',type:'button','data-testid':'grow-row-heal-'+x.id,'aria-label':'Heal: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();openTab('Heal')}}},'Heal'))}
+function gwHappened(x,primary){return gwRan(x)?h('button',{class:(primary?'btn sm':'gw-lnk')+' gw-hap gw-dre',type:'button','data-hap':x.id,'data-dr':x.id,'aria-label':'See what happened: '+gwPlain(gwVia(x.title).title),on:{click:e=>{e.stopPropagation();gwDrOpen(x.id)}}},'See what happened ›'):null}
 /* ---------- What happened: one scenario's run, step by step, beside the tree ---------- */
 /* The drawer reads the run the grow recorded for a scenario from that run's verified bundle (GET /api/runs/<run>/happened, which
    needs the session token) and shows its steps, what each one recorded, one sentence for how it broke, and the evidence behind
@@ -1107,6 +1111,12 @@ function gwJourneyDoes(j){const t=String(j&&j.title||'');if(!j||j.titleBy&&j.tit
  if(j.surface==='job'&&(m=/^(.*) job$/.exec(t)))return 'the '+lc(m[1])+' job runs'+via;
  if(j.surface==='http'&&/^(GET|POST|PUT|PATCH|DELETE) \//.test(t))return 'a client calls '+t+via;
  return t}
+/* A journey's heading: the same sentence, starting with a capital ("Someone runs tracegrove grow in a terminal") */
+function gwJourneyTitle(j){const t=gwJourneyDoes(j);return t.charAt(0).toUpperCase()+t.slice(1)}
+/* At the top of the Outline: every promise, in full, with its state word, in the spec's order */
+function gwOlPromises(){const v=gw.view;if(!v||!v.criteria.length)return null;
+ return [gbSec('Promises',String(v.criteria.length)),h('ol',{class:'gw-plist gw-olp',role:'list','aria-label':'Promises','data-testid':'grow-ol-promises'},v.criteria.map(c=>{const b=gwCB(c.status);
+  return h('li',{class:'gw-pr',title:c.status.text},gwSD(b),h('span',{class:'t'},...gwRich(c.text)),h('span',{class:'w '+b},b==='needs'?'needs you':gwCBL(b,1)))}))]}
 /* What the change does for its users: one sentence naming each journey, in the spec's words where it has them */
 function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;const N=['One','Two','Three','Four','Five','Six','Seven','Eight','Nine'];
  const lc=t=>/^[A-Z][a-z]/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t,show=J.length>5?J.slice(0,4):J,parts=[];
@@ -1249,7 +1259,7 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   if(!locked){el.textContent='Preview · '+lbl(id)+' keeps '+n+' of the '+all+' drafted'+(all>n?' and cuts '+(all-n):'')+'.'+(touch?' Tap it again to choose it.':'');return}
   /* what a bigger mode adds, itemised as the tree draws it: on the journeys, and the part checks and existing flows on shoots */
   const c=v.counts[cur],more=s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[id]&&gbRank[x.mode]>gbRank[cur]),kind=gwKindOf();
-  el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+', as ghosts on the tree.':n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
+  el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+(gw.tree==='outline'?'.':', as ghosts on the tree.'):n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(gw.preview){gw.preview=null;gbPaint();say(null)}};
  return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'+(who?'. '+who:'')},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
    on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
@@ -1485,7 +1495,8 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  if(gw.dr&&gw.pinned!=='s:'+gw.dr.sid){const p=gw.pinned;gw.dr=null;if(p&&p.startsWith('s:'))gwDrOpen(p.slice(2),null,true,true)}
  const drOn=!!(gw.dr&&gwScen(gw.dr.sid));
  const alone=gw.tree==='outline'&&!(s.asked&&!s.modeBy)&&!drOn;S.stage.classList.toggle('ol',alone);S.card.classList.toggle('olv',alone);
- if(alone)S.ins.replaceChildren();else gwSet(S.ins,drOn?gwDrawer():gwInspector());S.ins.hidden=alone||!S.ins.firstChild;S.stage.classList.toggle('solo',!S.ins.firstChild);
+ /* (beside the Outline, at rest, the left column keeps its Next block) */
+ if(alone)gwSet(S.ins,s.done&&!gw.pinned?gwNextBlock():null);else gwSet(S.ins,drOn?gwDrawer():gwInspector());S.ins.hidden=!S.ins.firstChild;S.stage.classList.toggle('solo',alone||!S.ins.firstChild);
  S.ins.classList.toggle('dr',drOn);
  requestAnimationFrame(gwInsFade);
  /* the Outline is the journey list, so it is not repeated below it */
