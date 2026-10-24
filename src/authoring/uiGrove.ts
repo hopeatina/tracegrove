@@ -221,7 +221,7 @@ ${BONSAI_CSS}
 .gw-ol tr.det>td{padding:2px 8px 14px;border-bottom:1px solid var(--line);background:var(--sel)}.gw-ol tr.det .gw-olcard{margin:0}
 .gw-mocknote{font:12px/18px var(--sans);color:var(--ink3);margin:10px 6px 0}.gw-mocknote .gw-chip{margin-right:6px}
 .gw-rail .ph b{white-space:normal;overflow:visible}
-@media (max-width:640px){.gw-ol tr.det{display:block}.gw-ol tr.det>td{display:block;padding:8px}.gw-olcard{margin:2px 0 12px;padding:4px 10px 10px}.gw .gb-hd .st .tks,.gw .gb-hd .st .gb-gs{justify-content:flex-start}.gw .gb-hd .st{white-space:normal;min-width:0}}
+@media (max-width:640px){.gw-ol tr.det{display:block}.gw-ol tr.det>td{display:block;padding:8px}.gw-olcard{margin:2px 0 12px;padding:4px 10px 10px}.gw .gb-hd .st .tks,.gw .gb-hd .st .gb-gs{justify-content:flex-start}.gw .gb-hd .st{white-space:normal;min-width:0}.gw .gb-jr>.gb-hd{flex-wrap:wrap}.gw .gb-jr>.gb-hd .st{flex:1 1 100%}.gw .gb-hd .st .tk{white-space:normal}}
 /* a long title pushes the clock and New grow onto their own line: they keep to the right edge, as beside a short one */
 @media (min-width:761px){.gw-head>.gw-meta{margin-left:auto}}
 /* in the Outline, the spec card alone takes the Outline's measure, centred under it, not half the page */
@@ -426,9 +426,8 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-ins .gw-cacts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .gw-ins .gw-lnk{display:inline-block;margin-top:6px}
 @media (min-width:761px){
- .gw-tree{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center}
- .gw-tree>:nth-child(1){grid-column:2;grid-row:1}.gw-tree>:nth-child(2){grid-column:1;grid-row:1;min-width:0}.gw-tree>:nth-child(n+3){grid-column:1/-1}
- .gw-tree .gw-bar{margin:0 4px}
+ .gw-tree .gw-bar{position:absolute;top:10px;right:12px;z-index:3;margin:0}
+ .gw-tree>.gw-stage{padding-top:40px}
  .gw-modearea{margin:0}.gb-mode{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:0 4px}
  .gw-modes.set{flex-wrap:nowrap;gap:6px}.gw-modes.set button{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:4px 14px 4px 10px}
  .gb-mode .gw-hintrow{flex:1 1 220px}
@@ -459,7 +458,6 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:block;margin-top:6px}.gw-side .gw-hintrow .gw-more{display:block}
  .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
  .gw-lay>.gw-main{display:block}.gw-lay>.gw-main>.card{display:block;padding-top:10px}
- .gw-tree .gw-bar{position:absolute;top:10px;right:12px;z-index:3;margin:0}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
 }
 @media (min-width:1061px){
@@ -1278,7 +1276,10 @@ const gwSet=(slot,...k)=>{slot.replaceChildren();gwPut(slot,...k)};
 function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!svg.isConnected)return;
  const vb=svg.viewBox&&svg.viewBox.baseVal,W=S.scroll.clientWidth;if(!vb||!vb.width||!W)return;
  if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';return}
- const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16,k=Math.max(.6,Math.min(1,(innerHeight-top-below)/H));
+ const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16;
+ /* never so small that a leaf reads under 18 px */
+ const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.5/(Math.min(...Ls)*W/vb.width):.6;
+ const k=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));
  svg.style.width=k<1?Math.round(W*k)+'px':''}
 /* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
    round its centre (the last drawn wins where two meet), so nothing in the drawing moves */

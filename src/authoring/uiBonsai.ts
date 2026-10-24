@@ -1679,10 +1679,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  svg.addEventListener('pointerleave',()=>{if(!gw.hov&&!gw.hovEl)return;gw.hovEl=null;gbHover(null)});
  svg.addEventListener('focusin',e=>{const k=keyOf(e);if(k){gbRove(e.target.closest('[data-k]'));gbHover(k,e.target.closest('[data-k]'))}});
  svg.addEventListener('focusout',e=>{if(!svg.contains(e.relatedTarget)&&(gw.hov||gw.hovEl))gbHover(null)});
- /* the browser moves a tap's click onto a target near the finger; the finger's own point is where the touch went down */
+ /* the browser moves a tap's click onto a target near the finger; the finger's own point is where the touch went down; a clear hit area round a small mark gives way to a leaf nearer the finger */
  svg.addEventListener('pointerdown',e=>{gw.tapAt=e.pointerType!=='mouse'?[e.clientX,e.clientY,e.timeStamp]:null},{passive:true});
  svg.addEventListener('click',e=>{const at=e.pointerType&&e.pointerType!=='mouse'&&gw.tapAt&&e.timeStamp-gw.tapAt[2]<1500?gw.tapAt:null,t0=at?document.elementFromPoint(at[0],at[1]):null,tt=t0&&svg.contains(t0)?t0:e.target;
-  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
+  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tt.classList.contains('gb-hit')||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
  svg.addEventListener('keydown',gbKeys);
  /* on a phone, a tap off the card under the drawing, on nothing that does a thing of its own, lets the card go */
  if(!gw.tapOff){gw.tapOff=true;document.addEventListener('click',e=>{const B2=gw.B,t=e.target;if(!B2||!B2.tip||B2.tip.hidden||!B2.tip.classList.contains('below')||!gw.pinned||!(t instanceof Element))return;
@@ -2670,7 +2670,7 @@ function gbCursors(now){const B=gw.B,s=gw.state;if(!B||!s||gw.tree!=='grove')ret
    between its method and its path), and each arrow goes with the hop before it, so a line ends on the arrow that leads on and
    never starts with one; a line the path wraps onto starts a little in, under the first hop, as the same path going on (see
    .gw-hp). */
-function gbPathEl(j,wound,R){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
+function gbPathEl(j,wound,R){const M=gw.M||(gw.M=gbModel());const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
  /* a journey's path that broke greys the hops after the break, as the tree draws them in grey dots */
  if(!R&&wound&&!(M.U[wound]||{}).root){const wi=j.units.indexOf(wound);if(wi>=0)R={lit:new Set(j.units.slice(0,wi+1))}}
  return h('ol',{class:'gb-path gw-path gw-hp'},order.map((u,i)=>h('li',{class:'hop'+(R&&!R.lit.has(u.id)?' un':'')},h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))))))}
