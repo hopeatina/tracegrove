@@ -47,6 +47,7 @@ import { initProject } from '../authoring/init.ts';
 import { startUi } from '../authoring/ui.ts';
 import { checkProject, discoverLive, draftWithAgent, saveCatalog } from '../authoring/workspace.ts';
 import { growCommand } from './grow.ts';
+import { clipDir, latestGrowLog, readGrowLog, recordGrove, recordSummary } from './growRecord.ts';
 import { setupBrowsers } from './setup.ts';
 import { detectAgents, readLocalSettings, resolveAgentSettings, writeLocalSettings } from '../authoring/agent.ts';
 import { createInterface } from 'node:readline/promises';
@@ -171,6 +172,10 @@ Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
                                                        run, step, expected and got with its evidence files, and what is not tested yet;
                                                        exits 0 ready, 1 not ready (a check failed: fix), 3 not proven yet (a scenario in
                                                        the mode has no result: prove more; --allow-unproven exits 0), 2 stopped, 4 cancelled
+       [--record]                                      then record it as a clip to post (same as running clip after)
+  clip [--log <file>] [--out <dir>] [--no-video]      the last grow as a 9:16 clip to post: grove.mp4, grove.html, grove.svg, grove.png;
+                                                       leaves are green only where a real flow passed
+
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -498,9 +503,27 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'grow': {
-      const result = await growCommand(args.flags);
-      if (args.flags.json === true) out(args, { log: result.log, state: result.state, summary: result.summary }, '');
+      const { record, ...growFlags } = args.flags;
+      const result = await growCommand(growFlags);
+      // A blocked grow has no tree to show, so it records nothing.
+      const clip = record === true && result.state.change && !result.state.blocked
+        ? await recordGrove(result.events, { out: clipDir(resolve(flag(args, 'dir') ?? '.'), result.events) })
+        : null;
+      if (args.flags.json === true) out(args, { log: result.log, state: result.state, summary: result.summary, ...(clip ? { clip: { files: clip.files, video: clip.video, note: clip.note } } : {}) }, '');
+      else if (clip) process.stdout.write(`\n${recordSummary(clip, process.cwd())}\n`);
+
       return result.code;
+    }
+
+    case 'clip': {
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const log = flag(args, 'log') ? resolve(flag(args, 'log')!) : latestGrowLog(dir);
+      if (!log || !existsSync(log)) throw new Blocked([{ code: 'clip_no_grow_log', owner: 'agent', detail: log ? `no grow log at ${log}` : 'no grow log in .tracegrove/discovery/', action: 'run `tracegrove grow` first, or pass --log <file>' }]);
+      const events = readGrowLog(log);
+      if (!events.some((e) => e.kind === 'change.read')) throw new Blocked([{ code: 'clip_empty_grow_log', owner: 'agent', detail: `${log} has no change to show (the grow was blocked before reading one)`, action: 'run `tracegrove grow` again' }]);
+      const result = await recordGrove(events, { out: flag(args, 'out') ? resolve(flag(args, 'out')!) : clipDir(dir, events), video: args.flags['no-video'] !== true });
+      out(args, { log, files: result.files, video: result.video, note: result.note, totals: result.timeline.totals }, recordSummary(result, process.cwd()));
+      return 0;
     }
 
     case 'check': {
