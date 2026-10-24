@@ -804,12 +804,14 @@ describe('Grow page', () => {
       return { soil: up(soil) / up(soil + T.D), flare: up(soil + T.D) / up(soil + 2 * T.D), foot: up(soil + T.D), Ht: T.Ht, cal: up(T.D), D: T.D, potL: L.potL, lone: !!L.lone };
     });
     const lr = L.roots.find((r: { loose: boolean }) => r.loose);
-    const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[]) => p[1]! - L.sy(p[0]!)) : [];
+    // (its centre against the soil line, and against its own girth there, over its first seven tenths)
+    const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[], i: number) => [p[1]! - L.sy(p[0]!), lr.w[i]]) : [];
     // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
     // stands above the soil, and the cut face and stake as drawn
     const root = lr ? (() => {
       const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], face = lg!.querySelector('.rcut')!;
-      const shows = lr.pts.slice(0, Math.floor(n * .7)).map((p: number[], i: number) => (L.sy(p[0]!) + .7 - (p[1]! - lr.w[i] / 2)) / lr.w[i]);
+      // (where it shows as it leaves the nebari, before it goes down into the soil)
+      const shows = lr.pts.slice(0, Math.max(2, Math.floor(n * .1))).map((p: number[], i: number) => (L.sy(p[0]!) + .7 - (p[1]! - lr.w[i] / 2)) / lr.w[i]);
       return { start: Math.abs(lr.pts[0][0] - X) / hb, past: (Math.abs(e[0] - X) - hb) / L.kpx, shows: Math.min(...shows), endTop: e[1] - lr.w[n - 1] / 2 - L.sy(e[0]),
         face: [Number(face.getAttribute('cx')) - e[0], Number(face.getAttribute('cy')) - e[1]], faceBox: box(face), op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
     })() : null;
@@ -896,9 +898,13 @@ describe('Grow page', () => {
         expect(tags[0]!.r, at).toBeLessThanOrEqual(rect.r);
         expect(dash, at).not.toBe('none');
         expect(Math.min(Math.abs(stake.cx - cut.l), Math.abs(stake.cx - cut.r)), at).toBeLessThanOrEqual(cut.w + 4);
-        for (const dy of g.sunk) expect(Math.abs(dy), at).toBeLessThan(1.5);
+        // It leaves the nebari with its centre just under the soil line and then goes down into the soil, a root and not a
+        // log laid along the soil: never above the soil line, and between, at least half its girth under it.
+        for (const [dy] of g.sunk) expect(dy, at).toBeGreaterThan(-1.5);
+        expect(Math.max(...g.sunk.map(([dy, w]: number[]) => dy! / w!)), at).toBeGreaterThanOrEqual(.5);
         // ... and a root of its own, faded, running out from under the nebari seventy to ninety pixels past the foot, about
-        // two fifths of it above the soil, its cut end standing out of it with the stake pushed into the cut face.
+        // two fifths of it above the soil where it leaves the nebari, its cut end standing out of it with the stake pushed
+        // into the cut face.
         const rt = g.root!;
         expect(rt.start, at).toBeLessThanOrEqual(1);
         expect(rt.past, at).toBeGreaterThanOrEqual(69.5);

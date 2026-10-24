@@ -837,10 +837,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     that fan up into the foliage, the leader itself the middle one, each from about a third of its girth there down to a hair;
     the fork stands as far under the crest as a branch's twigs stand under theirs, so the crest sits on ramified wood too. */
  if(!sap){const n1=tp.length-1,yc=co[1]+crc.b,kB=Math.max(2,Math.min(n1-2,leaderAt(yc+.3*crc.h+9))),kF=Math.max(kB+1,Math.min(n1-1,leaderAt(yc+4))),wF=tw[kB],acL=gbLen(tp),aB=acL[kB];
-  /* (one smooth taper, three of its girths long at least, from the foot of the crest to a narrow round tip, never a step where the twigs fork: while the crest
+  /* (one smooth taper, three of its girths long at least, from the foot of the crest to a round tip a hair across, never a step where the twigs fork: while the crest
      has not yet come out, the leader's end shows, and it reads as a growing shoot, not a split spike) */
   let kS=kB;while(kS>2&&acL[n1]-acL[kS]<3*tw[kS])kS--;
-  const wS=tw[kS],aS=acL[kS],aN=(acL[n1]-aS)||1,wt=Math.max(1.4,.2*wF);
+  const wS=tw[kS],aS=acL[kS],aN=(acL[n1]-aS)||1,wt=1.1;
   for(let i=kS+1;i<=n1;i++){const u=(acL[i]-aS)/aN;tw[i]=Math.min(tw[i],wt+(wS-wt)*(1-u*u))}
   const d0=[tp[kF+1][0]-tp[kF-1][0],tp[kF+1][1]-tp[kF-1][1]],dm=Math.hypot(d0[0],d0[1])||1,rf=gbRng(gbHash(key+':fork'));
   for(const sd of [-1,1]){const th=sd*(30+10*rf())*Math.PI/180,u=[(d0[0]*Math.cos(th)-d0[1]*Math.sin(th))/dm,(d0[0]*Math.sin(th)+d0[1]*Math.cos(th))/dm],len=crc.h*(.5+.16*rf())+9,S0=tp[kF];
@@ -1173,14 +1173,13 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
    return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
   const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NT=12,NC=15,NP=2*(NB+NT)+NC;
   /* the growing end is a shoot's tip a tenth of the wood's girth there across, never the girth of the wood below pushed up
-     as a stub: behind it the wood widens to its whole girth over one and a half calipers of it, widening at once from the
-     rounded tip (so the tip reads as a narrow point and not a nub on a flat end) and easing into the whole wood, so where
-     the taper meets it shows no corner */
+     as a stub: behind it the wood widens smoothly to its whole girth over one caliper of it (that girth, eased in and out,
+     so neither the tip nor where the taper meets the whole wood shows a corner) */
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
-   const q=at(e),Lt=Math.max(3,3*q.w),rt=Math.min(q.w+.4,Math.max(.5,.2*q.w));
+   const q=at(e),Lt=Math.max(2,2*q.w),rt=Math.min(q.w+.4,Math.max(.5,.2*q.w));
    /* (the band's points: NB along the whole wood behind the taper, and NT across the taper itself, so it keeps its shape) */
    const ts=Math.max(-2,e-Lt),ds=[];for(let i=0;i<NB;i++)ds.push(-2+(ts+2)*i/(NB-1));for(let i=1;i<=NT;i++)ds.push(ts+(e-ts)*i/NT);
-   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*u*(2-u);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
+   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*u*u*(3-2*u);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
    /* past the front: a half circle round the spine there, the tip's half-width */
    const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=rt*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
@@ -2479,7 +2478,7 @@ function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replace
  for(const t of B.svg.querySelectorAll('.klbl.on,.kpip.on,.rlbl,.shtag,.mlbl,.note,.kld'))add(R(t),2);
  for(const l of Object.values(B.lbl))add(R(l.el));
  for(const Q of Object.values(B.pad))for(const c of Q.cu||[])if(c&&c.el)add(R(c.el),2);
- for(const e of [...Object.values(B.leaf),...Object.values(B.bud)])if(!e.classList.contains('gone')){const b=e.querySelector('.blade');if(b)add(R(b),2)}
+ for(const e of [...Object.values(B.leaf),...Object.values(B.bud)])if(!e.classList.contains('gone'))for(const b of e.querySelectorAll('.blade'))add(R(b),2)
  const wood=[...B.svg.querySelectorAll('path.w,path.tw')].filter(e=>e.getScreenCTM()),inWood=(x,y)=>wood.some(e=>{try{return e.isPointInFill(new DOMPoint(x,y).matrixTransform(e.getScreenCTM().inverse()))}catch(err){return false}});
  const clear=b=>b[0]>=sr.left+2&&b[2]<=sr.right-2&&b[1]>=sr.top+2&&b[3]<=sr.bottom-2&&!keep.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])&&![0,.25,.5,.75,1].some(fx=>[0,.5,1].some(fy=>inWood(b[0]+(b[2]-b[0])*fx,b[1]+(b[3]-b[1])*fy)));
  const inv=m.inverse(),put=(word,cands)=>{const t=sv('text',{class:'padlbl','font-size':gbF(10/hf),'stroke-width':gbF(3/hf)},word);B.gPl.append(t);const w=R(t).width,h=10;
@@ -2493,7 +2492,7 @@ function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replace
   /* at the shoulder's outer edge; where a name or the wood has that, just under or over it, toward the outside */
   const ox=out<0?r.left-5:r.right+5,qx=out<0?r.left+r.width*.3:r.right-r.width*.3;
   put(GB_W.refuses,[[ox,y,out],[ox,r.top+6,out],[ox,r.bottom-6,out],[qx,r.bottom+9,0],[qx,r.top-9,0],[(r.left+r.right)/2,r.bottom+9,0]])});
- const hang=cs.flatMap(c=>c.hang).map(x=>B.leaf[x.id]).filter(e=>e&&!e.classList.contains('gone')&&!e.classList.contains('cut')).map(e=>R(e.querySelector('.blade')||e)).filter(r=>r.width);
+ const hang=cs.flatMap(c=>c.hang).map(x=>B.leaf[x.id]).filter(e=>e&&!e.classList.contains('gone')&&!e.classList.contains('cut')).map(e=>{const bs=[...e.querySelectorAll('.blade')].map(R).filter(q=>q.width);return bs.length?{left:Math.min(...bs.map(q=>q.left)),right:Math.max(...bs.map(q=>q.right)),top:Math.min(...bs.map(q=>q.top)),bottom:Math.max(...bs.map(q=>q.bottom)),width:1}:R(e)}).filter(r=>r.width);
  if(hang.length){const l=Math.min(...hang.map(r=>r.left)),r=Math.max(...hang.map(r=>r.right)),bt=Math.max(...hang.map(r=>r.bottom)),mid=(hang[0].top+hang[0].bottom)/2;
   /* (where a name, a cushion or the wood has those, close beside a hanging leaf's tip, a little under it on either side) */
   const near=[];for(const h of hang)for(const dy of [6,9,12,15,18])for(const dx of [2,5,8,11,14]){const gy=Math.max(0,dy-5);if(Math.hypot(dx,gy)<=14)near.push([Math.hypot(dx,gy),[h.right+dx,h.bottom+dy,1]],[Math.hypot(dx,gy),[h.left-dx,h.bottom+dy,-1]])}
