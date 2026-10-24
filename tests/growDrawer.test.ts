@@ -512,7 +512,7 @@ describe('What happened, step by step', () => {
       const v = page.getByTestId('grow-verdict');
       await expect(v.textContent()).resolves.toContain('“Removing a seat never charges the card” failed: expected 2 charges, got 3');
       const m = await v.evaluate((el) => {
-        const t = el.querySelector('.gw-vt') as HTMLElement, r = el.getBoundingClientRect(), cs = getComputedStyle(t), go = el.querySelector('[data-testid="grow-verdict-open"]')!.getBoundingClientRect();
+        const t = el.querySelector('.gw-vt') as HTMLElement, r = el.getBoundingClientRect(), cs = getComputedStyle(t), go = document.querySelector('[data-testid="grow-verdict-open"]')!.getBoundingClientRect();
         return { whole: t.scrollWidth <= t.clientWidth && t.scrollHeight <= t.clientHeight + 1, cut: cs.textOverflow === 'ellipsis' || cs.whiteSpace === 'nowrap',
           inside: r.left >= 0 && r.right <= innerWidth && go.right <= innerWidth, page: document.documentElement.scrollWidth <= innerWidth, tooltip: t.hasAttribute('title') || el.hasAttribute('title') };
       });
