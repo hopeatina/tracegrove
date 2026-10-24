@@ -172,6 +172,8 @@ ${BONSAI_CSS}
 .gw-ulist{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}.gw-ulist li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 12px;align-items:center;min-height:44px;border-top:1px solid var(--line);padding-top:6px}
 .gw-ulist .t{text-align:left;font:14px/20px var(--sans);color:var(--ink)}.gw-ulist .w{font:12px/18px var(--mono);color:var(--ink3);white-space:nowrap}.gw-ulist .w.nf{color:var(--muted)}
 @media (max-width:640px){.gw-ulist li{grid-template-columns:minmax(0,1fr) auto}.gw-ulist .w{grid-column:1}}
+@media (max-width:640px){.gw .gw-modes.set{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.gw .gw-modes.set button{padding:4px 6px!important;justify-content:center;white-space:nowrap;gap:5px}.gw .gw-modes.set button .gw-micon{display:none}
+ .gw button,.gw summary,.gw a{min-height:44px!important;min-width:44px}.gw button.gw-lnk,.gw a.gw-lnk{display:inline-flex;align-items:center}.gw summary{display:flex;align-items:center}}
 .gw-ev{margin:8px 0 0;font:12px/18px var(--mono);color:var(--ink2)}.gw-ev p{margin:0}.gw-ev .muted{color:var(--ink3)}
 /* a criterion's state, in the leaf palette: proved moss, partly proved half moss, failed red, needs you a gold mark of its own */
 .gw-sd{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;background:var(--line2)}
@@ -683,24 +685,18 @@ function gwModeTable(cls){const s=gw.state,v=gw.view,M=gw.M||gbModel();const ord
 /* The inspector: whatever is pinned (a journey, a scenario or a part); otherwise the part being traced while it runs,
    and once it is done the first failing journey, else the headline one. For a journey it says only what the list does not:
    its title, where it starts, its path and its failure; the Journeys card below is the one list of its scenarios. */
+/* At rest on a finished grow the panel is empty: the verdict says the one thing to look at first, with its action, and the panel
+   fills when something is selected. The first failure's run is read now, so its card has its evidence the moment it is. */
 function gwRest(M){const s=gw.state,V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwScen(f.scenario);
- const runs=s.scenarios.some(gwRan)?h('button',{class:'gw-lnk','data-testid':'grow-open-runs',type:'button',on:{click:()=>gwOpenRuns()}},'Open the runs'):null;
- if(x&&s.run[x.id]&&s.run[x.id].st==='fail'){const said=gw.view.said&&gw.view.said[x.id];
-  return [h('span',{class:'who'},V.failed&&V.failed.length>1?'Where the first of '+V.failed.length+' failures broke':'Where it broke'),
-   h('p',{class:'gw-rest err'},f.step?'Step '+f.step+' · ':'',said||(f.expected!=null?'expected '+f.expected+', got '+f.got:'')),
-   gwCardActs(x),gwEvLine(x),gwResultSteps(),runs]}
- const hd=gbHead(M,M.J);if(!hd)return null;const vis=s.modeBy?s.mode:null,toks=gbTok(M.leaves[hd.id]||[],hd,vis,q=>!vis||gwIn(q));
- return [h('span',{class:'who'},'The headline journey'),h('h3',{class:'gw-jt'},...gwRich(hd.title)),toks&&toks.length?h('p',{class:'gw-jst'},gbToks(toks)):null,
-  h('button',{class:'gw-lnk',type:'button',on:{click:()=>{gw.pinned='j:'+hd.id;growPaint()}}},'Open this journey ›'),runs]}
+ if(x&&s.run[x.id]&&s.run[x.id].st==='fail')gwHap(x)}
 function gwInspector(){const s=gw.state,v=gw.view;const M=gw.M||gbModel();
  const card=h('aside',{class:'gw-ins','aria-label':'Inspector','data-testid':'grow-inspector'});
  let pin=gw.pinned,who='Pinned',live=false;
  /* while the choice is open, the panel helps make it: how many scenarios each mode proves on each journey */
  if(!pin&&s.asked&&!s.modeBy&&M.J.length){gwPut(card,h('span',{class:'who'},'Before you choose'),h('h3',{},GB_W.modes),gwModeTable(),
    h('p',{class:'small muted',style:'margin:10px 0 0'},gwTouch()?'Tap a mode to see it on the tree: what it keeps stays, what it cuts fades. Tap it again to choose; nothing runs until you do.':'Point at a mode to see it on the tree: what it keeps stays, what it cuts fades. Nothing runs until you pick.'));return card}
- /* at rest on a finished grow, the panel holds the one thing to look at first, in a few words: the first failure with its step,
-    or the headline journey and how it stands; selecting anything replaces it */
- if(!pin&&s.done&&!s.blocked&&M.J.length){const rest=gwRest(M);if(rest){gwPut(card,rest);return card}}
+  /* at rest on a finished grow the panel is empty (gwRest) */
+ if(!pin&&s.done&&!s.blocked&&M.J.length){gwRest(M);return null}
  if(!pin){if(!s.done&&s.focus&&!(s.asked&&!s.modeBy)){pin='u:'+s.focus;live=true;const ag=s.agents.find(a=>!a.done&&a.unit===s.focus);who='Following '+(ag?(ag.by==='rules'?'the rules':ag.by)+' · '+ag.brief:'the latest event')}
   else if(M.J.length){const hd=gbHead(M,M.J),failing=(M.leaves[hd.id]||[]).some(x=>s.run[x.id]&&s.run[x.id].st==='fail');pin='j:'+hd.id;who=failing?'The first failing journey':'The headline journey'}}
  if(!pin){gwPut(card,h('span',{class:'gw-eyebrow'},'Inspector'),h('p',{class:'gw-empty'},'Follows the tracer as it works. Select a journey, a leaf or a knot to pin it.'));return card}
@@ -1098,6 +1094,7 @@ function gwResult(){const s=gw.state,v=gw.view,t=v.summary,P=v.verdict&&v.verdic
  const nt=s.scenarios.filter(x=>gwIn(x)&&!(s.run[x.id]&&(s.run[x.id].st==='pass'||s.run[x.id].st==='fail'))).length;
  const k=(n,w,cls)=>h('span',{class:'gw-rc'+(cls?' '+cls:'')},n+' '+w);
  const parts=[k(t.passed,'passed','pass'),t.failed?k(t.failed,'failed','fail'):null,nt?k(nt,'not tested yet','open'):null,P&&P.of?k(P.hold+' of '+P.of,P.of===1?'promise holds':'promises hold'):null].filter(Boolean);
+ if(s.scenarios.some(gwRan))parts.push(h('button',{class:'gw-lnk','data-testid':'grow-open-runs',type:'button',on:{click:()=>gwOpenRuns()}},'Open the runs'));
  return h('p',{class:'gw-result slim'+(t.failed?' failed':''),'data-testid':'grow-result'},...parts.flatMap((e,i)=>i?[h('span',{class:'sp','aria-hidden':'true'},' · '),e]:[e]))}
 /* Until the verdict, its place says where the grow is, so the tree does not jump when the verdict arrives */
 function gwProving(){const s=gw.state,v=gw.view;const box=(big,sub)=>h('div',{class:'gw-result quiet','aria-live':'polite'},h('div',{},h('div',{class:'big'},big),h('div',{class:'sub'},sub)));
@@ -1126,7 +1123,12 @@ function gwModePop(id,cur,locked){const s=gw.state,v=gw.view,lbl=q=>GW.modes.fin
  const grows=!(locked&&id===cur)&&!(base!=null&&gbRank[id]<gbRank[base]);
  return [h('b',{},head),h('p',{class:'gw-mpb'},blurb.charAt(0).toUpperCase()+blurb.slice(1)+'.'),
   grows&&names.length?h('ul',{class:'gw-mpl'},names.map(t=>h('li',{},t)),add.length>5?h('li',{class:'muted'},'and '+(add.length-5)+' more'):null):null,
-  grows&&add.length?h('p',{class:'gw-mpc'},'About '+gwStep(ms)+' more to run'+(noflow?'; '+noflow+' of them '+(noflow===1?'has':'have')+' no flow yet, counted at the '+gwStep(med)+' a flow here takes':'')+'.'):null]}
+  grows&&add.length?h('p',{class:'gw-mpc'},'About '+gwStep(ms)+' more to run'+(noflow?'; '+noflow+' of them '+(noflow===1?'has':'have')+' no flow yet, counted at the '+gwStep(med)+' a flow here takes':'')+'.'):null,
+  /* a smaller mode than the chosen one says what it would drop, and the time that saves */
+  ...(base!=null&&gbRank[id]<gbRank[base]?(()=>{const drop=s.scenarios.filter(x=>gbRank[x.mode]>gbRank[id]&&gbRank[x.mode]<=gbRank[base]);
+   const dms=drop.reduce((t,x)=>{const f=gwFlowOf(x);return t+(f&&took[f]?Math.min(...took[f]):f?med:0)},0);
+   return [h('ul',{class:'gw-mpl'},gbOrd(drop).slice(0,5).map(x=>h('li',{},'drops '+gwPlain(gwVia(x.title).title))),drop.length>5?h('li',{class:'muted'},'and '+(drop.length-5)+' more'):null),
+    h('p',{class:'gw-mpc'},'About '+gwStep(dms)+' less to run.')]})():[])]}
 /* How much to prove sits right above the tree it prunes; hovering a choice previews the cut. */
 function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;const locked=!!s.modeBy;
  const cur=locked?s.mode:(gw.picking||null),lbl=id=>GW.modes.find(m=>m.id===id).label;
@@ -1273,7 +1275,15 @@ function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!sv
  if(innerWidth<1061||gw.B&&gw.B.L&&gw.B.L.narrow){svg.style.width='';return}
  const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16,k=Math.max(.6,Math.min(1,(innerHeight-top-below)/H));
  svg.style.width=k<1?Math.round(W*k)+'px':''}
-if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state)gwFit()},{passive:true})}
+/* On a phone every mark that opens something takes a finger: a mark drawn smaller than 44 px gets a clear hit area of that size
+   round its centre (the last drawn wins where two meet), so nothing in the drawing moves */
+function gwHits(){const svg=gw.svg;if(!svg||!svg.isConnected||gw.tree!=='grove')return;
+ if(!svg.gwHitOn){svg.gwHitOn=true;const later=()=>{clearTimeout(gw.hitT3);gw.hitT3=setTimeout(gwHits,60)};svg.addEventListener('animationend',later);svg.addEventListener('transitionend',later)}
+for(const r of svg.querySelectorAll('.gb-hit'))r.remove();
+ if(innerWidth>640)return;const vb=svg.viewBox&&svg.viewBox.baseVal,w=svg.getBoundingClientRect().width;if(!vb||!vb.width||!w)return;const k=w/vb.width,m=45/k;
+ for(const g of svg.querySelectorAll('[role=button]')){let bb;try{bb=g.getBBox()}catch(e){continue}if(bb.width>=m&&bb.height>=m)continue;
+  const W=Math.max(bb.width,m),H=Math.max(bb.height,m);g.append(sv('rect',{class:'gb-hit',x:bb.x+bb.width/2-W/2,y:bb.y+bb.height/2-H/2,width:W,height:H,fill:'transparent','aria-hidden':'true'}))}}
+if(!window.gwFitOn){window.gwFitOn=true;addEventListener('resize',()=>{if(gw.state){gwFit();gwHits()}},{passive:true})}
 /* beside the tree the inspector scrolls inside the tree's height: while more of it is below, its foot fades */
 function gwInsFade(){const el=gw.slots&&gw.slots.ins;if(!el)return;el.classList.toggle('more',!el.hidden&&el.scrollHeight-el.scrollTop-el.clientHeight>4)}
 function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
@@ -1321,7 +1331,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
   /* the tree is drawn for the width it gets, so it waits until it is on the page */
   if(!S.scroll.isConnected||!S.scroll.clientWidth){if(!gw.waiting){gw.waiting=true;requestAnimationFrame(()=>{gw.waiting=false;growPaint()})}}
   else{gbPaint();if(S.scroll.firstChild!==gw.svg)S.scroll.replaceChildren(gw.svg,gw.B.tip)}
-  gwSet(S.legend,s.scenarios.length?gwKey():null);gwFit()}
+  gwSet(S.legend,s.scenarios.length?gwKey():null);gwFit();gwHits();clearTimeout(gw.hitT);gw.hitT=setTimeout(gwHits,500);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>gwHits())}
  else S.left.replaceChildren(gbOutline());
  /* the Outline already lists every journey and opens what is selected in place, so it stands alone at a readable width; only
     while the choice is open does the panel stay beside it, with what each mode proves */

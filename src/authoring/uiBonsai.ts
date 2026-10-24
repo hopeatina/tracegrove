@@ -230,6 +230,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
 .gb-ols.cut{cursor:default;color:var(--ink3);min-height:30px}.gb-ols.cut .t{text-decoration:line-through;text-decoration-color:var(--muted)}
 .gb-olx .err{font:12px/17px var(--mono);color:var(--verm-ink);background:var(--verm-bg);padding:6px 8px;border-radius:6px;overflow-wrap:break-word;margin:0 8px 4px 38px}
 .gb-olin{display:grid;gap:8px;padding:2px 8px 12px 38px;font-size:13px;line-height:19px;color:var(--ink3)}
+.gb-rstep{margin:8px 0 0;font:12px/18px var(--mono);color:var(--ink2)}.gb-rstep p{margin:0}.gb-rstep .muted{color:var(--ink3)}.gb-hapr .gb-ract,.gb-ract{margin-left:16px}
 .gb-hapr{margin:-4px 8px 6px 38px;line-height:18px}.gb-hapr .gw-lnk{margin-top:0}.gw-ins .gb-hapr{margin:-2px 4px 6px 34px}
 .gb-olf>summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:36px;padding:6px 8px;border-radius:6px;list-style:none;cursor:pointer;font:13px/18px var(--sans);color:var(--ink3)}
 .gb-olf>summary::-webkit-details-marker{display:none}.gb-olf>summary::before{content:'▸';width:10px;color:var(--muted);font-size:11px}.gb-olf[open]>summary::before{content:'▾'}.gb-olf>summary:hover{background:var(--sel)}
@@ -2697,7 +2698,7 @@ function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=
  return [h('h3',{class:'gw-st'},...gwRich(T.title)),T.via?h('div',{class:'gw-via'},'via ',...gwCodeText(T.via)):null,
   h('div',{class:'where'},...(j?[gbROLEW[gbPol(x)]+' · journey'+(n?' '+n:'')+': ',...gwRich(j.title)]:[(x.scenarioKind==='regression'?'existing flow':'part check')+' · ',...gwCodeText((M.U[x.unit]||{}).label||'')])),
   h('div',{class:'sec'},h('div',{class:'row gw-brow'+(r&&r.st==='fail'?' f':''),style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
-   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},gwBroke(r,0,x.id))):gwWhyNot(x),gwCardActs(x),gwHappened(x),gwEvLine(x),gwDrEntry(x),gwWriteEntry(x),gwMore(x),
+   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},(n=>n?h('b',{class:'gw-stepno'},'Step '+n+' · '):null)(gwStepNo(x)),gwBroke(r,0,x.id))):gwWhyNot(x),gwCardActs(x),gwHappened(x),gwEvLine(x),gwDrEntry(x),gwWriteEntry(x),gwMore(x),
    x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null),
   j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x),gbReach(M,j,x))):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},gwFlowOf(x)?h('span',{class:'gw-chip built'},gwFlowOf(x)):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
@@ -2732,11 +2733,23 @@ function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw
  return [gbItem(x,{class:'gb-ols'+(pin?' sel':'')+(hl?' hl':''),'data-sid':x.id,'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k),mouseenter:()=>gbLit2(k),mouseleave:()=>gbLit2(null)}},
    [x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)]),
   r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180,x.id)):null,
-  /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too */
-  !open&&gwRan(x)?h('div',{class:'gb-hapr'},gwHappened(x),gwDrEntry(x)):null,open?gbRowBody(x):null]}
+  /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too; every
+     row in this mode carries its one next action: Rerun its flow, Run a flow that never ran, or Write the flow it lacks */
+  !open&&(gwRan(x)||gwRowAct(x))?h('div',{class:'gb-hapr'},gwRan(x)?gwHappened(x):null,gwRan(x)?gwDrEntry(x):null,gwRowAct(x)):null,open?gbRowBody(x):null]}
+function gwRowAct(x){const s=gw.state,r=s.run[x.id],fl=gwFlowOf(x);if(!s.done||!gwIn(x)||r&&r.st==='run')return null;
+ const T=gwPlain(gwVia(x.title).title);
+ if(!fl)return h('button',{class:'gw-lnk gb-ract',type:'button','data-testid':'grow-row-write-'+x.id,'aria-label':'Write this flow: '+T,on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow');
+ return h('button',{class:'gw-lnk gb-ract',type:'button','data-testid':'grow-row-rerun-'+x.id,'aria-label':(gwRan(x)?'Rerun: ':'Run: ')+T,disabled:!!ui.running||!!state.compileError,on:{click:e=>{e.stopPropagation();openTab('Run');runNow(fl)}}},gwRan(x)?'Rerun':'Run it')}
+/* The step a failure broke at: the verdict's for its first failure, else the step its run says */
+function gwStepNo(x){const f=gw.view&&gw.view.verdict&&gw.view.verdict.first;if(f&&f.scenario===x.id&&f.step)return f.step;const D=gwHap(x);return D&&D.steps&&D.steps[D.at]?D.at+1:null}
+/* Opened in the Outline, a failure says its step and what the app answered there, from the run the drawer reads */
+function gwRowStep(x){const D=gwHap(x),f=gw.view&&gw.view.verdict&&gw.view.verdict.first;if(!D||!D.steps||!D.steps.length)return null;
+ const i=f&&f.scenario===x.id&&f.step?f.step-1:D.at,st=D.steps[i];if(!st)return null;
+ let a=null;for(let k=i;k>=0&&!a;k--){const q=D.steps[k];if(q.answer&&q.method!=='STANDIN')a=[k,q]}
+ return h('div',{class:'gb-rstep','data-testid':'grow-row-step'},h('p',{},'Step '+(i+1)+' · '+st.name),a?h('p',{class:'muted'},'The app answered'+(a[0]!==i?' at step '+(a[0]+1):'')+': '+gwCut(String(a[1].answer),160)):null)}
 /* A row opened in place: where it broke first, when it broke; then the claim, said as what the run did with it; then its chips. */
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
- gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,
+ gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,r&&r.st==='fail'?gwRowStep(x):null,(a=>a?h('div',{class:'gb-hapr'},a):null)(gwRowAct(x)),
   x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null,
   h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.criteria.map(gwCrit),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
    /* the row's badge already says "no flow yet"; the body names the flow when there is one, and why one that has a flow is not
