@@ -1112,10 +1112,13 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
     const hit=look(whole.slice(0,1),ok)||look(whole.slice(0,1),6*kpx)||look(whole.slice(1),6*kpx)||look(whole.slice(0,1),ok,1)||look(cut,6*kpx);if(hit)best=hit;
     if(!best){const d=r.d,sc=cutAt(d,looseLen);best=tagAt(sc,t+' · unused',0,tfs,d);best.s0=sc;best.d=d;best.t=t}
     /* the root: bark from under the foot to its cut end, thick where it leaves and tapering, its centre a little under the
-       soil's surface so about two fifths of it shows; over its last stretch it lifts, so the cut face stands out of the soil */
+       soil's surface where it leaves the nebari; over its last stretch it lifts, so the cut face stands out of the soil */
     const d=best.d,sc=best.s0,xa=X+d*hb*.5,n=24,kb=knobs(gbHash('cut:'+r.id),n),wa=Math.max(8.5*kpx,.64*hb),wc=Math.max(7*kpx,.36*hb);r.d=d;r.pts=[];r.w=[];
     for(let ii=0;ii<=n;ii++){const t=ii/n,x=xa+(sc-xa)*t,ww=(wa+(wc-wa)*Math.pow(t,.7))*(ii<n-1?1+.06*(kb[ii][0]-1)/.13:1),dy=Math.min(1.4,.7+.2*ww);
-     r.pts.push([x,sy(x)+(t<=.72?dy:dy+(.7-.28*ww-dy)*Math.pow((t-.72)/.28,1.4))]);r.w.push(ww)}}
+     /* (and between, it dives into the soil and runs on under it, so it reads as a root gone down into the pot, never a log
+        laid along the soil: what shows is where it leaves the nebari and the cut end it surfaces at) */
+     const dive=t>.1&&t<.82?(ww*.8+2*kpx)*Math.pow(Math.sin(Math.PI*(t-.1)/.72),.7):0;
+     r.pts.push([x,sy(x)+dive+(t<=.72?dy:dy+(.7-.28*ww-dy)*Math.pow((t-.72)/.28,1.4))]);r.w.push(ww)}}
    if(!best)continue;taken2.push(best.box);
    rl.push({r,x:best.x,y:best.top+best.th/2+best.f*.36,anchor:'middle',t:best.t,unused:!!r.loose,tag:true,fs:best.f,ww:best.ww,th:best.th,sx:best.sx,gy:best.gy,bot:best.bot,top:best.top,
     box:[best.box[0]-16*kpx,best.box[1]-16*kpx,best.box[2]+16*kpx,best.gy+2],tb:[best.box[0],best.box[1],best.box[2],best.gy+2]});x0=Math.min(x0,best.box[0]-6);x1=Math.max(x1,best.box[2]+6)}
@@ -1375,7 +1378,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   const gk='@'+ti;
   /* (a sapling, the trunk that rises while the first journey is still being traced, grows slowly enough to be seen growing:
      the tree that replaces it carries its reveal on, so it is still rising as the first branches leave it) */
-  const tdur=sap?2400:1100;const tkw=piece('t'+gk,tp,T.tw,'w',gWood,base,tdur,1.5,T.bx);rxMask.append(sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,undefined,T.bx),fill:'#000'}));if(!sap){/* the growth mask goes outside the softening, so the growing end stays crisp */const tcid='gb-tc'+N+'-'+ti;defs.append(sv('clipPath',{id:tcid},sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,1.5,T.bx)})));const tl=sv('g',{}),tli=sv('g',{'clip-path':'url(#'+tcid+')',filter:'url(#'+softId+')'}),tgr=sv('g',{});tl.append(tli);gLight.after(tl);gGrain.append(tgr);shade(tp,T.tw,2,tli);grain(tp,T.tw,gbHash('grain:'+T.key),tgr,T.knots.filter(q=>q.on==='t').map(q=>[q.k,q.off,q.rb]));tkw.__also=[tl,tgr]}lightAt=Math.max(lightAt,base+tdur);
+  const tdur=sap?2400:1100;const tkw=piece('t'+gk,tp,T.tw,'w',gWood,base,tdur,1.5,T.bx);rxMask.append(sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,undefined,T.bx),fill:'#000'}));if(!sap){/* the growth mask goes outside the softening, so the growing end stays crisp */const tcid='gb-tc'+N+'-'+ti;defs.append(sv('clipPath',{id:tcid},sv('path',{d:gbRib(tp,T.tw,0,tp.length-1,1.5,T.bx)})));const tl=sv('g',{}),tli=sv('g',{'clip-path':'url(#'+tcid+')',filter:'url(#'+softId+')'}),tgr=sv('g',{});tl.append(tli);gLight.after(tl);gGrain.append(tgr);/* (the shade side starts above the flare: in the spread foot it would read as a dark hollow between two legs, where the
+   foot is one solid base) */const fl=(()=>{const a=gbLen(tp),L=a[a.length-1]||1,iT=a.findIndex(v=>v>=L*.22),wT=T.tw[Math.max(0,iT)]||T.tw[0];let i=2;while(i<tp.length-2&&T.tw[i]>wT*1.12)i++;return i})();shade(tp,T.tw,fl,tli);grain(tp,T.tw,gbHash('grain:'+T.key),tgr,T.knots.filter(q=>q.on==='t').map(q=>[q.k,q.off,q.rb]));tkw.__also=[tl,tgr]}lightAt=Math.max(lightAt,base+tdur);
   /* times on this tree are read off its trunk's own reveal (a rebuild part way through keeps that clock): when the growing
      front passes a point of it, so a branch, twig, knot or cushion first seen in a later build keeps step with its wood */
   const tr=tkw.__r,accT=gbLen(tp),LT=accT[accT.length-1]||1,atK=k=>gbWT(tr,accT[Math.max(0,Math.min(tp.length-1,k))]/LT)-now,at=t=>atK(gbNear(T.ty,t)),tEnd=gbWT(tr,1)-now;
