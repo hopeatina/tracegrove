@@ -48,11 +48,13 @@ export const BONSAI_CSS = String.raw`
 .gb [data-k]{cursor:pointer;outline:none}
 .gb .kn:focus-visible .ring{opacity:1;stroke:var(--ink)}.gb .rt:focus-visible .rring{opacity:1;stroke:var(--ink);stroke-width:3}.gw-svg.gb:focus{outline:none}.gb .filsh{fill:color-mix(in srgb,var(--wood) 55%,#000);opacity:.3;filter:blur(1px)}
 .gb-lf:focus-visible .blade{stroke:var(--ink);stroke-width:2}.gb-lf:focus-visible .hitc{stroke:var(--ink);stroke-width:1.1;stroke-dasharray:2 2}
-.gb .pghost{transition:d .5s ease}.gb .pfill{stroke-width:.8;stroke-linejoin:round;transition:fill .25s}.gb .cush.ccr .pfill{fill:var(--fol-lo);stroke:color-mix(in srgb,var(--fol-lo) 75%,var(--ink))}
-/* the crown's crest, the smallest cushion on the tree raised on its riser, keeps its weight at the apex: a rim half again as
-   heavy and a step darker than any other cushion's (the pad's focus ring still shows over it) */
-.gb .jg.crown .cush.ccr .pfill{stroke-width:1.5;stroke:color-mix(in srgb,var(--fol-lo) 50%,var(--ink))}.gb .jg.crown .pad:focus-visible .cush.ccr .pfill{stroke:var(--ink);stroke-width:2}.gb .cush.csh .pfill{fill:var(--fsh-lo);stroke:color-mix(in srgb,var(--fsh-lo) 75%,var(--ink))}
-.gb .pcs{fill:none;stroke:color-mix(in srgb,var(--fol-lo) 70%,var(--ink));stroke-width:.9;stroke-linecap:round;opacity:.45}.gb .cush.csh .pcs{stroke:color-mix(in srgb,var(--fsh-lo) 70%,var(--ink))}
+.gb .pghost{transition:d .5s ease}.gb .pfill{stroke:none;transition:fill .25s}.gb .cush.ccr .pfill{fill:var(--fol-lo)}
+/* foliage has no outline: a cushion is its clumps, lit on top and shaded under (the pad's focus ring still shows over it) */
+.gb .jg.crown .pad:focus-visible .cush.ccr .pfill{stroke:var(--ink);stroke-width:2}.gb .cush.csh .pfill{fill:var(--fsh-lo)}
+.gb .pcs{fill:none;stroke:color-mix(in srgb,var(--fol-lo) 62%,#000);stroke-width:1.1;stroke-linecap:round;opacity:.3}.gb .cush.csh .pcs{stroke:color-mix(in srgb,var(--fsh-lo) 62%,#000)}
+/* each small lobe's lit top edge, and the cushion's shaded underside */
+.gb .pch{fill:none;stroke:color-mix(in srgb,var(--fol-hi) 70%,#fff);stroke-width:1.1;stroke-linecap:round;opacity:.5}.gb .cush.csh .pch{stroke:color-mix(in srgb,var(--fsh-hi) 70%,#fff);opacity:.4}
+.gb .pund{pointer-events:none}
 /* a cushion that loses its last kept leaf shrinks away into the wood it grew on */
 .gb .cush,.gb .tw.fk{transform-box:fill-box;transform-origin:50% 100%;transition:opacity .45s,transform .45s}.gb .cush.off,.gb .tw.fk.off{opacity:0;transform:scale(.25)}
 .gb .pclu,.gb .ptufts{pointer-events:none;transition:opacity .25s}.gb .ptex{opacity:.3}.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .ptuft.gone,.gb .tw.gone{display:none}
@@ -197,7 +199,6 @@ export const BONSAI_CSS = String.raw`
 /* A card is as wide as its longest piece that cannot break (a file and line, a route), within 280 to 380 px (gbTip); its
    prose is set in the page's sans and only paths and routes in mono, so no word ever runs past its edge */
 .gb-tip{position:absolute;z-index:3;width:280px;max-width:380px;pointer-events:none;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:9px 12px;box-shadow:0 8px 28px rgb(0 0 0 / .14);font:13px/18px var(--sans);color:var(--ink);overflow-wrap:break-word}
-.gb-tip.short>.path{max-height:36px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 50%,transparent);mask-image:linear-gradient(180deg,#000 50%,transparent)}
 .gb-tip.below{width:auto;max-width:none;right:0;box-shadow:none;pointer-events:auto}.gb-tip[hidden]{display:none}.gb-tip b{display:block;font-weight:500}.gb-tip .k{font:11px/16px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gb-tip>.k{display:block}
 .gb-tip .st{font:12.5px/17px var(--sans);margin-top:3px}.gb-tip .st.pass{color:var(--moss)}.gb-tip .st.fail{color:var(--verm-ink)}.gb-tip .st.run{color:var(--gold)}
 .gb-tip .m,.gb-tip .gw-onroute>.nw{font-family:var(--mono);font-size:.92em}.gb-tip b.m{font-weight:500}.gb-tip .st b.m{font-weight:600}
@@ -1186,7 +1187,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  /* each clump of foliage lit on its top and in its own shade beneath, the crest's a step lighter than its shoulders' */
  for(const [k,v] of [['cr','fol'],['sh','fsh']])defs.append(sv('linearGradient',{id:padG+k,x1:.3,y1:0,x2:.45,y2:1},sv('stop',{offset:.08,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.5,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:.92,style:'stop-color:var(--'+v+'-lo)'})),
   /* a tuft: lit along its top, where it crosses the leaf, and gone into the cushion below */
-  sv('linearGradient',{id:padG+'t'+k,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:.1,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.55,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:1,style:'stop-color:var(--'+v+');stop-opacity:0'})));
+  sv('linearGradient',{id:padG+'t'+k,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:.1,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.55,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:1,style:'stop-color:var(--'+v+');stop-opacity:0'})),
+  /* (and two more greens for the small lobes, one a little yellower and lighter, one a little bluer and deeper, so a cushion
+     is two or three greens heaped, never one flat colour) */
+  sv('linearGradient',{id:padG+k+'1',x1:.3,y1:0,x2:.45,y2:1},sv('stop',{offset:.08,style:'stop-color:color-mix(in oklab,var(--'+v+'-hi) 82%,#e8f0a0)'}),sv('stop',{offset:.6,style:'stop-color:color-mix(in oklab,var(--'+v+') 85%,#c8d870)'}),sv('stop',{offset:.95,style:'stop-color:var(--'+v+'-lo)'})),
+  sv('linearGradient',{id:padG+k+'2',x1:.3,y1:0,x2:.45,y2:1},sv('stop',{offset:.08,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:.55,style:'stop-color:color-mix(in oklab,var(--'+v+'-lo) 85%,#2f6a5a)'}),sv('stop',{offset:.95,style:'stop-color:color-mix(in oklab,var(--'+v+'-lo) 75%,#000)'})),
+  sv('linearGradient',{id:padG+'u'+k,x1:0,y1:0,x2:0,y2:1},sv('stop',{offset:.45,style:'stop-color:color-mix(in srgb,var(--'+v+'-lo) 55%,#000);stop-opacity:0'}),sv('stop',{offset:1,style:'stop-color:color-mix(in srgb,var(--'+v+'-lo) 55%,#000);stop-opacity:.55'})));
  /* the traced route is drawn over everything, but where it runs inside a pad it shows faintly, as sap under foliage */
  const rmId='gb-rm'+N,rMask=sv('mask',{id:rmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));defs.append(rMask);
  const B={vb:[vx,vy,W,VH],key,L,svg,grow:[],anim:[],pad:{},padsOf:{},brEl:{},leaf:{},clump:{},bud:{},budG:{},knot:{},klbl:{},root:{},lbl:{},vein:{},pos:{},nav:[],navEl:{},cur:{},jinEl:{}};
@@ -1624,7 +1630,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    const shape=g.shape;const q0=shape(()=>true),pk='gb-pk'+N+'-'+ti+'-'+pi;
    const els={ghost:sv('path',{class:'pghost',d:gbPadD(o,q0)}),clip:sv('path',{d:gbPadD(o,q0)})};defs.append(sv('clipPath',{id:pk},els.clip));
    const cu=g.cs.map((c,k)=>{const d=gbCushD(o,q0.cs[k]),X=o[0]+c.x,Y=o[1]+c.b,ck=pk+'-'+k,cr=c.role==='crest'?'cr':'sh';defs.append(sv('clipPath',{id:ck},sv('path',{d})));
-    const clu=sv('g',{'clip-path':'url(#'+ck+')',class:'pclu'});for(const [x,y,r] of c.body)clu.append(sv('circle',{cx:gbF(X+x),cy:gbF(Y+y),r:gbF(r),fill:'url(#'+padG+cr+')'}),sv('path',{class:'pcs',d:'M'+gbP([X+x-r*.92,Y+y+r*.38])+' A'+gbF(r)+' '+gbF(r)+' 0 0 0 '+gbP([X+x+r*.92,Y+y+r*.38])}));clu.append(sv('path',{class:'ptex',d,fill:'url(#'+padG+'s)'}));
+    const clu=sv('g',{'clip-path':'url(#'+ck+')',class:'pclu'});for(const [x,y,r] of c.body)clu.append(sv('circle',{cx:gbF(X+x),cy:gbF(Y+y),r:gbF(r),fill:'url(#'+padG+cr+')'}),sv('path',{class:'pcs',d:'M'+gbP([X+x-r*.92,Y+y+r*.38])+' A'+gbF(r)+' '+gbF(r)+' 0 0 0 '+gbP([X+x+r*.92,Y+y+r*.38])}));
+    /* over the clumps, small lobes heaped along each one's upper rim, each in one of the three greens and lit along its top,
+       so the cushion reads as dense clumped foliage, then its underside in shade */
+    c.body.forEach(([x,y,r],i)=>{for(const [a,f,j] of [[-2.35,.6,0],[-1.6,.66,1],[-.85,.6,2],[-1.98,.25,3],[-1.22,.28,4]]){const hh=gbHash('lb:'+pd.id+':'+k+':'+i+':'+j),rr=r*(.34+.12*hh),a2=a+(hh-.5)*.3,lx=X+x+Math.cos(a2)*r*f,ly=Y+y+Math.sin(a2)*r*f;
+     clu.append(sv('circle',{cx:gbF(lx),cy:gbF(ly),r:gbF(rr),fill:'url(#'+padG+cr+(['1','2',''][(i+j)%3])+')'}),sv('path',{class:'pch',d:'M'+gbP([lx-rr*.72,ly-rr*.45])+' A'+gbF(rr)+' '+gbF(rr)+' 0 0 1 '+gbP([lx+rr*.72,ly-rr*.45])}))}});
+    clu.append(sv('path',{class:'ptex',d,fill:'url(#'+padG+'s)'}),sv('path',{class:'pund',d,fill:'url(#'+padG+'u'+cr+')'}));
     const el=sv('g',{class:'cush c'+cr},sv('path',{class:'pfill',d}),clu);return {el,gr:sv('g',{class:'cgr'},el)}});
    /* a cushion is opaque to its foot: the limb it grew on goes in under it and does not show through (a smear of wood
       across its base), and a leaf's twig ends under the foliage its leaf lies on */
@@ -2519,7 +2530,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  tip.hidden=false;const wrap=tip.parentNode;if(!wrap)return;
  /* on a phone there is no room beside anything: the card sits under the drawing, full width, and the drawing stays clear. It
     sits under the drawing's caption and key */
- tip.classList.toggle('below',narrow);tip.classList.remove('dock','short');tip.style.maxWidth='';tip.style.width='';
+ tip.classList.toggle('below',narrow);tip.classList.remove('dock');tip.style.maxWidth='';tip.style.width='';
  /* (under the caption and the key, so neither they nor the drawing move when a card opens: what follows the key makes room) */
  if(narrow){const c0=wrap.getBoundingClientRect(),r=kr(),sr=B.svg.getBoundingClientRect(),yb=r?r.getBoundingClientRect().bottom:sr.bottom;
   tip.style.left='0px';tip.style.top=gbF(yb-c0.top+8)+'px';wrap.style.paddingBottom='';const l=lg();if(r&&l)l.style.setProperty('--gb-tiph',gbF(tip.offsetHeight+16)+'px');else wrap.style.paddingBottom=gbF(tip.offsetHeight+12)+'px';return}
@@ -2588,18 +2599,25 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const nearAny=(A,p)=>{for(const q of A)if(dB(p,q)<G)return true;return false},ptAny=(A,p)=>{for(const r of A)if(Math.hypot(r[0]-p[0],r[1]-p[1])<5)return true;return false},inAny=(A,p)=>{for(const q of A)if(inB(p,q))return true;return false},
   twAny=(A,p)=>{for(const s of A)if(p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])return true;return false};
  const lead=(CB,all,cap=Infinity,zc=Infinity)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
+  /* (from anywhere along the card's edge that faces the thing, its nearest point first: the line may leave the edge further
+     along where that keeps it clear of a name) */
+  {const cl=(v,a,b)=>Math.max(a,Math.min(b,v)),onX=pc[0]===CB[0]||pc[0]===CB[2],onY=pc[1]===CB[1]||pc[1]===CB[3];
+   const st=onX&&!onY?[CB[1]+10,(CB[1]+CB[3])/2,CB[3]-10].map(y=>[pc[0],y]):onY&&!onX?[CB[0]+10,(CB[0]+CB[2])/2,CB[2]-10].map(x=>[x,pc[1]]):[];
+   for(const q of st){if(Math.hypot(q[0]-pc[0],q[1]-pc[1])<6)continue;const a=[cl(q[0],AB[0],AB[2]),cl(q[1],AB[1],AB[3])];more.push([a,q])}}
   /* (one straight segment, always, from the card's nearest edge to the thing: never an elbow or a bracket round a name.
      Where that line is not clear, the card moves, not the line) */
   /* (a way is given up as soon as it costs as much as would keep its place from winning, since it could only cost more) */
-  let bestL=null,cut=false;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true,wd=false;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  let bestL=null,cut=false;for(const pts of [...opts,null,...more]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true,wd=false;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
     const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1])),wd2=wdg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
     /* (only what lies near this piece of it can be too near a point on it, and a piece near nothing is not walked at all) */
     const nr=(q,r)=>q[0]<Math.max(a[0],b[0])+r&&q[2]>Math.min(a[0],b[0])-r&&q[1]<Math.max(a[1],b[1])+r&&q[3]>Math.min(a[1],b[1])-r,txt2=txt.filter(q=>nr(q,G+1)),rp2=rp.filter(r=>nr([r[0],r[1],r[0],r[1]],6)),fm2=firm.filter(q=>!inB(p0,q)&&nr(q,1)),cu2=cus.filter(q=>!inB(p0,q)&&nr(q,1)),so2=soft.filter(q=>!inB(p0,q)&&nr(q,1));
-    let inW=false;if(txt2.length||rp2.length||tw2.length||wd2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
-     if(off&&txt2.length&&nearAny(txt2,p)){pen+=150;ok=false}
+    let inW=false,inT=false,inTw=false;if(txt2.length||rp2.length||tw2.length||wd2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
+     /* (running by a word costs more than crossing the wood, once a pass: a hairline that grazes a name reads as pointing at
+        it) */
+     if(off&&txt2.length&&nearAny(txt2,p)){if(!inT)pen+=2.5e4;inT=true;ok=false}else inT=false
      if(off&&rp2.length&&ptAny(rp2,p)){pen+=400;ok=false}
-     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){pen+=300;ok=false}
+     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){if(!inTw)pen+=2.2e4;inTw=true;ok=false}else inTw=false
      /* (wood crossed costs once a crossing, however thick the trunk there: a line across the trunk is worse than one beside
         a name, but not worse than a card over one) */
      if(wd2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=8&&twAny(wd2,p)&&!underCu(p)){if(!inW)pen+=2e4;inW=true;ok=false;wd=true}else inW=false
@@ -2652,9 +2670,6 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
     under 280 px nor under its longest piece: beside a pot or a crown there is often room for one but not the other */
  let best=fit(tw,th);best.w=mc;if(!best.zero)for(const w of [280,330,380]){if(w===mc||w<mc)continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.sc+=Math.abs(tw-w)*8;b2.w=w;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2}
- /* and where a crowded tree leaves no open ground for the whole card, the card leaves out the path, which the tree lights in
-    any case, after its first two lines, and is short enough to stand clear */
- if(!best.zero&&tip.querySelector(':scope>.path')){tip.classList.add('short');for(const w of [mc,330,380]){if(w<mc)continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.w=w;b2.short=true;b2.sc+=Math.abs(tw-w)*8+200;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2;if(best.zero)break}tip.classList.toggle('short',!!best.short)}
  tip.style.width=best.w+'px';
  tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
  /* (a root's card with no clear ground within reach of its root stands where the drawing is open, its hairline running out
