@@ -439,7 +439,8 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-modes button .gw-micon{color:var(--ink3)}.gw-modes button[aria-pressed=true] .gw-micon{color:var(--ink)}
 .gw-mpop{position:absolute;z-index:6;top:calc(100% + 6px);left:0;width:min(400px,92vw);padding:12px 14px;border:1px solid var(--line2);border-radius:10px;background:var(--paper);box-shadow:0 10px 30px rgba(0,0,0,.14);font:13px/19px var(--sans);color:var(--ink)}
 .gw-mpop b{font-weight:500}.gw-mpop .gw-mpb{margin:4px 0;color:var(--ink3)}.gw-mpop .gw-mpl{margin:6px 0;padding-left:18px}.gw-mpop .gw-mpl li{margin:1px 0}.gw-mpop .gw-mpc{margin:6px 0 0;font-family:var(--mono);font-size:12.5px}
-.gw-keyrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 18px;margin:6px 6px 0}
+/* the caption on its line, the key on its own under it, its row kept whether or not it has marks yet: the counts changing never rewrap the caption or move the tree */
+.gw-keyrow{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(18px,auto);align-items:center;gap:4px 18px;margin:6px 6px 0}.gw-keyrow>.gw-live{justify-content:flex-end}@media (max-width:600px){.gw-keyrow{grid-template-rows:auto minmax(40px,auto)}.gw-keyrow>.gw-live{justify-content:flex-start;align-content:flex-start;align-self:start}}
 .gw-cap{margin:0;font:13px/19px var(--sans);color:var(--ink3);flex:1 1 360px}
 .gw-live{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0;list-style:none;font:12.5px/18px var(--mono);color:var(--ink3)}.gw-live li{display:inline-flex;align-items:center;gap:6px}
 .gw-howto{margin:2px 6px 0}.gw-howto[open]{margin-bottom:8px}
@@ -1279,7 +1280,9 @@ function gwFit(){const S=gw.slots,svg=gw.svg;if(!S||!svg||gw.tree!=='grove'||!sv
  const H=W*vb.height/vb.width,top=S.scroll.getBoundingClientRect().top+scrollY,below=(S.legend.offsetHeight||40)+16;
  /* never so small that a leaf reads under 18 px */
  const Ls=gw.B&&gw.B.pad?Object.values(gw.B.pad).map(P=>P.geo&&P.geo.L).filter(Boolean):[],kL=Ls.length?18.1/(Math.min(...Ls)*W/vb.width):.6;
- const k=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));
+ /* the size is chosen once for a drawing at a width and window height, so the tree holds still through the grow: the verdict,
+    rail and key changing above or under it never shrink or grow it again */
+ const fk=svg.getAttribute('viewBox')+'|'+W+'|'+innerHeight;if(!gw.fitK||gw.fitK.id!==gw.id)gw.fitK={id:gw.id,k:{}};const KS=gw.fitK.k;if(KS[fk]===undefined)KS[fk]=Math.max(.6,kL,Math.min(1,(innerHeight-top-below)/H));const k=KS[fk];
  svg.style.width=k<1?Math.round(W*k)+'px':'';
  if(Ls.length&&k<1){const w=svg.getBoundingClientRect().width,lo=Math.min(...Ls)*w/vb.width;if(w&&lo<18.1)svg.style.width=Math.min(W,Math.ceil(w*18.1/lo))+'px'}}
 /* beside a wide tree Grove | Outline is set in the left column, beside what the mode says, so the drawing keeps the card's
