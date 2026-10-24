@@ -477,7 +477,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-hintrow>p:empty{display:none}
 .gw-next .gw-nshort{display:none}
 @media (min-width:1180px){.gw-side .gw-next .gw-nshort{display:inline}.gw-side .gw-next .gw-nfull{display:none}}
-.gb .rlbl.gw-flbl{pointer-events:none}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
+.gb .rlbl.gw-flbl{pointer-events:none;animation:gwFlIn .24s ease-out both}@keyframes gwFlIn{from{opacity:0}to{opacity:1}}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
 .gw-call .gw-vs{flex:1 1 100%;font:12.5px/18px var(--mono);color:var(--ink3);min-width:0}
 .gw-call .gw-vs .gw-facts{display:flex}
 @media (max-width:640px){.gw-call .gw-vs{order:3}}
