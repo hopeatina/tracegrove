@@ -3823,6 +3823,10 @@ describe('Grow page', () => {
         await settled(page);
         await page.evaluate(() => { (0, eval)('gw').picking = null; });
         await paintState(page, plMin);
+        // (on a phone a choice holds the mode area's height while the cut leaves fall, then folds it, and the tree rises under
+        // it: a forced click, which skips the wait for its target to hold still, goes once that fold is over, so it lands on the
+        // leaf it measured however slowly the page paints)
+        await page.waitForFunction(() => !(0, eval)('gw').slots.mode.style.height, null, { timeout: 30000 });
         const point = async (m: string) => {
           await page.getByTestId('grow-mode-' + m).scrollIntoViewIfNeeded();
           const bb = (await page.getByTestId('grow-mode-' + m).boundingBox())!;
