@@ -115,7 +115,7 @@ export const BONSAI_CSS = String.raw`
 .gb .bud .blade{stroke-width:1.25}.gb .bud.none .blade{stroke-dasharray:2 1.4}
 .gb .bmore{font:600 9.5px var(--mono);fill:var(--muted)}
 /* the snip: two blades closing at the cut, gone in a moment */
-.gb .snip{fill:none;stroke:var(--ink);stroke-width:1.2;stroke-linecap:round;pointer-events:none;animation:gbsnip .32s ease-out both}@keyframes gbsnip{0%{opacity:0;transform:scale(1.6)}25%{opacity:1;transform:scale(1)}to{opacity:0}}
+.gb .snip{fill:none;stroke:var(--ink);stroke-width:1.4;stroke-linecap:round;pointer-events:none;transform-box:fill-box;transform-origin:50% 50%;animation:gbsnip .32s ease-out both}@keyframes gbsnip{0%{opacity:0;transform:scale(1.6)}25%{opacity:1;transform:scale(1)}to{opacity:0}}
 @keyframes gbpulse{50%{transform:scale(1.2)}}
 .gb.dim .bud:not(.hl):not(.pv-add),.gb.dim .lbl:not(.hl),.gb.dim .bmore{opacity:.3}
 /* a previewed mode's ghosts are not part of what is pinned: the dimming leaves them out (the rules above), so each stays at
@@ -124,7 +124,9 @@ export const BONSAI_CSS = String.raw`
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
 /* where a cut that grew has healed: a small roll of callus in the bark's own tones, a step lighter than the bark, with a thin lit
    crescent on its lip; never a pale disc, and always under the knots, so it never reads as a boss or as one */
-.gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.5}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
+.gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.5}
+/* a cut that healed is a pale ring of callus round the bark of the cut, about the girth of what was cut: seen at 1x */
+.gb .heal.scar .cal,.gb .heal.shscar .cal{stroke:color-mix(in srgb,var(--wood-lit) 30%,#F4ECDF);stroke-width:1.3}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
 /* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib, and round it a soft red halo, the red mixed toward
    the page rather than made clear, so over green it stays red and never turns brown */
 .gb-lf.fail:not(.pv-out):not(.pv-add) .halo{opacity:1;fill:none;stroke:color-mix(in srgb,var(--verm) 66%,var(--paper));stroke-width:3.2;stroke-linejoin:round}.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{stroke:#5a1a14;stroke-width:1}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#5a1a14;opacity:1;stroke-width:.9}
@@ -381,6 +383,11 @@ function gbCuAt(v){for(let i=1;i<GB_CU.length;i++){const [a,p]=GB_CU[i-1],[b,q]=
 /* A pruned piece falls: snipped at p (its collar, where it leaves the wood), it tips th degrees about the cut and drops
    (dx, dy) along a short arc, sideways first, then down, as it fades; GB_FALL ms on an ease-in, gathering speed. */
 const GB_FALL=500,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
+/* the snip comes first: two blades close across the collar at p, the cut along u, and only GB_SNIP ms later does the piece
+   start to fall, so a cut reads as a cut and then a fall */
+const GB_SNIP=180;
+function gbSnip(parent,p,u,lag){if(!parent||gwQuiet())return;const n=[-u[1],u[0]],q=(a,b)=>[p[0]+u[0]*a+n[0]*b,p[1]+u[1]*a+n[1]*b];
+ const e=sv('path',{class:'snip',d:'M'+gbP(q(-4.5,-4))+' L'+gbP(q(1.5,0))+' M'+gbP(q(-4.5,4))+' L'+gbP(q(1.5,0))});e.style.animationDelay=gbF(lag)+'ms';parent.append(e);setTimeout(()=>e.remove(),lag+420)}
 function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'px) translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) rotate('+gbF(r)+'deg) translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';
  return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.4,transform:T(.45*dx,.16*dy,.7*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
 /* What was only ever a preview's ghost was never grown, so a mode that drops it does not cut it: it shrinks back into p
@@ -426,15 +433,19 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
     from a branchlet just under its crest */
  if(!one){const hc=crown&&shs.length?[sOut,sIn].filter(Boolean):[sOut||crest];g.failure.forEach((x,i)=>hc[i%hc.length].hang.push(x))}
  /* and a scenario whose run failed hangs too, under the cushion it grew in, as the caption says: never among the leaves that
-    passed (a cushion keeps at least one leaf, so a cushion all of whose leaves failed keeps them) */
+    passed (a cushion keeps at least one leaf, so a cushion all of whose leaves failed keeps them, and one that already has
+    the ways it fails hanging under it keeps its failed runs among its leaves, in red, as there is no room under it for
+    more); the cushion keeps the size
+    it had with them, so a run failing never shrinks it */
  const ran=gw.state&&gw.state.run||{},bad=x=>{const r=ran[x.id];return !!r&&r.st==='fail'};
- for(const c of cs){const f=c.lv.filter(bad);if(!f.length||f.length===c.lv.length)continue;c.lv=c.lv.filter(x=>!bad(x));c.ids=c.lv.map(x=>x.id);c.hang.push(...f)}
+ if(one)for(const c of cs){const f=c.lv.filter(bad);if(!f.length||f.length===c.lv.length||c.hang.length)continue;c.lv=c.lv.filter(x=>!bad(x));c.ids=c.lv.map(x=>x.id);c.hang.push(...f);c.held=f.length}
  for(const c of cs){c.hs=c.role==='shoulder'?c.sd:d;c.limf=c.role==='shoulder'?(crown?.14:.1):shs.length||crown?null:.1}
  /* A cushion's shape, its own from its pad's id so no two are stamped alike: each end a round cap (about three tenths of
     its height across, each its own), an underside that bows down slightly between them (six to ten hundredths of its
     height), and over them a low dome whose highest point sits a little to one side. Every join is tangent, so nothing
     flares to a point. About 2.8 times as wide as it is tall, a shoulder flatter, the crown's crest fuller (2.6). v runs
     from -1 to 1 across it. */
+
  const ar=c=>c.role==='shoulder'?.62:crown?.77:.71;
  for(const c of cs){const r=gbRng(gbHash('hull:'+seed+':'+c.role+c.sd));c.rL=.27+.07*r();c.rR=.27+.07*r();c.pk=(r()-.5)*.36;c.bul=.06+.04*r()}
  const cap=(c,v)=>{const sd=v<0?-1:1,rho=(sd<0?c.rL:c.rR)*c.h,xe=c.a-rho,x=Math.max(-c.a,Math.min(c.a,v*c.a)),yc=-(rho+c.bul*c.h);return {sd,rho,xe,x,yc}};
@@ -442,7 +453,7 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
    const L0=cap(c,-1),R0=cap(c,1),xl=-L0.xe,xr=R0.xe,f=(q.x-xl)/((xr-xl)||1),base=(L0.yc-L0.rho)*(1-f)+(R0.yc-R0.rho)*f,xp=c.pk*Math.min(L0.xe,R0.xe),u=q.x<xp?(q.x-xp)/((xp-xl)||1):(q.x-xp)/((xr-xp)||1);
    return base-Math.max(0,c.h+base)*(1+Math.cos(Math.PI*Math.max(-1,Math.min(1,u))))/2},
   bY=(c,v)=>{const q=cap(c,v),ax=Math.abs(q.x);if(ax>q.xe)return q.yc+Math.sqrt(Math.max(0,q.rho*q.rho-(ax-q.xe)*(ax-q.xe)));return -c.bul*c.h*(1-Math.cos(Math.PI*ax/(q.xe||1)))/2};
- const size=(c,k)=>{c.a=k*Math.sqrt((c.lv.length+.5)/ar(c));c.h=c.a*ar(c)};
+ const size=(c,k)=>{c.a=k*Math.sqrt((c.lv.length+(c.held||0)+.5)/ar(c));c.h=c.a*ar(c)};
  /* a leaf leans out along its twig: on a crest they fan from the wood under it, a little out from the trunk; on a shoulder
     lower, out over its own side; on a crown they fan from the leader */
  const ang=(c,px,id)=>{const v=Math.max(-1,Math.min(1,px/c.a)),j=(gbHash('lf:'+id)-.5)*12;let t;
@@ -467,9 +478,6 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
  /* the smallest size at which every cushion holds its leaves, or the larger one the tree asks for (K); never so small that a
     leaf stands more than about a third of its crest's height */
  let k=Math.max(K||0,L*1.22);const fit=k=>{for(const c of cs)size(c,k);return cs.every(place)};for(let i=0;i<48&&!fit(k);i++)k*=1.05;
- /* (the canopy is a scalene triangle to its tip: a crest, the highest cushion of its pad, is the smallest, each shoulder under
-    it a fifth again as wide at the least, its leaves set out again across it) */
- if(crest&&shs.length)for(const c of shs)if(c.a<crest.a*1.2){c.a=crest.a*1.2;c.h=c.a*ar(c);place(c)}
  /* the clumps a cushion is heaped from: a row along its crest, two more than its leaves (three to seven), each a little
     larger or smaller than the next, whose tops scallop its edge; and a lower row in front */
  for(const c of cs){const r=gbRng(gbHash('cl:'+seed+':'+c.role+c.sd)),kt=Math.max(3,Math.min(7,c.lv.length+2)),sp=1.56*c.a/(kt-1),R=Math.min(c.h*.5,.64*sp);c.body=[];
@@ -1835,7 +1843,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       const pos=[P.o[0]+sl[0],P.o[1]+sl[1]],a=sl[2]*Math.PI/180,sc=sl[3]||1,ca=Math.cos(a),sa=Math.sin(a),piv=tq?tq.pts[0]:[pos[0]-ca*(g.L/2+GB_PET)*sc,pos[1]-sa*(g.L/2+GB_PET)*sc];
       const h=gbHash('fall:'+x.id),dir=ca>.2?1:ca<-.2?-1:h<.5?-1:1,th=dir*(20+10*gbHash('spin:'+x.id)),hf=gbHf(B),dx=dir*(6+10*h)/hf,dy=(40+40*gbHash('drop:'+x.id))/hf;
       /* the leaf moves in its own frame, so the same motion is put into it: the cut point, the drop and the turn seen from the leaf */
-      const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),ms=el.__cutMs=fell?GB_FALL:GB_BACK,o={duration:ms,delay:lag,easing:GB_EASEIN,fill:'forwards'};
+      const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),ms=el.__cutMs=fell?GB_FALL:GB_BACK,o={duration:ms,delay:lag+(fell?GB_SNIP:0),easing:GB_EASEIN,fill:'forwards'};if(fell){const v=[piv[0]-pos[0],piv[1]-pos[1]],m=Math.hypot(v[0],v[1])||1;gbSnip(P.lg,piv,[-v[0]/m,-v[1]/m],lag)}
       el.__fall=fell?[el.__g.animate(gbFallK(lp,ld[0],ld[1],th),o)]:[el.__g.animate(gbBackK(lp),o)];if(tw&&tw.animate)el.__fall.push(tw.animate(fell?gbFallK(piv,dx,dy,th):gbBackK(piv),o));
       /* (it is cut until its own motion ends, on the clock that plays it, however long the rest of this paint takes) */
       /* (once it has fallen the motion is let go of, so a later preview's ghost of it shows where it grew, at its half strength) */
@@ -1864,7 +1872,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    /* (one for each cushion's cut leaves, and one for those that hung beneath it: where the twigs of a cushion left the wood
       heals as one cut, at the collar nearest their middle, so a branch is never studded with them) */
    {B.scar=B.scar||{};const grp=new Map();for(const x of list){const el=B.leaf[x.id],t=P.rt.lt[x.id];if(!el||!t)continue;
-    if(!el.__cal){const p=t.pts,a=p[0],e=p[Math.min(p.length-1,2)],m=Math.hypot(e[0]-a[0],e[1]-a[1])||1,u=[(e[0]-a[0])/m,(e[1]-a[1])/m],o=Math.min(2.4,(t.hw||2)*.6);el.__cal={c:[a[0]+u[0]*o,a[1]+u[1]*o],u}}
+    if(!el.__cal){const p=t.pts,a=p[0],e=p[Math.min(p.length-1,2)],m=Math.hypot(e[0]-a[0],e[1]-a[1])||1,u=[(e[0]-a[0])/m,(e[1]-a[1])/m],o=Math.min(2.4,(t.hw||2)*.6);el.__cal={c:[a[0]+u[0]*o,a[1]+u[1]*o],u,hw:t.hw||2}}
     const c=el.__cal.c,hid=!!(P.mk.isPointInFill&&P.mk.isPointInFill(new DOMPoint(c[0],c[1])));if(!((el.classList.contains('cut')||el.classList.contains('gone'))&&real.has(x.id)&&!hid&&(shown||!P.b)))continue;
     const k0=g.cOf.get(x.id),k=k0+(g.cs[k0]&&g.cs[k0].hang.some(q=>q.id===x.id)?'h':'');(grp.get(k)||grp.set(k,[]).get(k)).push(x)}
    const rep=new Map();for(const xs of grp.values()){const C=xs.map(x=>B.leaf[x.id].__cal.c),m=[C.reduce((a,q)=>a+q[0],0)/C.length,C.reduce((a,q)=>a+q[1],0)/C.length];let bi=0;C.forEach((q,i)=>{if(Math.hypot(q[0]-m[0],q[1]-m[1])<Math.hypot(C[bi][0]-m[0],C[bi][1]-m[1]))bi=i});rep.set(xs[bi].id,xs)}
@@ -1873,7 +1881,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     if(!on){if(sc)sc.classList.remove('on');continue}
     const sw=Math.max(cut?el.__lag||0:0,(el.__t0||0)-gbNow()),scIn=q=>{if(!quiet&&q.animate&&(cut||sw>0))q.animate([{opacity:0},{opacity:1}],{duration:60,delay:sw,fill:'backwards'})};
     if(sc&&!sc.classList.contains('on'))scIn(sc);
-    if(!sc){sc=gbCal(c,[-u[1],u[0]],u,3,2,'scar',sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:9,class:'hitc'}));sc.setAttribute('data-k','s:'+x.id);sc.setAttribute('data-pad',pid);sc.setAttribute('tabindex','-1');sc.setAttribute('role','button');const k1=P.jg.querySelector(':scope>.kn');if(k1)k1.before(sc);else P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
+    if(!sc){const rx=Math.max(4,1.25*el.__cal.hw+1);sc=gbCal(c,[-u[1],u[0]],u,rx,rx*.72,'scar',sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:9,class:'hitc'}));sc.setAttribute('data-k','s:'+x.id);sc.setAttribute('data-pad',pid);sc.setAttribute('tabindex','-1');sc.setAttribute('role','button');const k1=P.jg.querySelector(':scope>.kn');if(k1)k1.before(sc);else P.lg.append(sc);B.scar[x.id]=sc;scIn(sc)}
     sc.classList.add('on');sc.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t+(more?'; and '+more+' more pruned here':''))}}
    const falling=list.some(x=>B.leaf[x.id]&&B.leaf[x.id].classList.contains('cut'));const pruned=!!vis&&list.length>0&&!shown;const bare=!list.length;const cut=pruned&&!falling;const back=cut&&!!pv&&list.some(x=>gbRank[x.mode]<=gbRank[pv]);
    P.el.setAttribute('class','pad'+(P.crown?' crown':'')+(P.b&&P.b.back?' back':'')+(bare?' bare':'')+(gk!==kk?' pv-grow':'')+(failed?' failed':'')+(gw.pinned==='j:'+j.id?' sel':''));
@@ -1950,7 +1958,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   const stop=()=>{if(g.fade){g.fade.cancel();g.fade=null}if(g.cfade){g.cfade.cancel();g.cfade=null}};
   /* where a shoot that grew in a chosen mode heals once a mode drops it: a callus beside its knot (gbBuild's cal), under the boss */
   /* (laid just under its own knot, which may sit on a branch's wood above the scars layer: the knot stays a raised boss over it) */
-  if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,3,2,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
+  if(!g.scar){const q=g.cal||{c:g.base,t:[1,0],n:[0,-1]},ke=B.navEl['u:'+g.kid];g.scar=gbCal(q.c,q.t,q.n,4,2.9,'shscar');if(ke&&ke.parentNode&&ke.parentNode!==B.gKn)ke.before(g.scar);else B.gScar.append(g.scar)}
   if(any&&(vis==='max'||(!vis&&!pv)))real.add('sh:'+g.kid);const fell=real.has('sh:'+g.kid);
   if(on){g.g.style.display='';stop()}
   /* (one cut before it has sprouted never sprouts; one cut while sprouting falls from where it got to) */
@@ -1961,8 +1969,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       a preview's ghost shrinks back into its collar as it fades, and leaves no mark. Its count does not
       fall: it just fades. Once gone the motion is let go of, so the shoot can show again (a later preview's ghost, say) */
    const sd=g.tip[0]>=g.base[0]?1:-1,th=sd*(20+10*gbHash('shf:'+g.kid)),hf=gbHf(B),dy=(40+40*gbHash('shy:'+g.kid))/hf,dx=sd*(6+10*gbHash('shx:'+g.kid))/hf;
-   g.fade=g.fl.animate(fell?gbFallK(g.base,dx,dy,th):gbBackK(g.base),{duration:fell?GB_FALL:GB_BACK,delay:lag,easing:GB_EASEIN,fill:'forwards'});
-   if(g.ctag&&g.ctag.animate){const yet=gbNow()<(g.sp||0)+g.n*40+150;for(const a of g.ctag.getAnimations())a.cancel();g.cfade=g.ctag.animate(yet?[{opacity:0},{opacity:0}]:[{opacity:1},{opacity:0}],{duration:yet?GB_FALL+lag:120,delay:yet?0:lag,easing:'ease-in',fill:'forwards'})}
+   const lg2=lag+(fell?GB_SNIP:0);if(fell){const v=[g.tip[0]-g.base[0],g.tip[1]-g.base[1]],m=Math.hypot(v[0],v[1])||1;gbSnip(g.g,g.base,[v[0]/m,v[1]/m],lag)}
+   g.fade=g.fl.animate(fell?gbFallK(g.base,dx,dy,th):gbBackK(g.base),{duration:fell?GB_FALL:GB_BACK,delay:lg2,easing:GB_EASEIN,fill:'forwards'});
+   if(g.ctag&&g.ctag.animate){const yet=gbNow()<(g.sp||0)+g.n*40+150;for(const a of g.ctag.getAnimations())a.cancel();g.cfade=g.ctag.animate(yet?[{opacity:0},{opacity:0}]:[{opacity:1},{opacity:0}],{duration:yet?GB_FALL+lg2:120,delay:yet?0:lg2,easing:'ease-in',fill:'forwards'})}
    {const a=g.fade;a.onfinish=()=>{if(g.fade!==a)return;g.fade=null;if(!g.on)g.g.style.display='none';a.cancel();if(g.cfade){g.cfade.cancel();g.cfade=null}g.g.classList.remove('fall')}}}
   else if(!g.fade)g.g.style.display='none';
   /* the callus shows at the snip, and never before the growing wood has reached its knot */

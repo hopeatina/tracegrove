@@ -1610,7 +1610,7 @@ describe('Grow page', () => {
       g.cs.forEach((c: any, k: number) => {
         if (c.role === 'shoulder' && !c.ids.length) bad(pid, 'a shoulder with no guard', k);
         if (c.ids.length && L > 0.55 * c.a) bad(pid, 'leaf longer than a quarter of its cushion', [L, c.a]);
-        out.cush.push({ tree: (P.el.closest('svg')?.id ?? '') + ':' + P.tree, pid, crown: !!P.crown, role: c.role, n: c.ids.length, a: c.a, h: c.h });
+        out.cush.push({ tree: (P.el.closest('svg')?.id ?? '') + ':' + P.tree, pid, crown: !!P.crown, role: c.role, n: c.ids.length + (c.held ?? 0), a: c.a, h: c.h });
       });
       for (const [id, sl] of g.slot as Map<string, number[]>) {
         const el = B.leaf[id]; if (!on(el) || el.classList.contains('gone')) continue;
@@ -2153,13 +2153,13 @@ describe('Grow page', () => {
     const ca = (P: any) => Math.max(...P.geo.cs.map((c: any) => c.a));
     if (!B.L.narrow) for (let i = 1; i < up.length; i++) { const lo = Math.max(...up.slice(0, i).map(ca)); if (ca(up[i]) > lo + 0.01) bad('a cushion wider than any of a pad below it', [up[i].id, Math.round(2 * ca(up[i])), Math.round(2 * lo)]); }
     // the crown in tiers: its crest on its riser above its shoulders, and (beside a desktop tree; on a phone it stays one
-    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each wider than its crest, which
-    // is the smallest cushion at the apex of a scalene canopy
+    // crest) a crown of three or more leaves on its cushions carries one or two shoulders, each narrower than its crest
+    // where they hold its happy paths
     const cshs = crown.geo.cs.filter((c: any) => c.role === 'shoulder'), mid = (c: any) => c.b - c.h / 2;
     for (const c of cshs) if (mid(crest) >= mid(c)) bad('the crown crest not above its shoulder', [mid(crest), mid(c)]);
     if (!B.L.narrow && crown.geo.cs.reduce((a: number, c: any) => a + c.ids.length, 0) >= 3) {
       if (cshs.length < 1 || cshs.length > 2) bad('a crown of three or more leaves with no tier', cshs.length);
-      for (const c of cshs) if (c.a <= crest.a) bad('a crown shoulder no wider than its crest', [c.a, crest.a]);
+      for (const c of cshs) if (c.lv.every((x: any) => x.polarity === 'happy') && c.a >= crest.a) bad('a crown shoulder as wide as its crest', [c.a, crest.a]);
     }
     // the wood sized from the data: the trunk's girth from the leaves the tree carries, and about twelve girths tall
     out.nL = mine.reduce((a, P) => a + P.leaves.length, 0); out.D = T.D; out.Ht = T.Ht;
@@ -3390,7 +3390,8 @@ describe('Grow page', () => {
     out.order.sort((a, b) => a[0]! - b[0]! || a[1]! - b[1]!);
     for (let i = 1; i < out.order.length; i++) if (out.order[i]![1]! < out.order[i - 1]![1]!) bad('cut out of turn from the apex down', [out.order[i - 1], out.order[i]]);
     const ds = [...new Set(out.order.map((o) => o[1]!))].sort((a, b) => a - b);
-    if (ds.length && ds[0] !== 0) bad('the first cut waits', ds[0]);
+    // (what grew is snipped first, and falls 180 ms after its snip; what was only previewed goes back at once)
+    if (ds.length && ds[0] !== (real ? 180 : 0)) bad('the first cut waits', ds[0]);
     for (let i = 1; i < ds.length; i++) if (ds[i]! < 600 && Math.abs(ds[i]! - ds[i - 1]! - 40) > 1) bad('cuts not 40 ms apart', ds);
     return out;
   };
