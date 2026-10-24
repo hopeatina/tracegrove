@@ -3593,6 +3593,50 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 60000);
 
+  it('counts the mode once: the counts line, the key, the mode button and the marks on the tree agree, on a wide screen and a phone (plotline in Minimum, tracegrove in Max)', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [file, mode, total] of [['plotline-seats.jsonl', 'min', 7], ['tracegrove-max.jsonl', 'max', 45]] as const) {
+        const seen: string[] = [];
+        for (const width of [1440, 390]) {
+          const page = await treePage(browser, server.url, recordedGrow(file), { width, reduce: true });
+          const c = await page.evaluate((m) => {
+            const t = (e: Element | null) => (e ? (e.textContent ?? '').replace(/\s+/g, ' ').trim() : '');
+            const svg = document.querySelector('[data-testid="grow"] svg.gb')!, shown = (e: Element) => e.getBoundingClientRect().width > 0;
+            const num = (s: string, re: RegExp) => { const q = s.match(re); return q ? Number(q[1]) : 0; };
+            const line = t(document.querySelector('[data-testid="grow-result"]'));
+            const key = Array.from(document.querySelectorAll('[data-testid="grow-key"] li')).map((e) => t(e));
+            const leaves = Array.from(svg.querySelectorAll('.gb-lf:not(.gone)')).filter(shown), grafts = Array.from(svg.querySelectorAll('.gb-gr:not(.gone)')).filter(shown);
+            const more = Array.from(svg.querySelectorAll('text.shn')).filter(shown).map((e) => num(t(e), /^\+(\d+)$/)).reduce((a, b) => a + b, 0);
+            const st = (w: string) => key.filter((k) => k.endsWith(' ' + w)).map((k) => num(k, /^(\d+) /)).reduce((a, b) => a + b, 0);
+            return {
+              line, key, button: Number(t(document.querySelector(`[data-testid="grow-mode-${m}"] .mn`))),
+              passed: num(line, /(\d+) passed/), failed: num(line, /(\d+) failed/), open: num(line, /(\d+) not tested yet/),
+              keyPassed: st('passed'), keyFailed: st('failed'), keyOpen: st('no flow yet') + st('flow ready (not run)') + st('could not run') + st('running'),
+              shoots: num(key.find((k) => / of them on shoots$/.test(k)) ?? '', /(\d+) of them on shoots$/),
+              marks: leaves.length + grafts.length + more, failedMarks: leaves.filter((e) => e.classList.contains('fail')).length,
+              onShoots: leaves.filter((e) => e.classList.contains('bud')).length + grafts.length + more,
+            };
+          }, mode);
+          const at = file + ' at ' + width + 'px: ' + JSON.stringify(c);
+          expect(c.button, at).toBe(total);
+          expect(c.passed + c.failed + c.open, at).toBe(total);
+          expect([c.keyPassed, c.keyFailed, c.keyOpen], at).toEqual([c.passed, c.failed, c.open]);
+          expect(c.marks, at).toBe(total);
+          expect(c.failedMarks, at).toBe(c.failed);
+          expect(c.onShoots, at).toBe(c.shoots);
+          // no separator left dangling in the counts line
+          expect(c.line, at).not.toMatch(/^·|·$|· ·/);
+          seen.push(c.line + ' | ' + c.key.join(' / '));
+          await page.close();
+        }
+        // the phone says what the wide screen says
+        expect(seen[1], file).toBe(seen[0]);
+      }
+    } finally { await browser.close(); }
+  }, 90000);
+
   it('cuts what grew in a chosen mode at its collar, lets it fall in the preview’s grey, and heals each cut with a callus in the bark’s tones beside its knot', async () => {
     const { dir, state } = await grownBushy();
     withMax(state);

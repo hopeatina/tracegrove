@@ -1365,7 +1365,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const cmp=s.modeBy?h('div',{class:'gw-lgcmp',role:'group','aria-label':GB_W.modes},h('h4',{class:'gw-lgh'},GB_W.modes),gwModeTable('key')):null;
  /* the drawing says what it is in one caption, and a key counts only the marks it draws, worst first; the full key (every kind
     of mark, the modes side by side, how to read a pad) opens on asking, and is built only then */
- const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails; leaves: scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change; branches: journeys; leaves: scenarios; a leaf hanging below its pad is a way the journey fails.');
+ const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change; branches: journeys. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
  const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};
