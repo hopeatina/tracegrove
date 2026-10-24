@@ -6,7 +6,7 @@ import { TREE_GEOMETRY_JS, TREE_MATERIAL_CSS } from './uiTreeGeometry.ts';
  *
  * The wood is one material. The trunk is the change, so every journey grows from it, even one that shares
  * no code with the others. The headline journey (the first that failed, else the one the spec names most, else
- * the one with the most scenarios) is the crown, its crest the largest on the tree; the others branch below it,
+ * the one with the most scenarios) is the crown, the smallest pad, at the apex; the others branch below it,
  * the one with the most scenarios lowest (branches on the outside of curves, alternating, the apex leaning back
  * over the roots). A change with one journey grows that journey's
  * guards and failures as branches of their own. Pads are clumps of foliage, one per leaf: the happy path on
@@ -119,9 +119,9 @@ ${TREE_MATERIAL_CSS}
 .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.6}.gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .rib{opacity:0}
 @media (prefers-color-scheme:dark){.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{fill:#ef6b5b;stroke:#2a0d0a}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#f2b3a8}.gb-lf.fail:not(.pv-out):not(.pv-add) .nec{stroke:#2a0d0a}
  /* on a dark page a leaf still to prove stays an outline, a pass-green rim over a neutral fill a step off the page; one with no
-    flow yet is the legend's mark: a dashed rim round nothing, never a filled leaf to be read as passed */
+    flow yet is filled with a lightened cushion green under its dashed rim: a leaf, never a hole */
  .gb-lf.in:not(.pv-out):not(.pv-add):not(.bud) .blade,.gb-lf.idle:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-prove);stroke:var(--moss);stroke-width:1.5;stroke-dasharray:none}
- .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:none;stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1;stroke-dasharray:2.2 1.6}}
+ .gb-lf.none:not(.pv-out):not(.pv-add):not(.bud) .blade{fill:var(--leaf-pend);stroke:color-mix(in srgb,var(--moss) 70%,#fff);stroke-width:1;stroke-dasharray:2.2 1.6}}
 .gb-lf.hl:not(.pv-out):not(.pv-add):not(.bud) .blade{stroke-width:1.4}
 .gb .lbl text.t{font:400 13px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v{font:400 12.5px var(--sans);fill:var(--ink2)}.gb .lbl text.t.v.out{fill:var(--muted);text-decoration:line-through}.gb .lbl text.st{font:11px var(--mono);fill:var(--muted)}.gb .lbl tspan.x{fill:var(--cutc)}
 .gb .lbl tspan.code{font-family:var(--mono);font-size:.92em}
@@ -152,13 +152,13 @@ ${TREE_MATERIAL_CSS}
 @media (prefers-color-scheme:dark){.gb .rt.loose .w{opacity:.7}.gb .rt.ext .w{stroke:color-mix(in srgb,var(--rt-ext) 55%,#fff);stroke-opacity:.9;stroke-width:.8}.gb .nbf .w,.gb .rt.store:not(.hl):not(.sel) .w{fill:#7D6C5A}.gb .rlim{fill:#D6C2A8;opacity:.55}}
  /* the lit route is sap in the wood: an amber band about three tenths of the girth wide with a soft halo round it and a fine
     cream core along its spine, so it reads as a glow on the bark on a light page and a dark one; where it broke, the wood
-    itself is red (gbRed), the same band in red */
+    itself is red (gbRed), a band about half the girth, feathered in and out */
 .gw-svg.gb{--sap:#E9A23B;--sap-core:#FFF3D6;--sap-red:#D63A28}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
 .gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.5px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
-.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .sapw{fill:var(--sap-red)}
+.gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .rs{stop-color:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
    scenario does not run is a faint trace; a file the run never reached is a plain grey knot with a muted name */
 .gb .sap.faint{opacity:.25;animation:none}
@@ -459,9 +459,10 @@ function gbTwFork(C,Cw,i,yl,h,a,dir,lean){const S=C[i],wc=Cw[i]||2,F=[S[0]+dir*l
  const main={pts:m,w:mw,bi:i,fi,fk:1};return [main,{pts:sp,w:sp.map((_,j)=>s0+(1-s0)*j/8),bi:fi,c:main,fk:2}]}
 /* Every leaf grows on a twig of its own, off the wood that carries its cushion, from the point of that wood it can rise most
    nearly straight at. A failure hangs beneath its cushion from a twig that shows, never on a thread: the twig leaves the
-   wood under the cushion and runs out four pixels under its underside to the leaf, and the leaf hangs from that twig's
-   underside on a stem of ten pixels, at thirty to forty-five degrees, out and down. Where no such place is clear of the
-   wood, the cushions and the other leaves, it sits on the cushion's lower rim instead: a short stem (about two fifths of a
+   wood under the cushion and runs out four pixels under its underside to the leaf, and the leaf's own stem of ten pixels
+   leaves that twig's underside, at thirty to forty-five degrees, out and down (the twig is wood of the pad's, the stem the
+   leaf's). Only where no such place is clear of the wood, the cushions and the other leaves, however long the twig runs,
+   does it sit on the cushion's lower rim instead: a short stem (about two fifths of a
    leaf, eight pixels beside a desktop tree) ends inside the cushion, so about three tenths of its blade lies over the rim,
    and the wood under the cushion rises to it behind the foliage. (A leaf's own twig leaves its wood where that runs no more
    than about nine pixels under the cushion, where it can, so no twig shows as a long stilt under the pad.) Either way the leaf and its twig stay inside the cushion's
@@ -477,13 +478,16 @@ function gbLeafTwigs(g,o,car){const out=[],r=g.L/2+GB_PET;
      if(f.i===undefined){let bd=1e9;for(let i=Wd.lo;i<C.length;i++){const dd=Math.hypot(C[i][0]-f.E[0],C[i][1]-f.E[1]);if(dd<bd){bd=dd;f.i=i}}}}
     out.push({id:f.id,k,...gbTwigTo(C,Wd.w,f.i,f.E,f.u)})}}
   const Wh=c.hang.length?car(k,1):null;if(!Wh)return;const C=Wh.pts,sp=Math.max(g.W+5,1.1*g.L);
-  c.hang.forEach((x,j)=>{const st=Math.min(.5*g.Hc,.42*g.L),fall=33+10*gbHash('hg:'+x.id),th=(Wh.dir>0?fall:180-fall)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],cv=q=>Math.max(-1,Math.min(1,(q-X)/c.a));
+  const n=c.hang.length;
+  /* one leaf's place at a stem's angle fall: where (q), and how well it hangs (lv: 0 to 2 beneath the cushion's flat
+     underside, 3 and 4 only inside its ends, 5 on its rim, 6 from the wood's end) */
+  const place1=(x,j,fall,pk)=>{const st=Math.min(.5*g.Hc,.42*g.L),th=(Wh.dir>0?fall:180-fall)*Math.PI/180,u=[Math.cos(th),Math.sin(th)],cv=q=>Math.max(-1,Math.min(1,(q-X)/c.a));
    const yT=q=>o[1]+c.b+g.tY(c,cv(q)),yB=q=>o[1]+c.b+g.bY(c,cv(q)),inC=q=>Math.abs(q[0]-X)<c.a*.97&&q[1]>yT(q[0])+2.5&&q[1]<yB(q[0])-1.5,
     span=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+8&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-8},
     span0=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a&&Math.max(R[0][0],R[1][0])+hw<=X+c.a},
-    /* (one that hangs beneath it hangs under its flat underside, two pixels in from where each round end begins, never under
+    /* (one that hangs beneath it hangs under its flat underside, half a pixel in from where each round end begins, never under
        an end that has already turned up, where it would read as past the pad) */
-    spanB=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+c.rL*c.h+2&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-c.rR*c.h-2};
+    spanB=R=>{const hw=g.W/2*Math.abs(Math.sin(th));return Math.min(R[0][0],R[1][0])-hw>=X-c.a+c.rL*c.h+.5&&Math.max(R[0][0],R[1][0])+hw<=X+c.a-c.rR*c.h-.5};
    /* the stem ending at x=xe, lifted by t from just under the rim (0) to where its blade crosses the rim three tenths along
       (1); its start inside the cushion, joined to the nearest point of the wood under it behind the foliage */
    const at=(xe,t)=>{const lo=yB(xe)+1,hi=yB(xe+u[0]*(GB_PET+.3*g.L))-u[1]*(GB_PET+.3*g.L),E=[xe,lo+(Math.min(lo,hi)-lo)*t],S0=[xe-u[0]*st,E[1]-u[1]*st];
@@ -492,42 +496,61 @@ function gbLeafTwigs(g,o,car){const out=[],r=g.L/2+GB_PET;
    /* where: under the cushion (a crown's outer half), as far over the rim as it lies a blade's width clear of every other
       leaf, near its share of the way out (one at three fifths, more spread from three quarters in); else, as before, a step
       in from the wood's end for each, from the wood itself */
-   const n=c.hang.length,vt=n===1?.6:.75-.5*j/(n-1);
+   const vt=pk?2:n===1?.6:.75-.5*j/(n-1);
    /* (below: the twig's run four pixels under the cushion's lowest underside; it leaves the wood at least six pixels in from
       the leaf and no more than about four fifths of a leaf, so it never runs out under the pad as a bare wire, at the point
       nearest the leaf whose twig neither crosses that wood nor lies more than a quarter under a
       cushion, and neither the stem nor the blade touches the wood or a cushion, nor runs past the cushion's ends) */
    const inK=(p,m)=>g.cs.some(cc=>{const Xk=o[0]+cc.x,v=Math.max(-1,Math.min(1,(p[0]-Xk)/cc.a));return Math.abs(p[0]-Xk)<cc.a+m&&p[1]>o[1]+cc.b+g.tY(cc,v)-m&&p[1]<o[1]+cc.b+g.bY(cc,v)+m}),
     onW=(p,m)=>C.some((q,ii)=>Math.hypot(q[0]-p[0],q[1]-p[1])<(Wh.w[ii]||2)/2+m);
-   const below=(xs,cap,sp)=>{const wJ=1.3,yR=o[1]+c.b+4+wJ/2,E0=[xs,yR+wJ/2],E=[xs+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th);
-    if(!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))return null;
+   const below=(xs,cap,sp)=>{const wJ=1.3,yR=o[1]+c.b+4+wJ/2,E0=[xs,yR+wJ/2-.35],E=[xs+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th);
+    if(g.crown&&(m[0]-X)*Wh.dir<=.5||!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))return null;
     for(let f=0;f<=1.001;f+=.1){const p=[E0[0]+(R[1][0]-E0[0])*f,E0[1]+(R[1][1]-E0[1])*f];if(inK(p,1.5)||onW(p,1+(f*(10+g.L)>10?g.W/2:0)))return null}
     let best=null;for(let ii=C.length-1;ii>=Math.max(1,Wh.lo);ii--){const S=C[ii],dx=(xs-S[0])*Wh.dir;if(dx<6)continue;if(dx>cap)break;
-     const dy=yR-S[1],d=Math.min(.6*dx,Math.max(3,1.3*Math.abs(dy))),K=[S[0]+Wh.dir*d,yR],J=[xs-Wh.dir,yR];
+     const dy=yR-S[1],d=Math.min(.6*dx,Math.max(3,1.3*Math.abs(dy))),K=[S[0]+Wh.dir*d,yR],J=[xs+Wh.dir*.5,yR];
      const run=gbResample([...gbBez([S,[S[0]+Wh.dir*d*.35,S[1]+dy*.75],[K[0]-Wh.dir*d*.3,yR],K],8),J],Math.max(4,Math.round(dx/2)));
      const w0=Math.min(2.2,Math.max(1.6,.45*(Wh.w[ii]||3))),lim=(Wh.w[ii]||3)/2+2,far=run.filter(p=>Math.hypot(p[0]-S[0],p[1]-S[1])>lim);
      if(far.some(p=>onW(p,.6))||run.some(p=>Math.abs(p[0]-X)>c.a))continue;const hid=run.filter(p=>inK(p,0)).length/run.length;if(hid>.25)continue;
      best={i:ii,S,run,w0};break}
-    if(!best)return null;const stem=gbBez([E0,[E0[0]+u[0]*3.3,E0[1]+u[1]*3.3],[E0[0]+u[0]*6.6,E0[1]+u[1]*6.6],E],5),pts=[...best.run,...stem],nr=best.run.length;
-    return {i:best.i,S:best.S,E,S0:best.S,m,pts,w:pts.map((_,jj)=>jj<nr?best.w0+(wJ-best.w0)*jj/(nr-1):1.2-.25*(jj-nr)/(stem.length-1))}};
-   let q=null,qs=-1e9;const bel=(cap,sp)=>{for(let v=g.crown?.1:-.3;v<=1.001;v+=g.L/(4*c.a)){const p=below(X+Wh.dir*v*c.a,cap,sp);if(!p)continue;const sc=-Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}}};bel(Math.max(14,.8*g.L),spanB);
+    if(!best)return null;const stem=gbBez([E0,[E0[0]+u[0]*3.3,E0[1]+u[1]*3.3],[E0[0]+u[0]*6.6,E0[1]+u[1]*6.6],E],5),nr=best.run.length;
+    return {i:best.i,S:best.S,E,S0:best.S,m,run:best.run,rw:best.run.map((_,jj)=>best.w0+(wJ-best.w0)*jj/(nr-1)),stem,sw:stem.map((_,jj)=>1.2-.25*jj/(stem.length-1))}};
+   let q=null,qs=-1e9;const bel=(cap,sp,v0,dv)=>{for(let v=v0;v<=1.001;v+=dv||g.L/(4*c.a)){const p=below(X+Wh.dir*v*c.a,cap,sp);if(!p)continue;const sc=-Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}}},fd=pk?.25/c.a:g.L/(12*c.a),sB=pk===2?span0:spanB;bel(Math.max(14,.8*g.L),sB,g.crown?.1:-.3,pk?fd:0);
    const rim=(v0,v1,dv,sp,ts)=>{for(let v=v0;v<=v1;v+=dv){const xe=X+Wh.dir*v*c.a;for(const t of ts||[1,.75]){const p=at(xe,t);if(!ok(p,sp)||g.crown&&(p.m[0]-X)*Wh.dir<=0)continue;const sc=t-.05*Math.abs(v-vt)*c.a/g.L;if(sc>qs){qs=sc;q=p}break}}};
-   if(!q)rim(g.crown?.1:-.3,.88,g.L/(4*c.a));
-   /* (where the cushion's ends leave no room there, further in, a finer step at a time; a crown's leaf still out from its
-      middle) */
-   if(!q)rim(-.88,(g.crown?.1:-.3)-1e-6,g.L/(12*c.a));
-   /* (and where the rim has no room either, beneath it on a longer run under its flat underside; else on its rim, well over
-      it, anywhere inside its ends; else, as before, beneath it anywhere inside them: a phone's small crown, where two
-      failures share one crest) */
-   if(!q)bel(1e9,spanB);if(!q)rim(-.88,.88,g.L/(12*c.a),span0,[1,.75]);if(!q)bel(1e9,span0);
+   /* (where there is no room for that, beneath it on a longer run under its flat underside, from as far in as its other end
+      where it must (a crown's still hanging out from its middle), a finer step at a time; else beneath it anywhere inside its ends: a phone's small
+      crown, where two failures share one crest) */
+   /* (or, where no twig can run out to it, on its stem straight off the wood under the cushion where that wood shows: the
+      stem leaving the wood's underside clear of every cushion, the leaf no further under the cushion than a leaf's length) */
+   const hangW=sp=>{const lowY=o[1]+c.b;for(let ii=Math.max(1,Wh.lo);ii<C.length;ii++){const S=C[ii],wS=Wh.w[ii]||2,E0=[S[0],S[1]+wS/2-.35],v=(S[0]-X)*Wh.dir/c.a;if(inK(E0,2))continue;
+     const E=[E0[0]+u[0]*10,E0[1]+u[1]*10],m=[E[0]+u[0]*r,E[1]+u[1]*r],R=rib(m,th),nr=[-u[1],u[0]],top=Math.min(m[1]-Math.abs(u[1])*g.L/2,m[1]-Math.abs(nr[1])*g.W/2);
+     if(top-lowY>g.L-.5||g.crown&&(m[0]-X)*Wh.dir<=.5||!sp(R)||ribs.some(b=>gbSegD(R[0],R[1],b[0],b[1])<g.W+1))continue;
+     let cl=true;for(let f=0;f<=1.001&&cl;f+=.05){const p=[E0[0]+(R[1][0]-E0[0])*f,E0[1]+(R[1][1]-E0[1])*f];if(Math.hypot(p[0]-E0[0],p[1]-E0[1])<2)continue;if(inK(p,1.5)||onW(p,1+(f*(10+g.L)>10?g.W/2:0)))cl=false}
+     if(!cl)continue;const sc=-Math.abs(v-vt)*c.a/g.L-(top-lowY)/g.L;if(sc>qs){qs=sc;q={i:ii,S:E0,E,S0:E0,m}}}};
+   let lv=pk===2?3:0;if(!q){lv=Math.max(lv,1);bel(1e9,sB,-.88,fd)}if(!q){lv=pk===2?4:2;hangW(sB)}if(!q){lv=3;bel(1e9,span0,-.88,fd)}if(!q){lv=4;hangW(span0)}
+   /* (only where nothing can hang beneath it, on its rim; where the cushion's ends leave no room there, further in, a finer
+      step at a time, a crown's leaf still out from its middle; else well over it, anywhere inside its ends) */
+   if(!q){lv=5;rim(g.crown?.1:-.3,.88,g.L/(4*c.a))}if(!q)rim(-.88,(g.crown?.1:-.3)-1e-6,g.L/(12*c.a));if(!q)rim(-.88,.88,g.L/(12*c.a),span0,[1,.75]);
    /* (else from the wood itself; a leaf that then hangs clear beneath its cushion does so on a stem of ten pixels) */
-   if(!q){const tx=C[C.length-1][0]-Wh.dir*(.12*g.L+j*sp);let i=C.length-1;while(i>Wh.lo&&(C[i][0]-tx)*Wh.dir>0)i--;const S=C[i],put=l=>{const E=[S[0]+u[0]*l,S[1]+u[1]*l];return {i,S,E,S0:S,m:[E[0]+u[0]*r,E[1]+u[1]*r]}};
+   if(!q){lv=6;const tx=C[C.length-1][0]-Wh.dir*(.12*g.L+j*sp);let i=C.length-1;while(i>Wh.lo&&(C[i][0]-tx)*Wh.dir>0)i--;const S=C[i],put=l=>{const E=[S[0]+u[0]*l,S[1]+u[1]*l];return {i,S,E,S0:S,m:[E[0]+u[0]*r,E[1]+u[1]*r]}};
     q=put(st);const R=rib(q.m,th),inn=p=>Math.abs(p[0]-X)<c.a&&p[1]>yT(p[0])&&p[1]<yB(p[0]);let n0=0;for(let f=0;f<=1.001;f+=.1)if(inn([R[0][0]+(R[1][0]-R[0][0])*f,R[0][1]+(R[1][1]-R[0][1])*f]))n0++;if(!n0)q=put(10)}
-   const {i,S,E,S0}=q;ribs.push(rib(q.m,th));
-   g.slot.set(x.id,[E[0]+u[0]*r-o[0],E[1]+u[1]*r-o[1],th*180/Math.PI,1,1]);if(q.pts){out.push({id:x.id,k,pts:q.pts,w:q.w,bi:i,hang:1});return}
+   return {q,th,u,st,lv}};
+  /* and set there */
+  const set1=(x,P)=>{const {q,th,u,st}=P,{i,S,E,S0}=q;ribs.push(rib(q.m,th));
+   g.slot.set(x.id,[E[0]+u[0]*r-o[0],E[1]+u[1]*r-o[1],th*180/Math.PI,1,1]);if(q.run){const rr={k,pts:q.run,w:q.rw,bi:i,hang:1,sec:x.id};out.push(rr,{id:x.id,k,pts:q.stem,w:q.sw,bi:q.run.length-1,c:rr,hang:1});return}
    const stem=gbBez([S0,[S0[0]+u[0]*st*.33,S0[1]+u[1]*st*.33],[S0[0]+u[0]*st*.66,S0[1]+u[1]*st*.66],E],6);
    const pts=Math.hypot(S0[0]-S[0],S0[1]-S[1])>.5?[...gbBez([S,[S[0]+(S0[0]-S[0])*.3,S[1]+(S0[1]-S[1])*.6],[S0[0]-u[0]*2,S0[1]-u[1]*2],S0],4),...stem.slice(1)]:stem;
-   out.push({id:x.id,k,pts,w:pts.map((_,jj)=>1.9-.8*jj/(pts.length-1)),bi:i,hang:1})})});
+   out.push({id:x.id,k,pts,w:pts.map((_,jj)=>1.9-.8*jj/(pts.length-1)),bi:i,hang:1})};
+  /* each in turn at its own angle (thirty-three to forty-three degrees), or, where that leaves it no room beneath the
+     cushion's flat underside, as steep or as shallow as a stem may hang; and where one still finds none, the cushion's
+     failures set the other way round, if that hangs them better */
+  const lay=(ord,fa,pk)=>{let worst=0;for(const j of ord){const x=c.hang[j];let P=null;for(const f of pk?[ord.indexOf(j)?44:31]:fa?[fa]:[33+10*gbHash('hg:'+x.id),44,31]){const t=place1(x,j,f,pk);if(!P||t.lv<P.lv)P=t;if(P.lv<=2)break}worst=Math.max(worst,P.lv);set1(x,P)}return worst};
+  /* (and where they still crowd each other off it, all of them as steep as a stem may hang, which sets them closest; else
+     packed from the outside in, each as far out as it hangs clear of the last, a fraction of a pixel at a time: the first
+     as shallow as a stem may hang, the rest as steep, which lets each lie closest under the one before; and last so packed
+     anywhere beneath it inside its ends, as a phone's small crown may need) */
+  const r0=ribs.length,o0=out.length,ord=c.hang.map((_,j)=>j),rv=ord.slice().reverse();let w=lay(ord);
+  if(w>2&&n>1)for(const [od,fa,pk] of [[rv,0],[ord,44],[rv,44],[ord,0,1],[ord,0,2]]){const a={r:ribs.splice(r0),o:out.splice(o0),s:c.hang.map(x=>g.slot.get(x.id))},w2=lay(od,fa,pk);
+   if(w2<w){w=w2;if(w<=2)break}else{ribs.splice(r0);out.splice(o0);ribs.push(...a.r);out.push(...a.o);c.hang.forEach((x,jj)=>g.slot.set(x.id,a.s[jj]))}}});
  g.drop=Math.max(4,...[...g.slot.values()].filter(sl=>sl[4]).map(sl=>sl[1]+g.L/2+2));return out}
 /* Chaikin's corners, so a route through the wood bends like sap, not like a circuit trace. */
 function gbSmooth(pts,k){let p=pts;for(let it=0;it<(k||2);it++){if(p.length<3)return p;const o=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];o.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}o.push(p[p.length-1]);p=o}return p}
@@ -661,9 +684,10 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
     (six parts in a hundred, eased over the joint), and the wood swells slightly where it leaves. */
  /* (the foot flares over the bottom seventh, smoothly, so it reads as the trunk spreading into its roots, measured where it
     shows, above the soil: one caliper up it is three quarters wider than the trunk above its flare, two calipers up a
-    quarter, so it narrows by more than a third over that one caliper, and by about a third more to the seventh's top;
-    under the soil it holds the width it has there) */
- const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},s0=9,fP=1.7,fX=Math.log(3)/(Math.pow(2,fP)-1),fL=D/Math.pow(fX,1/fP),fA=.75*Math.exp(fX),fF=t=>1+fA*Math.exp(-Math.pow(Math.max(0,t*Ht-s0)/fL,fP));
+    quarter, so it narrows by more than a third over that one caliper, and by about a third more to the seventh's top; and
+    where it meets the soil it spreads once more into its roots, half as wide again as one caliper up, over less than half a
+    caliper, so the foot flares at the soil, not above it; under the soil it holds the width it has there) */
+ const base=t=>{const tc=Math.min(1,Math.max(0,t));return lit?(.3+.7*Math.pow(Math.max(0,1-t),1.05)):Math.pow(1-.68*tc,.85)},s0=9,fP=1.7,fX=Math.log(3)/(Math.pow(2,fP)-1),fL=D/Math.pow(fX,1/fP),fA=.75*Math.exp(fX),fS=.45*D,fF=t=>{const z=Math.max(0,t*Ht-s0);return 1+fA*Math.exp(-Math.pow(z/fL,fP))+.27*Math.exp(-Math.pow(z/fS,2))};
  const Tw=t=>{let w=D*base(t);
   if(!lit)for(const h of hs){const u=Math.max(0,Math.min(1,(t-h)/.05));w*=1-.06*u*u*(3-2*u)}
   for(const h of hs)w*=1+.05*Math.exp(-Math.pow((t-h-.006)/.025,2));w*=fF(t);if(t>1)w*=Math.max(.5,1-(t-1)*5);return Math.max(1.6,w)};
@@ -733,7 +757,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* The leader runs on into the crown and ends a third of the way up inside its crest, and the crest's leaves take their
     twigs from it. The crown's shoulders sit lower to either side, each on a branchlet the leader puts out just under it,
     rising at about forty degrees and levelling out through the cushion's foot; with no shoulders, its failures hang from a
-    short branchlet through the foot of its crest. */
+    short branchlet through the foot of its crest, cut where no more than three tenths of it lies inside, so most of it shows. */
  const cg=cpd.geo,te=tp[tp.length-1],co=[te[0]-crc.x,te[1]+crc.h*.32-crc.b];origin[apex.id]=co;
  const ctw=[],cc=[];const leaderAt=y=>{let ki=tp.length-1;for(let ii=tp.length-1;ii>0;ii--)if(tp[ii][1]>=y){ki=ii;break}return ki};
  /* The leader never ends in a blunt cap: it tapers on into its crest and, just under the cushion's foot, forks into fine twigs
@@ -746,20 +770,23 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
   for(const sd of [-1,1]){const th=sd*(30+10*rf())*Math.PI/180,u=[(d0[0]*Math.cos(th)-d0[1]*Math.sin(th))/dm,(d0[0]*Math.sin(th)+d0[1]*Math.cos(th))/dm],len=crc.h*(.5+.16*rf())+9,S0=tp[kF];
    const E=[S0[0]+u[0]*len*.8,S0[1]+u[1]*len*.8-len*.25],fp=gbBez([S0,[S0[0]+u[0]*len*.4,S0[1]+u[1]*len*.4],[E[0]-u[0]*len*.1,E[1]+len*.15],E],10);
    ctw.push({pts:fp,w:fp.map((_,j)=>Math.max(1,wF*.3*(1-j/10)+j/10)),k:cg.cs.indexOf(crc),bi:kF,fork:1})}}
- cg.cs.forEach((c,k)=>{const cr=c===crc;if(cr&&!c.hang.length)return;const sd=cr?cg.d:c.sd,yb=co[1]+c.b,X=co[0]+c.x;
+ cg.cs.forEach((c,k)=>{const cr=c===crc;if(cr&&!c.hang.length)return;const sd=cr?cg.d:c.sd,yb=co[1]+c.b,X=co[0]+c.x,hg=c.hang.length>1;
   /* (a shoulder's branchlet runs out level under it, its top seven pixels under the cushion's foot, and turns up into it; two
      forked twigs rise from the level stretch into the foliage, and its leaves' twigs leave the branchlet where it has risen
-     into the cushion) */
-  let t2,ki;if(cr){ki=leaderAt(yb-2);const e=[X+sd*c.a*.62,yb+cg.bY(c,.62*sd)-3.5],a0=tp[ki],dx=e[0]-a0[0],dy=a0[1]-e[1];t2=gbBez([a0,[a0[0]+dx*.3,a0[1]-dy*.6],[e[0]-dx*.4,e[1]+dy*.05],e],12)}
-  else{ki=leaderAt(yb+9+11*Math.max(.7,cg.z));const a0=tp[ki],e=[X+sd*c.a*.35,yb-c.limf*c.h],m=[sd*Math.max(sd*(X-sd*.2*c.a),sd*a0[0]+8),yb+9],d1=Math.abs(m[0]-a0[0]),d2=Math.abs(e[0]-m[0]);
+     into the cushion; one that hangs two failures or more turns up into it on its inner side, so its outer underside is
+     clear for them, its forks rising from that inner stretch where the underside over it is still near its foot, each leant
+     toward the cushion's middle as far as keeps both its tips three pixels inside the foliage) */
+  let t2,ki;if(cr){ki=leaderAt(yb+9);const e=[X+sd*c.a*.62,yb+cg.bY(c,.62*sd)-3.5],a0=tp[ki],dx=e[0]-a0[0],dy=a0[1]-e[1];const F=gbBez([a0,[a0[0]+dx*.3,a0[1]-dy*.6],[e[0]-dx*.4,e[1]+dy*.05],e],120),A=gbLen(F),i0=F.findIndex(q=>q[1]<yb+cg.bY(c,Math.max(-1,Math.min(1,(q[0]-X)/c.a)))),Lc=i0>0?Math.min(A[120],A[i0]/.7):A[120];
+   t2=gbResample(F.filter((_,jj)=>A[jj]<=Lc+1e-6),12)}
+  else{ki=leaderAt(yb+9+11*Math.max(.7,cg.z));const a0=tp[ki],e=[X+sd*c.a*(hg?-.6:.35),yb-c.limf*c.h],m=[sd*Math.max(sd*(X-sd*(hg?.95:.2)*c.a),sd*a0[0]+8),yb+9],d1=Math.abs(m[0]-a0[0]),d2=Math.abs(e[0]-m[0]);
    t2=gbResample([...gbBez([a0,[a0[0]+sd*d1*.35,a0[1]-(a0[1]-m[1])*.85],[m[0]-sd*d1*.3,m[1]],m],10),...gbBez([m,[m[0]+sd*d2*.45,m[1]],[e[0]-sd*d2*.1,e[1]+(m[1]-e[1])*.55],e],10).slice(1)],12)}
   const w2=t2.map((_,jj)=>Math.max(1.2,tw[ki]*.55*Math.pow(1-jj/12,.9)+jj/12*1.2));
   ctw.push({pts:t2,w:w2,k,bi:ki,lb:1});cc[k]={pts:t2,w:w2,bi:ki,dir:sd,lo:Math.max(0,t2.findIndex(q=>q[1]<yb-1))};
-  if(!cr){let V=[];t2.forEach((q,jj)=>{if(Math.abs(q[0]-X)<c.a*.7&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
+  if(!cr){let V=[];t2.forEach((q,jj)=>{if((hg?Math.abs(q[0]-X)<c.a&&cg.bY(c,(q[0]-X)/c.a)>-2.5:Math.abs(q[0]-X)<c.a*.7)&&q[1]-w2[jj]/2>=yb+4.5)V.push(jj)});const gp=jj=>t2[jj][1]-w2[jj]/2-yb,Vn=V.filter(jj=>gp(jj)<=7.5);if(Vn.length)V=Vn;else if(V.length){const m=Math.min(...V.map(gp));V=V.filter(jj=>gp(jj)<=m+1)}
    if(V.length){const pick=[V[Math.round(.15*(V.length-1))],V[Math.round(.85*(V.length-1))]].filter((v,j,A)=>A.indexOf(v)===j);
-    (pick.length>1?pick.map((jj,j)=>[jj,2*j-1]):[[pick[0],-3],[pick[0],3]]).forEach(([jj,ln])=>{for(const t of gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,ln)){if(t.fk===1)t.c=cc[k];t.k=k;ctw.push(t)}})}}});
+    (pick.length>1?pick.map((jj,j)=>[jj,2*j-1]):[[pick[0],-3],[pick[0],3]]).forEach(([jj,ln])=>{let f=gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,ln);for(let l=ln+.5;hg&&l<=ln+8&&!f.every(t=>{const q=t.pts[t.pts.length-1],u=(q[0]-X)/c.a;return Math.abs(u)<1&&q[1]<=yb+cg.bY(c,u)-3});l+=.5)f=gbTwFork(t2,w2,jj,yb,c.h,c.a,sd,l);for(const t of f){if(t.fk===1)t.c=cc[k];t.k=k;ctw.push(t)}})}}});
  /* the crest's leaves' twigs leave the leader inside it */
- for(const t of gbLeafTwigs(cg,co,(k,hang)=>{const c=cg.cs[k];if(c===crc&&!hang)return {pts:tp,w:tw,lo:leaderAt(co[1]+c.b-1),dir:1,gap:null};const q=cc[k];return q?{pts:q.pts,w:q.w,lo:hang?0:q.lo,dir:q.dir,gap:null}:null})){if(t.hang||cg.cs[t.k]!==crc)t.c=cc[t.k];ctw.push(t)}
+ for(const t of gbLeafTwigs(cg,co,(k,hang)=>{const c=cg.cs[k];if(c===crc&&!hang)return {pts:tp,w:tw,lo:leaderAt(co[1]+c.b-1),dir:1,gap:null};const q=cc[k];return q?{pts:q.pts,w:q.w,lo:hang?0:q.lo,dir:q.dir,gap:null}:null})){if(!t.c&&(t.hang||cg.cs[t.k]!==crc))t.c=cc[t.k];ctw.push(t)}
  const cdrop=cg.drop;
  /* Knots: parts the journeys share sit low on the trunk (most shared lowest, callee below caller); a journey's own parts sit
     on the bare wood of its branch, deepest nearest the trunk (a lone one toward the outer end of it, clear of the crotch,
@@ -1042,10 +1069,11 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
 
 /* Wood grows out along its own spine: the finished, textured wood is uncovered from its base to its tip by one clip per
    piece (its fill, its light and its grain alike): a band down the centre line, sampled close enough to follow every bend,
-   whole up to where the grow's clock has the wood, and past that a half circle round the spine as wide as the wood is
-   there. So the growing front is a round cap of the wood's own girth following the curve, never a flat, slanted or
-   pointed cut, while whatever grows on the wood (a knot, a twig, a leaf, a name) still finds it at its whole girth where
-   the clock says it has grown. On the inside of a bend the band reaches no further than the bend's centre
+   whole up to one caliper behind where the grow's clock has the wood, and from there tapering smoothly along the spine to
+   a round tip a tenth of the wood's girth, a half circle round the spine where the clock has it. So the growing front is a
+   shoot's tip, rounded and tapered and following the curve, never a flat or slanted cut nor the wood's whole girth pushed
+   up as a stub, while whatever grows on the wood (a knot, a twig, a leaf, a name) waits for it to show its whole girth
+   there (gbWood's lag, a caliper). On the inside of a bend the band reaches no further than the bend's centre
    allows, as the wood's own edge does, so it never folds over itself.
    The clip is the element's own style, animated on the page clock, the same clock every leaf, cushion, knot and name keys
    on, so whatever frame the browser paints (a screenshot's too) shows the wood and what grows on it at one moment. (An SVG
@@ -1053,7 +1081,6 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
    is placed in its element's own box, so each clipped element holds an empty rect over the whole drawing, which puts that
    box's corner at the drawing's. Its keyframes are close enough, a longer piece having more, that the band's points,
    moving straight from one to the next, keep to the spine between them. */
-const gbTipR=w=>Math.max(.33*w[0],w[w.length-1])/2+.4;
 function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [vx,vy,W,VH]=B.vb;
  for(const g of P){if(!g.pts)continue;const A=gbLen(g.pts),T=A[A.length-1]||1,n=g.pts.length-1,bx=g.el.__bx;
   /* how far out the band may reach on each side of the spine at each of its points: on the inside of a bend, no further than
@@ -1065,22 +1092,19 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
   const at=d=>{let j=1,hi=n;while(j<hi){const m=(j+hi)>>1;if(A[m]<d)j=m+1;else hi=m}
    const u=(d-A[j-1])/((A[j]-A[j-1])||1),a=g.pts[j-1],b=g.pts[j],m=Math.hypot(b[0]-a[0],b[1]-a[1])||1,t=[(b[0]-a[0])/m,(b[1]-a[1])/m],k=u<.5?j-1:j,w=g.w[j-1]+(g.w[j]-g.w[j-1])*Math.max(0,Math.min(1,u)),H=w*.62+4+(bx&&bx[k]?Math.abs(bx[k]):0);
    return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
-  const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NC=15,NP=2*NB+NC;
-  /* for the first sixth of its length the growing end is no wider than a third of the piece's foot (or its own end, if that
-     is wider): a shoot's tip, never the girth of the wood below pushed up as a stub; behind it the wood widens to its whole
-     girth along a taper (a pixel out each side for each pixel back). Over the next sixteenth the tip widens to the wood's own
-     girth and the taper behind it shortens to nothing, so from a quarter of the way on the front is the wood's own girth */
-  const RC=gbTipR(g.w);
+  const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NT=12,NC=15,NP=2*(NB+NT)+NC;
+  /* the growing end is a shoot's tip a tenth of the wood's girth there across, never the girth of the wood below pushed up
+     as a stub: behind it the wood widens smoothly to its whole girth over one caliper of it (that girth, eased in and out,
+     so neither the tip nor where the taper meets the whole wood shows a corner) */
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
-   const K=Math.max(0,Math.min(1,(f-.16)/.06)),K2=K*K*(3-2*K),q=at(e),rt=Math.min(q.w+.4,RC+Math.max(0,q.w+.4-RC)*K2),wide=rt>=q.w+.4-1e-6;
-   for(let i=0;i<NB;i++){const d=-2+(e+2)*i/(NB-1),o=at(d),tq=K2>=1?1e9:rt+(e-d)/(1-K2);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
-   /* past the front: a half circle round the spine there, that tip's half-width and a little (across it, on the side a
-      knot's boss swells, the boss as well, where the tip is the wood's whole girth) */
-   const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=(rt+(wide?th>0?q.bl:q.br:0))*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
+   const q=at(e),Lt=Math.max(2,2*q.w),rt=Math.min(q.w+.4,Math.max(.5,.2*q.w));
+   /* (the band's points: NB along the whole wood behind the taper, and NT across the taper itself, so it keeps its shape) */
+   const ts=Math.max(-2,e-Lt),ds=[];for(let i=0;i<NB;i++)ds.push(-2+(ts+2)*i/(NB-1));for(let i=1;i<=NT;i++)ds.push(ts+(e-ts)*i/NT);
+   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*u*u*(3-2*u);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
+   /* past the front: a half circle round the spine there, the tip's half-width */
+   const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=rt*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
-  /* (and a keyframe at every hundredth of the length while the tip widens to the wood's girth, so the frames between keep to
-     its shape there) */
-  const K=Math.max(24,Math.min(72,Math.ceil(T/6))),us=[],kf=[];for(let i=0;i<=K;i++)us.push(i/K);for(let i=14;i<=27;i++){const v=(i/100-g.f0)/(1-g.f0||1);if(v>0&&v<1)us.push(1-Math.pow(1-v,1/2.2))}
+  const K=Math.max(24,Math.min(72,Math.ceil(T/6))),us=[],kf=[];for(let i=0;i<=K;i++)us.push(i/K);
   us.sort((a,b)=>a-b);for(const u of us)kf.push({clipPath:"path('"+shape(u||g.f0?g.f0+(1-g.f0)*(1-Math.pow(1-u,2.2)):0)+"')",offset:u});
   const cw=sv('g',{});g.el.before(cw);cw.append(g.el);g.cw=cw;g.an=[];
   g.a=[cw,...(g.el.__also||[])].map(e=>{const r=sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'none'});e.append(r);g.an.push(r);return gbPlay(e,kf,{duration:g.ms,fill:'both'},g.t0)})}
@@ -1124,7 +1148,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  B.lead=sv('path',{class:'tiplead',d:''});gCur.append(B.lead);
  /* an animation that has not finished yet: started at its first build, continued by any rebuild; a piece of wood keeps its
     reveal (gbWood) in el.__r, whose clock everything that grows on it reads */
- const anim=(k,el,delay,ms,kind)=>{if(kind==='grow'){const len=gbLen(el.__pts),lw=el.__w,r=el.__r=gbWood(k,delay,ms,len[len.length-1]||1,Math.max(0,Math.max(...lw)/2-gbTipR(lw)));if(!quiet&&now<r.t0+r.ms)B.grow.push({el,t0:r.t0,ms:r.ms,f0:r.f0,lg:r.lg,pts:el.__pts,w:el.__w,floor:el.__floor});return r}
+ const anim=(k,el,delay,ms,kind)=>{if(kind==='grow'){const len=gbLen(el.__pts),lw=el.__w,r=el.__r=gbWood(k,delay,ms,len[len.length-1]||1,Math.max(...lw));if(!quiet&&now<r.t0+r.ms)B.grow.push({el,t0:r.t0,ms:r.ms,f0:r.f0,lg:r.lg,pts:el.__pts,w:el.__w,floor:el.__floor});return r}
   if(quiet)return;const t0=k===null?now+delay:gbTA(k,delay);if(now-t0>=ms)return;B.anim.push([el,t0-now,ms,kind])};
  const piece=(id,pts,w,cls,parent,delay,ms,floor,bx)=>{const d=gbRib(pts,w,0,pts.length-1,floor,bx);const p=sv('path',{d,class:cls});p.__pts=pts;p.__w=w;p.__floor=floor;p.__bx=bx;parent.append(p);clip.append(sv('path',{d}));anim('wood:'+id,p,delay,ms,'grow');return p};
  /* bark: the lit side and the shaded side, softened so they read as roundness, not as stripes; and a few strands of grain */
@@ -1163,8 +1187,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   {const lay=B.lay||(B.lay=[]),q2=(a,bb,cc)=>{const m2=[(a[0]+bb[0])/2,(a[1]+bb[1])/2],ct=[cc[0]+(m2[0]-cc[0])*.45,cc[1]+(m2[1]-cc[1])*.45],P=[];for(let t=0;t<=1.001;t+=.125)P.push([(1-t)*(1-t)*a[0]+2*(1-t)*t*ct[0]+t*t*bb[0],(1-t)*(1-t)*a[1]+2*(1-t)*t*ct[1]+t*t*bb[1]]);P.push(at(pts,acc,w,sL).q,c);return P};
    lay.push(q2(...fA),q2(...fB));const cr=ca*Math.PI/180,E=[];for(let i=0;i<12;i++){const t=i*Math.PI/6,x=.5*b*Math.cos(t),y=.65*b*Math.sin(t);E.push([pts[eo][0]+x*Math.cos(cr)-y*Math.sin(cr),pts[eo][1]+x*Math.sin(cr)+y*Math.cos(cr)])}lay.push(E)}
   /* (the collar, the fillets and the crotch's shade come in as the limb starts and are whole by the time its front leaves
-     the parent's edge, so the fork never shows the page, or the parent's lit side, as a seam while the limb grows out) */
-  const r0=el.__r,fd=Math.max(40,Math.min(240,r0?gbWT(r0,Math.min(1,Tk/2/(acc[n0]||1)))-r0.t0:240));
+     the parent's edge, so the fork never shows the page, or the parent's lit side, as a seam while the limb grows out: the
+     front's own clock, not the later one its whole girth keeps, gbWood's lag) */
+  const r0=el.__r,fd=Math.max(40,Math.min(240,r0?gbWT(Object.assign({},r0,{lg:0}),Math.min(1,Tk/2/(acc[n0]||1)))-r0.t0:240));
   const U=gU||fg,on=[col,sv('ellipse',{cx:gbF(pts[eo][0]),cy:gbF(pts[eo][1]),rx:gbF(.5*b),ry:gbF(.65*b),transform:'rotate('+gbF(ca)+' '+gbP(pts[eo])+')'})];U.append(col);clip.append(on[1]);anim('col:'+id,col,delay,fd,'fade');
   for(const f of [fil(...fA),fil(...fB)]){const fp=sv('path',{d:f,class:cls}),fc=sv('path',{d:f});U.append(fp);clip.append(fc);on.push(fp,fc);anim('fil:'+id+f.length,fp,delay,fd,'fade');
    /* the crotch sits in the shade of the limb above it, so the parent's lit side does not run on into it as a pale wedge */
@@ -1272,7 +1297,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     starts, the fork they leave the wood at and when the last ends (B.cuS); where a riser or branchlet has started, for the
     twigs off it (lbS); and where each growing branch has reached, by when (B.brAt). Times are the page clock's. */
  B.twEnd={};B.cuS={};B.brAt={};const lbS=new Map(),lbAt=(pts,i,d)=>{const r=lbS.get(pts),a=gbLen(pts);return r===undefined?d:gbWT(r,a[i]/(a[a.length-1]||1))-now};
- const twRec=(pid,t,r,tpp)=>{if(t.k===undefined||!t.id)return;B.twEnd[t.id]=r.t0+r.ms;const C=B.cuS[pid]=B.cuS[pid]||{},q=C[t.k]=C[t.k]||{s:Infinity,e:0,f:[],fh:[]};q.s=Math.min(q.s,r.t0);q.e=Math.max(q.e,r.t0+r.ms);(t.hang?q.fh:q.f).push(tpp[0])};
+ const twRec=(pid,t,r,tpp)=>{if(t.k===undefined)return;if(t.sec){t.r0=r;t.p0=tpp[0];return}if(!t.id)return;B.twEnd[t.id]=r.t0+r.ms;const C=B.cuS[pid]=B.cuS[pid]||{},q=C[t.k]=C[t.k]||{s:Infinity,e:0,f:[],fh:[]},rn=t.c&&t.c.sec&&t.c.r0?t.c:null;q.s=Math.min(q.s,rn?rn.r0.t0:r.t0);q.e=Math.max(q.e,r.t0+r.ms);(t.hang?q.fh:q.f).push(rn?rn.p0:tpp[0])};
  /* trees */
  L.trees.forEach((T,ti)=>{const X=L.xs[ti];const sh=q=>[q[0]+X,q[1]];const base=ti*250;const tp=T.tp.map(sh);
   /* every piece keeps its reveal by its own key for the whole grow, so a rebuild (a journey joined, a scenario was drafted)
@@ -1308,7 +1333,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     const ts=Math.max(0,t.c?lbAt(t.c.pts,t.bi,bF(t.c.bi)+320*t.bi/(t.c.pts.length-1)):bF(t.bi));
     /* the riser a raised crest stands on is a limb off the branch, grown the same way */
     if(t.lb)lbS.set(t.pts,limb('tw:'+id+':'+tk,tpp,t.w,{pts,w:b.w,k:t.bi},'w'+old,jg,lm.fg,b.back?null:wg,ts,320,{flat:b.back}).el.__r);
-    else{const k='tw:'+id+':'+(t.id||tk);const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk?' fk':'')+old});tw.__pts=tpp;tw.__w=t.w;if(t.fk)tw.__k=t.k;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(!b.back&&!t.fk)barkOn(tw,jg);const r=anim(k,tw,ts,320,'grow');if(t.fk===1)lbS.set(t.pts,r);twRec(b.id,t,r,tpp)}});
+    else{const k='tw:'+id+':'+(t.id||(t.sec?'h'+t.sec:tk));const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk?' fk':'')+old});tw.__pts=tpp;tw.__w=t.w;if(t.fk)tw.__k=t.k;jg.append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else if(!b.back&&!t.fk)barkOn(tw,jg);const r=anim(k,tw,ts,320,'grow');if(t.fk===1||t.sec)lbS.set(t.pts,r);twRec(b.id,t,r,tpp)}});
    /* where a pruning of it heals: cut flush where it left the trunk, no stub or peg, the cut rolled over with callus in the
       bark's own tones, a thin lit crescent on its outer lip; with how many scenarios the branch held */
    const pdl=T.pads[b.id].leaves.length;const cA=gbNear(b.acc,b.Tk/2),cq=pts[cA],cw=b.w[cA],cb=pts[Math.min(pts.length-1,cA+2)],cm=Math.hypot(cb[0]-cq[0],cb[1]-cq[1])||1,cn=[(cb[0]-cq[0])/cm,(cb[1]-cq[1])/cm];
@@ -1322,10 +1347,10 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    B.brEl[b.id]={g:wg,jg,stub,cutmk,cuttag,col:cq,on:lm.el.__on}}
   /* the leader forks into the crown */
   /* a branchlet starts once the leader has grown to it, out from under its bark, and a leaf's twig once its own wood has */
-  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||tk)+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
+  T.ctw.forEach((t,tk)=>{const tpp=t.pts.map(sh),ak='ctw:'+ti+':'+(t.id||(t.sec?'h'+t.sec:tk))+gk,t0=Math.max(0,t.c?lbAt(t.c.pts,t.bi,atK(t.c.bi)+320*t.bi/(t.c.pts.length-1)):atK(t.bi));
    /* the branchlets that carry the crown's shoulders, or hang its failures, are limbs off the leader like any branch */
    if(t.lb)lbS.set(t.pts,limb(ak,tpp,t.w,{pts:tp,w:T.tw,k:t.bi},'w',JG[T.apex.id],gWood,gGrain,t0,320).el.__r);
-   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')});tw.__pts=tpp;tw.__w=t.w;(t.id?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
+   else{const tw=sv('path',{d:gbRib(tpp,t.w),class:'tw'+(t.id?' lt':'')+(t.fk||t.fork?' fk':'')});tw.__pts=tpp;tw.__w=t.w;(t.id||t.sec?JG[T.apex.id]:gBud).append(tw);if(t.id)(B.ltw=B.ltw||{})[t.id]=[tw];else if(t.sec)(B.ltwr=B.ltwr||{})[t.sec]=tw;else barkOn(tw,gBud);const r=anim(ak,tw,t0,320,'grow');if(t.fk===1||t.fork||t.sec)lbS.set(t.pts,r);twRec(T.apex.id,t,r,tpp)}});
   /* knots: a raised boss on the bark, its file named beside it when its journey is lit */
   const padBox=T.padList.map(pd=>{const o=sh(T.origin[pd.id]),g=pd.geo;return [o[0]-g.PW/2,o[1]-g.PH-6,o[0]+g.PW/2,o[1]+g.drop+2]});const placed=L.rl.map(l=>{if(l.box)return l.box;const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;return [x0-2,l.y-L.fs,x0+w0+2,l.y+3]});
   T.knots.forEach(kn=>{const q=sh(kn.p);placed.push([q[0]-6,q[1]-6,q[0]+6,q[1]+6])});
@@ -1354,8 +1379,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    const own=id=>(M.buds[id]||[]).filter(x=>x.scenarioKind!=='regression');
    /* the wood a shoot and its leaves keep off, and the forks it keeps clear of: a limb's foot on its parent, a twig's on its limb */
    const wS=[],fk=[],ribs=[[tp,T.tw,T.bx]],addW=(pts,w,bx)=>{for(let k=0;k<pts.length;k++)wS.push([pts[k][0],pts[k][1],(w[k]||1)/2]);if(bx!==0)ribs.push([pts,w,bx])};addW(tp,T.tw,0);
-   for(const b of T.br){addW(b.pts.map(sh),b.w,b.bx);fk.push([tp[b.k],T.tw[b.k],b.w[0]]);for(const t of b.twigs||[]){addW(t.pts.map(sh),t.w);fk.push([sh(t.pts[0]),b.w[t.bi]||b.w[0],t.w[0]])}}
-   for(const t of T.ctw||[]){addW(t.pts.map(sh),t.w);fk.push([sh(t.pts[0]),T.tw[t.bi]||1,t.w[0]])}
+   for(const b of T.br){addW(b.pts.map(sh),b.w,b.bx);fk.push([tp[b.k],T.tw[b.k],b.w[0]]);for(const t of b.twigs||[]){addW(t.pts.map(sh),t.w);if(!(t.c&&t.c.sec))fk.push([sh(t.pts[0]),b.w[t.bi]||b.w[0],t.w[0]])}}
+   for(const t of T.ctw||[]){addW(t.pts.map(sh),t.w);if(!(t.c&&t.c.sec))fk.push([sh(t.pts[0]),T.tw[t.bi]||1,t.w[0]])}
    const inW=(p,m)=>wS.some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<q[2]+m);
    /* (the wood as drawn: each limb's outline with its swell over each boss, and the collar and fillets it lays on its parent) */
    const ribIn=(p,m)=>ribs.some(([P,w,bx])=>{for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1],dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;if(!l2)continue;const t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2;if(t<-.1||t>1.1)continue;
@@ -1563,7 +1588,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
       branchlet off it) and the trunk */
    /* (and how thick the wood it leaves is, where it leaves it: a cut there heals on that wood's bark) */
    const hwAt=(P,W,q)=>{let bd=Infinity,bw=2;P.forEach((p,i)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;bw=W[i]}});return bw/2};
-   const lts={};for(const t of pd.b?pd.b.twigs:T.ctw)if(t.id)lts[t.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null,hw:t.c?hwAt(t.c.pts,t.c.w,t.pts[0]):pd.b?hwAt(pd.b.pts,pd.b.w,t.pts[0]):hwAt(T.tp,T.tw,t.pts[0])};
+   const lts={};for(const t0 of pd.b?pd.b.twigs:T.ctw)if(t0.id){const t=t0.c&&t0.c.sec?{pts:[...t0.c.pts.slice(0,-1),...t0.pts],bi:t0.c.bi,c:t0.c.c}:t0;lts[t0.id]={pts:t.pts.map(sh),bi:t.bi,c:t.c?{pts:t.c.pts.map(sh),bi:t.c.bi}:null,hw:t.c?hwAt(t.c.pts,t.c.w,t.pts[0]):pd.b?hwAt(pd.b.pts,pd.b.w,t.pts[0]):hwAt(T.tp,T.tw,t.pts[0])}}
    const rt={tp,br:pd.b?pd.b.pts.map(sh):null,bw:pd.b?pd.b.w[pd.b.exit]:0,exit:pd.b?pd.b.exit:0,k:pd.b?pd.b.k:tp.length-1,lt:lts};
    B.pad[pd.id]={el:pg,jg,o,geo:g,jid,pol:pd.pol,crown:pd.crown,b:pd.b,lg,tg,leaves:pd.leaves,cS,lblAt,gk,tree:ti,shape,els,cu,mk,sk:'*',rt,q0};(B.padsOf[jid]=B.padsOf[jid]||[]).push(pd.id);
    if(!quiet)cu.forEach((u,k)=>{const c=cS[k];if(now<c.e)B.anim.push([u.gr,c.s-now,c.e-c.s,'cu',c.f])})
@@ -1741,7 +1766,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
     /* a leaf that has gone takes its twig and the tuft at its foot with it */
     /* (while it falls the twig falls with it; its copy seen through the cushion's foot is cut away at once) */
-    {const gone=cls.includes(' gone'),cut=cls.includes(' cut');((B.ltw||{})[x.id]||[]).forEach((e,k)=>e.classList.toggle('gone',gone||(cut&&k>0)));const tf=(B.tuft||{})[x.id];if(tf)tf.classList.toggle('gone',gone)}
+    {const gone=cls.includes(' gone'),cut=cls.includes(' cut');((B.ltw||{})[x.id]||[]).forEach((e,k)=>e.classList.toggle('gone',gone||(cut&&k>0)));{const rn=(B.ltwr||{})[x.id];if(rn)rn.classList.toggle('gone',gone)}const tf=(B.tuft||{})[x.id];if(tf)tf.classList.toggle('gone',gone)}
     if(im){shown++;if(s.run[x.id]&&s.run[x.id].st==='fail')failed=true}});
    /* a pad the mode keeps nothing of is cut back: once its leaves have fallen, the branch drops away and leaves a stub */
    /* a cushion stays while it holds a leaf the mode keeps, and shrinks away when it holds none; a previewed mode's extra
@@ -1989,7 +2014,7 @@ function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov
  B.sapX.setAttribute('d',dx);B.sapXo.setAttribute('d',dx);B.sapF.setAttribute('d',df);B.sapW.setAttribute('d',dw);
  /* (a spur up the leader to a reached hop above the route, gbSpur, is the same sap: its band and its core line) */
  if(!B.sapS){B.sapS=sv('path',{class:'sap spur',d:''});B.sap.after(B.sapS)}
- const rib=d?gbRibbon(B,d,.33,1.4,9,sq)+(ds?' '+gbRibbon(B,ds,.33,1.4,9,false):''):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);B.sapS.setAttribute('d',d?ds:'');gbRed(B,dw)}
+ const rib=d?gbRibbon(B,d,.33,1.4,9,sq,sq&&dw?GB_REDK-.03:0)+(ds?' '+gbRibbon(B,ds,.33,1.4,9,false):''):'';B.sapU.setAttribute('d',rib);B.sapR.setAttribute('d',rib);B.sap.setAttribute('d',dc||d);B.sapS.setAttribute('d',d?ds:'');gbRed(B,dw)}
 /* The wood a leaf's sap runs through on its way down: from where its stalk meets its cushion, down the twig that carries
    that cushion (or, for the outer cushion, to the branch's end inside it), along the branch's centre line to the trunk
    (round a fillet as wide as the branch, not a corner), and down the trunk's centre line. Without a cushion it joins the
@@ -2100,17 +2125,29 @@ function gbFork(pts,rr){const L=gw.B.L,sy=q=>L.sy?L.sy(q):0,p0=L.potC-L.potL/2,p
    nearest piece's girth. Read off every piece of wood the layout drew, once per drawing. */
 function gbGirth(B,p){if(!B.wS){const S=B.wS=[],L=B.L,add=(pts,w,X)=>{if(!pts||!w)return;for(let i=0;i<pts.length;i++)S.push([pts[i][0]+(X||0),pts[i][1],w[i]||1])};
   L.trees.forEach((T,ti)=>{const X=L.xs[ti];add(T.tp,T.tw,X);for(const b of T.br||[]){add(b.pts,b.w,X);for(const t of b.twigs||[])add(t.pts,t.w,X)}for(const t of T.ctw||[])add(t.pts,t.w,X)});for(const r of L.roots||[])add(r.pts,r.w,0)}
- let best=0,nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2];if(d<nd){nd=d;nw=q[2]}}return best||nw}
+ let best=0;for(const q of gbWNear(B,p)){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<q[2]/2+.5&&q[2]>best)best=q[2]}if(best)return best;
+ let nd=1e9,nw=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<nd){nd=d;nw=q[2]}}return nw}
 /* How far a point is from leaving the wood: the most room round it inside any piece of wood whose body holds it */
-function gbRoom(B,p){if(!B.wS)gbGirth(B,p);let r=0;for(const q of B.wS){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(q[2]/2-d>r)r=q[2]/2-d}return r}
+function gbRoom(B,p){if(!B.wS)gbGirth(B,p);let r=0;for(const q of gbWNear(B,p)){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(q[2]/2-d>r)r=q[2]/2-d}return r}
+/* (only the wood near a point can hold it: its pieces are filed once per drawing in 8 px squares, and a point looks in the
+   squares within half the widest girth of it, and one more each way) */
+function gbWNear(B,p){const S=B.wS;let G=B.wG;if(!G){G=B.wG={m:new Map(),r:0};for(const q of S){const k=Math.floor(q[0]/8)+','+Math.floor(q[1]/8);let a=G.m.get(k);if(!a)G.m.set(k,a=[]);a.push(q);G.r=Math.max(G.r,q[2]/2+.5)}}
+ const out=[],x0=Math.floor((p[0]-G.r)/8)-1,x1=Math.floor((p[0]+G.r)/8)+1,y0=Math.floor((p[1]-G.r)/8)-1,y1=Math.floor((p[1]+G.r)/8)+1;
+ for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){const a=G.m.get(x+','+y);if(a)for(const q of a)out.push(q)}return out}
 /* a path's runs of points (only M and L, as the route is written) */
 const gbSubs=d=>String(d||'').split('M').map(t=>t.trim()).filter(Boolean).map(t=>t.split(/\s*L\s*/).map(q=>q.trim().split(/\s+/).map(Number))).filter(q=>q.length>1&&q.every(v=>v.length===2&&v.every(isFinite)));
 /* A route drawn inside the wood: a filled band along each run, k of the girth wide (between mn and mx), the width eased along
    it so it tapers where the wood does (widening at once where it enters thicker wood, narrowing over a few pixels where it
    leaves it) and never more than seven tenths of the wood it runs in, nor so wide that an edge would leave the wood (at a
    join, where it cuts the corner), with round ends; with sq, the last run's end is cut square (where the red begins). */
-function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
-  const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g)))),w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return Math.min(wc[i],Math.max(w0[i],s/c))});
+function gbRibbon(B,d,k,mn,mx,sq,ke){const ck=[d,k,mn,mx,!!sq,ke||0].join('|'),C=B.ribC||(B.ribC=new Map());if(C.has(ck))return C.get(ck);const r=gbRibbon0(B,d,k,mn,mx,sq,ke);C.set(ck,r);return r}
+/* (a drawing's wood never changes, so each band is worked out once for it) */
+function gbRibbon0(B,d,k,mn,mx,sq,ke){const subs=gbSubs(d);let out='',ri=0;for(const run of subs){const last=++ri===subs.length;const a=gbLen(run),n=Math.max(2,Math.ceil(a[a.length-1]/1.6)),P=gbResample(run,n);
+  const G=P.map(q=>gbGirth(B,q)),wc=P.map((q,i)=>Math.max(.1,Math.min(.7*G[i],2*gbRoom(B,q)-.4))),w0=G.map((g,i)=>Math.min(wc[i],Math.max(mn,Math.min(mx,k*g))));
+  /* (where the band ends square and hands on to the red, ke: over its last girth it widens to ke of the girth, so the amber
+     meets the red at the red's own width) */
+  if(sq&&last&&ke){const T=a[a.length-1],Lr=Math.max(6,G[n]);for(let i=0;i<=n;i++){const u=Math.max(0,Math.min(1,1-(T-T*i/n)/Lr)),s=u*u*(3-2*u);w0[i]=Math.min(wc[i],w0[i]+(Math.max(w0[i],ke*G[i])-w0[i])*s)}}
+  const w=w0.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-4);j<=Math.min(n,i+4);j++){s+=w0[j];c++}return Math.min(wc[i],Math.max(w0[i],s/c))});
   /* where the wood is thin (a twig, or where a twig meets what carries it) each edge is checked against the wood as drawn,
      and drawn in toward the centre line until it is inside */
   const wd=B.wEls||(B.wEls=Array.from(B.svg.querySelectorAll('#gb-wood'+B.N+'>*,path.tw')).map(e=>{let b=null;try{b=e.getBBox()}catch(_){}return {e,b:b&&b.width+b.height>0?[b.x-1,b.y-1,b.x+b.width+1,b.y+b.height+1]:null}}));
@@ -2123,11 +2160,20 @@ function gbRibbon(B,d,k,mn,mx,sq){const subs=gbSubs(d);let out='',ri=0;for(const
   const cap=(c,m,h,s)=>{const o=[];for(let i=1;i<6;i++){const th=Math.PI*i/6,t=[m[1]*s,-m[0]*s];o.push([c[0]+m[0]*h*Math.cos(th)*s+t[0]*h*Math.sin(th),c[1]+m[1]*h*Math.cos(th)*s+t[1]*h*Math.sin(th)])}return o};
   const e=P[n],me=gbNorm(P,n),b=P[0],mb=gbNorm(P,0);
   out+=(out?' ':'')+'M'+[...Lf,...(sq&&last?[]:cap(e,me,w[n]/2,1)),...Rt.reverse(),...cap(b,mb,w[0]/2,-1)].map(gbP).join(' L')+'Z'}return out}
-/* Where it broke, the limb's own wood turns red: the same band as the amber on the same centre line (gbRibbon, three tenths
-   of the girth), so amber and red read as one stroke; flat red with no feather or blur, round at both ends, its start laid
-   over the amber's end so no wood shows between them, clipped to the bark, in the wood's own group, so the bosses on either
-   side stand over it */
-function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();const d=dw?gbRibbon(B,dw,.33,1.4,9,false):'';if(d)g.append(sv('path',{class:'sapw',d}))}
+/* Where it broke, the limb's own wood turns red: a crisp band GB_REDK of the girth wide on its centre line (the amber widens
+   to meet it, gbRibbon), each end cut square across the limb, feathered in and out along its length (each stop set where
+   the path itself reaches that share of its length), with no blur, inside the bark, in the wood's own group, so the bosses
+   on either side stand over it */
+const GB_REDK=.44;
+function gbRed(B,dw){const g=B.gRed;if(!g)return;g.replaceChildren();let i=0;
+ for(const run of gbSubs(dw)){const A=gbLen(run),T=A[A.length-1];if(!(T>2))continue;const n=Math.max(2,Math.ceil(T/1.2)),P=gbResample(run,n);
+  const w0=P.map(q=>gbGirth(B,q)),w=w0.map((_,k)=>{let s=0,c=0;for(let j=Math.max(0,k-3);j<=Math.min(n,k+3);j++){s+=w0[j];c++}return s/c});
+  const a=P[0],e=P[n],cx=e[0]-a[0],cy=e[1]-a[1],cl=cx*cx+cy*cy||1,on=f=>{const q=P[Math.round(f*n)];return Math.max(0,Math.min(1,((q[0]-a[0])*cx+(q[1]-a[1])*cy)/cl))};
+  const id='gb-red'+B.N+'-'+(i++);let gr=B.defs.querySelector('#'+id);
+  if(!gr){gr=sv('linearGradient',{id,gradientUnits:'userSpaceOnUse'},...[[0,0],[.28,1],[.72,1],[1,0]].map(([o,v])=>sv('stop',{offset:o,class:'rs','stop-opacity':v})));B.defs.append(gr)}
+  for(const [k,v] of [['x1',a[0]],['y1',a[1]],['x2',e[0]],['y2',e[1]]])gr.setAttribute(k,gbF(v));
+  const st=gr.querySelectorAll('stop');st[1].setAttribute('offset',gbF(on(.28)));st[2].setAttribute('offset',gbF(on(.72)));
+  g.append(sv('path',{class:'sapw',d:gbBand(P,w,GB_REDK,-GB_REDK),fill:'url(#'+id+')'}))}}
 /* Every file's name and every shoot's count, placed against one set of things to keep clear of: the wood (trunk, branches,
    twigs, roots), every cushion's outline and 4 px round it, every leaf with its stalk, the shoots and their leaves, the knots,
    the pot and the soil, the plant tags, and every other name and number. A count sits just off its shoot's tip. The names are
@@ -2166,25 +2212,25 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
  /* (a root's staked tag keeps a knot's name off itself and its stake by the margin any label does, gbKnotNames' clearL; its
     wider box is the room the tags keep from one another) */
  /* Everything Max grows, as the box each takes up, whether it shows in this mode or not: a shoot, each of its leaves, a dormant
-    bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader never
-    runs into one, but for its own knot's shoot, which rises off the boss at the leader's foot; so a mode, a preview or a pin
-    only ever shows or fades them round names that stay where they are */
- const obs=[],aabb=ps=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];return r},bbx=(ps,own,inF)=>obs.push({r:aabb(ps),own,inF}),budB=[];
- const inTurned=(c,th,a0,a1,b0,b1)=>p=>{const t=[Math.cos(th),Math.sin(th)],dx=p[0]-c[0],dy=p[1]-c[1],a=dx*t[0]+dy*t[1],b=-dx*t[1]+dy*t[0];return a>a0-.8&&a<a1+.8&&b>b0-.8&&b<b1+.8};
+    bud, a graft bud (and its count) and every leaf a pad holds. A name keeps a few px clear of each box, and its leader keeps
+    two px clear of the box each is drawn in (t, where the room kept round it is wider than that), but for its own knot's
+    shoot where it rises off the boss at the leader's foot; so a mode, a preview or a pin only ever shows or fades them round
+    names that stay where they are */
+ const obs=[],aabb=ps=>{let r=[1e9,1e9,-1e9,-1e9];for(const p of ps)r=[Math.min(r[0],p[0]),Math.min(r[1],p[1]),Math.max(r[2],p[0]),Math.max(r[3],p[1])];return r},bbx=(ps,own,tq)=>obs.push({r:aabb(ps),own,t:tq?aabb(tq):null}),budB=[];
  const turned=(c,th,a0,a1,b0,b1)=>{const t=[Math.cos(th),Math.sin(th)],n=[-t[1],t[0]];return [[a0,b0],[a1,b0],[a1,b1],[a0,b1]].map(([a,b])=>[c[0]+t[0]*a+n[0]*b,c[1]+t[1]*a+n[1]*b])};
- for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid,p=>Math.hypot(p[0]-e[0],p[1]-e[1])<3.8||P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,()=>false);
-  for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,inTurned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc))}}
- for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid,p=>P.some((a,i)=>i&&dPS(p,P[i-1],a)<2));bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,()=>false)}
+ for(const g of shoots){const P=g.pts,e=P[P.length-1];bbx([...P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),[e[0]-3,e[1]-3],[e[0]+3,e[1]+3]],g.kid);bbx([[P[0][0]-3.3,P[0][1]-2.6],[P[0][0]+3.3,P[0][1]+2.6]],g.kid,[[P[0][0]-1.3,P[0][1]-1.3],[P[0][0]+1.3,P[0][1]+1.3]]);
+  for(const q of g.slots){const sc=q[3]||1,th=q[2]*Math.PI/180;bbx(turned([q[0],q[1]],th,3.5*sc,14.5*sc,-3.5*sc,3.5*sc),g.kid,turned([q[0],q[1]],th,3.5*sc,14.5*sc,-2.65*sc,2.65*sc))}}
+ for(const g of rest){const P=g.pts;bbx(P.flatMap(p=>[[p[0]-1.3,p[1]-1.3],[p[0]+1.3,p[1]+1.3]]),g.kid);bbx([[P[0][0]-3,P[0][1]-2.4],[P[0][0]+3,P[0][1]+2.4]],g.kid,[[P[0][0]-1.3,P[0][1]-1.3],[P[0][0]+1.3,P[0][1]+1.3]])}
  /* (a pip keeps as clear of where a shoot leaves its knot, and of the whole shoot up to its count, as of the count itself) */
  for(const g of [...shoots,...rest]){const P=g.pts||[];for(let i=1;i<P.length;i++)budB.push([Math.min(P[i-1][0],P[i][0])-1.3,Math.min(P[i-1][1],P[i][1])-1.3,Math.max(P[i-1][0],P[i][0])+1.3,Math.max(P[i-1][1],P[i][1])+1.3]);if(P.length)budB.push([P[0][0]-3.3,P[0][1]-2.6,P[0][0]+3.3,P[0][1]+2.6])}
- for(const r of B.graftR||[])if(r.tree===ti&&!r.under){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null);budB.push(aabb(sw));
+ for(const r of B.graftR||[])if(r.tree===ti&&!r.under){const t=r.t||[1,0],sw=turned(r.c,Math.atan2(t[1],t[0]),-r.r-1,r.r+1,-4,4);bbx(sw,null,turned(r.c,Math.atan2(t[1],t[0]),-r.r-.95,r.r+.95,-3.45,3.45));budB.push(aabb(sw));
   /* (a swelling's count is a mark on its crown, its box as a shoot's count's is) */
   if(r.cnt){obs.push({r:r.cnt.r,own:null,cnt:1});budB.push(r.cnt.r)}}
- for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;bbx(turned([P.o[0]+sl[0],P.o[1]+sl[1]],(sl[2]||0)*Math.PI/180,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null)}}
+ for(const id in B.pad){const P=B.pad[id];if(P.tree!==ti||!P.geo||!P.geo.slot)continue;const g=P.geo;for(const [,sl] of g.slot){const sc=sl[3]||1;const c=[P.o[0]+sl[0],P.o[1]+sl[1]],th=(sl[2]||0)*Math.PI/180;bbx(turned(c,th,-(g.L/2+.3)*sc,(g.L/2+.3)*sc,-(.62*g.W+.3)*sc,(.62*g.W+.3)*sc),null,turned(c,th,-(g.L/2+.05)*sc,(g.L/2+.05)*sc,-(.47*g.W+.05)*sc,(.47*g.W+.05)*sc))}}
  const om=3.5/(V.hf||1),clearO=r=>!obs.some(o=>r[0]<o.r[2]+om&&r[2]>o.r[0]-om&&r[1]<o.r[3]+om&&r[3]>o.r[1]-om);
  /* (a leader keeps three pixels off the whole box of every count, its own knot's too: a count reads as a mark of its own, never
     as a bud strung on a name's line) */
- const fo=Math.min(5,4.8/(V.hf||1)),cm=Math.max(2.5,3/(V.hf||1)),intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=1.2){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs){const m=o.cnt?cm:.8;if(p[0]>o.r[0]-m&&p[0]<o.r[2]+m&&p[1]>o.r[1]-m&&p[1]<o.r[3]+m&&(o.cnt||!(o.own===id&&(d<fo||o.inF&&!o.inF(p)))))return true}}return false};
+ const fo=5.95/(V.hf||1),cm=Math.max(2.5,3/(V.hf||1)),mo=Math.max(.8,2.05/(V.hf||1)),intoO=(R,A,id)=>{const len=Math.hypot(A[0]-R[0],A[1]-R[1])||1;for(let d=0;d<=len+.01;d+=.5){const p=[R[0]+(A[0]-R[0])*d/len,R[1]+(A[1]-R[1])*d/len];for(const o of obs){const m=o.cnt?cm:mo,b=o.t||o.r;if(p[0]>b[0]-m&&p[0]<b[2]+m&&p[1]>b[1]-m&&p[1]<b[3]+m&&(o.cnt||!(o.own===id&&d<fo)))return true}}return false};
  for(const l of L.rl||[]){if(l.box){labs.push(l.tb||l.box);continue}const w0=gbW(l.t+(l.r.stop&&!l.bare&&!l.note?' · trace stops':''),L.fs*.62),x0=l.anchor==='start'?l.x:l.anchor==='end'?l.x-w0:l.x-w0/2;labs.push([x0-2,l.y-L.fs,x0+w0+2,l.y+3])}
  for(const pid in T.lbl||{}){const l=T.lbl[pid],lx=l.x+X,a=l.anchor==='start'?lx:l.anchor==='end'?lx-l.w:lx-l.w/2;labs.push([a,l.y-29,a+l.w,l.y-29+l.hgt]);if(l.dir)lines.push([[l.ax+X,l.ay],[lx,l.y-29+l.hgt/2]])}
  for(const r of B.badgeR||[])labs.push(r);
@@ -2247,7 +2293,7 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
      the knot's own leaves the boss, the leader leaves it at least 25 degrees round from where that shoot's stalk does, turned
      off the normal the least way that is, so the two never share a foot */
   const st=[...shoots,...rest].filter(g=>g.pts&&g.pts.length&&kIds(e).includes(g.kid)).map(g=>{const q=g.pts.find(t=>Math.hypot(t[0]-e.p[0],t[1]-e.p[1])>=e.ra-.5)||g.pts[g.pts.length-1],m=Math.hypot(q[0]-e.p[0],q[1]-e.p[1])||1;return [(q[0]-e.p[0])/m,(q[1]-e.p[1])/m]});
-  for(const ph of st.length?[0,.61,-.61,.87,-.87,1.13,-1.13]:[0]){const v=[v0[0]*Math.cos(ph)-v0[1]*Math.sin(ph),v0[0]*Math.sin(ph)+v0[1]*Math.cos(ph)];if(st.some(t=>t[0]*v[0]+t[1]*v[1]>.891))continue;
+  for(const ph of st.length?[0,.61,-.61,.87,-.87,1.13,-1.13,1.39,-1.39]:[0]){const v=[v0[0]*Math.cos(ph)-v0[1]*Math.sin(ph),v0[0]*Math.sin(ph)+v0[1]*Math.cos(ph)];if(st.some(t=>t[0]*v[0]+t[1]*v[1]>.891))continue;
   const R=[e.p[0]+v[0]*e.ra,e.p[1]+v[1]*e.ra],S=[e.p[0]+v[0]*(e.rb-.4),e.p[1]+v[1]*(e.rb-.4)];
   /* (a leader near upright may carry its name beside its end or centred over it; a refusals' collar knot's may also leave it
      down and out, under the branch that grows from its boss) */
@@ -2300,8 +2346,13 @@ function gbKnotNames(B,M,T,ti,V){const L=B.L,k=L.narrow?GB_NK:1,X=V.X,sh=q=>[q[0
    let got=null;const gut=[[V.vx+6,tb[0]-10*k],[tb[2]+10*k,V.vx+V.W-6]].filter(q=>q[1]-q[0]>=bw).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]));
    for(const q of gut){const pl=[];for(let y0=V.vy+4;y0<0;y0+=5*k)for(let x0=q[0];x0+bw<=q[1];x0+=7*k)pl.push([Math.max(0,-(y0+bh))+.6*Math.min(x0-V.vx,V.vx+V.W-x0-bw),x0,y0]);pl.sort((a,b)=>a[0]-b[0]);
     for(const [,x0,y0] of pl){const g=at(x0,y0);if(fits(g)){got=g;break}}if(got)break}
-   /* (under the pot: below everything drawn there, its roots' names too, under the pot's middle and inside the drawing) */
-   if(!got){const y0=L.y1+4*k,x0=Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,L.potC-bw/2));got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
+   /* (under the pot: under its feet and the shadow it casts, as close under them as keeps clear of its roots and their
+      names (else below those names too), under the pot's middle or as near it as that takes, and inside the drawing, so the
+      drawing grows down no more than it must) */
+   if(!got){const xm=L.potC-bw/2,cx=x=>Math.max(V.vx+6,Math.min(V.vx+V.W-6-bw,x)),yT=L.D+(L.lone?7:(L.fh||5)+5)+2*k,y1=L.y1+4*k;let y0=y1,x0=cx(xm);
+    const okU=g=>g.every(o=>{const r=o.r;return !caps.some(c=>c.lb==='r'&&dSR(c.a,c.b,r)<c.r+4*k)&&clearL([r[0],r[1]-5*k,r[2],r[3]+5*k],14)});
+    out:for(let y=yT-(rh-4*k-.78*fs-1.5);y<y1;y+=k)for(let i=0;i<=24;i++){const x=cx(xm+(i%2?-1:1)*Math.ceil(i/2)*k);if(okU(at(x,y))){y0=y;x0=x;break out}}
+    got=at(x0,y0);ext=Math.max(0,y0+bh+6*k-(V.vy+V.VH))}
    /* a pip keeps 8px from a count bud, a graft bud or a shoot: it moves off the boss along the limb's normal as little as that
       takes, else (where shoots crowd the wood) the least distance any way round; always still on its wood, never adrift
       beside it, and never further in across its limb than the boss stands (where no such place keeps that clear, the one that
@@ -2465,7 +2516,9 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
     into the card's side, there, at either end of it or at any point between, about 24 px apart) when that keeps it clear. It never crosses a name; past where it leaves, it keeps 12 px off every
     word and off the lit wood, it crosses no twig once it is off the thing it leaves (so it ends at a leaf's nearest edge,
     never across the twigs it hangs among), and it would rather not cross a cushion, foliage or the pot. */
- const lead=(CB,all)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
+ const nearAny=(A,p)=>{for(const q of A)if(dB(p,q)<G)return true;return false},ptAny=(A,p)=>{for(const r of A)if(Math.hypot(r[0]-p[0],r[1]-p[1])<5)return true;return false},inAny=(A,p)=>{for(const q of A)if(inB(p,q))return true;return false},
+  twAny=(A,p)=>{for(const s of A)if(p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])return true;return false};
+ const lead=(CB,all,cap=Infinity,zc=Infinity)=>{const [pa,pc]=near(AB,CB);if(Math.hypot(pc[0]-pa[0],pc[1]-pa[1])<=16)return {pts:null,pen:0,ok:true};const opts=[[pa,pc]],more=[];
   if(pa[0]<CB[0]||pa[0]>CB[2]){const my=Math.max(CB[1]+10,Math.min(CB[3]-10,pa[1])),mx=(AB[0]+AB[2])/2;for(const y2 of [my,CB[1]+10,CB[3]-10])if(Math.abs(y2-pa[1])>4){opts.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]]);
    /* (or, below the thing, from the middle of its foot: so a leaf hung among twigs is reached from under it) */
    if(!kb&&y2>AB[3]+4)opts.push([[mx,AB[3]],[mx,y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}for(const y2 of gbSteps(CB[1]+10,CB[3]-10))if(Math.abs(y2-pa[1])>4)more.push([pa,[pa[0],y2],[pa[0]<CB[0]?CB[0]:CB[2],y2]])}
@@ -2473,16 +2526,22 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   /* (off a name, it may also leave from either end of the name, level with its middle, and turn into the card: so off a name
      in a stacked key it runs clear of the lines above and below) */
   if(kb&&(pa[1]<CB[1]||pa[1]>CB[3])){const ym=(AB[1]+AB[3])/2;for(const [x0,sg] of [[AB[2],1],[AB[0],-1]])for(const x2 of [CB[0]+10,CB[2]-10,x0+sg*(G+4)])if((x2-x0)*sg>G&&x2>=CB[0]+4&&x2<=CB[2]-4)opts.push([[x0,ym],[x2,ym],[x2,pa[1]<CB[1]?CB[1]:CB[3]]])}
-  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear) */
-  let bestL=null;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL.ok)break;continue}let pen=pts.length>2?12:0,ok=true;const p0=pts[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  /* (the turns between the ends of the card's side are tried only for the place chosen, when none of those keeps it clear;
+     and a way is given up as soon as it costs as much as the best way found, or as would keep its place from winning, since
+     it could only cost more: the way chosen is the same, found sooner. For a place that covers nothing, which wins at once
+     on a clear way, only a way that is not clear is given up so, and should a clear way that costs that much or more be the
+     best left, every way is tried again in full) */
+  let bestL=null,cut=false;for(const pts of [...opts,null,...(all?more:[])]){if(!pts){if(bestL&&bestL.ok)break;continue}const lim=bestL?Math.min(bestL.pen,cap):cap;let pen=pts.length>2?12:0,ok=true;if(pen>=lim)continue;const p0=pts[0];for(let i=1;i<pts.length&&pen<lim&&(ok||pen<zc);i++){const a=pts[i-1],b=pts[i],sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
     for(const q of nox)if(!inB(p0,q)&&hit(a,b,[q[0]-2,q[1]-2,q[2]+2,q[3]+2])){pen+=1e5;ok=false}
     const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
-    for(let s2=2;s2<sl;s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
-     if(off&&txt.some(q=>dB(p,q)<G)){pen+=150;ok=false}
-     if(off&&rp.some(r=>Math.hypot(r[0]-p[0],r[1]-p[1])<5)){pen+=400;ok=false}
-     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&tw2.some(s=>p[0]>s[3][0]&&p[0]<s[3][2]&&p[1]>s[3][1]&&p[1]<s[3][3]&&gbSegD(p,p,s[0],s[1])<s[2])){pen+=300;ok=false}
-     if(firm.some(q=>!inB(p0,q)&&inB(p,q))){pen+=300;ok=false}else if(cus.some(q=>!inB(p0,q)&&inB(p,q))){pen+=60;ok=false}else if(soft.some(q=>!inB(p0,q)&&inB(p,q)))pen+=60}}
-   if(!bestL||pen<bestL.pen)bestL={pts,pen,ok}}return bestL};
+    /* (only what lies near this piece of it can be too near a point on it, and a piece near nothing is not walked at all) */
+    const nr=(q,r)=>q[0]<Math.max(a[0],b[0])+r&&q[2]>Math.min(a[0],b[0])-r&&q[1]<Math.max(a[1],b[1])+r&&q[3]>Math.min(a[1],b[1])-r,txt2=txt.filter(q=>nr(q,G+1)),rp2=rp.filter(r=>nr([r[0],r[1],r[0],r[1]],6)),fm2=firm.filter(q=>!inB(p0,q)&&nr(q,1)),cu2=cus.filter(q=>!inB(p0,q)&&nr(q,1)),so2=soft.filter(q=>!inB(p0,q)&&nr(q,1));
+    if(txt2.length||rp2.length||tw2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
+     if(off&&txt2.length&&nearAny(txt2,p)){pen+=150;ok=false}
+     if(off&&rp2.length&&ptAny(rp2,p)){pen+=400;ok=false}
+     if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){pen+=300;ok=false}
+     if(fm2.length&&inAny(fm2,p)){pen+=300;ok=false}else if(cu2.length&&inAny(cu2,p)){pen+=60;ok=false}else if(so2.length&&inAny(so2,p))pen+=60}}
+   if(!ok&&pen>=zc){cut=true;continue}if(pen<lim)bestL={pts,pen,ok}}if(cut&&bestL&&bestL.ok&&bestL.pen>=zc)return lead(CB,all);return bestL||{pts:null,pen:Infinity,ok:false}};
  /* (a root's card stays within 84 px of where its root crosses the rim, or of where a root in the pot starts) */
  const rd=rr&&rr.pts&&rr.pts.length?toPx(xo||rr.pts[0]):rim,rimB=rd?[rd[0],rd[1],rd[0],rd[1]]:null;
  const fit=(tw,th)=>{const H2=rid?H0+th+12:Math.max(H0,th+8),key=[0,H0,W2,H2];
@@ -2504,19 +2563,22 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  cand.push(...by.map(q=>[q,far(q)]).sort((a,b)=>a[1]-b[1]).map(q=>q[0]));
  let best=null;
  for(const q of cand){const x=Math.max(4,Math.min(q[0],W2-tw-4)),y=Math.max(4,Math.min(q[1],H2-th-4)),CB=[x,y,x+tw,y+th],CG=[x-G,y-G,x+tw+G,y+th+G];let sc=0,z=true;
+  /* (a place that already covers something and costs as much as the best so far, with its distance from what it explains,
+     is passed over at once: it could only cost more) */
+  const [pa,pc]=near(AB,CB),D=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05,lost=()=>!z&&best&&sc+D>=best.sc;
   for(const b of own){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}}
-  for(const b of hard){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}else if(ovB(CG,b)>0){sc+=300;z=false}}
+  for(const b of hard){const o=ovB(CB,b);if(o>0){sc+=1e5+o*10;z=false}else if(ovB(CG,b)>0){sc+=300;z=false}}if(lost())continue;
   for(const b of kn12)if(ovB(CG,b)>0){sc+=1e5;z=false}
-  for(const b of mid){const o=ovB(CB,b);if(o>0){sc+=5e4+o*5;z=false}else if(ovB(CG,b)>0){sc+=200;z=false}}
+  for(const b of mid){const o=ovB(CB,b);if(o>0){sc+=5e4+o*5;z=false}else if(ovB(CG,b)>0){sc+=200;z=false}}if(lost())continue;
   if(rpx.some(b=>ovB(CB,b)>0)){sc+=1e5;z=false}
   for(const b of firm){const o=ovB(CB,b);if(o>0){sc+=4e4+o*5;z=false}}
   for(const b of thin){const o=ovB(CB,b);if(o>0){sc+=o*2;z=false}}
-  for(const b of soft)sc+=ovB(CB,b)*2;
+  for(const b of soft)sc+=ovB(CB,b)*2;if(lost())continue;
   for(const p of rp)if(p[0]>x-3&&p[0]<x+tw+3&&p[1]>y-3&&p[1]<y+th+3){sc+=2e4;z=false}else if(inB(p,CG)){sc+=40;z=false}
   const ko=ovB(CB,key);if(ko>0){sc+=4000+ko*.02;z=false}
   if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false}}
-  const [pa,pc]=near(AB,CB);sc+=25*Math.hypot(pc[0]-pa[0],pc[1]-pa[1])+Math.abs(x+tw/2-cx)*.05;if(!z&&best&&sc>=best.sc)continue;
-  const L2=lead(CB);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
+  sc+=D;if(!z&&best&&sc>=best.sc)continue;
+  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok}}
  if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok)best.pts=L3.pts}
  return best};
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
