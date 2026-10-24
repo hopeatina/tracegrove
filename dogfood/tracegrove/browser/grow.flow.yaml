@@ -24,7 +24,7 @@ steps:
     timeoutMs: 30000
   - name: each mode says how many scenarios it proves
     browser: { kind: read, target: { by: testId, name: grow-modes } }
-    expect: { text: "Minimum · 2each critical journey end to end, its riskiest guard or failure, and every promise in the specStandard · 3adds the other journeys, and the other ways each one can failMax · 3adds every part on its own, and regression of the flows the change reaches" }
+    expect: { text: "Minimum 2each critical journey end to end, its riskiest guard or failure, and every promise in the specStandard 3adds the other journeys, and the other ways each one can failMax 3adds every part on its own, and regression of the flows the change reaches" }
   - name: choose minimum
     browser: { kind: click, target: { by: testId, name: grow-mode-min } }
   - name: every promise holds by a passing flow
