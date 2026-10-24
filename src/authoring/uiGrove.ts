@@ -187,7 +187,9 @@ ${BONSAI_CSS}
 .gw-sp.proved,.gw-sp.part,.gw-sp.toprove,.gw-sp.code{background:var(--moss-bg);color:var(--moss)}.gw-sp.failed{background:var(--verm-bg);color:var(--verm-ink)}
 .gw-sp.agent,.gw-sp.run,.gw-sp.needs{background:var(--gold-bg);color:var(--gold)}.gw-sp.open{background:none;border-color:var(--line2);color:var(--ink3)}
 .gw-cdet .gw-sp{margin-top:1px}
-.gw-chip .gw-sd{margin-right:5px;width:8px;height:8px}.gw-chip .gw-sd.needs{width:9px;height:8px}
+.gb-tip .k{text-transform:none;letter-spacing:0}
+.gw-chip.pr{white-space:normal;max-width:100%;font-family:var(--sans);text-align:left}.gw-chip.pr.f{background:var(--verm-bg);color:var(--verm-ink)}
+.gw-chip .gw-sd{margin-right:5px;flex:none;width:8px;height:8px}.gw-chip .gw-sd.needs{width:9px;height:8px}
 /* the table that helps choose a mode: fixed columns, numbers under their headers */
 .gw .gw-cmp{table-layout:fixed}.gw .gw-cmp th:first-child{width:56%}.gw .gw-cmp th.n,.gw .gw-cmp td.n{width:14.6%;text-align:right;padding:4px 6px 6px 6px}.gw .gw-cmp td.n{padding:7px 6px 7px 6px}
 /* pointing at a mode card lights its column: what that mode proves on each journey */
@@ -678,7 +680,10 @@ const gwCBT={proved:'Every scenario serving it passed',agent:'Passed, resting on
 const gwSD=b=>h('span',{class:'gw-sd '+b,'aria-hidden':'true'});
 function gwBuckets(){const n={};for(const c of gw.view.criteria){const b=gwCB(c.status);n[b]=(n[b]||0)+1}return gwCBO.filter(b=>n[b]).map(b=>[b,n[b]])}
 /* A criterion as a chip that carries its state's mark, wherever criteria are listed. */
-function gwCrit(id){const c=gw.view.criteria.find(q=>q.id===id);const b=c?gwCB(c.status):'wait';return h('span',{class:'gw-chip',title:c?gwPlain(c.text)+' · '+c.status.text:id},gwSD(b),id)}
+/* A promise where a scenario names it: its words and state, never its id. A failed scenario breaks it ("breaks promise: ...") */
+function gwCritLine(c,failed){const b=gwCB(c.status),t=gwPlain(c.text);return failed||b==='failed'?'breaks promise: '+gwCut(t,40):gwCut(t,40)+' · '+gwCBL(b,1)}
+function gwCrit(id,x){const c=gw.view.criteria.find(q=>q.id===id);if(!c)return null;const b=gwCB(c.status),f=b==='failed'||!!(x&&x.id&&gwStKey(x)==='fail');
+ return h('span',{class:'gw-chip pr'+(f?' f':''),title:gwPlain(c.text)+' · '+c.status.text},gwSD(f?'failed':b),gwCritLine(c,f))}
 /* The chip on a scenario that runs both ways, and the line that says what it means. */
 const gwMockChip=()=>h('span',{class:'gw-chip',title:'Runs against a stand-in on every PR, and against the real provider sandbox when its key is set'},'mock + sandbox');
 const gwMockNote=()=>h('p',{class:'gw-mocknote'},gwMockChip(),'runs against a stand-in on every PR, and against the provider’s real sandbox when its key is set.');
@@ -1000,7 +1005,8 @@ function gwDrawer(){const d=gw.dr,s=gw.state,M=gw.M||gbModel();const x=gwScen(d.
  gwPut(el,h('div',{class:'gw-drh'},h('span',{class:'mk '+st,'aria-hidden':'true'},{fail:'✗',pass:'✓',none:'○'}[st]),
   h('div',{style:'min-width:0'},h('h2',{id:'gw-dr-title',tabindex:'-1','data-testid':'grow-happened-title'},...gwRich(T.title)),
    h('div',{class:'meta'},h('span',{class:'w '+st},gwDrW[st]),h('span',{class:'gw-chip'+(x.mode==='min'?' min':'')},gwML(x.mode)),h('span',{},place),
-    h('span',{},x.criteria.length?'promise'+(x.criteria.length>1?'s ':' ')+x.criteria.join(', '):'no promise')),gwDrPager(x)),
+    (()=>{const C=x.criteria.map(id=>gw.view.criteria.find(q=>q.id===id)).filter(Boolean);if(!C.length)return h('span',{},'no promise');
+     return h('span',{title:C.map(c=>gwPlain(c.text)).join(' · ')},gwCritLine(C[0],st==='fail')+(C.length>1?' +'+(C.length-1)+' more':''))})()),gwDrPager(x)),
   h('button',{class:'gw-drx',type:'button','aria-label':'Close what happened','data-testid':'grow-happened-close',on:{click:gwDrClose}},'×')));
  if(!gwRan(x)){gwPut(el,gwDrNone(x,r,j,M));return el}
  if(d.loading){gwPut(el,h('p',{class:'row muted',style:'margin:14px 0 0'},h('span',{class:'think'},h('i'),h('i'),h('i')),'Reading run '+d.run));return el}

@@ -2485,7 +2485,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   const num=B.knp?B.knp.num:new Map();el[0].querySelectorAll(':scope>.gw-hop').forEach((e,i)=>{const n=o[i]&&num.get(o[i].id);if(n){const m=gbPipMark(B,n);e.prepend(h('span',{class:'gb-kn','aria-label':'pip '+m},m))}});return el};
  tip.replaceChildren();
  if(k.startsWith('s:')){const x=s.scenarios.find(q=>q.id===k.slice(2));if(!x){hide();return}const j=M.J.find(q=>M.leaves[q.id].includes(x));const w=gbStateWord(x),r0=s.run[x.id];
-  gwPut(tip,h('span',{class:'k'},gwFacts([j?gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check',x.criteria.length?x.criteria.join(' '):null])),h('b',{},x.title),
+  gwPut(tip,h('span',{class:'k'},(r=>r.charAt(0).toUpperCase()+r.slice(1))(j?gbROLEW[gbPol(x)]:x.scenarioKind==='regression'?'existing flow':'part check')),h('b',{},x.title),
    /* a failure says where it broke, in the same words as the list, then where on the route */
    r0&&r0.st==='fail'?h('div',{class:'st fail'},gwBroke(r0,140,x.id)):h('div',{class:'st '+w.c},w.t),
    /* the hop it checks comes before the whole path; the hops it reaches are in ink and the rest faint, as the tree lights
@@ -2702,7 +2702,7 @@ function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=
    r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},(n=>n?h('b',{class:'gw-stepno'},'Step '+n+' · '):null)(gwStepNo(x)),gwBroke(r,0,x.id))):gwWhyNot(x),gwCardActs(x),gwHappened(x),gwEvLine(x),gwDrEntry(x),gwWriteEntry(x),gwMore(x),
    x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null),
   j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x),gbReach(M,j,x))):null,
-  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},gwFlowOf(x)?h('span',{class:'gw-chip built'},gwFlowOf(x)):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
+  h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},gwFlowOf(x)?h('span',{class:'gw-chip built'},gwFlowOf(x)):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(id=>gwCrit(id,x)),
     x.ext.filter(e=>s.ext[e]&&s.ext[e].state!=='proven').map(e=>h('span',{class:'gw-chip agent',title:s.ext[e].path},'agent-written '+s.ext[e].extKind))),x.variants.length?gwLanes(x):null)]}
 
 /* ---------- The lists: the tree's journeys as rows ---------- */
@@ -2752,7 +2752,7 @@ function gwRowStep(x){const D=gwHap(x),f=gw.view&&gw.view.verdict&&gw.view.verdi
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
  gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,r&&r.st==='fail'?gwRowStep(x):null,(a=>a?h('div',{class:'gb-hapr'},a):null)(gwRowAct(x)),
   x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null,
-  h('div',{class:'gw-chips'},h('span',{class:'gw-chip'+(x.mode==='min'?' min':'')},gwML(x.mode)),x.criteria.map(gwCrit),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
+  h('div',{class:'gw-chips'},h('span',{class:'gw-chip'+(x.mode==='min'?' min':'')},gwML(x.mode)),x.criteria.map(id=>gwCrit(id,x)),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
    /* the row's badge already says "no flow yet"; the body names the flow when there is one, and why one that has a flow is not
       tested yet */
    x.flow?h('span',{class:'gw-chip built',title:'Runs this existing flow'},x.flow):null,
