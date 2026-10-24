@@ -1082,12 +1082,12 @@ function gwNext(){const s=gw.state;const open=s.scenarios.filter(x=>gwIn(x)&&!(s
 function gwVerdict(V,f,tone){
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
   h('span',{class:'gw-vt'},V.text.charAt(0).toUpperCase()+V.text.slice(1)),
-  f&&f.promise?h('span',{class:'gw-vc'},'promise'+(f.promise.indexOf(',')>=0?'s ':' ')+f.promise):null,
+  /* the promise it breaks, in the spec's words; when those are the failure's own title, the line already says them */
+  f&&f.promise?(()=>{const ids=f.promise.split(/,\s*/),cs=ids.map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean),pl=x=>gwPlain(x).toLowerCase().replace(/[.\s]+$/,'');
+   const own=cs.length===1&&pl(cs[0].text)===pl(gwVia(f.title||'').title);
+   return h('span',{class:'gw-vc',title:ids.join(', ')},!cs.length?'breaks '+(ids.length>1?'promises ':'a promise'):own?'breaks this promise':'breaks: '+cs.map(c=>gwCut(gwPlain(c.text),70)).join('; '))})():null,
   f&&V.more?h('span',{class:'gw-vm'},'and '+V.more+' more failed'):null,
   f&&f.run?h('button',{class:'btn sm gw-vgo',type:'button','data-testid':'grow-verdict-open',on:{click:()=>{gwDrOpen(f.scenario);if(gw.dr)gw.dr.from='t:grow-verdict-open'}}},'See what happened ›'):null)}
-/* The first failure's run, step by step, beside the tree: from the result band, above the fold */
-function gwResultSteps(){const V=gw.view&&gw.view.verdict,f=V&&V.first,x=f&&gwScen(f.scenario);if(!x||!gwRan(x)||!gwDrCan(x)||gw.state.run[x.id].st!=='fail')return null;
- return h('button',{class:'btn ghost sm gw-rsteps',type:'button','data-testid':'grow-result-steps','aria-label':'What happened, step by step: '+gwPlain(gwVia(x.title).title),on:{click:()=>{gwDrOpen(x.id);if(gw.dr)gw.dr.from='t:grow-result-steps'}}},'Step by step ›')}
 /* Under the verdict, one quiet line of counts in the page's words: scenarios passed, failed and not tested yet, and the promises
    that hold. The failure itself is said once, in the verdict; what to do about it is in the panel. */
 function gwResult(){const s=gw.state,v=gw.view,t=v.summary,P=v.verdict&&v.verdict.promises;
@@ -1246,7 +1246,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
     of mark, the modes side by side, how to read a pad) opens on asking, and is built only then */
  const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change. Crown: its happy path; side branches: what it refuses and how it fails. Leaves: scenarios; failures hang under their pad.':'Trunk: your change. Branches: journeys. Leaves: scenarios; failures hang under their pad.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
- const K=[['fail','.gb-lf.fail:not(.gone)','failed'],['run','.gb-lf.run:not(.gone)','running'],['none','.gb-lf.none:not(.gone)','no flow yet'],['in','.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)','flow ready, not run'],['pass','.gb-lf.pass:not(.gone)','passed']]
+ const K=[['fail','.gb-lf.fail:not(.gone)','failed'],['run','.gb-lf.run:not(.gone)','running'],['none','.gb-lf.none:not(.gone)','no flow yet'],['in','.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',gwInKey()],['pass','.gb-lf.pass:not(.gone)','passed']]
   .map(([k,sel,t])=>[k,sel,t,cnt(sel)]).filter(q=>q[3]>0);
  const key=K.length?h('ul',{class:'gw-live','data-testid':'grow-key','aria-label':'Key: the marks on this tree'},K.map(([k,sel,t,n])=>h('li',{'data-mark':sel},gwSw(k),h('span',{},n+' '+t)))):null;
  const full=gw.howOpen?[h('div',{class:'gw-legend','aria-label':'Legend'},where,leaves,route,knot,ground,cut,cmp),
