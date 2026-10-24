@@ -353,7 +353,11 @@ describe('What happened, step by step', () => {
     await page.goto(server.url);
     const go = page.getByTestId('grow-open-runs');
     await go.waitFor();
-    const box = (await go.boundingBox())!;
+    // a repaint can replace the link between the wait and the read (the run's evidence arrives after the page shows), so read
+    // its box once it is on the page again rather than from the node that was swapped out
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    for (let i = 0; i < 20 && !box; i++) { box = await go.boundingBox(); if (!box) await page.waitForTimeout(100); }
+    if (!box) throw new Error('Open the runs never settled on the page');
     await page.mouse.move(box.x + 5, box.y + 5); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const before = await page.evaluate(() => scrollY);
     await page.mouse.down(); await page.mouse.up();
