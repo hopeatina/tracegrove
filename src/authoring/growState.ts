@@ -26,7 +26,7 @@ export type ScenarioLevel = 'journey' | 'part';
 /** What a scenario shows: the path works, the app refuses what it must (auth, validation), or it survives a fault. */
 export type Polarity = 'happy' | 'guard' | 'failure';
 export const MODES: Array<{ id: Mode; label: string; blurb: string }> = [
-  { id: 'min', label: 'Minimum', blurb: 'each critical journey end to end, its riskiest guard or failure, and every spec criterion' },
+  { id: 'min', label: 'Minimum', blurb: 'each critical journey end to end, its riskiest guard or failure, and every promise in the spec' },
   { id: 'std', label: 'Standard', blurb: 'adds the other journeys, and the other ways each one can fail' },
   { id: 'max', label: 'Max', blurb: 'adds every part on its own, and regression of the flows the change reaches' },
 ];

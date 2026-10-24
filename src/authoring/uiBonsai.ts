@@ -230,6 +230,7 @@ i.gb-g{margin:0}.gb-gs{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:ce
 .gb-ols.cut{cursor:default;color:var(--ink3);min-height:30px}.gb-ols.cut .t{text-decoration:line-through;text-decoration-color:var(--muted)}
 .gb-olx .err{font:12px/17px var(--mono);color:var(--verm-ink);background:var(--verm-bg);padding:6px 8px;border-radius:6px;overflow-wrap:break-word;margin:0 8px 4px 38px}
 .gb-olin{display:grid;gap:8px;padding:2px 8px 12px 38px;font-size:13px;line-height:19px;color:var(--ink3)}
+.gb-rstep{margin:8px 0 0;font:12px/18px var(--mono);color:var(--ink2)}.gb-rstep p{margin:0}.gb-rstep .muted{color:var(--ink3)}.gb-hapr .gb-ract,.gb-ract{margin-left:16px}
 .gb-hapr{margin:-4px 8px 6px 38px;line-height:18px}.gb-hapr .gw-lnk{margin-top:0}.gw-ins .gb-hapr{margin:-2px 4px 6px 34px}
 .gb-olf>summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:36px;padding:6px 8px;border-radius:6px;list-style:none;cursor:pointer;font:13px/18px var(--sans);color:var(--ink3)}
 .gb-olf>summary::-webkit-details-marker{display:none}.gb-olf>summary::before{content:'▸';width:10px;color:var(--muted);font-size:11px}.gb-olf[open]>summary::before{content:'▾'}.gb-olf>summary:hover{background:var(--sel)}
@@ -1167,8 +1168,8 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
 /* Build the SVG once per shape; later paints only move leaves and toggle classes. */
 function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[key])||[];let L=gbLayout(M,width,sap);
  /* a phone scales the drawing to fit its width, so a wide tree is laid out again with leaves large enough to read there,
-    about eleven pixels and up */
- if(L.narrow&&!sap){for(let i=0;i<3;i++){const f=width/Math.max(width,L.x1-L.x0+24),lf=Math.min(...L.trees.flatMap(T=>T.padList.map(pd=>pd.geo.L)));if(lf*f>=11.5)break;M.lmin=Math.max(M.lmin||0,11.5/f*1.02);L=gbLayout(M,width,sap)}M.lmin=0}const quiet=gwQuiet(),now=gbNow();const N=gw.gbN=(gw.gbN||0)+1;
+    about eleven pixels and up; beside a desktop tree a crowded one is laid out again with leaves of eighteen and up */
+ if(!sap){const lo=L.narrow?11.5:18.2;for(let i=0;i<3;i++){const f=width/Math.max(width,L.x1-L.x0+24),lf=Math.min(...L.trees.flatMap(T=>T.padList.map(pd=>pd.geo.L)));if(lf*f>=lo)break;M.lmin=Math.max(M.lmin||0,lo/f*1.02);L=gbLayout(M,width,sap)}M.lmin=0}const quiet=gwQuiet(),now=gbNow();const N=gw.gbN=(gw.gbN||0)+1;
  const W=Math.max(width,L.x1-L.x0+24),vx=(L.x0+L.x1)/2-W/2,vy=L.y0-14,VH=L.y1-vy+8;
  const svg=sv('svg',{class:'gw-svg gb'+(L.narrow&&!sap?' nw':''),tabindex:'-1',viewBox:gbF(vx)+' '+gbF(vy)+' '+gbF(W)+' '+gbF(VH),role:'group','aria-label':'The change as a bonsai: each branch is an end-to-end journey, each leaf one of its scenarios, knots are the files it passes through, roots what it depends on'});
  const defs=sv('defs',{});const clipId='gb-wood'+N,softId='gb-soft'+N;const clip=sv('clipPath',{id:clipId});
@@ -1678,14 +1679,15 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  svg.addEventListener('pointerleave',()=>{if(!gw.hov&&!gw.hovEl)return;gw.hovEl=null;gbHover(null)});
  svg.addEventListener('focusin',e=>{const k=keyOf(e);if(k){gbRove(e.target.closest('[data-k]'));gbHover(k,e.target.closest('[data-k]'))}});
  svg.addEventListener('focusout',e=>{if(!svg.contains(e.relatedTarget)&&(gw.hov||gw.hovEl))gbHover(null)});
- /* the browser moves a tap's click onto a target near the finger; the finger's own point is where the touch went down */
+ /* the browser moves a tap's click onto a target near the finger; the finger's own point is where the touch went down; a clear hit area round a small mark gives way to a leaf nearer the finger */
  svg.addEventListener('pointerdown',e=>{gw.tapAt=e.pointerType!=='mouse'?[e.clientX,e.clientY,e.timeStamp]:null},{passive:true});
  svg.addEventListener('click',e=>{const at=e.pointerType&&e.pointerType!=='mouse'&&gw.tapAt&&e.timeStamp-gw.tapAt[2]<1500?gw.tapAt:null,t0=at?document.elementFromPoint(at[0],at[1]):null,tt=t0&&svg.contains(t0)?t0:e.target;
-  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
+  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tt.classList.contains('gb-hit')||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
  svg.addEventListener('keydown',gbKeys);
- /* on a phone, a tap off the card under the drawing, on nothing that does a thing of its own, lets the card go */
+ /* on a phone, a tap off the card under the drawing, on nothing that does a thing of its own, lets the card go (a tap whose
+    target a repaint took away, such as a mark's hit area, was on the drawing) */
  if(!gw.tapOff){gw.tapOff=true;document.addEventListener('click',e=>{const B2=gw.B,t=e.target;if(!B2||!B2.tip||B2.tip.hidden||!B2.tip.classList.contains('below')||!gw.pinned||!(t instanceof Element))return;
-  if(B2.tip.contains(t)||B2.svg.contains(t)||t.closest('button,a,summary,input,select,textarea,label,[data-ol],[data-k],[role=button],.gw-dr'))return;gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B2);growPaint()})}
+  if(!t.isConnected||B2.tip.contains(t)||B2.svg.contains(t)||t.closest('button,a,summary,input,select,textarea,label,[data-ol],[data-k],[role=button],.gw-dr'))return;gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B2);growPaint()})}
  /* the grey dots where a route never ran go under the knots they pass, which stand faint over them: each knot cuts them */
  {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
   for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
@@ -1736,7 +1738,7 @@ function gbLeafState(x){const s=gw.state;const r=s.run[x.id];
 function gbStateWord(x){const s=gw.state;const r=s.run[x.id];if(r){if(r.st==='pass')return {c:'pass',t:'passed in '+gwDur(r.ms||0)+(x.ext.some(e=>s.ext[e]&&s.ext[e].state!=='proven')?', resting on agent-written work not yet reviewed':'')};
   if(r.st==='fail')return {c:'fail',t:'failed'+(r.hop?(r.after?', after ':' at ')+r.hop:'')+': '+(r.why||'see the run')+(r.hop?'':' (the run does not say which hop broke)')};if(r.st==='run')return {c:'run',t:'running now'};
   /* in the one word its row and card give it: a run that never reached its checks says why it could not run */
-  const w=gwOpenWord(x);return {c:'',t:w==='could not run'?w+String(r.why).replace(/^Could not run/,''):w==='to prove'?w+(r.why?': '+r.why:''):w}}
+  const w=gwOpenWord(x);return {c:'',t:w==='could not run'?w+String(r.why).replace(/^Could not run/,''):w==='flow ready'?w+(r.why?': '+r.why:''):w}}
  if(gbRank[x.mode]>gbRank[s.mode]&&s.modeBy)return {c:'',t:'pruned: proved in '+GW.modes.find(m=>m.id===x.mode).label};
  return {c:'',t:'drafted'+(x.flow?', runs '+x.flow:', no flow yet')+(s.modeBy?'':' · in '+GW.modes.find(m=>m.id===x.mode).label)}}
 /* Where a failure happened, read from its message: the first part of the journey whose route or command it names. */
@@ -1753,10 +1755,10 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
  const inm=list.filter(inMode),ran=inm.filter(x=>s.run[x.id]),c=k=>ran.filter(x=>s.run[x.id].st===k).length,pr=vis?list.length-inm.length:0;
  if(vis&&!inm.length){const lo=list.reduce((a,x)=>gbRank[x.mode]<gbRank[a]?x.mode:a,'max');return [['pruned in '+gbModeName(vis)+' · '+gbModeName(lo)+' grows '+(list.length===1?'it':'them'),'n']]}
  const T=[];if(c('fail'))T.push([c('fail')+' failed','f']);if(c('pass'))T.push([c('pass')+' passed','p']);if(c('run'))T.push([c('run')+' running','r']);
- const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),ow=w=>open.filter(x=>gwOpenWord(x)===w).length,cr=ow('could not run'),nf=ow('no flow yet'),tp=ow('to prove');
+ const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),ow=w=>open.filter(x=>gwOpenWord(x)===w).length,cr=ow('could not run'),nf=ow('no flow yet'),tp=ow('flow ready');
  /* what a mode would keep and cut is said only before one is picked; from the paint a mode is picked in, the pad says what it
     holds in that mode and what was pruned, its final words, never both */
- if(!ran.length&&!vis){const km='min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' could not run','n']);if(tp)T.push([tp+' to prove','n']);if(nf)T.push([nf+' no flow yet','n'])}
+ if(!ran.length&&!vis){const km='min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' could not run','n']);if(tp)T.push([tp+' flow ready','n']);if(nf)T.push([nf+' no flow yet','n'])}
  if(pr)T.push(['+'+pr+' pruned','n']);return T}
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
@@ -2669,7 +2671,7 @@ function gbCursors(now){const B=gw.B,s=gw.state;if(!B||!s||gw.tree!=='grove')ret
    between its method and its path), and each arrow goes with the hop before it, so a line ends on the arrow that leads on and
    never starts with one; a line the path wraps onto starts a little in, under the first hop, as the same path going on (see
    .gw-hp). */
-function gbPathEl(j,wound,R){const M=gw.M;const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
+function gbPathEl(j,wound,R){const M=gw.M||(gw.M=gbModel());const parts=j.units.map(id=>M.U[id]).filter(Boolean);const order=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];
  /* a journey's path that broke greys the hops after the break, as the tree draws them in grey dots */
  if(!R&&wound&&!(M.U[wound]||{}).root){const wi=j.units.indexOf(wound);if(wi>=0)R={lit:new Set(j.units.slice(0,wi+1))}}
  return h('ol',{class:'gb-path gw-path gw-hp'},order.map((u,i)=>h('li',{class:'hop'+(R&&!R.lit.has(u.id)?' un':'')},h('button',{class:u.root?'rootp':u.id===wound?'bad':'',title:u.loc,on:{click:e=>{e.stopPropagation();gw.pinned='u:'+u.id;gw.pinList=null;gw.refocus='u:'+u.id;growPaint()},mouseenter:()=>{const B=gw.B;if(B)gbHover('u:'+u.id,B.knot[u.id]||B.root[u.id]||null)},mouseleave:()=>gbHover(null)}},...gwCodeText(gwPlain(u.label))))))}
@@ -2696,8 +2698,8 @@ function gbJourneyCard(jid){const s=gw.state,M=gw.M;const j=M.J.find(q=>q.id===j
 function gbScenarioCard(sid){const s=gw.state,M=gw.M;const x=s.scenarios.find(q=>q.id===sid);if(!x)return null;const j=M.J.find(q=>M.leaves[q.id].includes(x));const r=s.run[x.id];const T=gwVia(x.title);const n=j?(gw.order||[]).indexOf(j.id)+1:0;
  return [h('h3',{class:'gw-st'},...gwRich(T.title)),T.via?h('div',{class:'gw-via'},'via ',...gwCodeText(T.via)):null,
   h('div',{class:'where'},...(j?[gbROLEW[gbPol(x)]+' · journey'+(n?' '+n:'')+': ',...gwRich(j.title)]:[(x.scenarioKind==='regression'?'existing flow':'part check')+' · ',...gwCodeText((M.U[x.unit]||{}).label||'')])),
-  h('div',{class:'sec'},h('div',{class:'row',style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
-   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},gwBroke(r,0,x.id)),gwMore(x)):gwWhyNot(x),gwHappened(x),gwDrEntry(x),gwWriteEntry(x),gwCardActs(x),
+  h('div',{class:'sec'},h('div',{class:'row gw-brow'+(r&&r.st==='fail'?' f':''),style:'gap:8px'},gwBadge(x),x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null),
+   r&&r.st==='fail'?h('div',{class:'gw-flag red gw-broke'},h('span',{},(n=>n?h('b',{class:'gw-stepno'},'Step '+n+' · '):null)(gwStepNo(x)),gwBroke(r,0,x.id))):gwWhyNot(x),gwCardActs(x),gwHappened(x),gwEvLine(x),gwDrEntry(x),gwWriteEntry(x),gwMore(x),
    x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null),
   j?h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'The path it crosses'),gbPathEl(j,gbWound(M,j,x),gbReach(M,j,x))):null,
   h('div',{class:'sec'},h('span',{class:'gw-eyebrow'},'Proof'),h('div',{class:'gw-chips'},gwFlowOf(x)?h('span',{class:'gw-chip built'},gwFlowOf(x)):h('span',{class:'gw-chip missing'},'no flow yet'),x.criteria.map(gwCrit),
@@ -2715,7 +2717,7 @@ const gbByRole=list=>{const r={happy:0,guard:1,failure:2},s=gw.state,cut=x=>s.mo
 const gbNarrowList=()=>{try{return matchMedia('(max-width:1060px)').matches}catch(e){return false}};
 /* Selecting in a list pins, like a click on the tree, and remembers it came from a list, so the row opens in place; the row keeps
    focus across the repaint. */
-function gbOlPin(k){gw.pinned=gw.pinned===k?null:k;gw.pinList=gw.pinned;gw.refocus=k;growPaint()}
+function gbOlPin(k){gw.pinned=gw.pinned===k?null:k;gw.pinList=gw.pinned;gw.refocus=k;gw.olShow=gw.pinned;growPaint()}
 const gbOlOpen=(key,dflt)=>gw.open&&key in gw.open?gw.open[key]:!!dflt;
 function gbOlFold(key,sum,kids,dflt,cls){const open=gbOlOpen(key,dflt);const el=h('details',{class:'gb-olf'+(cls?' '+cls:''),open:open?true:null});
  gwPut(el,h('summary',{'data-ol':'f:'+key,on:{click:e=>{e.preventDefault();(gw.open||(gw.open={}))[key]=!open;gw.refocus='f:'+key;growPaint()}}},h('span',{class:'sm'},sum)),open?kids:null);return el}
@@ -2732,11 +2734,23 @@ function gbRow(x,inline){const s=gw.state,r=s.run[x.id];const k='s:'+x.id,pin=gw
  return [gbItem(x,{class:'gb-ols'+(pin?' sel':'')+(hl?' hl':''),'data-sid':x.id,'data-ol':k,'aria-pressed':String(pin),on:{click:()=>gbOlPin(k),mouseenter:()=>gbLit2(k),mouseleave:()=>gbLit2(null)}},
    [x.variants.length?gwMockChip():null,x.by!=='rules'?h('span',{class:'gw-chip agent'},x.by):null,gwBadge(x)]),
   r&&r.st==='fail'&&!open?h('div',{class:'err'},gwBroke(r,180,x.id)):null,
-  /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too */
-  !open&&gwRan(x)?h('div',{class:'gb-hapr'},gwHappened(x),gwDrEntry(x)):null,open?gbRowBody(x):null]}
+  /* a row whose scenario ran opens its run from where it is listed, beside the reason it broke, before it is opened too; every
+     row in this mode carries its one next action: Rerun its flow, Run a flow that never ran, or Write the flow it lacks */
+  !open&&(gwRan(x)||gwRowAct(x))?h('div',{class:'gb-hapr'},gwRan(x)?gwHappened(x):null,gwRan(x)?gwDrEntry(x):null,gwRowAct(x)):null,open?gbRowBody(x):null]}
+function gwRowAct(x){const s=gw.state,r=s.run[x.id],fl=gwFlowOf(x);if(!s.done||!gwIn(x)||r&&r.st==='run')return null;
+ const T=gwPlain(gwVia(x.title).title);
+ if(!fl)return h('button',{class:'gw-lnk gb-ract',type:'button','data-testid':'grow-row-write-'+x.id,'aria-label':'Write this flow: '+T,on:{click:e=>{e.stopPropagation();gwDrWrite(x)}}},'Write this flow');
+ return h('button',{class:'gw-lnk gb-ract',type:'button','data-testid':'grow-row-rerun-'+x.id,'aria-label':(gwRan(x)?'Rerun: ':'Run: ')+T,disabled:!!ui.running||!!state.compileError,on:{click:e=>{e.stopPropagation();openTab('Run');runNow(fl)}}},gwRan(x)?'Rerun':'Run it')}
+/* The step a failure broke at: the verdict's for its first failure, else the step its run says */
+function gwStepNo(x){const f=gw.view&&gw.view.verdict&&gw.view.verdict.first;if(f&&f.scenario===x.id&&f.step)return f.step;const D=gwHap(x);return D&&D.steps&&D.steps[D.at]?D.at+1:null}
+/* Opened in the Outline, a failure says its step and what the app answered there, from the run the drawer reads */
+function gwRowStep(x){const D=gwHap(x),f=gw.view&&gw.view.verdict&&gw.view.verdict.first;if(!D||!D.steps||!D.steps.length)return null;
+ const i=f&&f.scenario===x.id&&f.step?f.step-1:D.at,st=D.steps[i];if(!st)return null;
+ let a=null;for(let k=i;k>=0&&!a;k--){const q=D.steps[k];if(q.answer&&q.method!=='STANDIN')a=[k,q]}
+ return h('div',{class:'gb-rstep','data-testid':'grow-row-step'},h('p',{},'Step '+(i+1)+' · '+st.name),a?h('p',{class:'muted'},'The app answered'+(a[0]!==i?' at step '+(a[0]+1):'')+': '+gwCut(String(a[1].answer),160)):null)}
 /* A row opened in place: where it broke first, when it broke; then the claim, said as what the run did with it; then its chips. */
 function gbRowBody(x){const s=gw.state,r=s.run[x.id];const el=h('div',{class:'gb-olin'});
- gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,
+ gwPut(el,r&&r.st==='fail'?h('div',{class:'err',style:'margin:0'},gwBroke(r,0,x.id)):null,r&&r.st==='fail'?gwRowStep(x):null,(a=>a?h('div',{class:'gb-hapr'},a):null)(gwRowAct(x)),
   x.proves?h('div',{class:'gw-claim'},h('span',{class:'gw-eyebrow'},gwClaim(x)),h('span',{},...gwRich(x.proves))):null,
   h('div',{class:'gw-chips'},x.mode==='min'?h('span',{class:'gw-chip min'},'minimum'):h('span',{class:'gw-chip'},gwML(x.mode).toLowerCase()),x.criteria.map(gwCrit),x.layers.map(l=>h('span',{class:'gw-chip'},GW.layers[l])),
    /* the row's badge already says "no flow yet"; the body names the flow when there is one, and why one that has a flow is not
