@@ -90,3 +90,11 @@ Human sign-off is an actual decision and was not fabricated to make the example 
 - Preview: `http://127.0.0.1:51429/`. Changes are local and uncommitted; no merge, deployment or new npm publication was performed.
 
 [Run, desktop](../artifacts/qa/design-audit/final-run-desktop.png) · [Readiness, desktop](../artifacts/qa/design-audit/final-readiness-desktop.png) · [Run, phone](../artifacts/qa/design-audit/final-run-mobile.png)
+
+## Tree cohesion follow-up
+
+Recorded runs now share Grow's spline, tapered wood, foliage silhouette, leaf geometry and material tokens through `uiTreeGeometry.ts`, including the round-12 refinements from PR #94. Run keeps its meaning: a branch is a recorded scenario, a leaf is a step, and roots describe recorded routes. Failures use Grow's bitten leaf; unrun and unavailable evidence remain outlined. Large runs default to eight branches, prioritizing the selected scenario and failures, with an explicit expansion control and the complete scenario list below.
+
+The header and browser tab share one bonsai mark. The local SVG favicon supports light and dark appearances; empty-state seedlings use the same curves and leaf shape. Keyboard branch selection retains focus; mobile selection opens the real step detail.
+
+Validation: 84 tests passed across the latest Grow, knot-name and navigation suites after integrating upstream #94 and #95. All 17 navigation tests passed again after the compact-tree guard, including favicon serving, keyboard selection, exact leaf counts and dense geometry bounds. Earlier saved-evidence/Grow drawer coverage passed 117 tests. Live 375 px branch targets measured approximately 57 × 46 px, document width remained 375 px, and no browser warnings or errors were recorded. Captures are local at `artifacts/qa/design-audit/tree-cohesion-desktop.png` and `tree-cohesion-mobile.png`.

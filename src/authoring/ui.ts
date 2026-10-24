@@ -1,3 +1,4 @@
+import { FAVICON_SVG } from './uiBrand.ts';
 import { z } from 'zod';
 /**
  * `tracegrove ui`: a loopback-only web UI over one folder. It shows the config, flows and run
@@ -158,6 +159,7 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     if (req.method === 'POST' && req.headers['x-tracegrove-token'] !== token && req.headers.authorization !== `Bearer ${token}`) return send(403, { error: 'missing session token' });
     if (closing && req.method === 'POST') return send(409, { error: 'UI is closing; new work is not admitted.' });
     try {
+      if (req.method === 'GET' && (url.pathname === '/favicon.svg' || url.pathname === '/favicon.ico')) return send(200, FAVICON_SVG, 'image/svg+xml');
       if (req.method === 'GET' && url.pathname === '/') {
         const scriptJson = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c');
         return send(200, UI_HTML.replace('__TOKEN__', token).replace('__BRANCH__', scriptJson(options.branch ?? null)).replace('__DEFAULT_MODELS__', scriptJson(DEFAULT_MODELS)), 'text/html; charset=utf-8');
