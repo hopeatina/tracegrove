@@ -75,7 +75,7 @@ ${TREE_MATERIAL_CSS}
 .gw-sw .gr{fill:var(--paper);stroke:var(--moss);stroke-width:1.2}
 .gb-lf{transition:transform .45s cubic-bezier(.2,.7,.2,1),opacity .3s}
 .gb-lf .blade{stroke-width:.9;stroke-linejoin:round;transition:fill .35s,stroke .35s}
-.gb-lf .rib{fill:none;stroke:var(--paper);stroke-width:.8;opacity:.7}.gb .gb-lf .halo{fill:var(--paper);opacity:.9}.gb-lf.pv-add .halo{opacity:0}.gb-lf.pre .halo,.gb-lf.pv-out .halo{opacity:.55}.gb-lf.fail .halo{fill:color-mix(in srgb,var(--verm) 24%,var(--paper));opacity:1}
+.gb-lf .rib{fill:none;stroke:var(--paper);stroke-width:.8;opacity:.7}.gb .gb-lf .halo{fill:var(--paper);opacity:.9}.gb-lf.pv-add .halo{opacity:.55}.gb-lf.pre .halo,.gb-lf.pv-out .halo{opacity:.55}.gb-lf.fail .halo{fill:color-mix(in srgb,var(--verm) 24%,var(--paper));opacity:1}
 .gb-lf .bb,.gb-lf .nec{display:none}.gb-lf.fail .bb,.gb-lf.fail .nec{display:inline}.gb-lf.fail .bn{display:none}.gb-lf .nec{fill:none;stroke:#6B3A1E;stroke-width:1.3;stroke-linecap:round}
 .gb-lf .pet{fill:none;stroke:color-mix(in srgb,var(--wood) 70%,var(--moss));stroke-width:1.1;stroke-linecap:round}.gb-lf.hang .pet{stroke:var(--wood);stroke-width:1.3}
 .gb .scar{cursor:pointer}.gb.dim .jg:not(.hl) .scar,.gb.lfdim .jg.hl .scar{opacity:.4}.gb-lf .nick{display:none;fill:none;stroke:var(--cutc);stroke-width:1.3;stroke-linecap:round}
@@ -96,7 +96,8 @@ ${TREE_MATERIAL_CSS}
    adds appears as a dashed ghost */
 .gb-lf.pv-out .blade,.gb-lf.pre .blade{fill:color-mix(in srgb,var(--ink3) 30%,var(--paper));stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none;stroke-width:.8}.gb-lf.pv-out .rib,.gb-lf.pre .rib{opacity:0}
 .gb-lf.pv-out .bb,.gb-lf.pre .bb,.gb-lf.pv-out .nec,.gb-lf.pre .nec{display:none}.gb-lf.pv-out .bn,.gb-lf.pre .bn{display:inline}.gb-lf.pv-out .nick,.gb-lf.pre .nick{display:inline}
-.gb-lf.pv-add .blade{fill:var(--moss);fill-opacity:.3;stroke:var(--moss);stroke-width:1;stroke-dasharray:2.2 1.5}.gb-lf.pv-add .rib{opacity:0}
+/* a preview's ghost leaf: pale new growth, filled, with a dashed rim, so it reads on a dark cushion as on the page, at 1x */
+.gb-lf.pv-add .blade{fill:color-mix(in srgb,var(--paper) 78%,var(--moss));fill-opacity:1;stroke:var(--moss);stroke-width:1.1;stroke-dasharray:2.2 1.5}.gb-lf.pv-add .rib{opacity:0}
 /* (a ghost is at half strength: a journey's leaf on its own, a part check with the ghost of its shoot) */
 .gb-lf.pv-add:not(.bud){opacity:.5}.gb .budg:not(.pv-add) .gb-lf.bud.pv-add{opacity:.5}
 /* a leaf being pruned falls with its twig, cut at the wood (gbPaint); the tick at its stalk has done its work */
@@ -114,7 +115,7 @@ ${TREE_MATERIAL_CSS}
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
 /* where a cut that grew has healed: a small roll of callus in the bark's own tones, a step lighter than the bark, with a thin lit
    crescent on its lip; never a pale disc, and always under the knots, so it never reads as a boss or as one */
-.gb .heal .cal{fill:color-mix(in srgb,var(--wood-lit) 72%,#EADCC4);stroke:var(--wood-shade);stroke-width:.9}
+.gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.9}
 /* a cut that healed is a filled, slightly raised roll of callus about the girth of what was cut: pale new wood with a darker
    rim, never a pale ring round a dark middle (that reads as a hole punched in the bark): seen at 1x */
 .gb .heal.scar .cal,.gb .heal.shscar .cal{stroke:color-mix(in srgb,var(--wood-shade) 80%,#000);stroke-width:1.1}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
@@ -164,6 +165,7 @@ ${TREE_MATERIAL_CSS}
 @media (prefers-color-scheme:dark){.gw-svg.gb{--sap:#F2B24C;--sap-core:#FFF6E0;--sap-red:#F05A45}}
 .gb .sapu{fill:var(--sap);stroke:var(--sap);stroke-width:3;stroke-linejoin:round;opacity:.5;filter:blur(1.5px);pointer-events:none}
 .gb .sapr{fill:var(--sap);opacity:.95;pointer-events:none}
+.gb.dry .sapu,.gb.dry .sapr,.gb.dry .sapred{display:none}.gb.dry .kn.on .halo{display:none}.gb.dry .sap:not(.rest):not(.resto):not(.bad){stroke:var(--ink3);stroke-width:1.5;stroke-dasharray:3 3;opacity:.85;animation:none}.gb.dry .sap.faint{opacity:.3}
 .gb .sap{fill:none;stroke:var(--sap-core);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;opacity:.9;pointer-events:none}
 .gb .sap.bad{display:none}.gb .sapred{pointer-events:none}.gb .rs{stop-color:var(--sap-red)}
 /* past a break: round grey dots (r 1.6, every 5), each ringed dark so they read on bark; the part of a journey a leaf's own
@@ -199,6 +201,7 @@ ${TREE_MATERIAL_CSS}
 .gb-tip .st b{display:inline;font-weight:600}.gb-tip .st .k{font:inherit;text-transform:none;letter-spacing:0;color:inherit}.gb-tip.dock{max-width:none;box-shadow:none;border-color:var(--line)}.gb-docked>*{visibility:hidden}
 /* a phone's card under the drawing closes with a button a thumb can hit, or a tap anywhere off it */
 .gb-tip .gb-x{position:absolute;top:0;right:0;width:44px;height:44px;border:0;border-radius:0 10px 0 10px;background:none;color:var(--ink3);font:300 24px/44px var(--sans);text-align:center;cursor:pointer;padding:0}
+.gb-tip.act{pointer-events:auto}.gb-tip.pin>.k,.gb-tip.pin>b:first-of-type{margin-right:34px}.gb-tip .gb-tact{margin-top:8px}
 .gb-tip .gb-x:hover{background:var(--sel);color:var(--ink)}.gb-tip .gb-x:focus-visible{outline:2px solid var(--ink);outline-offset:-4px}.gb-tip.below>.k,.gb-tip.below>b:first-of-type{margin-right:34px}
 .gb-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 6px;font:12px/18px var(--sans);color:var(--ink3)}
 .gb-key i,i.gb-g{display:inline-block;flex:none;width:11px;height:7px;border-radius:7px 1px;vertical-align:0;margin-right:5px;border:1.2px solid var(--moss);background:var(--moss)}
@@ -336,7 +339,10 @@ function gbCuAt(v){for(let i=1;i<GB_CU.length;i++){const [a,p]=GB_CU[i-1],[b,q]=
 const GB_FALL=950,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
 /* the snip comes first: two blades close across the collar at p, the cut along u, and only GB_SNIP ms later does the piece
    start to fall, so a cut reads as a cut and then a fall */
-const GB_SNIP=140;
+const GB_SNIP=180;
+/* what a card standing with no hairline costs its place: a line that is not clear is not drawn (gbTip), so a place whose line would
+   cross wood, foliage or a word costs this and no more */
+const GB_NOLEAD=3e4;
 function gbSnip(parent,p,u,lag){if(!parent||gwQuiet())return;const n=[-u[1],u[0]],q=(a,b)=>[p[0]+u[0]*a+n[0]*b,p[1]+u[1]*a+n[1]*b];
  const e=sv('path',{class:'snip',d:'M'+gbP(q(-4.5,-4))+' L'+gbP(q(1.5,0))+' M'+gbP(q(-4.5,4))+' L'+gbP(q(1.5,0))});e.style.animationDelay=gbF(lag)+'ms';parent.append(e);setTimeout(()=>e.remove(),lag+700)}
 function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'px) translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) rotate('+gbF(r)+'deg) translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';
@@ -1120,15 +1126,14 @@ function gbGrowRun(B){const P=B.grow;if(!P.length||!B.svg.animate)return;const [
    const u=(d-A[j-1])/((A[j]-A[j-1])||1),a=g.pts[j-1],b=g.pts[j],m=Math.hypot(b[0]-a[0],b[1]-a[1])||1,t=[(b[0]-a[0])/m,(b[1]-a[1])/m],k=u<.5?j-1:j,w=g.w[j-1]+(g.w[j]-g.w[j-1])*Math.max(0,Math.min(1,u)),H=w*.62+4+(bx&&bx[k]?Math.abs(bx[k]):0);
    return {p:[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],t,n:[-t[1],t[0]],w:w/2,hl:Math.min(H,lim[k][0]),hr:Math.min(H,lim[k][1]),bl:bx&&bx[k]>0?bx[k]:0,br:bx&&bx[k]<0?-bx[k]:0}};
   const NB=Math.max(8,Math.min(64,Math.ceil(T/7))),NT=12,NC=15,NP=2*(NB+NT)+NC;
-  /* the growing end is a shoot's round tip, a third of the wood's girth there across, never the girth of the wood below
-     pushed up as a stub or a chisel: behind it the wood swells like a bullet (fast off the tip, easing into the whole girth)
-     over about two and a half calipers, or less of a piece that has only just begun, so the front reads as a narrow round
+  /* the growing end is a shoot's round tip, about a quarter of the wood's girth there across, never the girth of the wood
+     below pushed up as a stub or a chisel: behind it the wood swells gradually into its whole girth over about two and a half calipers, so the front reads as a narrow round
      shoot and never as a split spike */
   const shape=f=>{const L=[],R=[],e=f*T;if(f<=0){const q=at(0);return 'M'+Array(NP).fill(gbP([q.p[0]-vx,q.p[1]-vy])).join(' L')+' Z'}
-   const q=at(e),Lt=Math.max(3,Math.min(.45*e+2,5.2*q.w)),rt=Math.min(q.w+.4,Math.max(.9,.34*q.w));
+   const q=at(e),Lt=Math.max(3,5.2*q.w),rt=Math.min(q.w+.4,Math.max(.9,.26*q.w));
    /* (the band's points: NB along the whole wood behind the taper, and NT across the taper itself, so it keeps its shape) */
    const ts=Math.max(-2,e-Lt),ds=[];for(let i=0;i<NB;i++)ds.push(-2+(ts+2)*i/(NB-1));for(let i=1;i<=NT;i++)ds.push(ts+(e-ts)*i/NT);
-   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*(1-(1-u)*(1-u));L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
+   for(const d of ds){const o=at(d),u=(e-d)/Lt,tq=u>=1?1e9:rt+(o.w+.4-rt)*Math.pow(u,1.5);L.push([o.p[0]+o.n[0]*Math.min(o.hl,tq),o.p[1]+o.n[1]*Math.min(o.hl,tq)]);R.push([o.p[0]-o.n[0]*Math.min(o.hr,tq),o.p[1]-o.n[1]*Math.min(o.hr,tq)])}
    /* past the front: a half circle round the spine there, the tip's half-width */
    const cap=[];for(let i=0;i<NC;i++){const th=Math.PI/2-Math.PI*i/(NC-1),h=rt*Math.sin(th);cap.push([q.p[0]+q.n[0]*h+q.t[0]*Math.cos(th)*rt,q.p[1]+q.n[1]*h+q.t[1]*Math.cos(th)*rt])}
    return 'M'+[...L,...cap,...R.reverse()].map(q=>gbP([q[0]-vx,q[1]-vy])).join(' L')+' Z'};
@@ -1616,11 +1621,12 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
       that point, its clumps and all, as they grow (gbCu), never a pale patch laid on the branch ahead of its wood. When the
       last has grown it is whole; the wood seen through its foot comes in after. Its end is kept from the first time it is
       drawn, so a leaf drafted later never makes a grown cushion shrink and grow again. */
+   /* (a kept end stays kept: a start the wood now reaches later than it is never runs past it) */
    const cq=B.cuS[pd.id]||{},cS=q0.cs.map((c,k)=>{const q=cq[k];
     /* a cushion swells from the fork its twigs leave the wood at, so it starts no sooner than the wood is there (with no twig
        of it drawn yet, from its own foot: the shape's c is its outline, the layout's g.cs[k] has the foot) */
     if(!q||q.s===Infinity){const f=[o[0]+g.cs[k].x,o[1]+g.cs[k].b],w=gbWoodAt(B,f,2),s0=Math.max(now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tEnd),w<Infinity?w:-Infinity);return {s:s0,e:s0+380,f}}
-    const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s;return {s:s1,e:gbT('cue:'+pd.id+':'+k,Math.max(s1+380,q.e)-now),f}});
+    const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s,e1=gbT('cue:'+pd.id+':'+k,Math.max(s1+380,q.e)-now);return {s:Math.min(s1,e1),e:e1,f}});
    /* its name comes once its first cushion is half grown */
    const lblAt=Math.min(...cS.map(c=>c.s+gbCuAt(.5)*(c.e-c.s)));
    /* the wood a leaf's sap runs through on its way down: its own twig, then its branch (or, for the crown, the leader or a
@@ -1658,16 +1664,19 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  /* the bark's light and grain are uncovered with the wood they lie on (gbGrowRun), never faded in after it */
  /* hover, focus, click and keys: one tab stop, arrows move between pads, knots and roots, and along a journey's leaves */
  const keyOf=e=>{const t=e.target.closest&&e.target.closest('[data-k]');return t?t.getAttribute('data-k'):null};
- svg.addEventListener('pointerover',e=>{const el=e.target.closest&&e.target.closest('[data-k]');if(el!==gw.hovEl){gw.hovEl=el;gbHover(el?el.getAttribute('data-k'):null,el)}});
+ /* (a card that carries an action stays a moment once the pointer leaves what it explains, so the pointer can reach it across
+    the open drawing, and stays while the pointer is on it) */
+ const actTip=()=>!!(B.tip&&!B.tip.hidden&&B.tip.classList.contains('act')&&gw.hov);
+ svg.addEventListener('pointerover',e=>{const el=e.target.closest&&e.target.closest('[data-k]');if(el!==gw.hovEl){clearTimeout(gw.tipT);if(!el&&actTip()){gw.hovEl=null;gw.tipT=setTimeout(()=>{if(gw.hovEl===null&&!gw.inTip&&gw.B===B)gbHover(null)},400);return}gw.hovEl=el;gbHover(el?el.getAttribute('data-k'):null,el)}});
  /* a tap on the card moves focus and the mouse off the drawing; redrawing the card then would pull its Close from under the
     finger and lose the tap, so with nothing lit nothing is done */
- svg.addEventListener('pointerleave',()=>{if(!gw.hov&&!gw.hovEl)return;gw.hovEl=null;gbHover(null)});
+ svg.addEventListener('pointerleave',e=>{if(!gw.hov&&!gw.hovEl)return;if(e.relatedTarget&&B.tip&&B.tip.contains(e.relatedTarget)&&actTip()){gw.hovEl=null;return}gw.hovEl=null;gbHover(null)});
  svg.addEventListener('focusin',e=>{const k=keyOf(e);if(k){gbRove(e.target.closest('[data-k]'));gbHover(k,e.target.closest('[data-k]'))}});
  svg.addEventListener('focusout',e=>{if(!svg.contains(e.relatedTarget)&&(gw.hov||gw.hovEl))gbHover(null)});
  /* the browser moves a tap's click onto a target near the finger; the finger's own point is where the touch went down; a clear hit area round a small mark gives way to a leaf nearer the finger */
  svg.addEventListener('pointerdown',e=>{gw.tapAt=e.pointerType!=='mouse'?[e.clientX,e.clientY,e.timeStamp]:null},{passive:true});
  svg.addEventListener('click',e=>{const at=e.pointerType&&e.pointerType!=='mouse'&&gw.tapAt&&e.timeStamp-gw.tapAt[2]<1500?gw.tapAt:null,t0=at?document.elementFromPoint(at[0],at[1]):null,tt=t0&&svg.contains(t0)?t0:e.target;
-  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tt.classList.contains('gb-hit')||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&gw.pinned&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
+  const tg=tt.closest?tt.closest('[data-k]'):null,nl=gbNearLeaf(e);let k=tg?tg.getAttribute('data-k'):null;if(nl&&(!tg||tt.classList.contains('gb-hit')||tg.classList.contains('gb-lf')||tg.classList.contains('pad')))k=nl;if(e.pointerType&&e.pointerType!=='mouse'){gw.hov=null;gw.hovEl=null}if(!k){if(gw.pinned){gw.pinned=null;growPaint()}return}gw.pinned=gw.pinned===k?null:k;if(gw.B&&!gw.B.L.narrow)gbTipOff(gw.B);growPaint()});
  svg.addEventListener('keydown',gbKeys);
  /* on a phone, a tap off the card under the drawing, on nothing that does a thing of its own, lets the card go (a tap whose
     target a repaint took away, such as a mark's hit area, was on the drawing) */
@@ -1676,7 +1685,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  /* the grey dots where a route never ran go under the knots they pass, which stand faint over them: each knot cuts them */
  {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
   for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
- B.tip=h('div',{class:'gb-tip',hidden:true,role:'status'});B.width=width;
+ B.tip=h('div',{class:'gb-tip',hidden:true,role:'status',on:{pointerenter:()=>{gw.inTip=true;clearTimeout(gw.tipT)},pointerleave:e=>{gw.inTip=false;if(e.relatedTarget&&B.svg.contains(e.relatedTarget))return;if(gw.hov&&gw.B===B){gw.hovEl=null;gbHover(null)}}}});B.width=width;
  /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots, twigs), never out over the foliage */
  {const rc=sv('clipPath',{id:'gb-rc'+N});for(const c of clip.children)rc.append(c.cloneNode());
   for(const el of svg.querySelectorAll('path.tw'))rc.append(sv('path',{d:el.getAttribute('d')}));
@@ -1802,6 +1811,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       {const f=el.__fall[0];f.finished.then(()=>{if(el.__fall&&el.__fall[0]===f&&el.__in===false){el.classList.replace('cut','gone');for(const a of el.__fall)a.cancel();el.__fall=null;gbPaint()}},()=>{})}}
      cls+=el.__fall&&el.__fall[0].playState!=='finished'?' cut pv-out':' gone'}else{el.__cutAt=0;if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}
     if(pv&&!add){const keep=gbRank[x.mode]<=gbRank[pv];cls+=keep?' pv-in':' pv-out';if(!keep)cutN++}
+    /* (while the mode is still asked and none is pointed at, what Minimum would cut is the same grey ghost a preview of it draws,
+       never a grown leaf: the tree and its key show Minimum) */
+    else if(!pv&&!s.modeBy&&im&&gbRank[x.mode]>0)cls+=' pv-out';
     el.setAttribute('class',cls);el.setAttribute('aria-label','Scenario: '+x.title+', '+gbStateWord(x).t);
     if(im)kept.add(x.id);if(im||add)grown.add(x.id);
     /* a leaf that has gone takes its twig and the tuft at its foot with it */
@@ -1853,7 +1865,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
   for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(lb&&lb.pid){const inm=P.leaves.filter(inMode);lb.el.setAttribute('class','badge pol'+(inm.some(x=>s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(inm.length?'':' pruned')+(gw.pinned==='j:'+j.id?' sel':''))}if(!lb||lb.badge)continue;const list=P.leaves;
    lb.eb.textContent=(P.pol?'':'JOURNEY '+n+' · ')+(P.pol==='guard'?'WHAT IT REFUSES':P.pol==='failure'?'HOW IT FAILS':(gbSURFW[j.surface]||'START'));
    /* the state fills one line as wide as the name above it, then a second */
-   const tk=gbTok(list,j,vis,inMode),room=Math.max(20,Math.floor((lb.w-18)/6.7));const l1=[],l2=[];let used=0;
+   /* (a journey's heading counts the whole journey, from the same table as its row in the lists; a shoulder or failure pad's own
+      heading counts its pad) */
+   const tk=gbTok(P.pol?list:(M.leaves[j.id]||list),j,vis,inMode),room=Math.max(20,Math.floor((lb.w-18)/6.7));const l1=[],l2=[];let used=0;
    for(const t of tk){const add=(l1.length?3:0)+t[0].length;if(!l2.length&&(used+add<=room||!l1.length)){l1.push(t);used+=add}else l2.push(t)}
    const line=ts=>ts.flatMap((t,i)=>(i?[sv('tspan',{class:'n'},' · ')]:[]).concat([sv('tspan',{class:t[1]},t[0])]));
    lb.t2.replaceChildren(...line(l1));lb.t3.replaceChildren(...line(l2));
@@ -1920,7 +1934,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
       from the wood, and drops 40 to 80 px along a short arc as it fades, in half a second, gathering speed. One only ever
       a preview's ghost shrinks back into its collar as it fades, and leaves no mark. Its count does not
       fall: it just fades. Once gone the motion is let go of, so the shoot can show again (a later preview's ghost, say) */
-   const sd=g.tip[0]>=g.base[0]?1:-1,th=sd*(20+10*gbHash('shf:'+g.kid)),hf=gbHf(B),dy=(40+40*gbHash('shy:'+g.kid))/hf,dx=sd*(6+10*gbHash('shx:'+g.kid))/hf;
+   const sd=g.tip[0]>=g.base[0]?1:-1,th=sd*(28+12*gbHash('shf:'+g.kid)),hf=gbHf(B),dy=(70+40*gbHash('shy:'+g.kid))/hf,dx=sd*(8+12*gbHash('shx:'+g.kid))/hf;
    const lg2=lag+(fell?GB_SNIP:0);if(fell){const v=[g.tip[0]-g.base[0],g.tip[1]-g.base[1]],m=Math.hypot(v[0],v[1])||1;gbSnip(g.g,g.base,[v[0]/m,v[1]/m],lag)}
    g.fade=g.fl.animate(fell?gbFallK(g.base,dx,dy,th):gbBackK(g.base),{duration:fell?GB_FALL:GB_BACK,delay:lg2,easing:GB_EASEIN,fill:'forwards'});
    if(g.ctag&&g.ctag.animate){const yet=gbNow()<(g.sp||0)+g.n*40+150;for(const a of g.ctag.getAnimations())a.cancel();g.cfade=g.ctag.animate(yet?[{opacity:0},{opacity:0}]:[{opacity:1},{opacity:0}],{duration:yet?GB_FALL+lg2:120,delay:yet?0:lg2,easing:'ease-in',fill:'forwards'})}
@@ -1963,7 +1977,8 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
  for(const el of new Set(Object.values(B.knot))){el.classList.toggle('wound',kw(el.__ids,wounds));el.classList.toggle('brk',!kw(el.__ids,wounds)&&kw(el.__ids,past))}
  for(const id in B.klbl){const ids=B.knot[id]?B.knot[id].__ids:[];B.klbl[id].classList.toggle('wound',kw(ids,wounds));B.klbl[id].classList.toggle('brk',!kw(ids,wounds)&&kw(ids,past))}for(const id in B.root)B.root[id].classList.toggle('wound',wounds.has(id));
  for(const id in B.vein){const V=B.vein[id];for(const el of V.els)el.classList.toggle('live',live.has(V.jid))}
- gbLight();if(!gw.hov)gbPinTip()}
+ /* (what is pinned keeps its card, the pointer still on it too: a click that pins shows the pinned card at once) */
+ gbLight();if(!gw.hov)gbPinTip();else if(B.tip&&B.tip.hidden&&!B.L.narrow){const el=[...B.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===gw.hov);if(el)gbTip(gw.hov,el)}}
 function gbWidth(){const S=gw.slots;const w=(S&&S.scroll&&S.scroll.clientWidth)||(gw.el&&gw.el.clientWidth)||window.innerWidth-48;return Math.max(320,Math.min(1240,Math.floor(w/40)*40))}
 
 /* a knot's name: its file's, or for a burl the file in it that is lit (else its first) and how many more grew into it. It is
@@ -2003,6 +2018,9 @@ function gbLit(){const s=gw.state,M=gw.M,B=gw.B;const k=gw.hov||gw.pinned||null;
  if(out.part)out.units.add(out.part);return out}
 function gbLight(){const B=gw.B;if(!B)return;const L=gbLit();const any=!!(gw.hov||gw.pinned||gw.selCrit);const on=any&&(L.leaves.size>0||L.js.size>0||!!L.part);
  B.svg.classList.toggle('dim',on);B.svg.classList.toggle('lfdim',on&&!!L.leaf);
+ /* only what ran lights sap: a lit leaf with no run (no flow yet, or a flow not run) shows the route it would run as a thin
+    dashed neutral line inside the wood, with no amber and no glow */
+ {const r=L.leaf&&gw.state.run[L.leaf.id];B.svg.classList.toggle('dry',on&&!!L.leaf&&!(r&&(r.st==='pass'||r.st==='fail'||r.st==='run')))}
  for(const id in B.leaf){const el=B.leaf[id];el.classList.toggle('hl',L.leaves.has(id));el.classList.toggle('sel',gw.pinned==='s:'+id)}
  for(const id in B.bud){B.bud[id].classList.toggle('hl',L.leaves.has(id)||(L.part&&gw.state.scenarios.some(x=>x.id===id&&x.unit===L.part)))}
  /* a leaf lights only its own pad and the route that feeds it, and its row in the lists beside the tree; the journey's
@@ -2447,7 +2465,7 @@ function gbPadLbl(k,el){const B=gw.B;if(!B||!B.svg)return;if(B.gPl)B.gPl.replace
   const near=[];for(const h of hang)for(const dy of [6,9,12,15,18])for(const dx of [2,5,8,11,14]){const gy=Math.max(0,dy-5);if(Math.hypot(dx,gy)<=14)near.push([Math.hypot(dx,gy),[h.right+dx,h.bottom+dy,1]],[Math.hypot(dx,gy),[h.left-dx,h.bottom+dy,-1]])}
   put(GB_W.fails,[[(l+r)/2,bt+9,0],[l-6,mid,-1],[r+6,mid,1],...near.sort((a,b)=>a[0]-b[0]).map(q=>q[1])])}}
 /* on a phone a tap pins, and the pinned thing keeps its card under the drawing until it is tapped again */
-function gbPinTip(){const B=gw.B;if(!B)return;const k=B.L.narrow&&!gw.hov?gw.pinned:null;const el=k&&[...B.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k);gbTip(el?k:null,el||null)}
+function gbPinTip(){const B=gw.B;if(!B)return;const k=!gw.hov?gw.pinned:null;const el=k&&[...B.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k);gbTip(el?k:null,el||null)}
 /* a knot's own checks, in the words the inspector and the Outline use for them */
 const gbOwnSt=ids=>{const list=ids.flatMap(id=>gw.M.buds[id]||[]),u=ids.length===1?gw.M.U[ids[0]]:null;return list.length?h('div',{class:'st own'},gwFacts(u&&u.root?gwRootFacts(u,list):gwOwnFacts(list))):null};
 /* a file and line kept whole up to a slash, where it may wrap; a piece too long for any card is cut in its middle, and the
@@ -2462,7 +2480,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  const undock=()=>{const ins=tip.parentNode&&tip.parentNode.parentNode&&tip.parentNode.parentNode.nextElementSibling;if(ins)ins.classList.remove('gb-docked');tip.style.width=''};undock();
  const lg=()=>{const w=tip.parentNode;return w?w.nextElementSibling:null},kr=()=>{const l=lg();return l?l.querySelector('.gw-keyrow'):null},hide=()=>{tip.hidden=true;if(B.lead)B.lead.setAttribute('d','');if(tip.parentNode)tip.parentNode.style.paddingBottom='';const l=lg();if(l)l.style.removeProperty('--gb-tiph')};
  /* the scenario open in the drawer beside the tree has no card as well: the drawer says it once */
- if(!k||!el||(k===gw.pinned&&!B.L.narrow)||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))||(gw.dr&&k==='s:'+gw.dr.sid)){hide();return}
+ if(!k||!el||(k.startsWith('j:')&&!(P&&(P.pol||P.pruned)))||(gw.dr&&k==='s:'+gw.dr.sid)){hide();return}
  const s=gw.state,M=gw.M;/* a path breaks only between its hops */
  const pathOf=(j,R)=>{const parts=j.units.map(id=>M.U[id]).filter(Boolean),o=[...parts.filter(u=>!u.root),...parts.filter(u=>u.root)];const el=gwHops(o.map(u=>u.label),R?o.map(u=>R.lit.has(u.id)?'hit':'un'):null);
   /* a hop whose knot carries a pip has its mark here too, as it has in the key */
@@ -2492,6 +2510,15 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
  /* on a phone the card of what was tapped stays under the drawing until its Close button, a tap off it, or a tap on the same
     thing again */
  const wrap0=tip.parentNode,narrow=B.L.narrow||!!wrap0&&wrap0.clientWidth<480;
+ /* a failed mark's card, hovered or pinned, carries one action, See what happened: the evidence the Next block's primary
+    opens, one gesture from the mark. A pinned card on a wide screen stays too, with its Close and its row's actions, until
+    Escape, a click on the empty drawing or on what is pinned again */
+ let act=null;if(k.startsWith('s:')){const x=gwScen(k.slice(2)),r1=x&&s.run[x.id];if(r1&&r1.st==='fail')act=x}
+ else if(k.startsWith('u:')&&M){const id=k.slice(2);for(const j of M.J){for(const x of M.leaves[j.id]||[])if(!act&&gbWound(M,j,x)===id)act=x}}
+ tip.classList.toggle('act',!narrow&&(!!act||k===gw.pinned));tip.classList.toggle('pin',!narrow&&k===gw.pinned);
+ if(!narrow&&k===gw.pinned)tip.prepend(h('button',{class:'gb-x',type:'button','aria-label':'Close',on:{click:e=>{e.stopPropagation();gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B);growPaint()}}},'×'));
+ if(!narrow&&act)gwPut(tip,h('div',{class:'gb-tact'},gwHappened(act,true)));
+ if(!narrow&&k===gw.pinned&&k.startsWith('s:')&&!act){const x=gwScen(k.slice(2));if(x)gwPut(tip,gwWriteEntry(x),gwCardActs(x))}
  if(narrow&&k===gw.pinned)tip.prepend(h('button',{class:'gb-x',type:'button','aria-label':'Close',on:{click:e=>{e.stopPropagation();gw.pinned=null;gw.pinList=null;gw.hov=null;gw.hovEl=null;gbTipOff(B);growPaint()}}},'×'));
  /* and a phone's card of a scenario that ran opens what happened in its run; one no flow proves offers to write that flow */
  if(narrow&&k===gw.pinned&&k.startsWith('s:')){const x=gwScen(k.slice(2));gwPut(tip,gwMore(x),gwHappened(x),gwDrEntry(x),gwWriteEntry(x),gwCardActs(x))}
@@ -2504,7 +2531,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   tip.style.left='0px';tip.style.top=gbF(yb-c0.top+8)+'px';wrap.style.paddingBottom='';const l=lg();if(r&&l)l.style.setProperty('--gb-tiph',gbF(tip.offsetHeight+16)+'px');else wrap.style.paddingBottom=gbF(tip.offsetHeight+12)+'px';return}
  wrap.style.paddingBottom='';{const l=lg();if(l)l.style.removeProperty('--gb-tiph')}const c=wrap.getBoundingClientRect();
  /* as wide as its longest piece that cannot break, within 280 to 380 px */
- tip.style.width='min-content';const mc=Math.min(380,Math.max(280,Math.ceil(tip.offsetWidth)));tip.style.width=mc+'px';const tw=tip.offsetWidth,th=tip.offsetHeight;
+ tip.style.width='min-content';const mcw=Math.ceil(tip.offsetWidth),mc=Math.min(380,Math.max(280,mcw));tip.style.width=mc+'px';const tw=tip.offsetWidth,th=tip.offsetHeight;
  const sr=B.svg.getBoundingClientRect(),vb=B.svg.viewBox.baseVal,f=sr.width/vb.width;const toPx=p=>[sr.left-c.left+(p[0]-vb.x)*f,sr.top-c.top+(p[1]-vb.y)*f],toSv=q=>[vb.x+(q[0]-(sr.left-c.left))/f,vb.y+(q[1]-(sr.top-c.top))/f];
  const box=q=>[q.left-c.left,q.top-c.top,q.right-c.left,q.bottom-c.top];
  /* A root is long and runs off under the pot: its card points at where it crosses the rim, the spot its name is set by (a
@@ -2558,6 +2585,9 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
     leaves what it explains never crosses wood (the root a root's card explains is its own, and is left out) */
  /* (wood under a cushion is hidden by its foliage: a line over the foliage there does not cross the wood) */
  const cuE=[...B.svg.querySelectorAll('.pfill')].filter(e=>e.getBoundingClientRect().width),underCu=p=>cuE.some(e=>{const m=e.getScreenCTM();if(!m)return false;const q=m.inverse(),x=p[0]+c.left,y=p[1]+c.top;return e.isPointInFill(new DOMPoint(q.a*x+q.c*y+q.e,q.b*x+q.d*y+q.f))});
+ /* (a point in the foliage of a cushion, other than one the line starts in: a hairline never runs across foliage to reach what it
+    explains, but one that explains a leaf leaves it through its own cushion) */
+ const cuIn=(p,p0)=>cuE.some(e=>{const m=e.getScreenCTM();if(!m)return false;const q=m.inverse(),f=(x,y)=>e.isPointInFill(new DOMPoint(q.a*x+q.c*y+q.e,q.b*x+q.d*y+q.f));return f(p[0]+c.left,p[1]+c.top)&&!f(p0[0]+c.left,p0[1]+c.top)});
  const wdg=[];for(const e of B.svg.querySelectorAll('path.w')){if(!e.__pts||e.closest('.budg,.stub')||(rid&&B.root[rid].contains(e)))continue;const q=e.getBoundingClientRect(),m=e.getScreenCTM();if(!q.width||!m)continue;const P=e.__pts.map(p=>[m.a*p[0]+m.c*p[1]+m.e-c.left,m.b*p[0]+m.d*p[1]+m.f-c.top]),W=e.__w||[],sc=Math.hypot(m.a,m.b);
   for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],r=Math.max(W[i-1]||1,W[i]||1)*sc/2+1;wdg.push([a,b,r,[Math.min(a[0],b[0])-r,Math.min(a[1],b[1])-r,Math.max(a[0],b[0])+r,Math.max(a[1],b[1])+r]])}}
  /* The hairline back to what it explains, when the card is more than 16 px off: one straight segment. It never crosses a
@@ -2580,7 +2610,7 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
     const tw2=twg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1])),wd2=wdg.filter(s=>s[3][0]<Math.max(a[0],b[0])&&s[3][2]>Math.min(a[0],b[0])&&s[3][1]<Math.max(a[1],b[1])&&s[3][3]>Math.min(a[1],b[1]));
     /* (only what lies near this piece of it can be too near a point on it, and a piece near nothing is not walked at all) */
     const nr=(q,r)=>q[0]<Math.max(a[0],b[0])+r&&q[2]>Math.min(a[0],b[0])-r&&q[1]<Math.max(a[1],b[1])+r&&q[3]>Math.min(a[1],b[1])-r,txt2=txt.filter(q=>nr(q,G+1)),rp2=rp.filter(r=>nr([r[0],r[1],r[0],r[1]],6)),fm2=firm.filter(q=>!inB(p0,q)&&nr(q,1)),cu2=cus.filter(q=>!inB(p0,q)&&nr(q,1)),so2=soft.filter(q=>!inB(p0,q)&&nr(q,1));
-    let inW=false,inT=false,inTw=false;if(txt2.length||rp2.length||tw2.length||wd2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
+    let inW=false,inT=false,inTw=false,inC=false;if(txt2.length||rp2.length||tw2.length||wd2.length||fm2.length||cu2.length||so2.length)for(let s2=2;s2<sl&&pen<lim&&(ok||pen<zc);s2+=2){const t=s2/sl,p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];if(inB(p,me))continue;const off=Math.hypot(p[0]-p0[0],p[1]-p0[1])>=G;
      /* (running by a word costs more than crossing the wood, once a pass: a hairline that grazes a name reads as pointing at
         it) */
      if(off&&txt2.length&&nearAny(txt2,p)){if(!inT)pen+=2.5e4;inT=true;ok=false}else inT=false
@@ -2588,8 +2618,10 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
      if(tw2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=6&&twAny(tw2,p)){if(!inTw)pen+=2.2e4;inTw=true;ok=false}else inTw=false
      /* (wood crossed costs once a crossing, however thick the trunk there: a line across the trunk is worse than one beside
         a name, but not worse than a card over one) */
-     if(wd2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=8&&twAny(wd2,p)&&!underCu(p)){if(!inW)pen+=2e4;inW=true;ok=false;wd=true}else inW=false
-     if(fm2.length&&inAny(fm2,p)){pen+=300;ok=false}else if(cu2.length&&inAny(cu2,p)){pen+=60;ok=false}else if(so2.length&&inAny(so2,p))pen+=60}}
+     if(wd2.length&&Math.hypot(p[0]-p0[0],p[1]-p0[1])>=8&&twAny(wd2,p)&&!underCu(p)){if(!inW)pen+=1e5;inW=true;ok=false;wd=true}else inW=false
+     if(fm2.length&&inAny(fm2,p)){pen+=300;ok=false}else if(cu2.length&&inAny(cu2,p)){if(cuIn(p,p0)){if(!inC)pen+=1e5;inC=true;ok=false;wd=true}else{inC=false;pen+=20}}else{inC=false;if(so2.length&&inAny(so2,p))pen+=60}}}
+   /* (and it is short: a hairline over 120 px costs as it grows, so the card stands by what it explains) */
+   {let ln=0;for(let i=1;i<pts.length;i++)ln+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);if(ln>120)pen+=(ln-120)*150}
    if(!ok&&pen>=zc){cut=true;continue}if(pen<lim)bestL={pts,pen,ok,wood:wd}}if(cut&&bestL&&bestL.ok&&bestL.pen>=zc)return lead(CB,all);return bestL||{pts:null,pen:Infinity,ok:false}};
  /* (a root's card stays within 84 px of where its root crosses the rim, or of its tag in the pot, or else of where a root in
     the pot starts) */
@@ -2632,12 +2664,15 @@ function gbTip(k,el){const B=gw.B;if(!B||!B.tip)return;const tip=B.tip;const pid
   const ko=ovB(CB,key);if(ko>0){sc+=4000+ko*.02;z=false}
   let far=false;if(rimB){const [ra,rc]=near(rimB,CB);if(Math.hypot(rc[0]-ra[0],rc[1]-ra[1])>84){sc+=5e4;z=false;far=true}}
   sc+=D;if(!z&&best&&sc>=best.sc)continue;
-  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.pen;if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok,wood:!!L2.wood,far}}
+  const cp=best?best.sc-1-sc+1e-6:Infinity,L2=lead(CB,false,z?Infinity:cp,z?cp:Infinity);sc+=L2.ok?L2.pen:Math.min(L2.pen,GB_NOLEAD);if(z&&L2.ok)return {x,y,sc,pts:L2.pts,CB,zero:true};if(!best||sc<best.sc-1)best={x,y,sc,pts:L2.pts,CB,ok:L2.ok,wood:!!L2.wood,far}}
  if(best&&!best.ok){const L3=lead(best.CB,true);if(L3.ok){best.pts=L3.pts;best.wood=false}}
+ /* (and where even that line would cross wood, a twig or foliage, the card draws none: the thing it explains is lit on the
+    tree, and a line slashed across the tree would say less than none) */
+ if(best&&!best.ok&&best.pts){const L4=lead(best.CB,true);if(!L4.ok){best.pts=null;best.wood=false}}
  return best};
  /* a card with no open ground near what it explains tries another shape, wider and shorter or narrower and taller, never
     under 280 px nor under its longest piece: beside a pot or a crown there is often room for one but not the other */
- let best=fit(tw,th);best.w=mc;if(!best.zero)for(const w of [280,330,380]){if(w===mc||w<mc)continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.sc+=Math.abs(tw-w)*8;b2.w=w;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2}
+ let best=fit(tw,th);best.w=mc;if(!best.zero)for(const w of [200,230,260,280,330,380,440]){if(w===mc||w<Math.min(mc,Math.max(200,mcw)))continue;tip.style.width=w+'px';const b2=fit(tip.offsetWidth,tip.offsetHeight);b2.sc+=Math.abs(tw-w)*8;b2.w=w;if(b2.zero&&!best.zero||!b2.zero===!best.zero&&b2.sc<best.sc)best=b2}
  tip.style.width=best.w+'px';
  tip.style.left=gbF(best.x)+'px';tip.style.top=gbF(best.y)+'px';
  /* (a root's card with no clear ground within reach of its root stands where the drawing is open, its hairline running out

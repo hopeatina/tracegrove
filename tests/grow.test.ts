@@ -1187,9 +1187,18 @@ describe('Grow page', () => {
                   if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 8) wood = woods.some((e) => inFill(e, x, y)) && !cushions.some((e) => inFill(e, x, y));
                 }
               }
-              // (only a card that says its crown left it no place with a clear straight line may cross, on the crowded
-              // tracegrove crown alone: plotline's and notes' trees always have one)
+              // (no card may cross, the crowded tracegrove crown's included: each finds a place with a clear straight line)
               if (wood && !(tip.hasAttribute('data-crowd') && crowdOk)) out.push(k + ': hairline crosses the wood');
+              // and past its first 12 px it runs across no foliage but that of the cushion it starts in (a leaf's own)
+              let leafy = false;
+              for (let i = 1; i < lead.length && !leafy; i++) {
+                const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                for (let s = 0; s <= n && !leafy; s += 1) {
+                  const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                  if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) leafy = cushions.some((e) => inFill(e, x, y) && !inFill(e, lead[0]![0]!, lead[0]![1]!));
+                }
+              }
+              if (leafy) out.push(k + ': hairline crosses foliage');
               if (tip.hasAttribute('data-crowd')) crowded.push(k);
               // and a card over the tree stays inside the tree's card, over the drawing: never down over its caption or key
               if (!L.narrow && !k.endsWith(' pinned')) {
@@ -1235,12 +1244,12 @@ describe('Grow page', () => {
             // on a phone the pinned thing's card stays under the drawing, and covers nothing in it either
             if (w.gw.pinned && !(B.tip as HTMLElement).hidden) look(w.gw.pinned + ' pinned', B.tip.getBoundingClientRect(), null, []);
             return { cards, out, crowded };
-          }, { wide: width >= 1440, crowdOk: name === 'tracegrove' });
+          }, { wide: width >= 1440, crowdOk: false });
           const seen = await cards();
           expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
           expect(seen.out, name + ' ' + width).toEqual([]);
-          // (and few of them: plotline's tree has none, tracegrove's crowded crown at most 9 of its cards, as many as it has at 1440 now)
-          expect(seen.crowded.length, name + ' ' + width + ' crowded cards ' + seen.crowded.join(' ')).toBeLessThanOrEqual(name === 'tracegrove' ? 9 : 0);
+          // (and none of them says its crown left it no clear place: not plotline's, not tracegrove's)
+          expect(seen.crowded.length, name + ' ' + width + ' crowded cards ' + seen.crowded.join(' ')).toBe(0);
           // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
           if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
           // a leaf pinned as a click pins it, then every card again
@@ -1748,7 +1757,8 @@ describe('Grow page', () => {
               for (const p of Array.from(tip.querySelectorAll('.path'))) if (!/mono/i.test(getComputedStyle(p).fontFamily)) out.push(k + ': its path is not in mono');
               // beside the tree, as wide as its longest name needs, within 280 to 380 px; under it, as wide as the tree, and on a phone with a Close of 44 px
               const below = tip.classList.contains('below');
-              if (!below && (r.width < 279.5 || r.width > 380.5)) out.push(k + ': card ' + Math.round(r.width) + ' px wide');
+              // (round 15: a card may narrow to 200 px to stand in a free band beside the pot with a short, clear hairline)
+              if (!below && (r.width < 199.5 || r.width > 440.5)) out.push(k + ': card ' + Math.round(r.width) + ' px wide');
               if (phone) { const x = tip.querySelector('.gb-x'), xr = x ? x.getBoundingClientRect() : null; if (!xr || xr.width < 43.5 || xr.height < 43.5) out.push(k + ': no Close of 44 px'); }
             };
             for (const [k, el] of things) {
@@ -2331,7 +2341,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
-  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a pale leaf under a dashed rim, never a hole, the lists and the legend marking a leaf to prove and one with no flow yet as the tree does', async () => {
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a hollow leaf under a dashed rim over an opaque fill, the lists and the legend marking a leaf to prove and one with no flow yet as the tree does', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
@@ -2379,19 +2389,20 @@ describe('Grow page', () => {
           // and never read as passed: twenty L* or more from a passed leaf's fill
           expect(Math.abs(pass!.L - l.fill!.L), width + 'px L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
         }
-        // a leaf with no flow yet stays a pale leaf, never the page showing through: an opaque fill well above the page, under a
-        // dashed rim of a light green that stands off the page
+        // a leaf with no flow yet reads hollow on a dark page, never filled like a passed leaf and never the page showing
+        // through: an opaque fill within 15 L* of the page, under a dashed rim of a light green that stands off the page
         expect(look.none.length, width + 'px').toBeGreaterThan(0);
         for (const l of look.none) {
           expect(l.fill, width + 'px no-flow leaf with no fill').not.toBe('none');
           expect(l.paint, width + 'px no-flow leaf with a clear fill').not.toBeNull();
-          expect((l.paint?.lum ?? -1) - look.bg.lum, width + 'px no-flow leaf against the page').toBeGreaterThan(0.3);
+          expect(Math.abs((l.paint?.L ?? 999) - look.bg.L), width + 'px no-flow leaf hollow against the page').toBeLessThanOrEqual(15);
+          if (pass) expect(Math.abs(pass.L - (l.paint?.L ?? 999)), width + 'px no-flow leaf L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
           expect(l.dash, width + 'px no-flow leaf rim').not.toBe('none');
           expect(l.stroke, width + 'px no-flow leaf with no rim').not.toBeNull();
           expect(l.stroke!.L - look.bg.L, width + 'px no-flow rim against the page').toBeGreaterThan(30);
         }
         // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as the tree
-        // does too: a pale leaf under a dashed rim, never a hole
+        // does too: a hollow leaf under a dashed rim, its fill opaque
         await explain(page);
         const marks = await page.evaluate(() => {
           const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
@@ -2419,7 +2430,9 @@ describe('Grow page', () => {
           expect(l.dash, at + ' rim').not.toBe('none');
           expect(l.raw, at + ' with no fill').not.toBe('none');
           expect(l.fill, at + ' with a clear fill').not.toBeNull();
-          expect((l.fill?.lum ?? -1) - Math.max(marks.bg.lum, l.back.lum), at + ' against the page').toBeGreaterThan(0.3);
+          expect(Math.abs((l.fill?.L ?? 999) - l.back.L), at + ' hollow against what it sits on').toBeLessThanOrEqual(15);
+          expect(l.stroke, at + ' with no rim').not.toBeNull();
+          expect(l.stroke!.L - l.back.L, at + ' rim against what it sits on').toBeGreaterThan(30);
           // (the same paint as the tree's own leaf with no flow yet)
           for (const k of ['L', 'a', 'b'] as const) expect(Math.abs(l.fill![k] - look.none[0]!.paint![k]), at + ' ' + k + '* against the tree’s').toBeLessThanOrEqual(2);
         }
@@ -3089,8 +3102,10 @@ describe('Grow page', () => {
       // early on, the growing end: how wide the wood shows where a tip a third of the foot wide would be whole, against that
       const most = Math.max(0.33 * T.tw[0], T.tw.at(-1)), h0 = F - most / 2 - 0.4;
       if (f < 0.2) { out.heads.push({ f, w: side(h0, 1) + side(h0, -1), most }); continue; }
-      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1);
-      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
+      // (the front is a round shoot tip that swells to the whole girth over two and a half calipers: round 15, after the critics read
+      // a one-caliper taper as a split spike)
+      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - 2.6 * c, 1) + side(F - 2.6 * c, -1);
+      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - 2.6 * c).w });
     }
     clip.remove();
     return out;
@@ -3132,8 +3147,8 @@ describe('Grow page', () => {
         // centred on the spine, so the front follows the curve
         expect(o.fronts.length, at).toBe(3);
         for (const fr of o.fronts) {
-          expect(fr.ratio, at + ' at ' + fr.f + ' a quarter caliper behind the front, of one caliper behind').toBeLessThanOrEqual(0.4);
-          expect(fr.girth, at + ' at ' + fr.f + ' one caliper back').toBeGreaterThanOrEqual(0.85);
+          expect(fr.ratio, at + ' at ' + fr.f + ' a quarter caliper behind the front, of two and a half calipers behind').toBeLessThanOrEqual(0.5);
+          expect(fr.girth, at + ' at ' + fr.f + ' two and a half calipers back').toBeGreaterThanOrEqual(0.85);
           expect(fr.off, at + ' at ' + fr.f + ' off the spine').toBeLessThanOrEqual(0.2);
         }
         await page.close();
@@ -3295,18 +3310,19 @@ describe('Grow page', () => {
     const keys = (a: Animation) => (a.effect as KeyframeEffect).getKeyframes();
     const TR = /translate\(([-\d.]+)px, ?([-\d.]+)px\) translate\(([-\d.]+)px, ?([-\d.]+)px\) rotate\(([-\d.]+)deg\)/;
     const SC = /translate\(([-\d.]+)px, ?([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ?([-\d.]+)px\)/;
-    // a fall: half a second, gathering speed, turning 20 to 30 degrees about the cut and fading out as it drops along an arc
+    // a fall: 950 ms, gathering speed, turning 28 to 40 degrees about the cut and fading out as it drops 70 to 110 px along an arc
+    // (round 15: long and opaque enough to be seen in the frames taken 250 and 600 ms after the choice)
     const fall = (a: Animation | undefined, what: string, cut?: [number[], number]) => {
       if (!a) { bad(what + ' does not fall'); return -1; }
       const t = a.effect!.getTiming(), ks = keys(a), z = ks[ks.length - 1]!, m = String(z.transform).match(TR);
-      if (t.duration !== 500) bad(what + ' falls over', t.duration);
+      if (t.duration !== 950) bad(what + ' falls over', t.duration);
       if (!/^ease-in$|^cubic-bezier\(0\.42, 0, 1, 1\)$/.test(String(t.easing))) bad(what + ' does not gather speed', t.easing);
       if (!m || Number(z.opacity) !== 0 || Number(ks[0]!.opacity) !== 1) { bad(what + ' does not fade as it falls'); return Number(t.delay); }
       const [dx, dy, px, py, th] = m.slice(1).map(Number) as [number, number, number, number, number];
-      if (Math.abs(th) < 20 || Math.abs(th) > 30) bad(what + ' turns by', th);
+      if (Math.abs(th) < 28 || Math.abs(th) > 40) bad(what + ' turns by', th);
       if (cut) {
         if (Math.hypot(px - cut[0][0]!, py - cut[0][1]!) > cut[1]) bad(what + ' does not turn about its cut', [px, py, cut[0]]);
-        if (dy * hf < 39.9 || dy * hf > 80.1) bad(what + ' drops by', dy * hf);
+        if (dy * hf < 69.9 || dy * hf > 110.1) bad(what + ' drops by', dy * hf);
         if (Math.sign(dx) !== Math.sign(th)) bad(what + ' tips one way and drifts the other');
         const mid = ks.find((k) => k.computedOffset > 0 && k.computedOffset < 1), mm = mid && String(mid.transform).match(TR);
         if (!mm || !(Number(mm[1]) / dx > Number(mm[2]) / dy)) bad(what + ' drops straight down, not along an arc');
