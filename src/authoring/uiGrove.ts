@@ -12,7 +12,7 @@ import { BONSAI_CSS, BONSAI_JS } from './uiBonsai.ts';
 const CONST = JSON.stringify({ phases: PHASES, short: PHASE_SHORT, steps: DEPTH_STEPS, modes: MODES, layers: LAYER_LABEL, ext: EXTENSION_STATE }).replaceAll('<', '\\u003c');
 
 export const GROVE_CSS = String.raw`
-.gw{margin-bottom:28px;padding-inline:16px}
+.gw{margin-bottom:28px;margin-inline:-16px;padding-inline:16px}
 .gw-start{display:grid;gap:14px}
 .gw-start .opts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
 .gw-start label{display:inline-flex;gap:8px;align-items:center;font-size:14px;color:var(--ink2)}
@@ -432,6 +432,8 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-rest{margin:6px 0 10px;font:13px/19px var(--mono)}.gw-rest.err{color:var(--verm)}
 .gw-ins .gw-cacts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .gw-ins .gw-lnk{display:inline-block;margin-top:6px}
+/* on a phone Grove | Outline stands in the tree card's corner too, so the tree starts at the card's top, right under the verdict */
+@media (max-width:760px){.gw-tree .gw-bar{position:absolute;top:8px;right:8px;z-index:3;margin:0}}
 @media (min-width:761px){
  .gw-tree .gw-bar{position:absolute;top:10px;right:12px;z-index:3;margin:0}.gw-tree>.gw-stage{padding-top:40px}
  .gw-modearea{margin:0}.gb-mode{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:0 4px}
@@ -481,6 +483,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-next .gw-nshort{display:none}
 @media (min-width:1180px){.gw-side .gw-next .gw-nshort{display:inline}.gw-side .gw-next .gw-nfull{display:none}}
 .gb .rlbl.gw-flbl{pointer-events:none}.gb .rlbl.gw-flbl.pre{opacity:0}.gb .rlbl.gw-flbl.f{fill:var(--verm-ink)}
+.gw-call .gw-vstep{flex:1 1 100%;font:600 13px/19px var(--mono);color:var(--verm-ink);overflow-wrap:break-word}@media (max-width:640px){.gw-call .gw-vstep{order:2}}
 .gw-call .gw-vs{flex:1 1 100%;font:12.5px/18px var(--mono);color:var(--ink3);min-width:0}
 .gw-call .gw-vs .gw-facts{display:flex}
 @media (max-width:640px){.gw-call .gw-vs{order:3}}
@@ -685,7 +688,7 @@ function gwSw(k){
 /* A criterion's state as a bucket: every criterion lands in exactly one, so the counts always add up to the criteria. */
 const gwCB=st=>{const c=st.cls;return c==='pass'?'proved':c==='warn'?'agent':c==='fail'?'failed':c==='miss'?'needs':c==='open'?'open':c==='run'?'run':c==='cov'?(/ of /.test(st.text)?'part':'toprove'):c==='code'?'code':'wait'};
 const gwCBO=['proved','agent','part','run','toprove','code','wait','open','failed','needs'];
-const gwCBL=(b,n)=>b==='needs'?(n===1?'needs you':'need you'):{proved:n===1?'holds':'hold',agent:'agent-checked',part:'partly holds',run:'running',toprove:'untested',code:'untested',wait:'not traced yet',open:'untested',failed:'broken'}[b];
+const gwCBL=(b,n)=>b==='needs'?(n===1?'needs you':'need you'):{proved:n===1?'holds':'hold',agent:'agent-checked',part:'partly holds',run:'running',toprove:'not tested yet',code:'not tested yet',wait:'not traced yet',open:'not tested yet',failed:'broken'}[b];
 const gwCBT={proved:'Every scenario serving it passed',agent:'Passed, resting on agent-written work nobody has reviewed yet',part:'Some of the scenarios serving it passed; the rest did not run',run:'A scenario serving it is running',toprove:'Scenarios serve it; none has run',code:'Found in the code; no scenario serves it yet',wait:'Not traced yet',open:'Scenarios serve it, but none of them ran',failed:'A scenario serving it failed',needs:'Not found in this change: say whether it is built, or take it out of the spec'};
 const gwSD=b=>h('span',{class:'gw-sd '+b,'aria-hidden':'true'});
 function gwBuckets(){const n={};for(const c of gw.view.criteria){const b=gwCB(c.status);n[b]=(n[b]||0)+1}return gwCBO.filter(b=>n[b]).map(b=>[b,n[b]])}
@@ -1223,15 +1226,16 @@ function gwCause(list){const ws=[...new Set(list.map(x=>String((gw.state.run[x.i
 function gwSplit(list){const by={};for(const x of list){const k=gwStKey(x);if(GW_OPEN.includes(k))(by[k]=by[k]||[]).push(x)}
  return ['could','ready','nf'].filter(k=>by[k]).map(k=>{const c=k==='nf'?null:gwCause(by[k]);return by[k].length+' '+gwStW(k)+(c?': '+c:'')})}
 function gwVerdict(V,f,tone){const split=V.verdict==='not proven yet'?gwSplit(gwInView()):[];
- /* the step it broke at goes in the sentence, so a phone's first screen says it: "… failed at step 4: expected 2 charges, got 3" */
+ /* the step it broke at, with what it expected and got, on a line of its own under the sentence, so a phone's first screen says
+    it: "“Removing a seat never charges the card” failed" / "Step 4 · expected 2 charges, got 3" */
  const fx=f&&gwScen(f.scenario),n=fx&&gwStepNo(fx),T=V.text.charAt(0).toUpperCase()+V.text.slice(1);
- const said=n&&/” failed: /.test(T)?T.replace('” failed: ','” failed at step '+n+': '):T;
+ const cut=n?T.indexOf('” failed: '):-1,said=cut>=0?T.slice(0,cut+8):T,how=cut>=0?'Step '+n+' · '+T.slice(cut+10):null;
  /* the promise it breaks, in the spec's words and whole, only when they say something the sentence does not: never the
     failed scenario's own name again */
  const norm=t=>gwPlain(String(t)).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(),named=norm(fx?gwVia(fx.title).title:'');
  const cs=f&&f.promise?f.promise.split(/,\s*/).map(id=>(gw.view.criteria||[]).find(c=>c.id===id)).filter(Boolean).filter(c=>norm(c.text)!==named):[];
  return h('div',{class:'gw-call '+tone,'data-testid':'grow-verdict',role:'status'},h('span',{class:'gw-vp'},V.mark+' '+V.word),
-  h('span',{class:'gw-vt'},said),
+  h('span',{class:'gw-vt'},said),how?h('span',{class:'gw-vstep','data-testid':'grow-verdict-step'},how):null,
   /* not proven yet says why, by reason, and why the flows that are ready did not run, unless the key under the tree already
      counts the same reasons and the Next block says why (a single reason with its cause) */
   gw.tree!=='grove'&&(split.length>1||split.some(t=>t.includes(':')))?h('span',{class:'gw-vs','data-testid':'grow-verdict-split'},gwFacts(split.map(t=>[t]))):null,
@@ -1394,7 +1398,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const vis=s.modeBy?s.mode:s.asked&&gw.picking?gw.picking:null,inMode=x=>!vis||gbRank[x.mode]<=gbRank[vis];
  const names=narrow&&M&&(gw.order||[]).length?h('ol',{class:'gw-names','aria-label':'The journeys on the tree'},(gw.order||[]).map((id,i)=>{const j=M.J.find(q=>q.id===id);const t=j?j.title:'';
   /* under its name, the journey's state as its pad's label says it on a wide screen: a failure first, in red */
-  const toks=j?gbTok(gwPadLeaves(j.id,null)||M.leaves[j.id]||[],j,vis,inMode):null;
+  const toks=j?gbTok(M.leaves[j.id]||[],j,vis,inMode):null;
   return h('li',{},h('span',{class:'no','aria-hidden':'true'},String(i+1)),h('span',{class:'jn'},h('button',{'aria-pressed':String(gw.pinned==='j:'+id),'aria-label':'Journey '+(i+1)+': '+gwPlain(t),on:{click:()=>{gw.pinned=gw.pinned==='j:'+id?null:'j:'+id;growPaint()}}},...gwRich(t)),
    toks&&toks.length?h('span',{class:'gw-jst'},gbToks(toks)):null))}),gwPolKeys(one)):null;
  /* where a leaf sits is the tree's main code: on a journey's pad the happy path stands on the crest, what it refuses on a

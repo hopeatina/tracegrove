@@ -1848,7 +1848,9 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
    P.pruned=pruned;P.cut=cut;if(!P.pol&&cut)mainCut=true}
   /* each label speaks for its own pad: the journey's name or its riskiest guard or failure, then their state, one colour per word;
      a journey is headed once, so the branch of what it refuses or how it fails, which hangs on that journey, says only which it is */
-  for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(lb&&lb.pid){const inm=P.leaves.filter(inMode);lb.el.setAttribute('class','badge pol'+(inm.some(x=>s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(inm.length?'':' pruned')+(gw.pinned==='j:'+j.id?' sel':''))}if(!lb||lb.badge)continue;const list=P.leaves;
+  for(const pid of B.padsOf[j.id]||[]){const P=B.pad[pid],lb=B.lbl[pid];if(lb&&lb.pid){const inm=P.leaves.filter(inMode);lb.el.setAttribute('class','badge pol'+(inm.some(x=>s.run[x.id]&&s.run[x.id].st==='fail')?' fail':'')+(inm.length?'':' pruned')+(gw.pinned==='j:'+j.id?' sel':''))}if(!lb||lb.badge)continue;
+   /* a journey's heading counts the whole journey, as its Journeys row does; a guard or failure pad's label counts its own pad */
+   const list=P.pol?P.leaves:(gw.M&&gw.M.leaves[j.id]||P.leaves);
    lb.eb.textContent=(P.pol?'':'JOURNEY '+n+' · ')+(P.pol==='guard'?'WHAT IT REFUSES':P.pol==='failure'?'HOW IT FAILS':(gbSURFW[j.surface]||'START'));
    /* the state fills one line as wide as the name above it, then a second */
    const tk=gbTok(list,j,vis,inMode),room=Math.max(20,Math.floor((lb.w-18)/6.7));const l1=[],l2=[];let used=0;
@@ -2866,6 +2868,10 @@ function gbOlKeys(e){const all=[...e.currentTarget.querySelectorAll('[data-ol]')
 function gbOrderOf(M){return gw.order&&gw.order.length?gw.order.map(id=>M.J.find(j=>j.id===id)).filter(Boolean):gbOrder(M)}
 /* The Outline: the tree as a list, in sections: the journeys, the parts checked on their own, what the change depends on, then
    every part, folded. */
+/* The Outline's key: only the marks its rows draw, in the state table's order, at most five */
+function gbOlKeyMarks(lf){const s=gw.state,seen=new Set(gwInView().map(x=>{const k=gwStKey(x);return k==='ready'||k==='could'?'in':k==='nf'?'none':k}));
+ const out=[['pass','passed'],['fail','failed'],['run','running'],['in',gwInKey()],['none','no flow yet']].filter(q=>seen.has(q[0])).map(q=>lf(q[0],q[1]));
+ if(s.modeBy&&s.scenarios.some(x=>!gwIn(x)))out.push(lf('cut','pruned, named under its journey'));return out.slice(0,5)}
 function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrderOf(M);gw.order=order.map(j=>j.id);
  /* what is pinned is never hidden in a closed fold: its fold opens once, when the pin changes */
  if(gw.olPin!==gw.pinned){gw.olPin=gw.pinned;const p=gw.pinned||'',O=gw.open||(gw.open={});
@@ -2876,7 +2882,7 @@ function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrder
  gwPut(el,M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface. Grow again to trace journeys.'):null,
   gwOlPromises(),order.length?gbSec('Journeys',String(order.length)):h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
   /* what each leaf means, in one line under the heading, before the first leaf it explains */
-  order.length&&s.scenarios.length?h('div',{class:'gb-olkey',role:'group','aria-label':'What each leaf means'},lf('pass','passed'),lf('fail','failed'),lf('run','running'),lf('in',gwInKey()),lf('none','no flow yet'),s.modeBy&&s.scenarios.some(x=>!gwIn(x))?lf('cut','pruned, named under its journey'):null):null,
+  order.length&&s.scenarios.length?h('div',{class:'gb-olkey',role:'group','aria-label':'What each leaf means'},...gbOlKeyMarks(lf)):null,
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,false)),
   M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null,
   buds[0]||buds[1]?[gbSec(gwOwnHead(s.units.flatMap(u=>M.buds[u.id]||[]))),buds]:null,gbOlRoots(M,order),gbOlParts(M,order),
