@@ -9,6 +9,7 @@ import type { ChangeUnit } from '../src/authoring/growChange.ts';
 import { draftWithAgent, type ProvedFlow } from '../src/authoring/workspace.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
+import { jsonState, STATE_WORDS } from '../src/authoring/growWords.ts';
 import { applyGrow, freshGrow, growVerdict, growView, inMode, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { configRunsRoot } from '../src/authoring/runLocation.ts';
 import * as atomicFiles from '../src/core/atomicFiles.ts';
@@ -984,7 +985,7 @@ describe('grow --json and the exit code', () => {
     const dir = notesCount(true);
     const { code, state, summary } = await growCommand({ ...flags(dir), json: true }, () => {});
     expect(code).toBe(1);
-    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven', 'stopped']);
+    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven', 'stopped', 'words']);
     expect(summary).toMatchObject({ verdict: 'not ready', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum', counts: { passed: 1, failed: 1, notTestedYet: 0 }, promises: { hold: 1, of: 3 }, unproven: [], stopped: null });
     const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
     const f = summary!.failures[0]!;
@@ -1135,9 +1136,60 @@ describe('grow --json and the exit code', () => {
       { encoding: 'utf8', timeout: 60_000 });
     expect(child.status).toBe(1);
     expect((JSON.parse(child.stdout) as { summary: { exitCode: number } }).summary.exitCode).toBe(1);
+    // The json carries the page's words beside its codes: a word beside each run's st, a mode name beside each mode.
+    const out = JSON.parse(child.stdout) as { state: { mode: string; modeName: string; run: Record<string, { st: string; word: string }>; scenarios: Array<{ mode: string; modeName: string }> }; summary: { words: { scenarios: Array<{ st: string | null; word: string }> } } };
+    expect(out.state.modeName).toBe('Minimum');
+    for (const r of Object.values(out.state.run)) expect(r.word).toBe(r.st === 'pass' ? 'passed' : r.st === 'fail' ? 'failed' : r.st === 'run' ? 'running' : expect.stringMatching(/^(could not run|no flow yet|flow ready \(not run\)|not tested yet)$/));
+    expect(out.state.run).not.toEqual({});
+    for (const x of out.state.scenarios) expect(x.modeName).toBe({ min: 'Minimum', std: 'Standard', max: 'Max' }[x.mode]);
+    expect(out.summary.words.scenarios.find((x) => x.st === 'fail')!.word).toBe('failed');
     const unproved = spawnSync(process.execPath, ['--import', resolve('node_modules/tsx/dist/loader.mjs'), resolve('src/cli/main.ts'), 'grow', '--dir', dir, '--branch', 'notes-count', '--base', 'main', '--mode', 'min', '--no-gh', '--no-agent', '--no-prove'],
       { encoding: 'utf8', timeout: 60_000 });
     expect(unproved.status).toBe(3);
     expect(unproved.stdout.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: \d+ of \d+ scenarios in Minimum not tested yet$/);
   }, 120_000);
+});
+
+describe('grow --json speaks the page\'s words', () => {
+  it('words each scenario as the page does, beside its st and its mode, counts by those words, and keeps every key it had', () => {
+    const s = plotline();
+    const summary = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-words-')));
+    const w = summary.words;
+    // the counts line the page prints, from the same counts as the verdict
+    expect(w.countsLine).toBe('3 passed · 1 failed · 3 not tested yet');
+    expect(summary.counts).toEqual({ passed: 3, failed: 1, notTestedYet: 3 });
+    expect(w.states).toEqual({ failed: 1, 'no flow yet': 3, passed: 3 });
+    expect(w.modeName).toBe('Minimum');
+    const by = Object.fromEntries(w.scenarios.map((x) => [x.scenario, x]));
+    expect(by.s10).toMatchObject({ st: 'fail', word: 'failed', mode: 'min', modeName: 'Minimum', inMode: true });
+    // the three with no result and no flow: "no flow yet", never "not run" or "unproven"
+    for (const id of ['s1', 's5', 's6']) expect(by[id]).toMatchObject({ st: 'not_run', word: 'no flow yet', inMode: true });
+    for (const u of summary.unproven) expect(by[u.scenario]!.word).toMatch(/^(no flow yet|flow ready \(not run\)|could not run|running)$/);
+    // every scenario out of the mode still has its mode's name
+    for (const x of w.scenarios) expect(x.modeName).toBe({ min: 'Minimum', std: 'Standard', max: 'Max' }[x.mode]);
+    expect(w.vocabulary).toEqual({ states: ['failed', 'running', 'could not run', 'no flow yet', 'flow ready (not run)', 'passed'], notTestedYet: 'not tested yet',
+      promises: ['holds', 'agent-checked', 'partly holds', 'running', 'broken', 'not tested yet', 'not traced yet', 'needs you'], modes: ['Minimum', 'Standard', 'Max'] });
+    // a promise is worded from the table too, never "untested"
+    expect(w.promiseWords.map((p) => p.word)).not.toContain('untested');
+    expect(w.promiseWords.filter((p) => p.word === 'holds')).toHaveLength(summary.promises.hold);
+  });
+
+  it('words a run that never reached its checks "could not run", and one whose flow did not run "flow ready (not run)"', () => {
+    const why = "(app startup): application exited before becoming ready; last app output:\n    at x";
+    const s = plotline((e) => { if (e.kind !== 'scenario.failed') return e; const { hop: _h, after: _a, ...rest } = e; return { ...rest, why }; });
+    const w = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-words-'))).words;
+    expect(w.scenarios.find((x) => x.scenario === 's10')).toMatchObject({ st: 'not_run', word: 'could not run' });
+    expect(w.countsLine).toBe('3 passed · 4 not tested yet');
+    const ready = plotline((e) => (e.kind === 'scenario.passed' && e.scenario === 's8' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: 's8', why: 'Stopped before it ran' } as GrowEvent : e));
+    expect(growJsonSummary(ready, mkdtempSync(join(tmpdir(), 'tracegrove-words-'))).words.scenarios.find((x) => x.scenario === 's8')).toMatchObject({ st: 'not_run', word: STATE_WORDS.ready });
+  });
+
+  it('prints the state with a word beside each st and a mode name beside each mode, renaming and removing nothing', () => {
+    const s = plotline(); const j = jsonState(s);
+    for (const k of Object.keys(s)) expect(j).toHaveProperty(k);
+    expect(j.mode).toBe(s.mode); expect(j.modeName).toBe('Minimum');
+    for (const [id, r] of Object.entries(s.run)) expect(j.run[id]).toEqual({ ...r, word: expect.any(String) });
+    expect(j.run.s10!.word).toBe('failed');
+    j.scenarios.forEach((x, i) => { expect(x).toEqual({ ...s.scenarios[i], modeName: expect.any(String) }); });
+  });
 });
