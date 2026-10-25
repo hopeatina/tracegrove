@@ -10,6 +10,8 @@ import { basename, dirname, join, normalize, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { maskComments, scanSource } from './discover.ts';
 import type { Layer } from './growState.ts';
+import { AGENT_KIND, PROMPT_KIND, promptOnlyChange, promptUnits } from './growPrompt.ts';
+import { importsOf, resolveImport } from './growReach.ts';
 
 export type FileRole = 'code' | 'test' | 'doc' | 'config' | 'asset';
 export type AddedLine = { line: number; text: string };
@@ -373,6 +375,32 @@ export function unitsOf(dir: string, branch: string, files: FileChange[], cap = 
   for (const f of folded) {
     if (command) { command.added.push(...f.added); (command.also ??= []).push(f.path); continue; }
     branches.push({ id: '', label: basename(f.path), kind: 'module', layer: 'cli', root: false, file: f.path, line: f.added[0]?.line ?? 1, parent: null, needles: [`/${stem(f.path)}.`], added: f.added });
+  }
+  // A change to an agent's prompt: a prompt file, or a prompt string that is all a code file changed. Its units are the prompt,
+  // the agent code that reads it, and the entries that reach that agent, so the tree shows the journeys that depend on it.
+  for (const u of branches) {
+    if (u.kind !== 'module' && u.kind !== 'component' && u.kind !== 'page' && u.kind !== 'job') continue;
+    const f = files.find((x) => x.path === u.file); const t = f ? readAt(dir, branch, f.path) : null;
+    const name = f && t ? promptOnlyChange(f, t) : null;
+    if (name) { u.kind = PROMPT_KIND; u.label = `${name} in ${basename(u.file)}`; }
+  }
+  const taken = new Set([...branches, ...roots].map((u) => u.file));
+  const reach = promptUnits(dir, branch, files, taken);
+  branches.push(...reach.units);
+  // the services an agent calls, in its own file or a file it imports (one hop): the model API it sends the prompt to
+  let listing: Set<string> | null = null;
+  for (const a of branches.filter((u) => u.kind === AGENT_KIND || u.kind === PROMPT_KIND && /\.[cm]?[jt]sx?$|\.py$/.test(u.file))) {
+    const t = readAt(dir, branch, a.file); if (!t) continue;
+    listing ??= new Set(git(dir, ['ls-tree', '-r', '--name-only', branch]).split('\n').filter(Boolean));
+    const near = [[a.file, t] as const, ...importsOf(a.file, t).map((i) => resolveImport(a.file, i.spec, listing!)).filter((x): x is string => !!x).map((f) => [f, readAt(dir, branch, f) ?? ''] as const)];
+    for (const [file, text] of near) {
+      const masked = maskComments(file, text);
+      for (const pv of PROVIDERS) if (pv.test.test(masked) && !rootKeys.has(pv.name)) {
+        rootKeys.add(pv.name);
+        const line = masked.split('\n').findIndex((l) => pv.test.test(l)) + 1 || 1;
+        roots.push({ id: '', label: pv.name, kind: 'third party', layer: 'ext', root: true, file, line, parent: a.label, needles: [pv.name.toLowerCase()], added: [], provider: { name: pv.name, keys: pv.keys } });
+      }
+    }
   }
   const order: Layer[] = ['ui', 'cli', 'api', 'jobs', 'lib'];
   branches.sort((a, b) => order.indexOf(a.layer) - order.indexOf(b.layer) || b.added.length - a.added.length);
