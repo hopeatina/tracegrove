@@ -1392,7 +1392,11 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  /* once the grow is done the key counts the mode from the state table, as the counts line and the verdict do, so it is the same at
     any width: each state's whole count, then how many of them grow on shoots (the shoots' leaves, their +N counts and the graft
     buds), so the leaves on the journeys' pads and the shoots add up to the mode. While it grows it counts the leaves drawn so far */
- let K;if(s.done&&M){const all=gwInView(),off=all.filter(x=>!onJ(x)).length;
+ /* (and from the moment a mode is chosen, pruning included, it counts that mode from the table too, never the leaves still
+    falling; while the mode is being asked it counts the mode being previewed, from the table, so a scenario with no flow is
+    never called flow ready) */
+ const drawn=x=>!!B&&!!((B.leaf&&B.leaf[x.id])||(B.bud&&B.bud[x.id]));
+ let K;if((s.done||s.modeBy||s.asked)&&M){const all=s.modeBy?gwInView():s.scenarios.filter(x=>inMode(x)&&(s.asked||drawn(x))),off=all.filter(x=>!onJ(x)).length;
   K=gwTallyRows(gwTally(all)).map(([k,w,g,cl,n])=>[g,SEL[g],n+' '+w]);
   if(off)K.push(['ntag','[data-k^="u:"], .gb-lf.bud',off+' of them on shoots']);
  }else K=[['fail',SEL.fail,gwStW('fail')],['run',SEL.run,gwStW('run')],['none',SEL.none,gwStW('nf')],['in',SEL.in,gwInKey()],['pass',SEL.pass,gwStW('pass')]].map(([k,sel,t])=>[k,sel,t,cnt(sel)]).filter(q=>q[3]>0).map(([k,sel,t,n])=>[k,sel,n+' '+t]);

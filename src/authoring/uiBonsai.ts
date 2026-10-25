@@ -105,7 +105,7 @@ ${TREE_MATERIAL_CSS}
 .gb .bud .blade{stroke-width:1.25}.gb .bud.none .blade{stroke-dasharray:2 1.4}
 .gb .bmore{font:600 9.5px var(--mono);fill:var(--muted)}
 /* the snip: two blades closing at the cut, gone in a moment */
-.gb .snip{fill:none;stroke:var(--ink);stroke-width:1.4;stroke-linecap:round;pointer-events:none;transform-box:fill-box;transform-origin:50% 50%;animation:gbsnip .32s ease-out both}@keyframes gbsnip{0%{opacity:0;transform:scale(1.6)}25%{opacity:1;transform:scale(1)}to{opacity:0}}
+.gb .snip{fill:none;stroke:var(--ink);stroke-width:1.7;stroke-linecap:round;pointer-events:none;transform-box:fill-box;transform-origin:50% 50%;animation:gbsnip .62s ease-out both}@keyframes gbsnip{0%{opacity:0;transform:scale(1.7)}18%{opacity:1;transform:scale(1)}70%{opacity:1}to{opacity:0}}
 @keyframes gbpulse{50%{transform:scale(1.2)}}
 .gb.dim .bud:not(.hl):not(.pv-add),.gb.dim .lbl:not(.hl),.gb.dim .bmore{opacity:.3}
 /* a previewed mode's ghosts are not part of what is pinned: the dimming leaves them out (the rules above), so each stays at
@@ -114,9 +114,10 @@ ${TREE_MATERIAL_CSS}
 .gb-lf.cut .nick,.gb .budg.snap .cutk{stroke:var(--cutc)}
 /* where a cut that grew has healed: a small roll of callus in the bark's own tones, a step lighter than the bark, with a thin lit
    crescent on its lip; never a pale disc, and always under the knots, so it never reads as a boss or as one */
-.gb .heal .cal{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.5}
-/* a cut that healed is a pale ring of callus round the bark of the cut, about the girth of what was cut: seen at 1x */
-.gb .heal.scar .cal,.gb .heal.shscar .cal{stroke:color-mix(in srgb,var(--wood-lit) 30%,#F4ECDF);stroke-width:1.3}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
+.gb .heal .cal{fill:color-mix(in srgb,var(--wood-lit) 72%,#EADCC4);stroke:var(--wood-shade);stroke-width:.9}
+/* a cut that healed is a filled, slightly raised roll of callus about the girth of what was cut: pale new wood with a darker
+   rim, never a pale ring round a dark middle (that reads as a hole punched in the bark): seen at 1x */
+.gb .heal.scar .cal,.gb .heal.shscar .cal{stroke:color-mix(in srgb,var(--wood-shade) 80%,#000);stroke-width:1.1}.gb .heal .cres{fill:none;stroke:color-mix(in srgb,var(--knot-lit) 50%,#F4ECDF);stroke-width:.7;stroke-linecap:round}.gb .shscar{pointer-events:none}
 /* a failed leaf: no pale lining in its bite, a dark outline and a dark midrib, and round it a soft red halo, the red mixed toward
    the page rather than made clear, so over green it stays red and never turns brown */
 .gb-lf.fail:not(.pv-out):not(.pv-add) .halo{opacity:1;fill:none;stroke:color-mix(in srgb,var(--verm) 66%,var(--paper));stroke-width:3.2;stroke-linejoin:round}.gb-lf.fail:not(.pv-out):not(.pv-add) .blade{stroke:#5a1a14;stroke-width:1}.gb-lf.fail:not(.pv-out):not(.pv-add) .rib{stroke:#5a1a14;opacity:1;stroke-width:.9}
@@ -332,14 +333,14 @@ const GB_CU=[[0,.08],[.2,.42],[.45,.74],[.7,.92],[1,1]];
 function gbCuAt(v){for(let i=1;i<GB_CU.length;i++){const [a,p]=GB_CU[i-1],[b,q]=GB_CU[i];if(q>=v)return a+(b-a)*(v-p)/((q-p)||1)}return 1}
 /* A pruned piece falls: snipped at p (its collar, where it leaves the wood), it tips th degrees about the cut and drops
    (dx, dy) along a short arc, sideways first, then down, as it fades; GB_FALL ms on an ease-in, gathering speed. */
-const GB_FALL=500,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
+const GB_FALL=950,GB_BACK=360,GB_EASEIN='cubic-bezier(.42,0,1,1)';
 /* the snip comes first: two blades close across the collar at p, the cut along u, and only GB_SNIP ms later does the piece
    start to fall, so a cut reads as a cut and then a fall */
-const GB_SNIP=180;
+const GB_SNIP=140;
 function gbSnip(parent,p,u,lag){if(!parent||gwQuiet())return;const n=[-u[1],u[0]],q=(a,b)=>[p[0]+u[0]*a+n[0]*b,p[1]+u[1]*a+n[1]*b];
- const e=sv('path',{class:'snip',d:'M'+gbP(q(-4.5,-4))+' L'+gbP(q(1.5,0))+' M'+gbP(q(-4.5,4))+' L'+gbP(q(1.5,0))});e.style.animationDelay=gbF(lag)+'ms';parent.append(e);setTimeout(()=>e.remove(),lag+420)}
+ const e=sv('path',{class:'snip',d:'M'+gbP(q(-4.5,-4))+' L'+gbP(q(1.5,0))+' M'+gbP(q(-4.5,4))+' L'+gbP(q(1.5,0))});e.style.animationDelay=gbF(lag)+'ms';parent.append(e);setTimeout(()=>e.remove(),lag+700)}
 function gbFallK(p,dx,dy,th){const T=(x,y,r)=>'translate('+gbF(x)+'px,'+gbF(y)+'px) translate('+gbF(p[0])+'px,'+gbF(p[1])+'px) rotate('+gbF(r)+'deg) translate('+gbF(-p[0])+'px,'+gbF(-p[1])+'px)';
- return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.4,transform:T(.45*dx,.16*dy,.7*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
+ return [{offset:0,transform:T(0,0,0),opacity:1},{offset:.3,transform:T(.3*dx,.08*dy,.55*th),opacity:1},{offset:.6,transform:T(.7*dx,.38*dy,.9*th),opacity:.85},{offset:1,transform:T(dx,dy,th),opacity:0}]}
 /* What was only ever a preview's ghost was never grown, so a mode that drops it does not cut it: it shrinks back into p
    (its collar) as it fades, in GB_BACK ms on the same ease-in, and leaves no mark. */
 /* A healed cut: a small roll of callus at c, in the bark's own tones, rx along the grain t and ry across it (six by four at
@@ -1717,8 +1718,8 @@ function gbLeafEl(x,L,W,hang){const inner=sv('g',{class:'gb-lfi'},sv('circle',{r
 const gbHf=B=>{const vb=B.svg.viewBox&&B.svg.viewBox.baseVal,w=B.svg.getBoundingClientRect().width||B.width;return vb&&vb.width&&w?w/vb.width:1};
 function gbLeafState(x){const s=gw.state;const r=s.run[x.id];
  if(r){if(r.st==='pass')return x.ext.some(e=>s.ext[e]&&s.ext[e].state!=='proven')?'pass warn':'pass';if(r.st==='fail')return 'fail';if(r.st==='run')return 'run';return gwFlowOf(x)?'idle':'none'}
- /* (once a mode is chosen its pads say which leaves have no flow yet, gbTok, and from that same paint those leaves are drawn so) */
- return !s.modeBy&&gbRank[x.mode]>0?'pre':s.modeBy&&!gwFlowOf(x)?'none':'in'}
+ /* (a leaf with no flow is drawn as having none in every state, before the mode is chosen too, as its pad and the key say it) */
+ return !s.modeBy&&gbRank[x.mode]>0?'pre':!gwFlowOf(x)?'none':'in'}
 function gbStateWord(x){const s=gw.state;const r=s.run[x.id];if(r){if(r.st==='pass')return {c:'pass',t:'passed in '+gwDur(r.ms||0)+(x.ext.some(e=>s.ext[e]&&s.ext[e].state!=='proven')?', resting on agent-written work not yet reviewed':'')};
   if(r.st==='fail')return {c:'fail',t:'failed'+(r.hop?(r.after?', after ':' at ')+r.hop:'')+': '+(r.why||'see the run')+(r.hop?'':' (the run does not say which hop broke)')};if(r.st==='run')return {c:'run',t:'running now'};
   /* in the one word its row and card give it: a run that never reached its checks says why it could not run */
@@ -1792,7 +1793,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     /* (a ghost is drawn where the leaf grows, whole: one still falling when a preview ghosts it is let go of) */
     if(add){cls+=' pv-add';if(el.__fall){for(const a of el.__fall)a.cancel();el.__fall=null}}else if(!im){if(was===true&&!quiet&&el.__g.animate&&!(gbNow()<(el.__t0||0))){el.__cutAt=Date.now();for(const a of el.__g.getAnimations())a.cancel();const lag=el.__lag=cutLag.get('s:'+x.id)||0,tw=((B.ltw||{})[x.id]||[])[0],tq=P.rt.lt[x.id],fell=el.__fell=real.has(x.id);
       const pos=[P.o[0]+sl[0],P.o[1]+sl[1]],a=sl[2]*Math.PI/180,sc=sl[3]||1,ca=Math.cos(a),sa=Math.sin(a),piv=tq?tq.pts[0]:[pos[0]-ca*(g.L/2+GB_PET)*sc,pos[1]-sa*(g.L/2+GB_PET)*sc];
-      const h=gbHash('fall:'+x.id),dir=ca>.2?1:ca<-.2?-1:h<.5?-1:1,th=dir*(20+10*gbHash('spin:'+x.id)),hf=gbHf(B),dx=dir*(6+10*h)/hf,dy=(40+40*gbHash('drop:'+x.id))/hf;
+      const h=gbHash('fall:'+x.id),dir=ca>.2?1:ca<-.2?-1:h<.5?-1:1,th=dir*(28+12*gbHash('spin:'+x.id)),hf=gbHf(B),dx=dir*(8+12*h)/hf,dy=(70+40*gbHash('drop:'+x.id))/hf;
       /* the leaf moves in its own frame, so the same motion is put into it: the cut point, the drop and the turn seen from the leaf */
       const loc=q=>[(q[0]*ca+q[1]*sa)/sc,(-q[0]*sa+q[1]*ca)/sc],lp=loc([piv[0]-pos[0],piv[1]-pos[1]]),ld=loc([dx,dy]),ms=el.__cutMs=fell?GB_FALL:GB_BACK,o={duration:ms,delay:lag+(fell?GB_SNIP:0),easing:GB_EASEIN,fill:'forwards'};if(fell){const v=[piv[0]-pos[0],piv[1]-pos[1]],m=Math.hypot(v[0],v[1])||1;gbSnip(P.lg,piv,[-v[0]/m,-v[1]/m],lag)}
       el.__fall=fell?[el.__g.animate(gbFallK(lp,ld[0],ld[1],th),o)]:[el.__g.animate(gbBackK(lp),o)];if(tw&&tw.animate)el.__fall.push(tw.animate(fell?gbFallK(piv,dx,dy,th):gbBackK(piv),o));
