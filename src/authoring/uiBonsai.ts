@@ -96,8 +96,9 @@ ${TREE_MATERIAL_CSS}
    adds appears as a dashed ghost */
 .gb-lf.pv-out .blade,.gb-lf.pre .blade{fill:color-mix(in srgb,var(--ink3) 30%,var(--paper));stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none;stroke-width:.8}.gb-lf.pv-out .rib,.gb-lf.pre .rib{opacity:0}
 .gb-lf.pv-out .bb,.gb-lf.pre .bb,.gb-lf.pv-out .nec,.gb-lf.pre .nec{display:none}.gb-lf.pv-out .bn,.gb-lf.pre .bn{display:inline}.gb-lf.pv-out .nick,.gb-lf.pre .nick{display:inline}
-/* a preview's ghost leaf: pale new growth, filled, with a dashed rim, so it reads on a dark cushion as on the page, at 1x */
-.gb-lf.pv-add .blade{fill:color-mix(in srgb,var(--paper) 78%,var(--moss));fill-opacity:1;stroke:var(--moss);stroke-width:1.1;stroke-dasharray:2.2 1.5}.gb-lf.pv-add .rib{opacity:0}
+/* a preview's ghost leaf: pale new growth, filled, with a dashed rim, so it reads on a cushion at 1x; one hanging below its pad
+   sits on the page, so it is a mid green there, never page on page */
+.gb-lf.pv-add .blade{fill:color-mix(in srgb,var(--paper) 86%,var(--moss));fill-opacity:1;stroke:var(--moss);stroke-width:1.1;stroke-dasharray:2.2 1.5}.gb-lf.pv-add .rib{opacity:0}.gb-lf.pv-add.hang .blade{fill:color-mix(in srgb,var(--paper) 45%,var(--moss))}
 /* (a ghost is at half strength: a journey's leaf on its own, a part check with the ghost of its shoot) */
 .gb-lf.pv-add:not(.bud){opacity:.5}.gb .budg:not(.pv-add) .gb-lf.bud.pv-add{opacity:.5}
 /* a leaf being pruned falls with its twig, cut at the wood (gbPaint); the tick at its stalk has done its work */
@@ -1917,7 +1918,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     const now=gbNow(),t1=(g.sp||0)+i*40;if(!quiet&&fr.animate&&now<t1+170)gbPlay(fr,[{transform:'scale(.001)'},{transform:'scale(1)'}],{duration:170,easing:'cubic-bezier(.2,.9,.3,1.15)',fill:'backwards'},t1)}
    /* while a dropped shoot fades, its leaves stay on it */
    const fad=!showBuds&&!!(g.fade||(g.on===undefined?gw.prevBuds:g.on));const im=(showBuds||fad)&&(inMode(x)||pv==='max'||fad);const cut=!!pv&&pv!=='max'&&inMode(x);
-   el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)&&!fad?' pv-add':'')+(im&&(cut||fad)?' pv-out':''));
+   el.setAttribute('class','gb-lf bud'+(x.scenarioKind==='regression'?' reg':'')+' '+gbLeafState(x)+(im?'':' gone')+(im&&!inMode(x)&&!fad?' pv-add':'')+(im&&(cut||fad||(!pv&&!gw.state.modeBy&&gbRank[x.mode]>0))?' pv-out':''));
    el.setAttribute('aria-label',(x.scenarioKind==='regression'?'Existing flow: ':'Part check: ')+x.title+', '+gbStateWord(x).t+(i===g.slots.length-1&&list.length>g.slots.length?'; and '+(list.length-g.slots.length)+' more checks here, in the Outline':''))});
   /* shoots a chosen mode drops wither and fade, rather than vanish */
   const any=list.some(inMode),on=showBuds&&(any||pv==='max'),was=g.on===undefined?gw.prevBuds:g.on;g.on=on;
