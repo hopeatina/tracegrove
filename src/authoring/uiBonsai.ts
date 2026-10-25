@@ -41,13 +41,12 @@ ${TREE_MATERIAL_CSS}
 .gb .pghost{transition:d .5s ease}.gb .pfill{stroke:none;transition:fill .25s}.gb .cush.ccr .pfill{fill:var(--fol-lo)}
 /* foliage has no outline: a cushion is its clumps, lit on top and shaded under (the pad's focus ring still shows over it) */
 .gb .jg.crown .pad:focus-visible .cush.ccr .pfill{stroke:var(--ink);stroke-width:2}.gb .cush.csh .pfill{fill:var(--fsh-lo)}
-.gb .pcs{fill:none;stroke:color-mix(in srgb,var(--fol-lo) 62%,#000);stroke-width:1.1;stroke-linecap:round;opacity:.3}.gb .cush.csh .pcs{stroke:color-mix(in srgb,var(--fsh-lo) 62%,#000)}
-/* each small lobe's lit top edge, and the cushion's shaded underside */
-.gb .pch{fill:none;stroke:color-mix(in srgb,var(--fol-hi) 70%,#fff);stroke-width:1.1;stroke-linecap:round;opacity:.5}.gb .cush.csh .pch{stroke:color-mix(in srgb,var(--fsh-hi) 70%,#fff);opacity:.4}
+.gb .pcs{fill:none;stroke:color-mix(in srgb,var(--fol-lo) 62%,#000);stroke-width:1.1;stroke-linecap:round;opacity:.16}.gb .cush.csh .pcs{stroke:color-mix(in srgb,var(--fsh-lo) 62%,#000)}
+/* the cushion's shaded underside */
 .gb .pund{pointer-events:none}
 /* a cushion that loses its last kept leaf shrinks away into the wood it grew on */
 .gb .cush,.gb .tw.fk{transform-box:fill-box;transform-origin:50% 100%;transition:opacity .45s,transform .45s}.gb .cush.off,.gb .tw.fk.off{opacity:0;transform:scale(.25)}
-.gb .pclu,.gb .ptufts{pointer-events:none;transition:opacity .25s}.gb .ptex{opacity:.3}.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .ptuft.gone,.gb .tw.gone{display:none}
+.gb .pclu,.gb .ptufts{pointer-events:none;transition:opacity .25s}.gb .ptex{opacity:.42}.gb .stl{fill:var(--pad-lit)}.gb .sts{fill:var(--pad-shade)}.gb .ptuft.gone,.gb .tw.gone{display:none}
 .gb.dim .jg:not(.hl) .pclu,.gb.dim .jg:not(.hl) .ptufts,.gb .jg.pv-cut .pclu,.gb .jg.pv-cut .ptufts,.gb .jg.crown.pruned .pclu,.gb .jg.crown.pruned .ptufts,.gb .jg.pruned.pv-back .pclu,.gb .jg.pruned.pv-back .ptufts{opacity:.12}
 .gb .pghost{fill:none;stroke:none}.gb .pad.pv-grow .pghost{fill:var(--fol);fill-opacity:.32;stroke:var(--moss);stroke-width:1;stroke-dasharray:3 3}
 .gb .pad:focus-visible .pfill{stroke:var(--ink);stroke-width:1.5}.gb .pad.back .pclu{opacity:.55}
@@ -1603,11 +1602,13 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
    const shape=g.shape;const q0=shape(()=>true),pk='gb-pk'+N+'-'+ti+'-'+pi;
    const els={ghost:sv('path',{class:'pghost',d:gbPadD(o,q0)}),clip:sv('path',{d:gbPadD(o,q0)})};defs.append(sv('clipPath',{id:pk},els.clip));
    const cu=g.cs.map((c,k)=>{const d=gbCushD(o,q0.cs[k]),X=o[0]+c.x,Y=o[1]+c.b,ck=pk+'-'+k,cr=c.role==='crest'?'cr':'sh';defs.append(sv('clipPath',{id:ck},sv('path',{d})));
-    const clu=sv('g',{'clip-path':'url(#'+ck+')',class:'pclu'});for(const [x,y,r] of c.body)clu.append(sv('circle',{cx:gbF(X+x),cy:gbF(Y+y),r:gbF(r),fill:'url(#'+padG+cr+')'}),sv('path',{class:'pcs',d:'M'+gbP([X+x-r*.92,Y+y+r*.38])+' A'+gbF(r)+' '+gbF(r)+' 0 0 0 '+gbP([X+x+r*.92,Y+y+r*.38])}));
-    /* over the clumps, small lobes heaped along each one's upper rim, each in one of the three greens and lit along its top,
-       so the cushion reads as dense clumped foliage, then its underside in shade */
-    c.body.forEach(([x,y,r],i)=>{for(const [a,f,j] of [[-2.35,.6,0],[-1.6,.66,1],[-.85,.6,2],[-1.98,.25,3],[-1.22,.28,4]]){const hh=gbHash('lb:'+pd.id+':'+k+':'+i+':'+j),rr=r*(.34+.12*hh),a2=a+(hh-.5)*.3,lx=X+x+Math.cos(a2)*r*f,ly=Y+y+Math.sin(a2)*r*f;
-     clu.append(sv('circle',{cx:gbF(lx),cy:gbF(ly),r:gbF(rr),fill:'url(#'+padG+cr+(['1','2',''][(i+j)%3])+')'}),sv('path',{class:'pch',d:'M'+gbP([lx-rr*.72,ly-rr*.45])+' A'+gbF(rr)+' '+gbF(rr)+' 0 0 1 '+gbP([lx+rr*.72,ly-rr*.45])}))}});
+    /* one mass of foliage: every clump in the same light, a gradient over the whole cushion from its lit top to its shaded
+       foot, so the clumps merge into one cushion and only a faint crease marks where one heaps on the next (never a pile of
+       lit marbles); the stipple over it is its leaves */
+    let y0=Infinity,y1=-Infinity;for(const [,y,r] of c.body){y0=Math.min(y0,Y+y-r);y1=Math.max(y1,Y+y+r)}
+    const v=cr==='cr'?'fol':'fsh',mg=ck+'-m';defs.append(sv('linearGradient',{id:mg,gradientUnits:'userSpaceOnUse',x1:gbF(X),y1:gbF(y0),x2:gbF(X+(y1-y0)*.18),y2:gbF(y1)},sv('stop',{offset:.04,style:'stop-color:var(--'+v+'-hi)'}),sv('stop',{offset:.42,style:'stop-color:var(--'+v+')'}),sv('stop',{offset:.95,style:'stop-color:var(--'+v+'-lo)'})));
+    const clu=sv('g',{'clip-path':'url(#'+ck+')',class:'pclu'});for(const [x,y,r] of c.body)clu.append(sv('circle',{cx:gbF(X+x),cy:gbF(Y+y),r:gbF(r),fill:'url(#'+mg+')'}));
+    for(const [x,y,r] of c.body)clu.append(sv('path',{class:'pcs',d:'M'+gbP([X+x-r*.92,Y+y+r*.38])+' A'+gbF(r)+' '+gbF(r)+' 0 0 0 '+gbP([X+x+r*.92,Y+y+r*.38])}));
     clu.append(sv('path',{class:'ptex',d,fill:'url(#'+padG+'s)'}),sv('path',{class:'pund',d,fill:'url(#'+padG+'u'+cr+')'}));
     const el=sv('g',{class:'cush c'+cr},sv('path',{class:'pfill',d}),clu);return {el,gr:sv('g',{class:'cgr'},el)}});
    /* a cushion is opaque to its foot: the limb it grew on goes in under it and does not show through (a smear of wood
