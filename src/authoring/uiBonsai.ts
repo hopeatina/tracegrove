@@ -1741,7 +1741,9 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
  const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),ow=k=>open.filter(x=>gwOpenKey(x)===k).length,cr=ow('could'),nf=ow('nf'),tp=ow('ready');
  /* what a mode would keep and cut is said only before one is picked; from the paint a mode is picked in, the pad says what it
     holds in that mode and what was pruned, its final words, never both */
- if(!ran.length&&!vis){const km='min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' '+gwStW('could'),'n']);if(tp)T.push([tp+' '+gwStW('ready'),'n']);if(nf)T.push([nf+' '+gwStW('nf'),'n'])}
+ if(!ran.length&&!vis){/* (before a pick, in the done state's words: what Minimum would keep, by its state, then what it would cut) */
+  const kp=list.filter(x=>gbRank[x.mode]<=gbRank.min),kw=k=>kp.filter(x=>gwOpenKey(x)===k).length;
+  for(const k of ['could','ready','nf'])if(kw(k))T.push([kw(k)+' '+gwStW(k),'n']);if(list.length>kp.length)T.push(['cuts '+(list.length-kp.length),'x'])}else{if(cr)T.push([cr+' '+gwStW('could'),'n']);if(tp)T.push([tp+' '+gwStW('ready'),'n']);if(nf)T.push([nf+' '+gwStW('nf'),'n'])}
  if(pr)T.push(['+'+pr+' pruned','n']);return T}
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
@@ -2769,7 +2771,9 @@ function gbJourneyBlock(j,n,M,fold){const s=gw.state;const list=M.leaves[j.id]||
  const key='j:'+j.id,pinned=gw.pinned===key,mine=!!gw.pinned&&list.some(x=>gw.pinned==='s:'+x.id);
  const wound=list.map(x=>gbWound(M,j,x)).find(Boolean);const fail=list.some(x=>s.run[x.id]&&s.run[x.id].st==='fail');
  /* a journey the mode cut entirely says so in the page's one phrasing for pruning */
- const toks=s.modeBy&&list.length&&!inm.length?[[gwPruned(list,s.mode),'n']]:gbTok(list,j,s.modeBy?s.mode:null,x=>!s.modeBy||gwIn(x));const inline=!fold;
+ /* (counted in the mode the tree prunes to from the moment it is picked, as the tree's headings count it) */
+ const pk=s.modeBy?s.mode:s.asked&&gw.picking||null;
+ const toks=s.modeBy&&list.length&&!inm.length?[[gwPruned(list,s.mode),'n']]:gbTok(list,j,pk,x=>!pk||gbRank[x.mode]<=gbRank[pk]);const inline=!fold;
  const head=[h('span',{class:'no'},String(n)),h('span',{class:'tt','data-testid':'grow-ol-title-'+n},...gwRich(gwJourneyTitle(j)),j.by&&j.by!=='rules'?h('span',{class:'by'},j.by==='spec'?'from the spec':j.by):null),
   h('span',{class:'wh'},gwFacts([gbStarts(j,M)])),
   h('span',{class:'st'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,gbToks(toks))];

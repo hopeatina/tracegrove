@@ -1185,10 +1185,14 @@ function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;co
  const titles=new Set(J.map(j=>norm(j.title))),more=[];let n=parts.reduce((a,p)=>a+words(typeof p==='string'?p:p.textContent||''),2);
  for(const c of (gw.view&&gw.view.criteria)||[]){const t=gwPlain(c.text);if(titles.has(norm(t)))continue;const w=words(t);if(n+w>32||more.length>1)break;more.push(lc(t));n+=w}
  if(more.length&&J.length===show.length){parts.push('; '+more.slice(0,-1).join(', ')+(more.length>1?', and ':'')+more[more.length-1])}
+ /* a change to an agent's prompt says so, and which journeys run that agent, from each journey's why ("POST /tickets runs the
+    agent in triage.mjs, so it touches the agent's prompt prompts/triage.md") */
+ const pr={};for(const j of J){const m=/touches the agent's prompt (\S+?)[.,;]?$/.exec(String(j.why||'').trim());if(m)(pr[m[1]]=pr[m[1]]||[]).push(j)}
+ const prs=Object.entries(pr).map(([f,js])=>' '+(js.length===J.length?(J.length===1?'It touches':J.length===2?'Both touch':'All '+J.length+' touch'):js.length===1?'One touches':js.length+' touch')+" the agent's prompt "+f+'.');
  /* and what the drawing is, said once, here, so the tree needs no legend to be read */
  const draw=J.length===1?'Tree: leaves are scenarios, the happy path on the crown, what it refuses on a side branch.'
   :'Tree: branches are journeys, leaves scenarios.';
- return h('p',{class:'gw-sum1','data-testid':'grow-summary'},(N[J.length-1]||String(J.length))+(J.length===1?' journey: ':' journeys: '),...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.',
+ return h('p',{class:'gw-sum1','data-testid':'grow-summary'},(N[J.length-1]||String(J.length))+(J.length===1?' journey: ':' journeys: '),...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.',...prs,
   ' ',h('span',{class:'gw-sum2','data-testid':'grow-caption'},draw))}
 /* "Open the runs": every run this grow saved, from its first failure's; in the Journeys card's head, beside the runs it opens */
 function gwOpenRunsBtn(){const s=gw.state;return s&&s.scenarios.some(gwRan)?h('button',{class:'gw-lnk','data-testid':'grow-open-runs',type:'button',on:{click:()=>gwOpenRuns()}},'Open the runs'):null}
@@ -1348,7 +1352,7 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
  const live=()=>!!gw.state&&!!gw.el&&!!gw.el.isConnected;
  const look=id=>{if(!live())return;if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(!live()){gw.preview=null;return}if(gw.preview){gw.preview=null;gbPaint();say(null)}};
  return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'+(who?'. '+who:''),title:locked&&!touch?'Point at another mode to preview it.':null},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
-   on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
+   on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);growPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
    /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
    gwModeIcon(m.id),h('b',{'data-rec':asked&&m.id==='min'?'':null},m.label,s.scenarios.length?[' ',h('span',{class:'mn','data-u':v.counts[m.id]===1?'scenario':'scenarios'},String(v.counts[m.id]))]:null),
    /* while the choice is open each mode says what it proves; once chosen, the control is one line and pointing at a mode says it */
@@ -1439,7 +1443,8 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  /* what the drawing is is said once, in the summary above it (gwSummary): no caption under it repeats that */
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
- const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};
+ /* (a leaf falling from a cut, or one a preview takes away, is no longer on the tree) */
+ const X=':not(.gone):not(.cut):not(.pv-out)',SEL={fail:'.gb-lf.fail'+X,run:'.gb-lf.run'+X,none:'.gb-lf.none'+X,in:'.gb-lf.in'+X+', .gb-lf.idle'+X,pass:'.gb-lf.pass'+X};
  /* once the grow is done the key counts the mode from the state table, as the counts line and the verdict do, so it is the same at
     any width: each state's whole count, then how many of them grow on shoots (the shoots' leaves, their +N counts and the graft
     buds), so the leaves on the journeys' pads and the shoots add up to the mode. While it grows it counts the leaves drawn so far */
