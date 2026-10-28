@@ -1758,7 +1758,9 @@ function gbTok(list,j,vis,inMode){const s=gw.state;if(!list.length)return [[(gbW
  const open=inm.filter(x=>{const r=s.run[x.id];return !r||r.st==='not_run'}),ow=k=>open.filter(x=>gwOpenKey(x)===k).length,cr=ow('could'),nf=ow('nf'),tp=ow('ready');
  /* what a mode would keep and cut is said only before one is picked; from the paint a mode is picked in, the pad says what it
     holds in that mode and what was pruned, its final words, never both */
- if(!ran.length&&!vis){const km='min',k=list.filter(x=>gbRank[x.mode]<=gbRank[km]).length;T.push(['keeps '+k,'n']);if(list.length>k)T.push(['cuts '+(list.length-k),'x'])}else{if(cr)T.push([cr+' '+gwStW('could'),'n']);if(tp)T.push([tp+' '+gwStW('ready'),'n']);if(nf)T.push([nf+' '+gwStW('nf'),'n'])}
+ if(!ran.length&&!vis){/* (before a pick, in the done state's words: what Minimum would keep, by its state, then what it would cut) */
+  const kp=list.filter(x=>gbRank[x.mode]<=gbRank.min),kw=k=>kp.filter(x=>gwOpenKey(x)===k).length;
+  for(const k of ['could','ready','nf'])if(kw(k))T.push([kw(k)+' '+gwStW(k),'n']);if(list.length>kp.length)T.push(['cuts '+(list.length-kp.length),'x'])}else{if(cr)T.push([cr+' '+gwStW('could'),'n']);if(tp)T.push([tp+' '+gwStW('ready'),'n']);if(nf)T.push([nf+' '+gwStW('nf'),'n'])}
  if(pr)T.push(['+'+pr+' pruned','n']);return T}
 const gbNext=id=>GW.modes[Math.min(GW.modes.length-1,GW.modes.findIndex(m=>m.id===id)+1)].id;
 
@@ -2810,7 +2812,9 @@ function gbJourneyBlock(j,n,M,fold){const s=gw.state;const list=M.leaves[j.id]||
  const key='j:'+j.id,pinned=gw.pinned===key,mine=!!gw.pinned&&list.some(x=>gw.pinned==='s:'+x.id);
  const wound=list.map(x=>gbWound(M,j,x)).find(Boolean);const fail=list.some(x=>s.run[x.id]&&s.run[x.id].st==='fail');
  /* a journey the mode cut entirely says so in the page's one phrasing for pruning */
- const toks=s.modeBy&&list.length&&!inm.length?[[gwPruned(list,s.mode),'n']]:gbTok(list,j,s.modeBy?s.mode:null,x=>!s.modeBy||gwIn(x));const inline=!fold;
+ /* (counted in the mode the tree prunes to from the moment it is picked, as the tree's headings count it) */
+ const pk=s.modeBy?s.mode:s.asked&&gw.picking||null;
+ const toks=s.modeBy&&list.length&&!inm.length?[[gwPruned(list,s.mode),'n']]:gbTok(list,j,pk,x=>!pk||gbRank[x.mode]<=gbRank[pk]);const inline=!fold;
  const head=[h('span',{class:'no'},String(n)),h('span',{class:'tt','data-testid':'grow-ol-title-'+n},...gwRich(gwJourneyTitle(j)),j.by&&j.by!=='rules'?h('span',{class:'by'},j.by==='spec'?'from the spec':j.by):null),
   h('span',{class:'wh'},gwFacts([gbStarts(j,M)])),
   h('span',{class:'st'},list.length?h('span',{class:'gb-gs'},gbByRole(list).map(gbGlyph)):null,gbToks(toks))];
@@ -2909,6 +2913,10 @@ function gbOlKeys(e){const all=[...e.currentTarget.querySelectorAll('[data-ol]')
 function gbOrderOf(M){return gw.order&&gw.order.length?gw.order.map(id=>M.J.find(j=>j.id===id)).filter(Boolean):gbOrder(M)}
 /* The Outline: the tree as a list, in sections: the journeys, the parts checked on their own, what the change depends on, then
    every part, folded. */
+/* The Outline's key: only the marks its rows draw, in the state table's order, at most five */
+function gbOlKeyMarks(lf){const s=gw.state,seen=new Set(gwInView().map(x=>{const k=gwStKey(x);return k==='ready'||k==='could'?'in':k==='nf'?'none':k}));
+ const out=[['pass','passed'],['fail','failed'],['run','running'],['in',gwInKey()],['none','no flow yet']].filter(q=>seen.has(q[0])).map(q=>lf(q[0],q[1]));
+ if(s.modeBy&&s.scenarios.some(x=>!gwIn(x)))out.push(lf('cut','pruned, named under its journey'));return out.slice(0,5)}
 function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrderOf(M);gw.order=order.map(j=>j.id);
  /* what is pinned is never hidden in a closed fold: its fold opens once, when the pin changes */
  if(gw.olPin!==gw.pinned){gw.olPin=gw.pinned;const p=gw.pinned||'',O=gw.open||(gw.open={});
@@ -2917,9 +2925,9 @@ function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrder
  const el=h('div',{class:'gb-ol','data-testid':'grow-outline',on:{keydown:gbOlKeys}});const lf=(c,t)=>h('span',{class:'gw-li'},gwSw(c),h('span',{},t));
  const buds=gbBudFolds(M);
  gwPut(el,M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface. Grow again to trace journeys.'):null,
-  gwOlPromises(),order.length?gbSec('Journeys',String(order.length)):h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
+  gwOlPromises(),gwOlModes(),order.length?gbSec('Journeys',String(order.length)):h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
   /* what each leaf means, in one line under the heading, before the first leaf it explains */
-  order.length&&s.scenarios.length?h('div',{class:'gb-olkey',role:'group','aria-label':'What each leaf means'},lf('pass','passed'),lf('fail','failed'),lf('run','running'),lf('in',gwInKey()),lf('none','no flow yet'),s.modeBy&&s.scenarios.some(x=>!gwIn(x))?lf('cut','pruned, named under its journey'):null):null,
+  order.length&&s.scenarios.length?h('div',{class:'gb-olkey',role:'group','aria-label':'What each leaf means'},...gbOlKeyMarks(lf)):null,
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,false)),
   M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null,
   buds[0]||buds[1]?[gbSec(gwOwnHead(s.units.flatMap(u=>M.buds[u.id]||[]))),buds]:null,gbOlRoots(M,order),gbOlParts(M,order),
@@ -2929,7 +2937,7 @@ function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrder
    the tree says only what this does not. */
 function gbJourneys(){const s=gw.state,M=gw.M||gbModel();const card=h('section',{class:'card gw-jcard','aria-label':'Journeys','data-testid':'grow-scenarios'});const order=gbOrderOf(M);
  gwPut(card,h('div',{class:'row',style:'justify-content:space-between;margin-bottom:6px'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Journeys · '+M.J.length),
-  h('span',{class:'small muted'},!s.scenarios.length?'Drafted after tracing':s.modeBy?gwFacts([s.scenarios.filter(gwIn).length+' scenarios in '+gbModeName(s.mode),s.scenarios.length+' drafted']):gwFacts([s.scenarios.length+' drafted',s.scenarios.filter(gwIn).length+' in Minimum']))),
+  h('span',{class:'small muted'},!s.scenarios.length?'Drafted after tracing':s.modeBy?gwFacts([s.scenarios.filter(gwIn).length+' scenarios in '+gbModeName(s.mode),s.scenarios.length+' drafted',gwOpenRunsBtn()]):gwFacts([s.scenarios.length+' drafted',s.scenarios.filter(gwIn).length+' in Minimum']))),
   M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface, links between parts not recorded. Grow again to trace journeys.'):null,
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,true)),gbBudFolds(M),
   M.jin.length?h('p',{class:'gb-loose'},'Changed, on no journey: '+M.jin.map(u=>u.label).join(', ')+'. Nothing in this change reaches '+(M.jin.length===1?'it':'them')+'; Max checks '+(M.jin.length===1?'it':'them')+' on '+(M.jin.length===1?'its':'their')+' own.'):null,

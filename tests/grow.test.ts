@@ -3662,7 +3662,7 @@ describe('Grow page', () => {
         const page = await treePage(browser, server.url, asked, { width: 1440 });
         await settled(page);
         const pointed = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.preview = 'min'; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
-        expect(Object.values(pointed).some((t) => /keeps \d+/.test(t)), JSON.stringify(pointed)).toBe(true);
+        expect(Object.values(pointed).some((t) => /cuts \d+/.test(t)), JSON.stringify(pointed)).toBe(true);
         const first = await page.evaluate((f) => { const w = (0, eval)('({ gw, gbPaint })'); w.gw.picking = 'min'; w.gw.preview = null; w.gbPaint(); return (0, eval)('(' + f + ')')(); }, words.toString()) as Record<string, string>;
         expect(Object.values(first).some((t) => /pruned/.test(t)), JSON.stringify(first)).toBe(true);
         for (const t of Object.values(first)) expect(/keeps|cuts/.test(t) && /pruned/.test(t), t).toBe(false);
@@ -3728,10 +3728,13 @@ describe('Grow page', () => {
           }, mode);
           const at = file + ' at ' + width + 'px: ' + JSON.stringify(c);
           expect(c.button, at).toBe(total);
-          expect(c.passed + c.failed + c.open, at).toBe(total);
-          expect([c.keyPassed, c.keyFailed, c.keyOpen], at).toEqual([c.passed, c.failed, c.open]);
+          // the key counts the scenarios by their marks; the counts line says how many promises hold, and counts scenarios only
+          // when the change has no promises, and then the same as the key
+          expect(c.keyPassed + c.keyFailed + c.keyOpen, at).toBe(total);
+          if (/passed|failed|not tested yet/.test(c.line)) expect([c.keyPassed, c.keyFailed, c.keyOpen], at).toEqual([c.passed, c.failed, c.open]);
+          else expect(c.line, at).toMatch(/^\d+ of \d+ promises? holds?$|^$/);
           expect(c.marks, at).toBe(total);
-          expect(c.failedMarks, at).toBe(c.failed);
+          expect(c.failedMarks, at).toBe(c.keyFailed);
           expect(c.onShoots, at).toBe(c.shoots);
           // no separator left dangling in the counts line
           expect(c.line, at).not.toMatch(/^·|·$|· ·/);
