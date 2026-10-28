@@ -9,6 +9,7 @@ import type { ChangeUnit } from '../src/authoring/growChange.ts';
 import { draftWithAgent, type ProvedFlow } from '../src/authoring/workspace.ts';
 import { expGot } from '../src/authoring/checkCompare.ts';
 import { failureWords, growJsonSummary, verdictFacts } from '../src/authoring/growJson.ts';
+import { jsonState, STATE_WORDS } from '../src/authoring/growWords.ts';
 import { applyGrow, freshGrow, growVerdict, growView, inMode, plainTitle, type GrowEvent, type GrowState, type VerdictFacts } from '../src/authoring/growState.ts';
 import { configRunsRoot } from '../src/authoring/runLocation.ts';
 import * as atomicFiles from '../src/core/atomicFiles.ts';
@@ -261,7 +262,10 @@ describe('From a grown scenario to its run', () => {
     const v = page.getByTestId('grow-verdict');
     const title = plainTitle(state.scenarios.find((x) => x.id === failed)!.title);
     // It names the promise that failed and how, from the run's recorded check: never the title alone, which says the opposite.
-    await expect(v.textContent()).resolves.toBe(`✗ Not ready“${title}” failed: expected body.count 0, got 1breaks: GET /notes/count returns how many notes the caller owns; Another user's notes are never countedSee what happened ›`);
+    // then its step with what it expected and got on a line of its own, the promises it breaks whole, and the way to what happened
+    await expect(v.textContent()).resolves.toBe(`✗ Not ready“${title}” failedStep 3 · expected body.count 0, got 1breaks: GET /notes/count returns how many notes the caller owns; Another user's notes are never countedSee what happened`);
+    // the chip is never shortened, and nothing of it is only in a tooltip
+    await expect(v.locator('.gw-vc').getAttribute('title')).resolves.toBe(null);
     const fit = () => page.evaluate(() => {
       const v = document.querySelector('[data-testid="grow-verdict"]') as HTMLElement, r = v.getBoundingClientRect();
       const tree = document.querySelector('[data-testid="grow"] .gw-tree')!.getBoundingClientRect();
@@ -272,15 +276,15 @@ describe('From a grown scenario to its run', () => {
         inside: kids.every((k) => k.top >= r.top && k.bottom <= r.bottom && k.left >= r.left && k.right <= r.right), whole: t.scrollWidth <= t.clientWidth };
     });
     expect(await fit()).toEqual({ inBand: false, beside: true, overResult: true, inside: true, whole: true });
-    // The plotline grow's verdict fits the same way.
+    // The plotline grow's verdict fits the same way. Its promise is the failed scenario's own name, so no chip says it again.
     const plot = plotline();
     await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot) });
-    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 calls, got 3breaks this promiseSee what happened ›');
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 calls, got 3See what happened');
     expect(await fit()).toEqual({ inBand: false, beside: true, overResult: true, inside: true, whole: true });
     // With its run's recorded check, as the server reads it, the count is said in the route's own word.
     const facts = { step: 4, stepName: 'only the Team upgrade and the added seat were charged', check: 'payments POST /v1/charges call count', expected: 2, got: 3 };
     await page.evaluate(({ s, v }) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state = s; w.gw.view = v; w.growPaint(); }, { s: plot, v: growView(plot, facts) });
-    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failed: expected 2 charges, got 3breaks this promiseSee what happened ›');
+    await expect(v.textContent()).resolves.toBe('✗ Not ready“Removing a seat never charges the card” failedStep 4 · expected 2 charges, got 3See what happened');
     expect(await fit()).toEqual({ inBand: false, beside: true, overResult: true, inside: true, whole: true });
     await page.close();
   });
@@ -328,8 +332,10 @@ describe('From a grown scenario to its run', () => {
     // beside the verdict line, never inside it
     expect(await next.evaluate((b) => !b.closest('[data-testid="grow-verdict"]'))).toBe(true);
     await expect(next.textContent()).resolves.toBe('See why it could not run ›');
-    await expect(page.getByTestId('grow-result').textContent()).resolves.toBe('3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs');
-    await expect(page.getByTestId('grow-untested').locator('li .w').allTextContents()).resolves.toEqual(['no flow yet', 'no flow yet', 'no flow yet', 'could not run']);
+    // the band says how many promises hold; the key under the tree counts the scenarios by their marks
+    await expect(page.getByTestId('grow-result').textContent()).resolves.toBe('1 of 5 promises hold');
+    await expect(page.getByTestId('grow-key').locator('li').allTextContents()).resolves.toEqual(['1 could not run', '3 no flow yet', '3 passed']);
+    await expect(page.getByTestId('grow-untested').locator('li .w').allTextContents()).resolves.toEqual(['could not run', 'no flow yet', 'no flow yet', 'no flow yet']);
     await next.click();
     await page.locator('.gw-drerr').or(page.getByTestId('grow-happened-oneline')).waitFor();
     expect(await page.evaluate(() => (0, eval)('gw').dr.sid)).toBe('s10');
@@ -376,8 +382,9 @@ describe('From a grown scenario to its run', () => {
       why: 'Not proven: the run evidence did not verify' } as GrowEvent : e));
     expect(reasons(unverified).s10).toBe('Not proven: the run evidence did not verify');
     await show(page, unverified);
-    await expect(big()).resolves.toBe('3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs');
-    await expect(words()).resolves.toEqual(['no flow yet', 'no flow yet', 'no flow yet', 'flow ready (not run)']);
+    await expect(big()).resolves.toBe('1 of 5 promises hold');
+    await expect(page.getByTestId('grow-key').locator('li').allTextContents()).resolves.toEqual(['3 no flow yet', '1 flow ready (not run)', '3 passed']);
+    await expect(words()).resolves.toEqual(['flow ready (not run)', 'no flow yet', 'no flow yet', 'no flow yet']);
     // s1 has no flow of its own; an agent wrote one and ran it, and the app did not start: it could not run, as grow --json says
     const s1 = plotline().scenarios.find((x) => x.id === 's1')!;
     expect(s1.flow).toBeFalsy();
@@ -388,7 +395,8 @@ describe('From a grown scenario to its run', () => {
     expect(written.run.s1).toMatchObject({ st: 'not_run', flow: 'discovered.seats-panel' });
     expect(reasons(written).s1).toMatch(/^Could not run: the app did not start/);
     await show(page, written);
-    await expect(big()).resolves.toBe('3 passed · 1 failed · 3 not tested yet · 1 of 5 promises hold · Open the runs');
+    await expect(big()).resolves.toBe('1 of 5 promises hold');
+    await expect(page.getByTestId('grow-key').locator('li').allTextContents()).resolves.toEqual(['1 failed', '1 could not run', '2 no flow yet', '3 passed']);
     await expect(words()).resolves.toEqual(['could not run', 'no flow yet', 'no flow yet']);
     await page.close();
   });
@@ -422,16 +430,16 @@ describe('From a grown scenario to its run', () => {
     const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent : e));
     expect(reasonsOf(crashed).s10).toBe(APP);
     await pinned(page, crashed, 's10');
-    expect(await said(page, 's10')).toEqual({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['no flow yet', 'no flow yet', 'no flow yet', 'could not run'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
-      proof: ['seats.remove-seat'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready, or could not run'], live: ['3 no flow yet', '1 flow ready, or could not run', '3 passed'] });
+    expect(await said(page, 's10')).toEqual({ band: '1 of 5 promises hold', untested: ['could not run', 'no flow yet', 'no flow yet', 'no flow yet'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
+      proof: ['seats.remove-seat'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready (not run), or could not run'], live: ['1 could not run', '3 no flow yet', '3 passed'] });
     // one with no flow at all has none yet, everywhere, and offers to write it
     await pinned(page, crashed, 's5');
     expect(await said(page, 's5')).toMatchObject({ row: 'no flow yet', card: 'no flow yet', why: 'No flow proves this yet.', write: true, proof: ['no flow yet'], leaf: 'no flow yet', mark: 'none' });
     // a run whose evidence did not verify is still flow ready, with why; nothing could not run, so the key says only flow ready
     const unverified = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'passed', why: 'Not proven: the run evidence did not verify' } as GrowEvent : e));
     await pinned(page, unverified, 's10');
-    expect(await said(page, 's10')).toMatchObject({ band: '3 passed · 4 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['no flow yet', 'no flow yet', 'no flow yet', 'flow ready (not run)'], row: 'flow ready', card: 'flow ready', why: 'Not proven: the run evidence did not verify.', write: false,
-      leaf: 'flow ready: Not proven: the run evidence did not verify', mark: 'idle', key: ['flow ready'], live: ['3 no flow yet', '1 flow ready', '3 passed'] });
+    expect(await said(page, 's10')).toMatchObject({ band: '1 of 5 promises hold', untested: ['flow ready (not run)', 'no flow yet', 'no flow yet', 'no flow yet'], row: 'flow ready (not run)', card: 'flow ready (not run)', why: 'Not proven: the run evidence did not verify.', write: false,
+      leaf: 'flow ready (not run): Not proven: the run evidence did not verify', mark: 'idle', key: ['flow ready (not run)'], live: ['3 no flow yet', '1 flow ready (not run)', '3 passed'] });
     await page.close();
   });
 
@@ -444,8 +452,8 @@ describe('From a grown scenario to its run', () => {
     expect(written.scenarios.find((x) => x.id === 's1')!.flow).toBeFalsy();
     expect(reasonsOf(written).s1).toBe(APP);
     await pinned(page, written, 's1');
-    expect(await said(page, 's1')).toEqual({ band: '3 passed · 1 failed · 3 not tested yet · 1 of 5 promises hold · Open the runs', untested: ['could not run', 'no flow yet', 'no flow yet'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
-      proof: ['discovered.seats-panel'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready, or could not run'], live: ['1 failed', '2 no flow yet', '1 flow ready, or could not run', '3 passed'] });
+    expect(await said(page, 's1')).toEqual({ band: '1 of 5 promises hold', untested: ['could not run', 'no flow yet', 'no flow yet'], row: 'could not run', card: 'could not run', why: `${APP}.`, write: false,
+      proof: ['discovered.seats-panel'], leaf: 'could not run: the app did not start (application exited before becoming ready)', mark: 'idle', key: ['flow ready (not run), or could not run'], live: ['1 failed', '1 could not run', '2 no flow yet', '3 passed'] });
     const acts = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-inspector"] [data-testid="grow-card-actions"] button')).map((b) => b.textContent));
     expect(acts).toEqual(['Rerun', 'Copy link']);
     // its row in the Outline says the same, with the same reason when it is opened
@@ -464,6 +472,9 @@ describe('From a grown scenario to its run', () => {
     const crashed = plotline((e) => (e.kind === 'scenario.failed' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: e.scenario, run: e.run, outcome: 'infrastructure_failed', why: APP } as GrowEvent
       : e.kind === 'scenario.passed' && e.scenario === 's4' ? { ...e, run: '2026-12-31T00-00-00Z_pass_newest' } as GrowEvent : e));
     await pinned(page, crashed, 's4');
+    // a pinned leaf takes the Next block's place; Escape brings it back
+    await expect(page.getByTestId('grow-verdict-next').count()).resolves.toBe(0);
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('grow-verdict-next').textContent()).resolves.toBe('See why it could not run ›');
     await page.getByTestId('grow-open-runs').click();
     expect(await drawn(page)).toMatchObject({ tab: 'Discover', sid: 's10' });
@@ -638,10 +649,11 @@ describe('One failure, worded one way everywhere', () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
     await page.goto(server.url);
-    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain(`failed: ${words}`);
+    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain(`failedStep 2 · ${words}`);
     await page.getByTestId('grow-view-outline').click();
     const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
-    expect(row.startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
+    expect(row, row).toMatch(/^Step \d+ · /);
+    expect(row.replace(/^Step \d+ · /, '').startsWith(`Broke at check “the card was charged the Team price once”: ${words}`)).toBe(true);
     // The drawer, on the step that broke.
     await page.getByTestId('grow-verdict-open').click();
     await page.getByTestId('grow-happened-oneline').waitFor();
@@ -670,7 +682,8 @@ describe('One failure, worded one way everywhere', () => {
     await page.getByTestId('grow-view-outline').click();
     await page.evaluate((id) => { const w = (0, eval)('({ gw, growPaint })'); w.gw.state.run[id].why = 'the card was charged the Team price once: expected 1 call, got 2'; w.growPaint(); }, failed);
     const row = (await page.locator(`.gb-ols[data-sid="${failed}"] + .err`).first().textContent())!;
-    expect(row.startsWith('Broke at check “the card was charged the Team price once”: expected 1 charge, got 2')).toBe(true);
+    expect(row, row).toMatch(/^Step \d+ · /);
+    expect(row.replace(/^Step \d+ · /, '').startsWith('Broke at check “the card was charged the Team price once”: expected 1 charge, got 2')).toBe(true);
     // With no run to read, the recorded reason stands.
     expect(failureWords(state, mkdtempSync(join(tmpdir(), 'tracegrove-norun-')))).toEqual({});
     await page.close();
@@ -977,7 +990,7 @@ describe('grow --json and the exit code', () => {
     const dir = notesCount(true);
     const { code, state, summary } = await growCommand({ ...flags(dir), json: true }, () => {});
     expect(code).toBe(1);
-    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven', 'stopped']);
+    expect(Object.keys(summary!)).toEqual(['verdict', 'exitCode', 'exitMeaning', 'mode', 'counts', 'promises', 'failures', 'unproven', 'stopped', 'words']);
     expect(summary).toMatchObject({ verdict: 'not ready', exitCode: 1, exitMeaning: 'fix', mode: 'Minimum', counts: { passed: 1, failed: 1, notTestedYet: 0 }, promises: { hold: 1, of: 3 }, unproven: [], stopped: null });
     const x = state.scenarios.find((y) => y.flow === 'notes.count')!;
     const f = summary!.failures[0]!;
@@ -1128,9 +1141,60 @@ describe('grow --json and the exit code', () => {
       { encoding: 'utf8', timeout: 60_000 });
     expect(child.status).toBe(1);
     expect((JSON.parse(child.stdout) as { summary: { exitCode: number } }).summary.exitCode).toBe(1);
+    // The json carries the page's words beside its codes: a word beside each run's st, a mode name beside each mode.
+    const out = JSON.parse(child.stdout) as { state: { mode: string; modeName: string; run: Record<string, { st: string; word: string }>; scenarios: Array<{ mode: string; modeName: string }> }; summary: { words: { scenarios: Array<{ st: string | null; word: string }> } } };
+    expect(out.state.modeName).toBe('Minimum');
+    for (const r of Object.values(out.state.run)) expect(r.word).toBe(r.st === 'pass' ? 'passed' : r.st === 'fail' ? 'failed' : r.st === 'run' ? 'running' : expect.stringMatching(/^(could not run|no flow yet|flow ready \(not run\)|not tested yet)$/));
+    expect(out.state.run).not.toEqual({});
+    for (const x of out.state.scenarios) expect(x.modeName).toBe({ min: 'Minimum', std: 'Standard', max: 'Max' }[x.mode]);
+    expect(out.summary.words.scenarios.find((x) => x.st === 'fail')!.word).toBe('failed');
     const unproved = spawnSync(process.execPath, ['--import', resolve('node_modules/tsx/dist/loader.mjs'), resolve('src/cli/main.ts'), 'grow', '--dir', dir, '--branch', 'notes-count', '--base', 'main', '--mode', 'min', '--no-gh', '--no-agent', '--no-prove'],
       { encoding: 'utf8', timeout: 60_000 });
     expect(unproved.status).toBe(3);
     expect(unproved.stdout.trimEnd().split('\n').at(-1)).toMatch(/^◌ Not proven yet: \d+ of \d+ scenarios in Minimum not tested yet$/);
   }, 120_000);
+});
+
+describe('grow --json speaks the page\'s words', () => {
+  it('words each scenario as the page does, beside its st and its mode, counts by those words, and keeps every key it had', () => {
+    const s = plotline();
+    const summary = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-words-')));
+    const w = summary.words;
+    // the counts line the page prints, from the same counts as the verdict
+    expect(w.countsLine).toBe('3 passed · 1 failed · 3 not tested yet');
+    expect(summary.counts).toEqual({ passed: 3, failed: 1, notTestedYet: 3 });
+    expect(w.states).toEqual({ failed: 1, 'no flow yet': 3, passed: 3 });
+    expect(w.modeName).toBe('Minimum');
+    const by = Object.fromEntries(w.scenarios.map((x) => [x.scenario, x]));
+    expect(by.s10).toMatchObject({ st: 'fail', word: 'failed', mode: 'min', modeName: 'Minimum', inMode: true });
+    // the three with no result and no flow: "no flow yet", never "not run" or "unproven"
+    for (const id of ['s1', 's5', 's6']) expect(by[id]).toMatchObject({ st: 'not_run', word: 'no flow yet', inMode: true });
+    for (const u of summary.unproven) expect(by[u.scenario]!.word).toMatch(/^(no flow yet|flow ready \(not run\)|could not run|running)$/);
+    // every scenario out of the mode still has its mode's name
+    for (const x of w.scenarios) expect(x.modeName).toBe({ min: 'Minimum', std: 'Standard', max: 'Max' }[x.mode]);
+    expect(w.vocabulary).toEqual({ states: ['failed', 'running', 'could not run', 'no flow yet', 'flow ready (not run)', 'passed'], notTestedYet: 'not tested yet',
+      promises: ['holds', 'agent-checked', 'partly holds', 'running', 'broken', 'not tested yet', 'not traced yet', 'needs you'], modes: ['Minimum', 'Standard', 'Max'] });
+    // a promise is worded from the table too, never "untested"
+    expect(w.promiseWords.map((p) => p.word)).not.toContain('untested');
+    expect(w.promiseWords.filter((p) => p.word === 'holds')).toHaveLength(summary.promises.hold);
+  });
+
+  it('words a run that never reached its checks "could not run", and one whose flow did not run "flow ready (not run)"', () => {
+    const why = "(app startup): application exited before becoming ready; last app output:\n    at x";
+    const s = plotline((e) => { if (e.kind !== 'scenario.failed') return e; const { hop: _h, after: _a, ...rest } = e; return { ...rest, why }; });
+    const w = growJsonSummary(s, mkdtempSync(join(tmpdir(), 'tracegrove-words-'))).words;
+    expect(w.scenarios.find((x) => x.scenario === 's10')).toMatchObject({ st: 'not_run', word: 'could not run' });
+    expect(w.countsLine).toBe('3 passed · 4 not tested yet');
+    const ready = plotline((e) => (e.kind === 'scenario.passed' && e.scenario === 's8' ? { v: e.v, seq: e.seq, ms: e.ms, kind: 'scenario.not_run', scenario: 's8', why: 'Stopped before it ran' } as GrowEvent : e));
+    expect(growJsonSummary(ready, mkdtempSync(join(tmpdir(), 'tracegrove-words-'))).words.scenarios.find((x) => x.scenario === 's8')).toMatchObject({ st: 'not_run', word: STATE_WORDS.ready });
+  });
+
+  it('prints the state with a word beside each st and a mode name beside each mode, renaming and removing nothing', () => {
+    const s = plotline(); const j = jsonState(s);
+    for (const k of Object.keys(s)) expect(j).toHaveProperty(k);
+    expect(j.mode).toBe(s.mode); expect(j.modeName).toBe('Minimum');
+    for (const [id, r] of Object.entries(s.run)) expect(j.run[id]).toEqual({ ...r, word: expect.any(String) });
+    expect(j.run.s10!.word).toBe('failed');
+    j.scenarios.forEach((x, i) => { expect(x).toEqual({ ...s.scenarios[i], modeName: expect.any(String) }); });
+  });
 });

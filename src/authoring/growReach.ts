@@ -136,6 +136,15 @@ export function reachGraph(dir: string, branch: string, units: ChangeUnit[], pro
       }
     }
   }
+  // An agent's prompt file: the part whose code names the file reads it.
+  for (const p of units.filter((x) => x.kind === "agent's prompt" && !SOURCE.test(x.file))) {
+    const name = p.file.split('/').pop()!;
+    for (const u of units) {
+      if (u.root || u === p) continue;
+      const own = region(u); const m = new RegExp(`['"\`/]${escape(name)}['"\`]`).exec(own.text);
+      if (m) push({ from: u.id, to: p.id, how: 'reads', loc: `${u.file}:${own.from + lineAt(own.text, m.index) - 1}` });
+    }
+  }
   // Roots: the part whose changed lines call a service, or whose code names a table or a cache.
   for (const root of units.filter((x) => x.root)) {
     if (root.parent) { push({ from: root.parent, to: root.id, how: 'calls', loc: `${root.file}:${root.line}` }); }
@@ -193,8 +202,11 @@ export function journeysOf(units: ChangeUnit[], edges: ReachEdge[]): { journeys:
     const ids = reach(u.id); ids.forEach((x) => covered.add(x));
     const first = (out.get(u.id) ?? [])[0];
     const reached = ids.length - 1;
+    // a journey that reaches an agent's prompt says so: the prompt is what changed, the code on the way only reads it
+    const prompt = ids.map((x) => byId.get(x)!).find((x) => x.kind === "agent's prompt");
+    const agent = prompt ? ids.map((x) => byId.get(x)!).find((x) => x.kind === 'agent') : undefined;
     journeys.push({ id: `j${journeys.length + 1}`, title: ruleTitle(u), entry: u.id, units: ids, surface: surfaceOf(u),
-      why: reached ? `${u.label} ${first!.how === 'requests' ? 'requests' : first!.how === 'imports' ? 'calls into' : 'calls'} ${byId.get(first!.to)!.label}${reached > 1 ? ` and ${reached - 1} more part${reached > 2 ? 's' : ''}` : ''}` : `${u.label} is where it starts; no other changed part is reached from it`,
+      why: prompt ? `${u.label}${agent ? ` runs the agent in ${agent.label}, so it` : ''} touches the agent's prompt ${prompt.kind === "agent's prompt" && !SOURCE.test(prompt.file) ? prompt.file : prompt.label}` : reached ? `${u.label} ${first!.how === 'requests' ? 'requests' : first!.how === 'imports' ? 'calls into' : 'calls'} ${byId.get(first!.to)!.label}${reached > 1 ? ` and ${reached - 1} more part${reached > 2 ? 's' : ''}` : ''}` : `${u.label} is where it starts; no other changed part is reached from it`,
       loc: first?.loc ?? `${u.file}:${u.line}` });
   };
   for (const u of entries) if (!inner.has(u.id)) add(u);

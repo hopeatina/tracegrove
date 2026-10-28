@@ -14,6 +14,7 @@ import { cellBundleName } from '../core/bundlePaths.ts';
 import { MODES, growVerdict, growView, inMode, plainTitle, failReason, type GrowState, type Mode, type RunState, type VerdictFacts } from './growState.ts';
 import { configRunsRoot, savedRunDirectory } from './runLocation.ts';
 import { readSavedRun } from './runSource.ts';
+import { jsonWords } from './growWords.ts';
 
 export type GrowFailure = {
   scenario: string; title: string; promise: string | null; flow: string | null; run: string | null;
@@ -32,6 +33,9 @@ export type GrowJsonSummary = {
   unproven: Array<{ scenario: string; title: string; reason: string; run?: string; saved?: true; evidence?: string[] }>;
   /** why a grow stopped, and what to do: null unless it stopped or was cancelled */
   stopped: { code: string; detail: string; action: string } | null;
+  /** the page's words for what the codes above say: each scenario's state word beside its `st` and its mode's name beside
+   *  `mode`, counts by state word, each promise's word, and the vocabulary (growWords.ts, S/r15/WORDS.md) */
+  words: ReturnType<typeof jsonWords>;
 };
 
 /** A failure in the grow's own words, when its run recorded no check to read: where it broke and the first line of its
@@ -195,5 +199,6 @@ export function growJsonSummary(s: GrowState, dir: string, opts: { allowUnproven
     failures: read.map((f) => f.failure),
     unproven: v.unproven.map((u) => { const evidence = u.run ? unprovenEvidence(s, dir, u.scenario) : null; return evidence ? { ...u, saved: true as const, evidence } : u; }),
     stopped: s.blocked ? { code: s.blocked.code, detail: s.blocked.detail, action: s.blocked.action } : null,
+    words: jsonWords(s),
   };
 }

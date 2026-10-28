@@ -24,6 +24,8 @@ import type { TestRunReport } from './runReport.ts';
 import { draftWithAgent, latestObservedRun, type ProvedFlow } from './workspace.ts';
 import { PROVIDERS, findSpec, git, grepAt, harnessOf, isPatternSource, isTestFile, matchCriterion, pullRequestFor, readAt, readChange, routesOf, termsOf, unitsOf, type ChangeUnit, type Criterion, type FileChange } from './growChange.ts';
 import { journeysOf, reachGraph, words } from './growReach.ts';
+import { AGENT_KIND, PROMPT_KIND } from './growPrompt.ts';
+const SOURCE_FILE = /\.(?:[cm]?[jt]sx?|py)$/;
 import {
   GROW_EVENT_VERSION, MODE_RANK, applyGrow, couldNotRun, freshGrow, modeCount, type CellStatus, type DepthStatus, type DepthStep, type GrowEvent, type GrowEventBody,
   type GrowJourney, type GrowState, type Layer, type Mode, type Polarity, type ScenarioKind, type ScenarioLevel, type Tracer,
@@ -467,6 +469,11 @@ function templates(u: ChangeUnit, effects: string[]): Template[] {
     { kind: 'happy', title: `Calls ${u.label} and uses the answer`, proves: `The request ${u.label} receives is the one intended, and its answer is used.`, risk: 0 },
     { kind: 'sad', title: `${u.label} errors are surfaced`, proves: `An error from ${u.label} is reported, never swallowed.`, risk: 2 },
     { kind: 'edge', title: `${u.label} is slow or unreachable`, proves: 'The caller times out cleanly and says what happened.', risk: 1, mockOnly: `${u.label} can’t be made slow or unreachable on demand, so this fault runs against the stand-in only` }];
+  if (u.kind === PROMPT_KIND) return [
+    { kind: 'happy', title: `The agent follows ${SOURCE_FILE.test(u.file) ? u.label : u.file}`, proves: 'On a case the new prompt covers, the agent answers as it now says, in the shape its callers read.', risk: 0 },
+    { kind: 'edge', title: 'A case the prompt does not cover still gets a valid answer', proves: 'The answer still parses and its callers fall back safely.', risk: 1 }];
+  if (u.kind === AGENT_KIND) return [
+    { kind: 'happy', title: `${u.label} sends its prompt and reads the answer`, proves: 'It sends the prompt it reads and turns the answer into what its callers use.', risk: 0 }];
   return [{ kind: 'happy', title: `${u.label} gives its callers the right result`, proves: 'Proved through the commands and routes that call it.', risk: 0 },
     { kind: 'sad', title: 'Unexpected input does not escape as a crash', proves: 'Its callers report a clear error instead of a stack trace.', risk: 1 }];
 }
@@ -536,6 +543,19 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** A journey's own scenarios, at the surface a person starts from: end to end first, then the ways it fails there. */
 function journeyTemplates(entry: ChangeUnit, parts: ChangeUnit[], effects: string[]): Template[] {
+  // A journey a change reaches only through an agent's prompt: what it proves is that the journey still acts on the agent's
+  // answer as the new prompt words it, not the entry's own code, which did not change.
+  const prompt = parts.find((p) => p.kind === PROMPT_KIND);
+  if (prompt && !entry.added.length) {
+    const agent = parts.find((p) => p.kind === AGENT_KIND); const by = agent ? `the ${agent.label} agent` : 'the agent';
+    const what = SOURCE_FILE.test(prompt.file) ? prompt.label : prompt.file;
+    const start = entry.kind === 'route' ? entry.label : entry.layer === 'jobs' ? `The ${words(entry.label).toLowerCase()} job` : words(entry.label);
+    return [
+      { kind: 'happy', title: `${start} acts on ${by}'s answer under the new prompt`, proves: `${entry.label} runs ${by} with ${what}; its answer parses and ${entry.label} acts on it.`, risk: 0 },
+      { kind: 'sad', title: `When ${by}'s answer does not parse, ${entry.kind === 'route' ? entry.label : 'it'} still answers`, proves: `A reply that is not what ${what} asks for falls back to a safe default instead of an error.`, risk: 2 },
+      { kind: 'edge', title: 'Cases the old prompt handled get the same answer', proves: `Inputs from before the change are answered as before, except where ${what} meant to change them.`, risk: 1 },
+    ];
+  }
   if (entry.layer !== 'ui') return templates(entry, effects);
   const routes = parts.filter((p) => p.kind === 'route');
   const names = routes.slice(0, 3).map((r) => r.label).join(', ') + (routes.length > 3 ? ` and ${routes.length - 3} more` : '');
@@ -601,6 +621,8 @@ function criticalJourneys(ctx: Ctx, linkedTo: (unit: string) => string[]): Set<s
     picked.push(next.j); serves(next.j).forEach((c) => served.add(c));
   }
   for (const r of ranked) if (picked.length < CRITICAL_CAP && !picked.includes(r.j) && r.weight >= total / 10) picked.push(r.j);
+  // A changed agent's prompt puts every journey that runs the agent at the same risk: the lines they share are its words.
+  for (const r of ranked) if (picked.length < CRITICAL_CAP && !picked.includes(r.j) && r.j.units.some((id) => unit(id)?.kind === PROMPT_KIND)) picked.push(r.j);
   return new Set(picked.map((j) => j.id));
 }
 

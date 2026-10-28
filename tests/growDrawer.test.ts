@@ -299,16 +299,17 @@ describe('What happened, step by step', () => {
     await page.close();
   });
 
-  it('opens on the first failure’s broken step from the result band, above the fold at 1440 × 900, and gives focus back there', async () => {
+  it('opens on the first failure’s broken step from Open the runs in the Journeys card, and gives focus back there', async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
     await page.goto(server.url);
     const go = page.getByTestId('grow-open-runs');
     await go.waitFor();
     await expect(go.textContent()).resolves.toBe('Open the runs');
+    // it sits in the head of the Journeys card, beside the runs it opens (the first screen keeps See what happened in the verdict)
+    expect(await go.evaluate((b) => !!b.closest('[data-testid="grow-scenarios"]'))).toBe(true);
+    await go.scrollIntoViewIfNeeded();
     expect(await go.evaluate((b) => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
-    // it sits in the slim result line under the verdict
-    expect(await go.evaluate((b) => !!b.closest('[data-testid="grow-result"]'))).toBe(true);
     await go.click();
     await opened(page);
     await expect(page.getByTestId('grow-happened-title').textContent()).resolves.toBe('Removing a seat never charges the card');
@@ -351,9 +352,14 @@ describe('What happened, step by step', () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => { errors.push(String(e)); });
     await page.goto(server.url);
-    const go = page.getByTestId('grow-open-runs');
+    // the verdict's See what happened opens the drawer from the left column, over the mode cards' x
+    const go = page.getByTestId('grow-verdict-open');
     await go.waitFor();
-    const box = (await go.boundingBox())!;
+    // a repaint can replace the link between the wait and the read (the run's evidence arrives after the page shows), so read
+    // its box once it is on the page again rather than from the node that was swapped out
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    for (let i = 0; i < 20 && !box; i++) { await go.scrollIntoViewIfNeeded().catch(() => {}); box = await go.boundingBox(); if (!box) await page.waitForTimeout(100); }
+    if (!box) throw new Error('See what happened never settled on the page');
     await page.mouse.move(box.x + 5, box.y + 5); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const before = await page.evaluate(() => scrollY);
     await page.mouse.down(); await page.mouse.up();
@@ -473,7 +479,7 @@ describe('What happened, step by step', () => {
     const last = await (await fetch(new URL('/api/grow/last?branch=seats', server.url))).json() as { view: { more: Record<string, string> } };
     expect(last.view.more).toEqual({ [failed]: more });
     const page = await open(`#grow/${failed}`);
-    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain('“Removing a seat never charges the card” failed: expected 2 charges, got 3');
+    await expect(page.getByTestId('grow-verdict').textContent()).resolves.toContain('“Removing a seat never charges the card” failedStep 4 · expected 2 charges, got 3');
     const card = page.locator('.gw-insw');
     await expect(card.locator('.gw-broke > span').first().textContent()).resolves.toContain('were charged”: expected 2 charges, got 3');
     await expect(card.getByTestId('grow-card-more').textContent()).resolves.toBe(more);
@@ -510,9 +516,9 @@ describe('What happened, step by step', () => {
     for (const width of [1024, 768]) {
       const page = await open('', width);
       const v = page.getByTestId('grow-verdict');
-      await expect(v.textContent()).resolves.toContain('“Removing a seat never charges the card” failed: expected 2 charges, got 3');
+      await expect(v.textContent()).resolves.toContain('“Removing a seat never charges the card” failedStep 4 · expected 2 charges, got 3');
       const m = await v.evaluate((el) => {
-        const t = el.querySelector('.gw-vt') as HTMLElement, r = el.getBoundingClientRect(), cs = getComputedStyle(t), go = el.querySelector('[data-testid="grow-verdict-open"]')!.getBoundingClientRect();
+        const t = el.querySelector('.gw-vt') as HTMLElement, r = el.getBoundingClientRect(), cs = getComputedStyle(t), go = document.querySelector('[data-testid="grow-verdict-open"]')!.getBoundingClientRect();
         return { whole: t.scrollWidth <= t.clientWidth && t.scrollHeight <= t.clientHeight + 1, cut: cs.textOverflow === 'ellipsis' || cs.whiteSpace === 'nowrap',
           inside: r.left >= 0 && r.right <= innerWidth && go.right <= innerWidth, page: document.documentElement.scrollWidth <= innerWidth, tooltip: t.hasAttribute('title') || el.hasAttribute('title') };
       });
@@ -579,11 +585,12 @@ describe('What happened, step by step', () => {
     }
   });
 
-  it('gives every button in the result band at least 44 px on a phone', async () => {
+  it('gives every button in the result band and the verdict, and Open the runs, at least 44 px on a phone', async () => {
     const page = await open(`#grow/${failed}`, 390);
-    const sizes = await page.getByTestId('grow-result').evaluate((band) => Array.from(band.querySelectorAll('button')).filter((b) => (b as HTMLElement).offsetParent)
+    const sizes = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="grow-result"] button, [data-testid="grow-verdict"] button, [data-testid="grow-open-runs"]')).filter((b) => (b as HTMLElement).offsetParent)
       .map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent, h: r.height }; }));
     expect(sizes.map((q) => q.t)).toContain('Open the runs');
+    expect(sizes.map((q) => q.t)).toContain('See what happened');
     expect(sizes.filter((q) => q.h < 44)).toEqual([]);
     await page.close();
   });
