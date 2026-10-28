@@ -386,7 +386,7 @@ function gbPadGeo(list,H,dir,seed,crown,K,pol,lmin,tier){const z=Math.max(.6,Mat
  const crest=one||g.happy.length||crown?mk('crest',0,one?gbOrd(list):g.happy):null;
  const sides={};sides[d]=[];sides[-d]=[];if(!one)g.guard.forEach((x,i)=>sides[i%2?-d:d].push(x));
  /* (a crown with no guards and three or more happy paths: every other one to a shoulder, the first of those on the outer one,
-    so its crest keeps the most; on a phone, where the upper trunk's names need the room, the crown stays one crest) */
+    so its crest keeps the most) */
  const hap=tier&&crown&&!one&&!g.guard.length&&g.happy.length>=3;if(hap){const lv=crest.lv;crest.lv=lv.filter((_,i)=>i%2===0);crest.ids=crest.lv.map(x=>x.id);lv.filter((_,i)=>i%2).forEach((x,i)=>sides[i%2?-d:d].push(x))}
  const sIn=sides[-d].length?mk('shoulder',-d,sides[-d]):null,sOut=sides[d].length?mk('shoulder',d,sides[d]):null;if(hap)for(const c of [sIn,sOut])if(c)c.hap=true;
  const cs=[sIn,crest,sOut].filter(Boolean),shs=[sIn,sOut].filter(Boolean);
@@ -1673,7 +1673,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  /* (a card that carries an action stays a moment once the pointer leaves what it explains, so the pointer can reach it across
     the open drawing, and stays while the pointer is on it) */
  const actTip=()=>!!(B.tip&&!B.tip.hidden&&B.tip.classList.contains('act')&&gw.hov);
- svg.addEventListener('pointerover',e=>{const el=e.target.closest&&e.target.closest('[data-k]');if(el!==gw.hovEl){clearTimeout(gw.tipT);if(!el&&actTip()){gw.hovEl=null;gw.tipT=setTimeout(()=>{if(gw.hovEl===null&&!gw.inTip&&gw.B===B)gbHover(null)},400);return}gw.hovEl=el;gbHover(el?el.getAttribute('data-k'):null,el)}});
+ svg.addEventListener('pointerover',e=>{const el=e.target.closest&&e.target.closest('[data-k]');if(el!==gw.hovEl){clearTimeout(gw.tipT);if(!el&&actTip()){gw.hovEl=null;gw.tipT=setTimeout(()=>{if(gw.hovEl===null&&!gw.inTip&&gw.B===B&&gw.state)gbHover(null)},400);return}gw.hovEl=el;gbHover(el?el.getAttribute('data-k'):null,el)}});
  /* a tap on the card moves focus and the mouse off the drawing; redrawing the card then would pull its Close from under the
     finger and lose the tap, so with nothing lit nothing is done */
  svg.addEventListener('pointerleave',e=>{if(!gw.hov&&!gw.hovEl)return;if(e.relatedTarget&&B.tip&&B.tip.contains(e.relatedTarget)&&actTip()){gw.hovEl=null;return}gw.hovEl=null;gbHover(null)});
@@ -1691,7 +1691,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
  /* the grey dots where a route never ran go under the knots they pass, which stand faint over them: each knot cuts them */
  {const kmId='gb-km'+N,km=sv('mask',{id:kmId,maskUnits:'userSpaceOnUse',x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH)},sv('rect',{x:gbF(vx),y:gbF(vy),width:gbF(W),height:gbF(VH),fill:'#fff'}));
   for(const e of B.klq||[])km.append(sv('circle',{cx:gbF(e.p[0]),cy:gbF(e.p[1]),r:gbF(e.ra+2.5),fill:'#000'}));defs.append(km);B.sapX.setAttribute('mask','url(#'+kmId+')')}
- B.tip=h('div',{class:'gb-tip',hidden:true,role:'status',on:{pointerenter:()=>{gw.inTip=true;clearTimeout(gw.tipT)},pointerleave:e=>{gw.inTip=false;if(e.relatedTarget&&B.svg.contains(e.relatedTarget))return;if(gw.hov&&gw.B===B){gw.hovEl=null;gbHover(null)}}}});B.width=width;
+ B.tip=h('div',{class:'gb-tip',hidden:true,role:'status',on:{pointerenter:()=>{gw.inTip=true;clearTimeout(gw.tipT)},pointerleave:e=>{gw.inTip=false;if(e.relatedTarget&&B.svg.contains(e.relatedTarget))return;if(gw.hov&&gw.B===B&&gw.state){gw.hovEl=null;gbHover(null)}}}});B.width=width;
  /* the traced route stays inside what it runs through: the wood (trunk, branches, forks, roots, twigs), never out over the foliage */
  {const rc=sv('clipPath',{id:'gb-rc'+N});for(const c of clip.children)rc.append(c.cloneNode());
   for(const el of svg.querySelectorAll('path.tw'))rc.append(sv('path',{d:el.getAttribute('d')}));

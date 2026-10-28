@@ -2253,6 +2253,55 @@ describe('Grow page', () => {
     return out;
   };
 
+  it('grows a scalene canopy beside a desktop tree: the lowest pad the widest, each higher pad narrower, the crown the smallest pad at the apex', async () => {
+    // the notes sample, grown on a branch that adds GET /count, as the critics' notes tree is
+    const nd = temp();
+    cpSync(join(import.meta.dirname, '../src/samples/notes-api'), nd, { recursive: true });
+    git(nd, 'init', '-q', '-b', 'main'); git(nd, 'add', '-A'); git(nd, 'commit', '-qm', 'Notes sample');
+    git(nd, 'checkout', '-qb', 'count');
+    const app = join(nd, 'app/app.mjs');
+    writeFileSync(app, readFileSync(app, 'utf8').replace('  const match = url.pathname.match(',
+      "  if (req.method === 'GET' && url.pathname === '/count') return send(res, 200, { count: 0 });\n  const match = url.pathname.match("));
+    git(nd, 'add', '-A'); git(nd, 'commit', '-qm', 'Count notes\n\n## Acceptance criteria\n- [ ] GET /count starts at zero');
+    git(nd, 'checkout', '-q', 'main');
+    const notes = (await grow({ dir: nd, branch: 'count', base: 'main', mode: 'min', prove: false, gh: false, agent: { off: true }, save: false })).state;
+    const server = await startUi({ dir: nd, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [name, state] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['notes', notes]] as const) {
+        for (const width of [1440, 1024]) {
+          const page = await treePage(browser, server.url, state, { width, reduce: true });
+          await page.waitForTimeout(400);
+          // each pad's cushions as drawn: its widest cushion, its foot, and the crown's crest
+          const pads = await page.evaluate(() => {
+            const B = (0, eval)('gw').B, out: Record<string, { w: number; bot: number; crown: boolean; crest: number | null; top: number }> = {};
+            for (const c of Array.from(B.svg.querySelectorAll('.pad .cush')) as Element[]) {
+              const f = c.querySelector('.pfill'); if (!f || getComputedStyle(c).display === 'none') continue;
+              const r = f.getBoundingClientRect(); if (!r.width) continue;
+              const pad = c.closest('.pad')!, id = pad.getAttribute('data-pad')!, crown = pad.classList.contains('crown');
+              const o = out[id] ??= { w: 0, bot: -Infinity, crown, crest: null, top: Infinity };
+              o.w = Math.max(o.w, r.width); o.bot = Math.max(o.bot, r.bottom); o.top = Math.min(o.top, r.top);
+              if (crown && c.classList.contains('ccr')) o.crest = r.width;
+            }
+            return out;
+          });
+          const at = name + ' ' + width + 'px', list = Object.entries(pads).sort((a, b) => b[1].bot - a[1].bot);
+          expect(list.length, at).toBeGreaterThanOrEqual(2);
+          // the lowest pad is the widest; each higher pad no wider than any pad below it
+          for (let i = 1; i < list.length; i++) for (let j = 0; j < i; j++)
+            expect(list[i]![1].w / list[j]![1].w, at + ' ' + list[i]![0] + ' over ' + list[j]![0]).toBeLessThanOrEqual(1.001);
+          // the crown is the smallest pad and stands at the apex, its crest at most four fifths of the lowest pad
+          const crown = list.find(([, p]) => p.crown)![1];
+          expect(crown.crest, at + ' crest').not.toBeNull();
+          for (const [, p] of list) expect(crown.crest!, at + ' crest against a pad').toBeLessThanOrEqual(p.w + .001);
+          expect(crown.crest! / list[0]![1].w, at + ' crest to the lowest pad').toBeLessThanOrEqual(.8);
+          expect(crown.top, at + ' crest at the apex').toBeLessThanOrEqual(Math.min(...list.map(([, p]) => p.top)) + .5);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 180000);
+
   it('puts the headline journey in the crown, its crest at most three quarters across the widest cushion below it, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
     const bushy = await grownBushy();
     const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
