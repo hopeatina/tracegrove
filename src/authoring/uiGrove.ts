@@ -472,7 +472,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  .gw-side .gw-result.slim{padding-left:16px;margin:8px 0 14px}
  .gw-side .gb-mode{display:block;margin:0 0 12px}.gw-side .gw-modes.set{display:flex;gap:6px}.gw-side .gw-modes.set button{flex:1 1 auto;padding:4px 8px;gap:6px;justify-content:center;white-space:nowrap}.gw-side .gw-modes.set button b{white-space:nowrap}
  .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;margin-top:6px}.gw-side .gw-hintrow>:not(.gw-barw){grid-column:1}.gw-side .gw-hintrow>.gw-barw{grid-column:2;grid-row:1/span 2;align-self:start}.gw-side .gw-hintrow .gw-more{display:block}
- .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{overflow-wrap:anywhere}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
+ .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{overflow-wrap:anywhere;padding-right:84px}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
  .gw-side .gw-bar{margin:0}.gw-cols .gw-tree>.gw-stage{padding-top:0}
  .gw-cols>.gw-main{display:block}.gw-cols>.gw-main>.card{display:block;padding-top:10px}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
@@ -836,10 +836,10 @@ function gwUntested(){const s=gw.state;if(!s.done||!s.modeBy)return null;
     h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it'))};
  const groups=[];for(const r of rows){const L=groups[groups.length-1];if(L&&L.g===r.g)L.xs.push(r.x);else groups.push({g:r.g,xs:[r.x]})}
  /* up to 8 rows: one list under group headings. Past 8: one row per group, its count and reasons on the row, each opening on its own
-    (the first open), so the list stays a list and nothing not tested is hidden behind prose */
+    (all open until closed), so the list stays a list and nothing not tested is hidden behind prose */
  const O=gw.open||(gw.open={}),words=xs=>{const c={};for(const x of xs){const w=gwOpenWord(x);c[w]=(c[w]||0)+1}return Object.entries(c).map(([w,n])=>n+' '+w).join(', ')};
  const body=rows.length<=8?h('ul',{class:'gw-ulist'},groups.flatMap(G=>[h('li',{class:'gw-ugh'},head(G.g)),...G.xs.map(row)])):
-  h('div',{class:'gw-ugrps'},groups.map((G,i)=>{const k='ug:'+G.g,open=O[k]!=null?O[k]:i===0;
+  h('div',{class:'gw-ugrps'},groups.map((G,i)=>{const k='ug:'+G.g,open=O[k]!=null?O[k]:true;
    /* (a closed group holds only its summary: its rows are built when it opens) */
    const d=h('details',{class:'gw-ugrp','data-testid':'grow-untested-group-'+G.g,open:open?true:null,on:{toggle:e=>{O[k]=d.open;const u=d.querySelector(':scope>ul');if(d.open&&!u)d.append(h('ul',{class:'gw-ulist'},G.xs.map(row)));else if(!d.open&&u)u.remove()}}},h('summary',{},h('span',{class:'t'},head(G.g)),h('span',{class:'n'},words(G.xs))),open?h('ul',{class:'gw-ulist'},G.xs.map(row)):null);
    return d}));
@@ -1182,7 +1182,7 @@ function gwOlPromises(){const v=gw.view;if(!v||!v.criteria.length)return null;
 /* What the change does for its users: one sentence naming each journey, in the spec's words where it has them */
 function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;const N=['One','Two','Three','Four','Five','Six','Seven','Eight','Nine'];
  const lc=t=>/^[A-Z][a-z]/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t,show=J.length>5?J.slice(0,4):J,parts=[];
- show.forEach((j,i)=>{if(i)parts.push(i===show.length-1&&J.length===show.length?'; and ':'; ');parts.push(...gwRich(lc(gwJourneyDoes(j))))});
+ show.forEach((j,i)=>{if(i)parts.push(i===show.length-1&&J.length===show.length?'; and ':'; ');const t=gwJourneyDoes(j);parts.push(...gwRich(i?lc(t):t.charAt(0).toUpperCase()+t.slice(1)))});
  /* then, while the sentence stays short, the spec's other promises in its words: what the change never does or refuses ("another
     user's notes are never counted, and without a token the count is refused"), which a journey's name does not say */
  const words=t=>(gwPlain(t).match(/\S+/g)||[]).length,norm=t=>gwPlain(String(t)).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -1194,9 +1194,9 @@ function gwSummary(){const J=(gw.state.journeys||[]);if(!J.length)return null;co
  const pr={};for(const j of J){const m=/touches the agent's prompt (\S+?)[.,;]?$/.exec(String(j.why||'').trim());if(m)(pr[m[1]]=pr[m[1]]||[]).push(j)}
  const prs=Object.entries(pr).map(([f,js])=>' '+(js.length===J.length?(J.length===1?'It touches':J.length===2?'Both touch':'All '+J.length+' touch'):js.length===1?'One touches':js.length+' touch')+" the agent's prompt "+f+'.');
  /* and what the drawing is, said once, here, so the tree needs no legend to be read */
- const draw=J.length===1?'Tree: leaves are scenarios, the happy path on the crown, what it refuses on a side branch.'
-  :'Tree: branches are journeys, leaves scenarios.';
- return h('p',{class:'gw-sum1','data-testid':'grow-summary'},(N[J.length-1]||String(J.length))+(J.length===1?' journey: ':' journeys: '),...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.',...prs,
+ const draw=J.length===1?'Trunk: the change; leaves: scenarios, the happy path on the crown, refusals on a side branch, hanging ones break.'
+  :'Trunk: the change; branches: journeys; leaves: scenarios, hanging ones break.';
+ return h('p',{class:'gw-sum1','data-testid':'grow-summary'},...parts,J.length>show.length?'; and '+(J.length-show.length)+' more.':'.',...prs,
   ' ',h('span',{class:'gw-sum2','data-testid':'grow-caption'},draw))}
 /* "Open the runs": every run this grow saved, from its first failure's; in the Journeys card's head, beside the runs it opens */
 function gwOpenRunsBtn(){const s=gw.state;return s&&s.scenarios.some(gwRan)?h('button',{class:'gw-lnk','data-testid':'grow-open-runs',type:'button',on:{click:()=>gwOpenRuns()}},'Open the runs'):null}
@@ -1358,7 +1358,7 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   /* the card previewed looks the same before a choice and after it: one ring, whichever card it is */
   for(const b of gw.el.querySelectorAll('.gw-modes [data-m]'))b.classList.toggle('pv',!!id&&b.getAttribute('data-m')===id&&!(locked&&id===cur));
   const d=gw.el.querySelector('.gw-mdesc');if(d)d.replaceChildren(...desc(id||cur))};
- const say=id=>{mark(id);const pop=gw.el&&gw.el.querySelector('[data-testid="grow-mode-pop"]');if(pop){const k=id?gwModePop(id,cur,locked):null;pop.hidden=!k;pop.replaceChildren(...(k||[]));if(k)pop.setAttribute('data-m',id)}
+ const say=id=>{mark(id);const pop=gw.el&&gw.el.querySelector('[data-testid="grow-mode-pop"]');if(pop){const k=id?gwModePop(id,cur,locked):null;pop.hidden=!k;pop.replaceChildren(...(k||[]).filter(Boolean));if(k)pop.setAttribute('data-m',id)}
   const el=gw.el&&gw.el.querySelector('[data-testid="grow-mode-preview"]');if(!el)return;if(!id||id===cur&&locked){el.textContent=idle;return}
   const n=v.counts[id],all=s.scenarios.length;
   if(!locked){el.textContent='Preview · '+lbl(id)+' keeps '+n+' of the '+all+' drafted'+(all>n?' and cuts '+(all-n):'')+'.'+(touch?' Tap it again to choose it.':'');return}
@@ -1473,7 +1473,7 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const full=gw.howOpen?[h('div',{class:'gw-legend','aria-label':'Legend'},where,leaves,route,knot,ground,cut,cmp),
   h('p',{class:'gw-howp'},one?'One journey, end to end: the crown is its happy path; what it refuses and how it fails grow as its branches.':'Each branch is a journey, end to end, fed from the roots it depends on; each leaf is one of its scenarios; each knot a file it passes through.'),
   h('p',{class:'gw-howp'},'On a pad, the happy path sits on the crest, what it refuses on the shoulders, and how it fails hangs beneath.')]:null;
- const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{const o=e.currentTarget.open;if(o!==!!gw.howOpen){gw.howOpen=o;growPaint()}}}},h('summary',{},'Full key'),full);
+ const how=h('details',{class:'gw-howto',open:gw.howOpen?true:null,on:{toggle:e=>{const o=e.currentTarget.open;if(o!==!!gw.howOpen){gw.howOpen=o;growPaint()}}}},h('summary',{},'Key'),full);
  return [names,h('div',{class:'gw-keyrow'},key),how]}
 /* The page, top down: the verdict once there is one, the phases (quiet when done), the tracers, the tree with its inspector, then the journeys and the spec side by side, then what the agent built.
    Everything paints into fixed slots so the tree's SVG stays where it is between paints: moving a node resets its transitions, and the limbs would snap instead of grow. */
