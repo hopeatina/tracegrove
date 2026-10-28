@@ -793,7 +793,7 @@ describe('Grow page', () => {
       stops: Array.from(g.querySelectorAll('.rlbl.nt')).map((t) => ({ text: t.textContent, ...box(t) })), end: g.querySelector('.tailend') ? box(g.querySelector('.tailend')!) : null }));
     const lg = svg.querySelector('.rt.loose');
     const loose = lg ? { tags: Array.from(lg.querySelectorAll('.rlbl')).map((t) => ({ text: t.textContent, lines: t.querySelectorAll('tspan[dy], tspan[y]').length, ...box(t) })), rect: box(lg.querySelector('.tag')!),
-      dash: getComputedStyle(lg.querySelector('.tag')!).strokeDasharray, stake: box(lg.querySelector('.stake')!), cut: box(lg.querySelector('.rcut')!) } : null;
+      dash: getComputedStyle(lg.querySelector('.tag')!).strokeDasharray, stake: box(lg.querySelector('.stake')!), nodes: lg.querySelectorAll('.snode').length } : null;
     const seal = Array.from(svg.querySelectorAll('.seal .sm')).map((t) => ({ text: t.textContent ?? '', len: (t as SVGTextElement).getComputedTextLength() }));
     const room = Number(svg.querySelector('.seal')?.getAttribute('data-room'));
     // the soil line, and where a store root that no journey uses lies against it
@@ -809,13 +809,13 @@ describe('Grow page', () => {
     // (its centre against the soil line, and against its own girth there, over its first seven tenths)
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[], i: number) => [p[1]! - L.sy(p[0]!), lr.w[i]]) : [];
     // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
-    // stands above the soil, and the cut face and stake as drawn
+    // stands above the soil, and where its stake stands
     const root = lr ? (() => {
-      const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], face = lg!.querySelector('.rcut')!;
+      const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], sx = Number((lg!.querySelector('.stake')!.getAttribute('d') ?? '').replace(/^M\s*/, '').split(/[\s,]+/)[0]);
       // (where it shows as it leaves the nebari, before it goes down into the soil)
       const shows = lr.pts.slice(0, Math.max(2, Math.floor(n * .1))).map((p: number[], i: number) => (L.sy(p[0]!) + .7 - (p[1]! - lr.w[i] / 2)) / lr.w[i]);
       return { start: Math.abs(lr.pts[0][0] - X) / hb, past: (Math.abs(e[0] - X) - hb) / L.kpx, shows: Math.min(...shows), endTop: e[1] - lr.w[n - 1] / 2 - L.sy(e[0]),
-        face: [Number(face.getAttribute('cx')) - e[0], Number(face.getAttribute('cy')) - e[1]], faceBox: box(face), op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
+        stakeOff: Math.abs(sx - e[0]), endW: lr.w[n - 1], op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
     })() : null;
     // the pot: its lip a deeper rim of lighter clay than the body with a highlight along its top, its walls leaning in to the foot
     const body = svg.querySelector('.pot-b') as SVGPathElement, lipB = svg.querySelector('.lip-b')!, pt = (svg as SVGSVGElement).createSVGPoint();
@@ -888,10 +888,10 @@ describe('Grow page', () => {
         const stop = root!.stops[0]!, end = root!.end!;
         expect(Math.min(Math.abs(stop.l - end.r), Math.abs(stop.r - end.l)), at).toBeLessThan(8);
         expect(Math.abs(stop.cy - end.cy), at).toBeLessThan(8);
-        // The unused store: a stub sunk to half its depth in the soil, its tag one line inside a dashed border, staked beside
-        // the cut face.
+        // The unused store: a stub sunk to half its depth in the soil, its tag one line inside a dashed border, on a bamboo
+        // cane with nodes standing where the root ends.
         expect(g.loose, at).toBeTruthy();
-        const { tags, rect, dash, stake, cut } = g.loose!;
+        const { tags, rect, dash, stake, nodes } = g.loose!;
         expect(tags, at).toHaveLength(1);
         expect(tags[0]!.text, at).toMatch(/^seats(?: table|…)? · unused$/);
         if (width >= 768) expect(tags[0]!.text, at).toBe('seats table · unused');
@@ -899,22 +899,22 @@ describe('Grow page', () => {
         expect(tags[0]!.l, at).toBeGreaterThanOrEqual(rect.l);
         expect(tags[0]!.r, at).toBeLessThanOrEqual(rect.r);
         expect(dash, at).not.toBe('none');
-        expect(Math.min(Math.abs(stake.cx - cut.l), Math.abs(stake.cx - cut.r)), at).toBeLessThanOrEqual(cut.w + 4);
+        expect(stake.b - stake.t, at).toBeGreaterThan(0);
+        expect(nodes, at).toBeGreaterThan(0);
         // It leaves the nebari with its centre just under the soil line and then goes down into the soil, a root and not a
         // log laid along the soil: never above the soil line, and between, at least half its girth under it.
         for (const [dy] of g.sunk) expect(dy, at).toBeGreaterThan(-1.5);
         expect(Math.max(...g.sunk.map(([dy, w]: number[]) => dy! / w!)), at).toBeGreaterThanOrEqual(.5);
         // ... and a root of its own, faded, running out from under the nebari seventy to ninety pixels past the foot, about
-        // two fifths of it above the soil where it leaves the nebari, its cut end standing out of it with the stake pushed
-        // into the cut face.
+        // two fifths of it above the soil where it leaves the nebari, then under the soil to its end, where its cane stands:
+        // no cut end on the soil to read as a log on the rim.
         const rt = g.root!;
         expect(rt.start, at).toBeLessThanOrEqual(1);
         expect(rt.past, at).toBeGreaterThanOrEqual(69.5);
         expect(rt.past, at).toBeLessThanOrEqual(90.5);
         expect(rt.shows, at).toBeGreaterThanOrEqual(.25);
-        expect(rt.endTop, at).toBeLessThan(-1);
-        expect(Math.hypot(rt.face[0]!, rt.face[1]!), at).toBeLessThan(.5);
-        expect(Math.abs(stake.cx - rt.faceBox.cx), at).toBeLessThanOrEqual(rt.faceBox.w / 2);
+        expect(rt.endTop, at).toBeGreaterThanOrEqual(0);
+        expect(rt.stakeOff, at).toBeLessThanOrEqual(rt.endW / 2);
         expect(rt.op, at).toBeGreaterThanOrEqual(.35);
         expect(rt.op, at).toBeLessThanOrEqual(.75);
         // Bare soil: no moss, which carries nothing.

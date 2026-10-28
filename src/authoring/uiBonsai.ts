@@ -144,7 +144,7 @@ ${TREE_MATERIAL_CSS}
 .gb .seal text{font-family:var(--mono);font-weight:500;letter-spacing:.03em}.gb .seal .sm{fill:color-mix(in srgb,var(--pot-dk) 50%,#000)}.gb .seal .sl{fill:color-mix(in srgb,var(--pot) 50%,#fff);opacity:.45}
 /* (on a dark page the cut shows the paler clay inside it, at least three to one against the face, with no edge) */
 @media (prefers-color-scheme:dark){.gb .seal .sm{fill:color-mix(in srgb,var(--pot) 28%,#fff)}.gb .seal .sl{display:none}}
-.gb .stake{fill:none;stroke:var(--stake);stroke-linecap:round}.gb .tag{fill:var(--paper);stroke:color-mix(in srgb,var(--line2) 70%,var(--ink3));stroke-width:.9}.gb .rt.hl .stake,.gb .rt.sel .stake{stroke:color-mix(in srgb,var(--stake) 60%,var(--ink))}.gb .rt.hl .tag,.gb .rt.sel .tag{stroke:var(--ink3)}.gb .pot{fill:var(--pot)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:1;opacity:.55;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:color-mix(in srgb,var(--pot-dk) 70%,#000);stroke-width:1;opacity:.8;stroke-linecap:round}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .soil{fill:var(--soil-c)}.gb .soilx,.gb .seal,.gb .rhi,.gb .rcutg,.gb .ptag{pointer-events:none}
+.gb .stake{fill:none;stroke:var(--stake);stroke-linecap:round}.gb .cane .stake{stroke:color-mix(in srgb,#c9a94f 70%,var(--stake));stroke-linecap:butt}.gb .snode{fill:none;stroke:color-mix(in srgb,#8a6a2a 80%,var(--stake));stroke-width:.9;stroke-linecap:round}.gb .tag{fill:var(--paper);stroke:color-mix(in srgb,var(--line2) 70%,var(--ink3));stroke-width:.9}.gb .rt.hl .stake,.gb .rt.sel .stake{stroke:color-mix(in srgb,var(--stake) 60%,var(--ink))}.gb .rt.hl .tag,.gb .rt.sel .tag{stroke:var(--ink3)}.gb .pot{fill:var(--pot)}.gb .pot-inc{fill:none;stroke:var(--pot-dk);stroke-width:.9;opacity:.75}.gb .pot-inc.lit{stroke:#fff;stroke-width:.7;opacity:.28}.gb .lip-hi{fill:none;stroke:#fff;stroke-width:1;opacity:.55;stroke-linecap:round}.gb .lip-lo{fill:none;stroke:color-mix(in srgb,var(--pot-dk) 70%,#000);stroke-width:1;opacity:.8;stroke-linecap:round}.gb .gl{fill:var(--soil-lit);opacity:.9}.gb .gd{fill:#000;opacity:.18}.gb .pot-ft{fill:var(--pot-ft)}.gb .soil{fill:var(--soil-c)}.gb .soilx,.gb .seal,.gb .rhi,.gb .rcutg,.gb .ptag{pointer-events:none}
 @media (prefers-color-scheme:dark){.gb .gl{fill:#5A4A3E;opacity:1}.gb .gd{opacity:.3}}
 .gb .rring{fill:none;stroke:var(--paper);stroke-width:3;opacity:0;transition:opacity .2s}.gb .rt.hl .rring{opacity:1}.gb .rt.sel .rring{opacity:1;stroke:var(--ink);stroke-width:1.6}
 .gb .rt.hl .w,.gb .rt.sel .w{fill:var(--wood-lit)}.gb .rt.hl .rlbl,.gb .rt.sel .rlbl{fill:var(--ink);font-weight:600}.gb.dim .rt:not(.hl):not(.sel){opacity:.32}
@@ -1076,14 +1076,14 @@ function gbLayout(M,width,sap){const s=gw.state;const brn=(s.change&&s.change.br
       for(const o of lean?[.4,.7,1]:[0]){const g=tagAt(sc,vt+' · unused',d*o,f,o?0:d);g.c=score(g,r);g.s0=sc;g.d=d;g.t=vt;if(!best||g.c>best.c+.5)best=g;if(g.c>=need)return g}}return null};
     const hit=look(whole.slice(0,1),ok)||look(whole.slice(0,1),6*kpx)||look(whole.slice(1),6*kpx)||look(whole.slice(0,1),ok,1)||look(cut,6*kpx);if(hit)best=hit;
     if(!best){const d=r.d,sc=cutAt(d,looseLen);best=tagAt(sc,t+' · unused',0,tfs,d);best.s0=sc;best.d=d;best.t=t}
-    /* the root: bark from under the foot to its cut end, thick where it leaves and tapering, its centre a little under the
-       soil's surface where it leaves the nebari; over its last stretch it lifts, so the cut face stands out of the soil */
+    /* the root: bark from under the foot to its end, thick where it leaves and tapering, its centre a little under the
+       soil's surface where it leaves the nebari, then gone down under it */
     const d=best.d,sc=best.s0,xa=X+d*hb*.5,n=24,kb=knobs(gbHash('cut:'+r.id),n),wa=Math.max(8.5*kpx,.64*hb),wc=Math.max(7*kpx,.36*hb);r.d=d;r.pts=[];r.w=[];
     for(let ii=0;ii<=n;ii++){const t=ii/n,x=xa+(sc-xa)*t,ww=(wa+(wc-wa)*Math.pow(t,.7))*(ii<n-1?1+.06*(kb[ii][0]-1)/.13:1),dy=Math.min(1.4,.7+.2*ww);
-     /* (and between, it dives into the soil and runs on under it, so it reads as a root gone down into the pot, never a log
-        laid along the soil: what shows is where it leaves the nebari and the cut end it surfaces at) */
-     const dive=t>.1&&t<.82?(ww*.8+2*kpx)*Math.pow(Math.sin(Math.PI*(t-.1)/.72),.7):0;
-     r.pts.push([x,sy(x)+dive+(t<=.72?dy:dy+(.7-.28*ww-dy)*Math.pow((t-.72)/.28,1.4))]);r.w.push(ww)}}
+     /* (and past the nebari, from about two fifths of its length, it sinks into the soil and runs on under it to its end, where the stake stands: it reads
+        as a root gone down into the pot, never a log laid along the soil; what shows is where it leaves the nebari) */
+     const dive=t>.42?(ww*.8+2*kpx)*Math.pow(Math.sin(Math.PI/2*Math.min(1,(t-.42)/.48)),1.3):0;
+     r.pts.push([x,sy(x)+dive+dy]);r.w.push(ww)}}
    if(!best)continue;taken2.push(best.box);
    rl.push({r,x:best.x,y:best.top+best.th/2+best.f*.36,anchor:'middle',t:best.t,unused:!!r.loose,tag:true,fs:best.f,ww:best.ww,th:best.th,sx:best.sx,gy:best.gy,bot:best.bot,top:best.top,
     box:[best.box[0]-16*kpx,best.box[1]-16*kpx,best.box[2]+16*kpx,best.gy+2],tb:[best.box[0],best.box[1],best.box[2],best.gy+2]});x0=Math.min(x0,best.box[0]-6);x1=Math.max(x1,best.box[2]+6)}
@@ -1300,10 +1300,7 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
      rim light, so on a dark page it stands off the soil and the night */
   if(!r.loose){const m=gbNorm(pts,Math.floor(n*.35)),up=m[1]<0?1:-1,hl=sv('path',{class:'rhi',d:gbBand(pts.slice(0,r.ext?Math.ceil(n*.62):n),r.w,up*.25,up*.9)}),rim=sv('path',{class:'rlim',d:gbBand(pts,r.w,up*.74,up*1.04)});g.append(hl,rim);anim('rhi:'+id,hl,delay+520,300,'fade');anim('rlim:'+id,rim,delay+520,300,'fade')}
   else{const m=gbNorm(pts,Math.floor(n*.5)),up=m[1]<0?1:-1,rim=sv('path',{class:'rlim',d:gbBand(pts,r.w,up*.7,up*1.02)});body.append(rim);anim('rlim:'+id,rim,delay+520,300,'fade')}
-  /* its far end is cut: a face of pale wood with two growth rings, cut on a slant so it shows */
   if(r.loose)wd.before(sv('path',{d:wd.getAttribute('d'),class:'rbed'}));
-  if(r.loose){const c=pts[n-1],w0=r.w[n-1],a=Math.atan2(c[1]-pts[n-3][1],c[0]-pts[n-3][0])*180/Math.PI,rx=w0*.42,ry=w0*.54,arc=(k,a0,a1)=>{const p=t=>[c[0]+Math.cos(t)*rx*k,c[1]+Math.sin(t)*ry*k];return 'M'+gbP(p(a0))+' A'+gbF(rx*k)+' '+gbF(ry*k)+' 0 1 1 '+gbP(p(a1))};
-   body.append(sv('g',{class:'rcutg',transform:'rotate('+gbF(a)+' '+gbP(c)+')'},sv('ellipse',{class:'rcut',cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(rx),ry:gbF(ry)}),sv('path',{class:'rring2',d:arc(.64,-2.2,1.9)}),sv('path',{class:'rring2',d:arc(.3,-1.4,2.6)})))}
   if(r.id){body.insertBefore(sv('path',{d:wd.getAttribute('d'),class:'rring','clip-path':'url(#'+airId+')'}),body.firstChild);
    g.append(sv('path',{d:gbLine(pts),class:'hitl','stroke-width':14}));
    if(r.stop){const e=pts[n-1];const z=r.ext?[L.wallX(r.d,D+11)+r.d*1.9,D+11]:[e[0]+r.d*2,e[1]+7];const gid='gb-fade'+N+'-'+i;
@@ -1313,7 +1310,9 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
   /* a store's plant tag: a small rounded tag on a wooden stake pushed into the soil, its foot cut off at the soil; an unused
      store's stake is pushed into its root's cut face */
   if(r.id&&!r.ext){const l=L.rl.find(q=>q.r===r&&q.tag);if(l){const ft=r.loose?pts[n-1][1]:l.gy+3.6*kx;
-   const tg=sv('g',{class:'ptag'},sv('path',{class:'stake','clip-path':'url(#'+airId+')','stroke-width':gbF(1.35*kx),d:'M'+gbP([l.sx,ft])+' L'+gbP([l.sx,l.bot+1])}),sv('rect',{class:'tag',x:gbF(l.x-l.ww/2),y:gbF(l.top),width:gbF(l.ww),height:gbF(l.th),rx:gbF(2.6*kx)}));g.append(tg);anim('stake:'+id,tg,delay+560,300,'fade')}}
+   /* (an unused store's is a bamboo cane, a little stouter, with a node every few units above the soil) */
+   const sw=(r.loose?2.1:1.35)*kx,nodes=[];if(r.loose){const sy0=L.sy(l.sx);for(let y=sy0-3.2*kx;y>l.bot+2*kx;y-=4.6*kx)nodes.push('M'+gbP([l.sx-sw*.75,y])+' L'+gbP([l.sx+sw*.75,y]))}
+   const tg=sv('g',{class:'ptag'+(r.loose?' cane':'')},sv('path',{class:'stake','clip-path':'url(#'+airId+')','stroke-width':gbF(sw),d:'M'+gbP([l.sx,ft])+' L'+gbP([l.sx,l.bot+1])}),...(nodes.length?[sv('path',{class:'snode',d:nodes.join(' ')})]:[]),sv('rect',{class:'tag',x:gbF(l.x-l.ww/2),y:gbF(l.top),width:gbF(l.ww),height:gbF(l.th),rx:gbF(2.6*kx)}));g.append(tg);anim('stake:'+id,tg,delay+560,300,'fade')}}
   if(!r.id&&r.front){const T=L.trees[r.tree],a=pts[0][0],e=pts[n-1][0],dd=e>a?1:-1,fid='gb-nbm'+N+'-'+i;
    /* it grows out of the trunk's surface: faded in over its first stretch, which lies over the trunk */
    defs.append(sv('linearGradient',{id:fid+'g',gradientUnits:'userSpaceOnUse',x1:gbF(a),y1:'0',x2:gbF(a+dd*.36*T.D),y2:'0'},sv('stop',{offset:0,style:'stop-color:#000'}),sv('stop',{offset:1,style:'stop-color:#fff'})),
