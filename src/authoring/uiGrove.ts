@@ -124,8 +124,8 @@ ${BONSAI_CSS}
 .gw-sw .lf.in{fill:var(--paper);stroke:var(--moss)}.gw-sw .lf.none{fill:var(--paper);stroke:var(--moss);stroke-dasharray:2 1.3}.gw-sw .lf.pre{fill:var(--paper);stroke:var(--line2)}.gw-sw .lf.bud{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.9}
 /* on a dark page the marks in the lists and the legend are the tree's own: a leaf still to prove an outline, the passed
    leaf's green as a rim over a neutral fill a step off the page (the tree's --leaf-prove), never read as passed; one with no
-   flow yet the tree's pale leaf (its --leaf-pend), a lightened cushion green under its dashed rim, never the page showing through */
-@media (prefers-color-scheme:dark){.gw-sw .lf.in{fill:color-mix(in srgb,var(--paper) 86%,#fff)}.gw-sw .lf.none{fill:color-mix(in oklab,color-mix(in srgb,var(--moss) 56%,var(--paper)) 84%,#fff)}}
+   flow yet the tree's hollow leaf (its --leaf-pend), the card's own dark a touch green under its dashed rim, never filled like passed */
+@media (prefers-color-scheme:dark){.gw-sw .lf.in{fill:color-mix(in srgb,var(--paper) 86%,#fff)}.gw-sw .lf.none{fill:color-mix(in srgb,var(--paper) 88%,var(--moss))}}
 .gw-sw .rib{fill:none;stroke:var(--paper);stroke-width:.7;opacity:.55}.gw-sw .rib.o{stroke:var(--moss);opacity:.35}
 .gw-sw .wd{fill:var(--sw-wood)}.gw-sw .wl{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.8}.gw-sw .cf{fill:var(--sw-cut);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cal{fill:var(--sw-lit);stroke:var(--sw-shade);stroke-width:.6}.gw-sw .cres{fill:none;stroke:var(--sw-crs);stroke-width:.8;stroke-linecap:round}.gw-sw .rim{fill:var(--sw-rim)}
 .gw-sw .stem{fill:none;stroke:var(--sw-wood);stroke-width:1.2;stroke-linecap:round}.gw-sw .soil{stroke:var(--sw-shade);stroke-width:1;opacity:.7}
@@ -1388,11 +1388,15 @@ function gwKey(){const s=gw.state;const M=gw.M,B=gw.B,row=gwKeyRow;
  const cap=h('p',{class:'gw-cap','data-testid':'grow-caption'},one?'Trunk: your change; crown: its happy path; side branches: what it refuses and how it fails. Leaves are scenarios; a leaf hanging below its pad is a way the journey fails.':'Trunk: your change. Leaves are scenarios; one hanging below its pad is a way it fails.');
  const svg=B&&B.svg,cnt=sel=>svg?svg.querySelectorAll(sel).length:0;
  /* the leaf mark each state is drawn with on the tree */
- const SEL={fail:'.gb-lf.fail:not(.gone)',run:'.gb-lf.run:not(.gone)',none:'.gb-lf.none:not(.gone)',in:'.gb-lf.in:not(.gone), .gb-lf.idle:not(.gone)',pass:'.gb-lf.pass:not(.gone)'};
+ const G=':not(.gone):not(.cut):not(.pv-out):not(.pv-add)',SEL={fail:'.gb-lf.fail'+G,run:'.gb-lf.run'+G,none:'.gb-lf.none'+G,in:'.gb-lf.in'+G+', .gb-lf.idle'+G,pass:'.gb-lf.pass'+G};
  /* once the grow is done the key counts the mode from the state table, as the counts line and the verdict do, so it is the same at
     any width: each state's whole count, then how many of them grow on shoots (the shoots' leaves, their +N counts and the graft
     buds), so the leaves on the journeys' pads and the shoots add up to the mode. While it grows it counts the leaves drawn so far */
- let K;if(s.done&&M){const all=gwInView(),off=all.filter(x=>!onJ(x)).length;
+ /* (and from the moment a mode is chosen, pruning included, it counts that mode from the table too, never the leaves still
+    falling; while the mode is being asked it counts the mode being previewed, from the table, so a scenario with no flow is
+    never called flow ready) */
+ const drawn=x=>{const e=B&&((B.leaf&&B.leaf[x.id])||(B.bud&&B.bud[x.id]));return !!e&&!/\b(gone|pre|cut)\b/.test(e.getAttribute('class')||'')};
+ let K;if(M){const all=s.done||s.modeBy?gwInView():s.scenarios.filter(x=>drawn(x)&&(!s.asked||gbRank[x.mode]<=gbRank[gw.picking||'min'])),off=all.filter(x=>!onJ(x)).length;
   K=gwTallyRows(gwTally(all)).map(([k,w,g,cl,n])=>[g,SEL[g],n+' '+w]);
   if(off)K.push(['ntag','[data-k^="u:"], .gb-lf.bud',off+' of them on shoots']);
  }else K=[['fail',SEL.fail,gwStW('fail')],['run',SEL.run,gwStW('run')],['none',SEL.none,gwStW('nf')],['in',SEL.in,gwInKey()],['pass',SEL.pass,gwStW('pass')]].map(([k,sel,t])=>[k,sel,t,cnt(sel)]).filter(q=>q[3]>0).map(([k,sel,t,n])=>[k,sel,n+' '+t]);

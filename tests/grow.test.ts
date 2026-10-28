@@ -793,7 +793,7 @@ describe('Grow page', () => {
       stops: Array.from(g.querySelectorAll('.rlbl.nt')).map((t) => ({ text: t.textContent, ...box(t) })), end: g.querySelector('.tailend') ? box(g.querySelector('.tailend')!) : null }));
     const lg = svg.querySelector('.rt.loose');
     const loose = lg ? { tags: Array.from(lg.querySelectorAll('.rlbl')).map((t) => ({ text: t.textContent, lines: t.querySelectorAll('tspan[dy], tspan[y]').length, ...box(t) })), rect: box(lg.querySelector('.tag')!),
-      dash: getComputedStyle(lg.querySelector('.tag')!).strokeDasharray, stake: box(lg.querySelector('.stake')!), cut: box(lg.querySelector('.rcut')!) } : null;
+      dash: getComputedStyle(lg.querySelector('.tag')!).strokeDasharray, stake: box(lg.querySelector('.stake')!), nodes: lg.querySelectorAll('.snode').length } : null;
     const seal = Array.from(svg.querySelectorAll('.seal .sm')).map((t) => ({ text: t.textContent ?? '', len: (t as SVGTextElement).getComputedTextLength() }));
     const room = Number(svg.querySelector('.seal')?.getAttribute('data-room'));
     // the soil line, and where a store root that no journey uses lies against it
@@ -809,13 +809,13 @@ describe('Grow page', () => {
     // (its centre against the soil line, and against its own girth there, over its first seven tenths)
     const sunk = lr ? lr.pts.slice(0, Math.floor(lr.pts.length * .7)).map((p: number[], i: number) => [p[1]! - L.sy(p[0]!), lr.w[i]]) : [];
     // the unused store's root in the layout's units: where it leaves, how far past the foot its cut end lies, how much of it
-    // stands above the soil, and the cut face and stake as drawn
+    // stands above the soil, and where its stake stands
     const root = lr ? (() => {
-      const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], face = lg!.querySelector('.rcut')!;
+      const n = lr.pts.length, X = L.xs[lr.tree], hb = half(L.trees[lr.tree]), e = lr.pts[n - 1], sx = Number((lg!.querySelector('.stake')!.getAttribute('d') ?? '').replace(/^M\s*/, '').split(/[\s,]+/)[0]);
       // (where it shows as it leaves the nebari, before it goes down into the soil)
       const shows = lr.pts.slice(0, Math.max(2, Math.floor(n * .1))).map((p: number[], i: number) => (L.sy(p[0]!) + .7 - (p[1]! - lr.w[i] / 2)) / lr.w[i]);
       return { start: Math.abs(lr.pts[0][0] - X) / hb, past: (Math.abs(e[0] - X) - hb) / L.kpx, shows: Math.min(...shows), endTop: e[1] - lr.w[n - 1] / 2 - L.sy(e[0]),
-        face: [Number(face.getAttribute('cx')) - e[0], Number(face.getAttribute('cy')) - e[1]], faceBox: box(face), op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
+        stakeOff: Math.abs(sx - e[0]), endW: lr.w[n - 1], op: Number(getComputedStyle(lg!.querySelector('.w')!).opacity) };
     })() : null;
     // the pot: its lip a deeper rim of lighter clay than the body with a highlight along its top, its walls leaning in to the foot
     const body = svg.querySelector('.pot-b') as SVGPathElement, lipB = svg.querySelector('.lip-b')!, pt = (svg as SVGSVGElement).createSVGPoint();
@@ -888,10 +888,10 @@ describe('Grow page', () => {
         const stop = root!.stops[0]!, end = root!.end!;
         expect(Math.min(Math.abs(stop.l - end.r), Math.abs(stop.r - end.l)), at).toBeLessThan(8);
         expect(Math.abs(stop.cy - end.cy), at).toBeLessThan(8);
-        // The unused store: a stub sunk to half its depth in the soil, its tag one line inside a dashed border, staked beside
-        // the cut face.
+        // The unused store: a stub sunk to half its depth in the soil, its tag one line inside a dashed border, on a bamboo
+        // cane with nodes standing where the root ends.
         expect(g.loose, at).toBeTruthy();
-        const { tags, rect, dash, stake, cut } = g.loose!;
+        const { tags, rect, dash, stake, nodes } = g.loose!;
         expect(tags, at).toHaveLength(1);
         expect(tags[0]!.text, at).toMatch(/^seats(?: table|…)? · unused$/);
         if (width >= 768) expect(tags[0]!.text, at).toBe('seats table · unused');
@@ -899,22 +899,22 @@ describe('Grow page', () => {
         expect(tags[0]!.l, at).toBeGreaterThanOrEqual(rect.l);
         expect(tags[0]!.r, at).toBeLessThanOrEqual(rect.r);
         expect(dash, at).not.toBe('none');
-        expect(Math.min(Math.abs(stake.cx - cut.l), Math.abs(stake.cx - cut.r)), at).toBeLessThanOrEqual(cut.w + 4);
+        expect(stake.b - stake.t, at).toBeGreaterThan(0);
+        expect(nodes, at).toBeGreaterThan(0);
         // It leaves the nebari with its centre just under the soil line and then goes down into the soil, a root and not a
         // log laid along the soil: never above the soil line, and between, at least half its girth under it.
         for (const [dy] of g.sunk) expect(dy, at).toBeGreaterThan(-1.5);
         expect(Math.max(...g.sunk.map(([dy, w]: number[]) => dy! / w!)), at).toBeGreaterThanOrEqual(.5);
         // ... and a root of its own, faded, running out from under the nebari seventy to ninety pixels past the foot, about
-        // two fifths of it above the soil where it leaves the nebari, its cut end standing out of it with the stake pushed
-        // into the cut face.
+        // two fifths of it above the soil where it leaves the nebari, then under the soil to its end, where its cane stands:
+        // no cut end on the soil to read as a log on the rim.
         const rt = g.root!;
         expect(rt.start, at).toBeLessThanOrEqual(1);
         expect(rt.past, at).toBeGreaterThanOrEqual(69.5);
         expect(rt.past, at).toBeLessThanOrEqual(90.5);
         expect(rt.shows, at).toBeGreaterThanOrEqual(.25);
-        expect(rt.endTop, at).toBeLessThan(-1);
-        expect(Math.hypot(rt.face[0]!, rt.face[1]!), at).toBeLessThan(.5);
-        expect(Math.abs(stake.cx - rt.faceBox.cx), at).toBeLessThanOrEqual(rt.faceBox.w / 2);
+        expect(rt.endTop, at).toBeGreaterThanOrEqual(0);
+        expect(rt.stakeOff, at).toBeLessThanOrEqual(rt.endW / 2);
         expect(rt.op, at).toBeGreaterThanOrEqual(.35);
         expect(rt.op, at).toBeLessThanOrEqual(.75);
         // Bare soil: no moss, which carries nothing.
@@ -1187,9 +1187,18 @@ describe('Grow page', () => {
                   if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 8) wood = woods.some((e) => inFill(e, x, y)) && !cushions.some((e) => inFill(e, x, y));
                 }
               }
-              // (only a card that says its crown left it no place with a clear straight line may cross, on the crowded
-              // tracegrove crown alone: plotline's and notes' trees always have one)
+              // (no card may cross, the crowded tracegrove crown's included: each finds a place with a clear straight line)
               if (wood && !(tip.hasAttribute('data-crowd') && crowdOk)) out.push(k + ': hairline crosses the wood');
+              // and past its first 12 px it runs across no foliage but that of the cushion it starts in (a leaf's own)
+              let leafy = false;
+              for (let i = 1; i < lead.length && !leafy; i++) {
+                const a = lead[i - 1]!, b = lead[i]!, n = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+                for (let s = 0; s <= n && !leafy; s += 1) {
+                  const x = a[0]! + (b[0]! - a[0]!) * s / (n || 1), y = a[1]! + (b[1]! - a[1]!) * s / (n || 1);
+                  if (Math.hypot(x - lead[0]![0]!, y - lead[0]![1]!) >= 12) leafy = cushions.some((e) => inFill(e, x, y) && !inFill(e, lead[0]![0]!, lead[0]![1]!));
+                }
+              }
+              if (leafy) out.push(k + ': hairline crosses foliage');
               if (tip.hasAttribute('data-crowd')) crowded.push(k);
               // and a card over the tree stays inside the tree's card, over the drawing: never down over its caption or key
               if (!L.narrow && !k.endsWith(' pinned')) {
@@ -1235,12 +1244,12 @@ describe('Grow page', () => {
             // on a phone the pinned thing's card stays under the drawing, and covers nothing in it either
             if (w.gw.pinned && !(B.tip as HTMLElement).hidden) look(w.gw.pinned + ' pinned', B.tip.getBoundingClientRect(), null, []);
             return { cards, out, crowded };
-          }, { wide: width >= 1440, crowdOk: name === 'tracegrove' });
+          }, { wide: width >= 1440, crowdOk: false });
           const seen = await cards();
           expect(seen.cards, name + ' ' + width).toBeGreaterThan(8);
           expect(seen.out, name + ' ' + width).toEqual([]);
-          // (and few of them: plotline's tree has none, tracegrove's crowded crown at most 9 of its cards, as many as it has at 1440 now)
-          expect(seen.crowded.length, name + ' ' + width + ' crowded cards ' + seen.crowded.join(' ')).toBeLessThanOrEqual(name === 'tracegrove' ? 9 : 0);
+          // (and none of them says its crown left it no clear place: not plotline's, not tracegrove's)
+          expect(seen.crowded.length, name + ' ' + width + ' crowded cards ' + seen.crowded.join(' ')).toBe(0);
           // the inspector, where there is one beside the tree, keeps what it said: a card floats over the tree
           if (inspector !== null) expect(await ins.textContent(), name + ' ' + width).toBe(inspector);
           // a leaf pinned as a click pins it, then every card again
@@ -1748,7 +1757,8 @@ describe('Grow page', () => {
               for (const p of Array.from(tip.querySelectorAll('.path'))) if (!/mono/i.test(getComputedStyle(p).fontFamily)) out.push(k + ': its path is not in mono');
               // beside the tree, as wide as its longest name needs, within 280 to 380 px; under it, as wide as the tree, and on a phone with a Close of 44 px
               const below = tip.classList.contains('below');
-              if (!below && (r.width < 279.5 || r.width > 380.5)) out.push(k + ': card ' + Math.round(r.width) + ' px wide');
+              // (round 15: a card may narrow to 200 px to stand in a free band beside the pot with a short, clear hairline)
+              if (!below && (r.width < 199.5 || r.width > 440.5)) out.push(k + ': card ' + Math.round(r.width) + ' px wide');
               if (phone) { const x = tip.querySelector('.gb-x'), xr = x ? x.getBoundingClientRect() : null; if (!xr || xr.width < 43.5 || xr.height < 43.5) out.push(k + ': no Close of 44 px'); }
             };
             for (const [k, el] of things) {
@@ -2243,6 +2253,55 @@ describe('Grow page', () => {
     return out;
   };
 
+  it('grows a scalene canopy beside a desktop tree: the lowest pad the widest, each higher pad narrower, the crown the smallest pad at the apex', async () => {
+    // the notes sample, grown on a branch that adds GET /count, as the critics' notes tree is
+    const nd = temp();
+    cpSync(join(import.meta.dirname, '../src/samples/notes-api'), nd, { recursive: true });
+    git(nd, 'init', '-q', '-b', 'main'); git(nd, 'add', '-A'); git(nd, 'commit', '-qm', 'Notes sample');
+    git(nd, 'checkout', '-qb', 'count');
+    const app = join(nd, 'app/app.mjs');
+    writeFileSync(app, readFileSync(app, 'utf8').replace('  const match = url.pathname.match(',
+      "  if (req.method === 'GET' && url.pathname === '/count') return send(res, 200, { count: 0 });\n  const match = url.pathname.match("));
+    git(nd, 'add', '-A'); git(nd, 'commit', '-qm', 'Count notes\n\n## Acceptance criteria\n- [ ] GET /count starts at zero');
+    git(nd, 'checkout', '-q', 'main');
+    const notes = (await grow({ dir: nd, branch: 'count', base: 'main', mode: 'min', prove: false, gh: false, agent: { off: true }, save: false })).state;
+    const server = await startUi({ dir: nd, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const [name, state] of [['plotline', folded('plotline-seats.jsonl')], ['tracegrove', folded('tracegrove-max.jsonl')], ['notes', notes]] as const) {
+        for (const width of [1440, 1024]) {
+          const page = await treePage(browser, server.url, state, { width, reduce: true });
+          await page.waitForTimeout(400);
+          // each pad's cushions as drawn: its widest cushion, its foot, and the crown's crest
+          const pads = await page.evaluate(() => {
+            const B = (0, eval)('gw').B, out: Record<string, { w: number; bot: number; crown: boolean; crest: number | null; top: number }> = {};
+            for (const c of Array.from(B.svg.querySelectorAll('.pad .cush')) as Element[]) {
+              const f = c.querySelector('.pfill'); if (!f || getComputedStyle(c).display === 'none') continue;
+              const r = f.getBoundingClientRect(); if (!r.width) continue;
+              const pad = c.closest('.pad')!, id = pad.getAttribute('data-pad')!, crown = pad.classList.contains('crown');
+              const o = out[id] ??= { w: 0, bot: -Infinity, crown, crest: null, top: Infinity };
+              o.w = Math.max(o.w, r.width); o.bot = Math.max(o.bot, r.bottom); o.top = Math.min(o.top, r.top);
+              if (crown && c.classList.contains('ccr')) o.crest = r.width;
+            }
+            return out;
+          });
+          const at = name + ' ' + width + 'px', list = Object.entries(pads).sort((a, b) => b[1].bot - a[1].bot);
+          expect(list.length, at).toBeGreaterThanOrEqual(2);
+          // the lowest pad is the widest; each higher pad no wider than any pad below it
+          for (let i = 1; i < list.length; i++) for (let j = 0; j < i; j++)
+            expect(list[i]![1].w / list[j]![1].w, at + ' ' + list[i]![0] + ' over ' + list[j]![0]).toBeLessThanOrEqual(1.001);
+          // the crown is the smallest pad and stands at the apex, its crest at most four fifths of the lowest pad
+          const crown = list.find(([, p]) => p.crown)![1];
+          expect(crown.crest, at + ' crest').not.toBeNull();
+          for (const [, p] of list) expect(crown.crest!, at + ' crest against a pad').toBeLessThanOrEqual(p.w + .001);
+          expect(crown.crest! / list[0]![1].w, at + ' crest to the lowest pad').toBeLessThanOrEqual(.8);
+          expect(crown.top, at + ' crest at the apex').toBeLessThanOrEqual(Math.min(...list.map(([, p]) => p.top)) + .5);
+          await page.close();
+        }
+      }
+    } finally { await browser.close(); }
+  }, 180000);
+
   it('puts the headline journey in the crown, its crest at most three quarters across the widest cushion below it, beside a desktop tree no cushion wider than one of a pad below, on wood sized from the data, with leaves that lead', async () => {
     const bushy = await grownBushy();
     const server = await startUi({ dir: bushy.dir, port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
@@ -2331,7 +2390,7 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
-  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a pale leaf under a dashed rim, never a hole, the lists and the legend marking a leaf to prove and one with no flow yet as the tree does', async () => {
+  it('keeps a leaf still to prove an outline on a dark page: a pass-green rim over an opaque neutral fill a step off the page, never read as passed, and no flow yet a hollow leaf under a dashed rim over an opaque fill, the lists and the legend marking a leaf to prove and one with no flow yet as the tree does', async () => {
     const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
     const browser = await chromium.launch({ headless: true });
     // a colour as the page paints it, whatever space it was mixed in, as CIE L*a*b* and its luminance; none or clear is a hole
@@ -2379,19 +2438,20 @@ describe('Grow page', () => {
           // and never read as passed: twenty L* or more from a passed leaf's fill
           expect(Math.abs(pass!.L - l.fill!.L), width + 'px L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
         }
-        // a leaf with no flow yet stays a pale leaf, never the page showing through: an opaque fill well above the page, under a
-        // dashed rim of a light green that stands off the page
+        // a leaf with no flow yet reads hollow on a dark page, never filled like a passed leaf and never the page showing
+        // through: an opaque fill within 15 L* of the page, under a dashed rim of a light green that stands off the page
         expect(look.none.length, width + 'px').toBeGreaterThan(0);
         for (const l of look.none) {
           expect(l.fill, width + 'px no-flow leaf with no fill').not.toBe('none');
           expect(l.paint, width + 'px no-flow leaf with a clear fill').not.toBeNull();
-          expect((l.paint?.lum ?? -1) - look.bg.lum, width + 'px no-flow leaf against the page').toBeGreaterThan(0.3);
+          expect(Math.abs((l.paint?.L ?? 999) - look.bg.L), width + 'px no-flow leaf hollow against the page').toBeLessThanOrEqual(15);
+          if (pass) expect(Math.abs(pass.L - (l.paint?.L ?? 999)), width + 'px no-flow leaf L* gap to a passed leaf').toBeGreaterThanOrEqual(20);
           expect(l.dash, width + 'px no-flow leaf rim').not.toBe('none');
           expect(l.stroke, width + 'px no-flow leaf with no rim').not.toBeNull();
           expect(l.stroke!.L - look.bg.L, width + 'px no-flow rim against the page').toBeGreaterThan(30);
         }
         // the lists' glyphs and the legend's marks draw a leaf to prove as the tree does, and one with no flow yet as the tree
-        // does too: a pale leaf under a dashed rim, never a hole
+        // does too: a hollow leaf under a dashed rim, its fill opaque
         await explain(page);
         const marks = await page.evaluate(() => {
           const lab = (window as any).__lab, bg = lab(getComputedStyle(document.body).backgroundColor);
@@ -2419,7 +2479,9 @@ describe('Grow page', () => {
           expect(l.dash, at + ' rim').not.toBe('none');
           expect(l.raw, at + ' with no fill').not.toBe('none');
           expect(l.fill, at + ' with a clear fill').not.toBeNull();
-          expect((l.fill?.lum ?? -1) - Math.max(marks.bg.lum, l.back.lum), at + ' against the page').toBeGreaterThan(0.3);
+          expect(Math.abs((l.fill?.L ?? 999) - l.back.L), at + ' hollow against what it sits on').toBeLessThanOrEqual(15);
+          expect(l.stroke, at + ' with no rim').not.toBeNull();
+          expect(l.stroke!.L - l.back.L, at + ' rim against what it sits on').toBeGreaterThan(30);
           // (the same paint as the tree's own leaf with no flow yet)
           for (const k of ['L', 'a', 'b'] as const) expect(Math.abs(l.fill![k] - look.none[0]!.paint![k]), at + ' ' + k + '* against the tree’s').toBeLessThanOrEqual(2);
         }
@@ -3089,8 +3151,10 @@ describe('Grow page', () => {
       // early on, the growing end: how wide the wood shows where a tip a third of the foot wide would be whole, against that
       const most = Math.max(0.33 * T.tw[0], T.tw.at(-1)), h0 = F - most / 2 - 0.4;
       if (f < 0.2) { out.heads.push({ f, w: side(h0, 1) + side(h0, -1), most }); continue; }
-      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - c, 1) + side(F - c, -1);
-      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - c).w });
+      // (the front is a round shoot tip that swells to the whole girth over two and a half calipers: round 15, after the critics read
+      // a one-caliper taper as a split spike)
+      const c = at(F).w, nl = side(F - c / 4, 1), nr = side(F - c / 4, -1), back = side(F - 2.6 * c, 1) + side(F - 2.6 * c, -1);
+      out.fronts.push({ f, ratio: (nl + nr) / back, off: Math.abs(nl - nr) / Math.max(5, back), girth: back / at(F - 2.6 * c).w });
     }
     clip.remove();
     return out;
@@ -3132,8 +3196,8 @@ describe('Grow page', () => {
         // centred on the spine, so the front follows the curve
         expect(o.fronts.length, at).toBe(3);
         for (const fr of o.fronts) {
-          expect(fr.ratio, at + ' at ' + fr.f + ' a quarter caliper behind the front, of one caliper behind').toBeLessThanOrEqual(0.4);
-          expect(fr.girth, at + ' at ' + fr.f + ' one caliper back').toBeGreaterThanOrEqual(0.85);
+          expect(fr.ratio, at + ' at ' + fr.f + ' a quarter caliper behind the front, of two and a half calipers behind').toBeLessThanOrEqual(0.5);
+          expect(fr.girth, at + ' at ' + fr.f + ' two and a half calipers back').toBeGreaterThanOrEqual(0.85);
           expect(fr.off, at + ' at ' + fr.f + ' off the spine').toBeLessThanOrEqual(0.2);
         }
         await page.close();
@@ -3295,18 +3359,19 @@ describe('Grow page', () => {
     const keys = (a: Animation) => (a.effect as KeyframeEffect).getKeyframes();
     const TR = /translate\(([-\d.]+)px, ?([-\d.]+)px\) translate\(([-\d.]+)px, ?([-\d.]+)px\) rotate\(([-\d.]+)deg\)/;
     const SC = /translate\(([-\d.]+)px, ?([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ?([-\d.]+)px\)/;
-    // a fall: half a second, gathering speed, turning 20 to 30 degrees about the cut and fading out as it drops along an arc
+    // a fall: 950 ms, gathering speed, turning 28 to 40 degrees about the cut and fading out as it drops 70 to 110 px along an arc
+    // (round 15: long and opaque enough to be seen in the frames taken 250 and 600 ms after the choice)
     const fall = (a: Animation | undefined, what: string, cut?: [number[], number]) => {
       if (!a) { bad(what + ' does not fall'); return -1; }
       const t = a.effect!.getTiming(), ks = keys(a), z = ks[ks.length - 1]!, m = String(z.transform).match(TR);
-      if (t.duration !== 500) bad(what + ' falls over', t.duration);
+      if (t.duration !== 950) bad(what + ' falls over', t.duration);
       if (!/^ease-in$|^cubic-bezier\(0\.42, 0, 1, 1\)$/.test(String(t.easing))) bad(what + ' does not gather speed', t.easing);
       if (!m || Number(z.opacity) !== 0 || Number(ks[0]!.opacity) !== 1) { bad(what + ' does not fade as it falls'); return Number(t.delay); }
       const [dx, dy, px, py, th] = m.slice(1).map(Number) as [number, number, number, number, number];
-      if (Math.abs(th) < 20 || Math.abs(th) > 30) bad(what + ' turns by', th);
+      if (Math.abs(th) < 28 || Math.abs(th) > 40) bad(what + ' turns by', th);
       if (cut) {
         if (Math.hypot(px - cut[0][0]!, py - cut[0][1]!) > cut[1]) bad(what + ' does not turn about its cut', [px, py, cut[0]]);
-        if (dy * hf < 39.9 || dy * hf > 80.1) bad(what + ' drops by', dy * hf);
+        if (dy * hf < 69.9 || dy * hf > 110.1) bad(what + ' drops by', dy * hf);
         if (Math.sign(dx) !== Math.sign(th)) bad(what + ' tips one way and drifts the other');
         const mid = ks.find((k) => k.computedOffset > 0 && k.computedOffset < 1), mm = mid && String(mid.transform).match(TR);
         if (!mm || !(Number(mm[1]) / dx > Number(mm[2]) / dy)) bad(what + ' drops straight down, not along an arc');
