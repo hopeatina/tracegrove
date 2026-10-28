@@ -366,8 +366,8 @@ function gbCu(f){const T=k=>'translate('+gbF(f[0])+'px,'+gbF(f[1])+'px) scale('+
    for a guard (or a crown's happy path, below), so no cushion is ever empty; the ways it fails hang on short stems from the wood under the pad. A crest with
    shoulders stands clear above them on its leaves' own twigs, so which tier a leaf is on reads at a glance. A crown is the
    same cushions round the leader's top, in tiers too: a crown of three or more happy paths and no guards deals them between its
-   crest and one or two smaller shoulders below it, so the apex is a crest on its riser, never one flat cloud (beside a desktop
-   tree; on a phone it stays one crest). On a pad one rule
+   crest and one or two smaller shoulders below it, so the apex is a crest on its riser, never one flat cloud (at every width:
+   a phone's tree is the desktop's, scaled). On a pad one rule
    sizes every cushion: its area grows with the leaves it holds (its width with their square root); how wide each pad is, the
    tree decides (gbTree). A single journey's own guard or failure pad holds all its leaves in one cushion. Leaves lie inside their cushion, apart, each turned along the twig it
    grows on; in each group the minimum's leaves come first. Coordinates are the pad's own: x from its middle, y up from the
@@ -637,7 +637,7 @@ function gbTree(M,js,H,S,key,sap,strict,dmin){const U=M.U;const nc=j=>M.leaves[j
  /* one rule sizes every cushion on the tree: the size the most crowded of them needs to hold its leaves apart, so a bigger
     cushion always means more scenarios; the crown's shoulders reach out on the side away from the first branch, so the
     canopy balances over the roots */
- const pgeo=(pd,K)=>gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,K,pd.pol,M.lmin,!M.nw);
+ const pgeo=(pd,K)=>gbPadGeo(pd.leaves,H,pd.crown?(m?-S:0):side[pd.i],gbHash('pad:'+key+':'+pd.id),pd.crown,K,pd.pol,M.lmin,true);
  for(const pd of padList)pd.leaves=leavesOf(pd);
  const cpd=padList[0];
  const sizePads=()=>{for(const pd of padList)pd.geo=pgeo(pd,0);
