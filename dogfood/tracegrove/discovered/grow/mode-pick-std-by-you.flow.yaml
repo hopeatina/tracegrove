@@ -15,8 +15,8 @@ steps:
     json: { id: "{waitingRun}", mode: std }
     expect: { status: 200, json: { mode: std } }
   - name: the page says the mode was the user's choice
-    browser: { kind: read, target: { by: testId, name: grow-mode-hint } }
-    expect: { text: "Mode: Standard, your choice." }
+    browser: { kind: read, target: { by: label, name: "How much to prove. Mode: Standard, your choice." } }
+    expect: { text: "Minimum 2Standard 3Max 3" }
     timeoutMs: 30000
   - name: the grow runs to its end, proving after the choice
     use: grow.wait-until-idle
