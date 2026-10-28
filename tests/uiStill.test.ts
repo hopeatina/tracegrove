@@ -43,7 +43,8 @@ const where = () => {
   }
   const key = document.querySelector('[data-testid="grow-key"]'), cap = document.querySelector('[data-testid="grow-caption"]');
   if (key) o.key = [box(key)[1]!];
-  if (cap) o.caption = box(cap);
+  // (a caption under the drawing holds still with it; the sentence that names the drawing now heads the page, above the verdict)
+  if (cap && cap.closest('.gw-tree')) o.caption = box(cap);
   o.svg = box(svg);
   return o;
 };

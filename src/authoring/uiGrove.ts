@@ -289,7 +289,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 /* a one-journey tree on a phone: the badges on its other pads, keyed under the journey */
 .gw-names li.pol .no{color:var(--ink3)}.gw-names .pt{color:var(--ink3)}.gw-names .gw-jst{display:inline-flex;margin-left:2px}
 /* each journey's state under its name, in the words its pad's label uses on a wide screen, a failure first and red */
-.gw-names .jn{min-width:0}.gw-names .jn>button{display:block}.gw-names .jn>.gw-jst{display:flex;margin:1px 0 0}
+.gw-names .jn{min-width:0}.gw-names .jn>button{display:block}.gw-names .jn>.gw-jst{display:flex;margin:1px 0 0;min-height:32px;align-content:flex-start}/* (two lines kept for a journey's state, which counts the whole journey and may wrap once it has run, so the key under it holds still) */
 /* A path is a list of its hops, each whole: every hop after the first starts with its arrow, so a line the path wraps onto
    starts with "›", flush with the first line, and no line ends on an arrow (see gbPathEl, gwHops) */
 .gw .gw-hp{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px .45em;list-style:none;margin:0;padding:0}
@@ -457,8 +457,10 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw-cols{display:flex;flex-direction:column}.gw-side{display:contents}
 .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
 .gw-side>:nth-child(1){order:1}.gw-side>:nth-child(2){order:2}.gw-side>:nth-child(3){order:3}.gw-cols>.gw-main{order:4}.gw-side>:nth-child(4){order:5}
-/* narrower than two columns, once there is a verdict the tree comes right after it: then the counts, the mode and the panel */
-.gw-cols.done>.gw-main{order:2}.gw-cols.done>.gw-side>:nth-child(2){order:3}.gw-cols.done>.gw-side>:nth-child(3){order:4}
+/* on a touch screen narrower than two columns, once there is a verdict the tree comes right after it: then the counts, the mode
+   and the panel. (A pointer that crosses the tree to reach the modes would open a leaf's card under the drawing and move them
+   away from it, so with a mouse the modes stay above the tree) */
+@media (hover:none){.gw-cols.done>.gw-main{order:2}.gw-cols.done>.gw-side>:nth-child(2){order:3}.gw-cols.done>.gw-side>:nth-child(3){order:4}}
 .gw-tree{position:relative}
 @media (min-width:1180px){
  .gw-cols{display:grid;grid-template-columns:minmax(330px,380px) minmax(0,1fr);gap:0 22px;align-items:start}
@@ -1342,7 +1344,9 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   /* what a bigger mode adds, itemised as the tree draws it: on the journeys, and the part checks and existing flows on shoots */
   const c=v.counts[cur],more=s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[id]&&gbRank[x.mode]>gbRank[cur]),kind=gwKindOf();
   el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+(gw.tree==='outline'?'.':', as ghosts on the tree.'):n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
- const look=id=>{if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(gw.preview){gw.preview=null;gbPaint();say(null)}};
+ /* (a card left on the page once its grow has gone, after New grow, previews nothing) */
+ const live=()=>!!gw.state&&!!gw.el&&!!gw.el.isConnected;
+ const look=id=>{if(!live())return;if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(!live()){gw.preview=null;return}if(gw.preview){gw.preview=null;gbPaint();say(null)}};
  return h('div',{class:'gb-mode'},h('div',{class:'gw-modes'+(asked?' ask':locked?' set':' wait'),'data-testid':'grow-modes',role:'group','aria-label':'How much to prove'+(who?'. '+who:''),title:locked&&!touch?'Point at another mode to preview it.':null},GW.modes.map(m=>h('button',{class:[asked&&m.id==='min'?'rec':'',gw.preview===m.id&&!(locked&&m.id===cur)?'pv':''].filter(Boolean).join(' ')||null,'data-m':m.id,'data-testid':'grow-mode-'+m.id,'aria-pressed':String(locked?s.mode===m.id:gw.picking===m.id),disabled:!asked&&!locked,'aria-disabled':locked?'true':null,title:locked&&m.id!==s.mode?'Preview what '+m.label+' grows. To prove it, start a new grow in '+m.label+'.':asked&&m.id==='min'?'Recommended: the critical journeys end to end and every promise in the spec':null,
    on:{click:e=>{if(!asked){if(locked&&touch&&e.pointerType!=='mouse'){if(gw.tapped===m.id)away();else{gw.tapped=m.id;look(m.id)}}return}if(touch&&e.pointerType!=='mouse'&&gw.tapped!==m.id){gw.tapped=m.id;look(m.id);return}gw.tapped=null;gw.picking=m.id;gw.preview=null;growPick(m.id);gbPaint()},mouseenter:()=>{if(gwArmed())look(m.id)},pointermove:e=>{if(e.movementX||e.movementY){gw.armed=true;gw.armY=scrollY}if(gwArmed()&&gw.preview!==m.id)look(m.id)},focus:()=>look(m.id),mouseleave:()=>{if(!touch)away()},blur:away}},
    /* the Recommended tag is drawn by the stylesheet, so the chip's text stays its name, count and blurb */
