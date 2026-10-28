@@ -64,7 +64,7 @@ ${TREE_MATERIAL_CSS}
 .gb .tipbud path{fill:var(--moss-bg);stroke:var(--moss);stroke-width:1}.gb .shn{font:500 9.5px var(--mono);fill:var(--ink3)}.gb .shtag .sbud{fill:color-mix(in srgb,var(--moss) 14%,var(--paper));stroke:var(--shoot);stroke-width:1;stroke-linejoin:round}.gb .shtag .shn{fill:var(--moss)}
 /* an existing flow Max re-checks: a graft bud ringed into the bark at its knot, in the state its run is in */
 .gb .gb-gr{cursor:pointer;transition:opacity .3s}.gb .gb-gr.gone{display:none}.gb .gb-gr:focus{outline:none}
-.gb .gb-gr .gring{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.6}.gb .gb-gr .ghalo{fill:var(--wood-shade);opacity:.32;filter:blur(.6px)}.gb .gb-gr .gcres{fill:color-mix(in srgb,var(--knot-lit) 55%,#fff);opacity:.85}
+.gb .gb-gr .gring{fill:var(--wood-lit);stroke:var(--wood-shade);stroke-width:.6}.gb .gb-gr .gseam{fill:none;stroke:color-mix(in srgb,var(--wood-shade) 75%,#000);stroke-width:.7;stroke-linecap:round;opacity:.85}.gb .gb-gr .ghalo{fill:var(--wood-shade);opacity:.32;filter:blur(.6px)}.gb .gb-gr .gcres{fill:color-mix(in srgb,var(--knot-lit) 55%,#fff);opacity:.85}
 .gb .gb-gr .gtip{fill:var(--moss-bg);stroke:var(--moss);stroke-width:.7}.gb .gb-gr.under .gsw{display:none}.gb .gb-gr.none .gtip{fill:var(--paper);stroke-dasharray:1.2 .9}.gb .gb-gr.pass .gtip{fill:var(--moss);stroke:var(--moss)}.gb .gb-gr.pass.warn .gtip{stroke:var(--gold)}
 .gb .gb-gr.fail .gtip{fill:var(--verm);stroke:var(--verm)}.gb .gb-gr.fail .gring{stroke:var(--verm)}.gb .gb-gr.run .gtip{fill:var(--gold);stroke:var(--gold)}
 .gb .gb-gr.pre .gtip,.gb .gb-gr.pv-out .gtip{fill:var(--paper);stroke:color-mix(in srgb,var(--ink3) 50%,var(--paper));stroke-dasharray:none}.gb .gb-gr.pv-add{opacity:.5}.gb .gb-gr.pv-add .gtip{fill:color-mix(in srgb,var(--moss) 40%,#fff);stroke:var(--moss);stroke-dasharray:1.2 .9}.gb .gb-gr.pv-add .gring{stroke:var(--moss);stroke-width:.8;stroke-dasharray:1.6 1.1}.gb .gb-gr.pv-add .ghalo{opacity:.12}.gb.dim .gb-gr.pv-add{opacity:.5}
@@ -324,6 +324,10 @@ const gbWT=(r,f)=>(f=Math.min(1,f+(r.lg||0)),f<=r.f0?r.t0:r.t0+r.ms*(1-Math.pow(
    step with the wood it grows on. The wood's reveal (a clip path) runs on the page's own thread, but a fade or a swell may
    run on the compositor, which goes on while a busy page holds the wood back; so whatever comes in (held at its start
    before it, fill backwards) is also hidden until the page's own clock reaches its start, and never shows ahead of its wood. */
+/* a graft's union: the seam where the scion meets the wood, a fine dark ring drawn across the swelling (two arcs, one each
+   side of its middle, bowed the way the swelling runs) so it reads as a joint, never a plain bump */
+function gbSeam(c,ang,rx){const a=+ang*Math.PI/180,u=[Math.cos(a),Math.sin(a)],v=[-u[1],u[0]],o=Math.min(1.1,rx*.28),p=(s,t)=>[c[0]+u[0]*s+v[0]*t,c[1]+u[1]*s+v[1]*t];
+ let d='';for(const k of [-1,1])d+='M'+gbP(p(k*o,-2.4))+' Q'+gbP(p(k*o+k*.9,0))+' '+gbP(p(k*o,2.4))+' ';return sv('path',{class:'gseam',d})}
 function gbPlay(el,kf,o,t0){const a=el.animate(o.fill==='backwards'?kf.map((k,i)=>i?k:Object.assign({visibility:'hidden'},k)):kf,Object.assign({},o,{delay:0}));try{a.startTime=t0}catch(e){a.effect.updateTiming({delay:t0-gbNow()})}return a}
 /* When the growing wood has reached a point: the first piece that carries it, on the same ease-out its reveal runs on. */
 function gbWoodAt(B,p,pad){let t=Infinity;for(const g of B.grow){const P=g.pts;if(!P||P.length<2)continue;const A=gbLen(P),T=A[A.length-1]||1;let bd=Infinity,bf=0;
@@ -1493,7 +1497,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
      /* (cut, it heals as a shoot does: a callus beside its knot along the grain, on the bark) */
      if(bs&&bs.ra){const k2=Math.max(1,Math.min(n1-1,k0+Math.max(1,Math.round((bs.ra+4.6)/step)))),a2=pl[k2],m2=gbNorm(pl,k2),sd=m2[0]*d.ns[0]+m2[1]*d.ns[1]<0?-1:1,o=Math.max(0,wd[k2]/2-2.2),g0=pl[k2+1],g1=pl[k2-1],gm=Math.hypot(g0[0]-g1[0],g0[1]-g1[1])||1;
       cal={c:[a2[0]+m2[0]*sd*o,a2[1]+m2[1]*sd*o],t:[(g0[0]-g1[0])/gm,(g0[1]-g1[1])/gm],n:[m2[0]*sd,m2[1]*sd]}}
-     const spts=gbBez([sb,[sb[0]+u[0]*sl*.35,sb[1]+u[1]*sl*.35],[sb[0]+u[0]*sl*.7,sb[1]+u[1]*sl*.7],[sb[0]+u[0]*sl,sb[1]+u[1]*sl]],6);
+     /* (a twig, not a ruled stub: it leaves its knot bowed up a little toward the light and straightens into its bud) */
+     const wv=[-u[1],u[0]],bw=(wv[1]<0?1:-1)*sl*.2,spts=gbBez([sb,[sb[0]+u[0]*sl*.35+wv[0]*bw,sb[1]+u[1]*sl*.35+wv[1]*bw],[sb[0]+u[0]*sl*.7+wv[0]*bw*.35,sb[1]+u[1]*sl*.7+wv[1]*bw*.35],[sb[0]+u[0]*sl,sb[1]+u[1]*sl]],6);
      {const e=spts[spts.length-1],P=[e[0]+u[0]*2.55*hw,e[1]+u[1]*2.55*hw];placed.push([Math.min(e[0],P[0])-hw,Math.min(e[1],P[1])-hw,Math.max(e[0],P[0])+hw,Math.max(e[1],P[1])+hw])}
      (B.shootRest=B.shootRest||[]).push({uids,kid,c,dorm:1,base:sb,pts:spts,tip:spts[spts.length-1],u,ns:d.ns,tb:d.tb,cal,bid:bs&&bs.bid,boss:bs?{p:bs.p,ra:bs.ra,rb:bs.rb}:null});return}
     if(!best)return;placed.push(best.r);
@@ -1955,7 +1960,7 @@ function gbPaint(){const s=gw.state;const M=gbModel();const sap=!M.trees.length;
     const tip=at(0,2.2),ta=gbF(Math.atan2(n[1],n[0])*180/Math.PI);
     el=sv('g',{class:'gb-gr'+(r.under?' under':''),'data-k':'s:'+x.id,tabindex:-1,role:'button'},sv('circle',{cx:gbF(c[0]),cy:gbF(c[1]),r:gbF(Math.max(5.2,7/gbHf(B))),class:'hitc'}),
      sv('g',{class:'gsw'},sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(r.r+.9),ry:3.4,transform:'rotate('+ang+' '+gbP(c)+')',class:'ghalo'}),sv('ellipse',{cx:gbF(c[0]),cy:gbF(c[1]),rx:gbF(r.r),ry:2.5,transform:'rotate('+ang+' '+gbP(c)+')',class:'gring'}),
-      sv('path',{d:gbLine(cr)+'Z',class:'gcres'}),sv('path',{d:gbLeafD(3.4,1.5),class:'gtip',transform:'translate('+gbP(tip)+') rotate('+ta+')'}),
+      sv('path',{d:gbLine(cr)+'Z',class:'gcres'}),gbSeam(c,ang,r.r),sv('path',{d:gbLeafD(3.4,1.5),class:'gtip',transform:'translate('+gbP(tip)+') rotate('+ta+')'}),
       r.cnt?sv('g',{class:'shtag'},sv('path',{class:'sbud',d:r.cnt.bud,transform:'translate('+gbP(r.cnt.at)+') rotate('+gbF(r.cnt.ang)+')'}),sv('text',{class:'shn',x:gbF(r.cnt.x),y:gbF(r.cnt.y),'text-anchor':'middle'},'+'+r.cnt.more)):null));
     /* (on a phone its 44 px target is a hit circle too: a graft bud is a swelling, never a drawn ring) */
     gbThumb(B,el,gbF(c[0]),1,gbF(c[1]),'hitc');
