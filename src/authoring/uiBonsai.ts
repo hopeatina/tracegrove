@@ -2884,7 +2884,7 @@ function gbOutline(){const s=gw.state;const M=gw.M=gbModel();const order=gbOrder
  const el=h('div',{class:'gb-ol','data-testid':'grow-outline',on:{keydown:gbOlKeys}});const lf=(c,t)=>h('span',{class:'gw-li'},gwSw(c),h('span',{},t));
  const buds=gbBudFolds(M);
  gwPut(el,M.legacy?h('p',{class:'small muted'},'Saved before journeys were traced: one journey per surface. Grow again to trace journeys.'):null,
-  gwOlPromises(),order.length?gbSec('Journeys',String(order.length)):h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
+  gwOlPromises(),gwOlModes(),order.length?gbSec('Journeys',String(order.length)):h('p',{class:'gw-empty',style:'margin:6px'},s.units.length?'Journeys appear here as they are traced.':'Parts appear here as they are found.'),
   /* what each leaf means, in one line under the heading, before the first leaf it explains */
   order.length&&s.scenarios.length?h('div',{class:'gb-olkey',role:'group','aria-label':'What each leaf means'},...gbOlKeyMarks(lf)):null,
   order.map((j,i)=>gbJourneyBlock(j,i+1,M,false)),

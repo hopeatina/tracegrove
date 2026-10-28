@@ -190,8 +190,8 @@ ${BONSAI_CSS}
 .gb-tip .k{text-transform:none;letter-spacing:0}
 /* a card opening under the tree never scrolls the page: the browser does not anchor scrolling inside the grow page */
 .gw{overflow-anchor:none}
-.gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}.gw-call .gw-vopen{justify-self:start;min-height:32px}.gw-urest{margin:10px 0 0;font:13px/20px var(--sans);color:var(--ink3)}.gw-urest b{font-weight:500;color:var(--ink2)}
-.gw-olp{margin:0 0 14px}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
+.gw-ulist li.gw-ugh{display:block;min-height:0;border-top:0;padding:8px 0 0;font:500 12px/16px var(--sans);color:var(--ink3)}.gw-uctx{color:var(--ink3)}.gw-umore{margin-top:8px;min-height:44px}.gw-call .gw-vopen{justify-self:start;min-height:32px}.gw-ugrps{display:grid;margin-top:6px}.gw-ugrp{border-top:1px solid var(--line)}.gw-ugrp>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-height:44px;padding:12px 0;cursor:pointer;font:500 13px/19px var(--sans);color:var(--ink)}.gw-ugrp>summary{list-style:none}.gw-ugrp>summary::-webkit-details-marker{display:none}.gw-ugrp>summary::before{content:'▸';content:'▸' / '';color:var(--ink3);margin-right:-4px}.gw-ugrp[open]>summary::before{content:'▾';content:'▾' / ''}.gw-ugrp>summary .n{font:12px/18px var(--mono);color:var(--ink3)}.gw-ugrp>.gw-ulist{margin:0 0 8px}
+.gw-olp{margin:0 0 14px}.gw-olmodes{list-style:none;margin:0 0 14px;padding:0 6px;display:grid;gap:8px}.gw-olmodes li{display:grid;gap:2px;font:13px/19px var(--sans);color:var(--ink2)}.gw-olmodes b{font-weight:600;color:var(--ink)}.gw-olmn{color:var(--ink2)}.gw-olp .gw-pr{cursor:default;padding:4px 6px}.gb-olin .gb-hapr.gw-facts2{margin-left:0}
 .gb-hapr.gw-facts2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px}.gb-hapr.gw-facts2 .btn.sm{min-height:32px;padding:0 12px;font-size:13px}.gb-olin .gw-more,.gb-olin .gw-ev{margin:6px 0 0}
 .gw-chip.pr{white-space:normal;max-width:100%;font-family:var(--sans);text-align:left}.gw-chip.pr.f{background:var(--verm-bg);color:var(--verm-ink)}
 .gw-chip .gw-sd{margin-right:5px;flex:none;width:8px;height:8px}.gw-chip .gw-sd.needs{width:9px;height:8px}
@@ -297,7 +297,10 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
 .gw .gw-hp>li+li::before{content:'›';content:'›' / '';flex:none;margin-right:.45em;color:var(--muted);font-weight:400}
 .gw .gw-hp .hl,.gw .gw-hp button{min-width:0}
 .gw .gb-olx>.gb-path.gw-hp{margin-left:0}
-@media (max-width:640px){.gw .gb-olx>.gb-path.gw-hp{margin-left:36px}.gw .gb-jr>.gb-olx>.gb-path.gw-hp{margin-left:50px}}
+@media (max-width:640px){.gw .gb-olx>.gb-path.gw-hp{margin-left:0}.gw .gb-jr>.gb-olx>.gb-path.gw-hp{margin-left:0}
+ /* on a phone a route is a row of wrapping chips, each hop whole, so a long route takes a few lines, not one line per hop */
+ .gw .gb-path.gw-hp{gap:6px 4px;margin-top:6px}.gw .gb-path.gw-hp>li+li::before{margin-right:4px}
+ .gw .gb-path.gw-hp button{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--paper);text-decoration:none;font:12px/16px var(--mono)}}
 /* the key is a grid: each row's name in a column of its own, its items on tracks every row shares (the same container, the same
    track sizes), so the key's columns line up at any width; an item's mark sits right against its words, which wrap inside the
    item and never off the edge. A narrow key puts a row's name over its items */
@@ -469,7 +472,7 @@ svg.gw-svg.gb.gw-lpad{display:inline-block;flex:none;width:42px;height:30px;over
  .gw-side .gw-result.slim{padding-left:16px;margin:8px 0 14px}
  .gw-side .gb-mode{display:block;margin:0 0 12px}.gw-side .gw-modes.set{display:flex;gap:6px}.gw-side .gw-modes.set button{flex:1 1 auto;padding:4px 8px;gap:6px;justify-content:center;white-space:nowrap}.gw-side .gw-modes.set button b{white-space:nowrap}
  .gw-side .gw-modes .mn[data-u]::after{content:none!important}.gw-side .gw-hintrow{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;margin-top:6px}.gw-side .gw-hintrow>:not(.gw-barw){grid-column:1}.gw-side .gw-hintrow>.gw-barw{grid-column:2;grid-row:1/span 2;align-self:start}.gw-side .gw-hintrow .gw-more{display:block}
- .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
+ .gw-side .gw-ins{position:relative}.gw-side .gw-ins .gw-brow.f{display:none}.gw-side .gw-ins .sec>.gw-cacts{display:inline-flex;vertical-align:middle;margin:8px 12px 0 0}.gw-side .gw-ins .sec>.gw-hap{display:inline-block;vertical-align:middle;margin-top:8px}.gw-side .gw-ins>.row:first-child{position:absolute;right:0;top:10px}.gw-side .gw-ins>.row:first-child .who{display:none}.gw-side .gw-ins>.row:first-child+h3{padding-right:84px}.gw-side .gw-ins .where{overflow-wrap:anywhere}.gw-side .gw-insw{position:static;contain:none;overflow:visible;padding-bottom:0}.gw-side .gw-ins{padding:12px 0 0;border-top:1px solid var(--line)}
  .gw-side .gw-bar{margin:0}.gw-cols .gw-tree>.gw-stage{padding-top:0}
  .gw-cols>.gw-main{display:block}.gw-cols>.gw-main>.card{display:block;padding-top:10px}
  .gw-stage,.gw-stage.wide,.gw-stage.solo,.gw-stage.ol{grid-template-columns:minmax(0,1fr)}
@@ -791,15 +794,16 @@ function gwBadge(x){const r=gw.state.run[x.id];if(!gwIn(x))return h('span',{clas
  if(r.st==='fail')return h('span',{class:'gw-badge fail'},'failed');return gwOpenBadge(x)}
 /* The spec as a strip of criteria: one chip each, its mark the status; the chosen one opens below and lights its parts in the
    tree. Above the strip, every criterion is counted once, as chips with the same marks. */
-function gwSpec(){const s=gw.state,v=gw.view;const card=h('section',{class:'card','aria-label':'Spec','data-testid':'grow-spec'});
+/* In the Outline the promises are already listed at its top: the card under it keeps only its notes (drift, stops, dropped claims) */
+function gwSpec(bare){const s=gw.state,v=gw.view;if(bare&&!s.drift.length&&!s.stops.length&&!s.dropped.length)return null;const card=h('section',{class:'card','aria-label':bare?'Spec notes':'Spec','data-testid':'grow-spec'});
  const open=gw.selCrit?v.criteria.find(c=>c.id===gw.selCrit):null;const ob=open?gwCB(open.status):null;
  const notes=[...s.drift.length?[h('div',{class:'gw-flag'},h('b',{},'In the code, not in the spec'),h('span',{},'Changed here, but no promise covers '+(s.drift.length===1?'it':'them')+'. Confirm '+(s.drift.length===1?'it is':'they are')+' intended, or add '+(s.drift.length===1?'it':'them')+' to the spec.'),s.drift.map(d=>h('span',{class:'gw-loc'},h('span',{class:'nw'},d.what),' ',h('span',{class:'gw-ref muted'},...gwCodeText(d.loc)))))]:[],
   ...s.stops.map(x=>h('div',{class:'gw-flag red'},h('b',{},'Tracing stopped at '+((gwUnit(x.unit)||{}).label||x.unit)),h('span',{},...gwNote(x.why),' ',h('span',{class:'gw-loc gw-ref muted'},...gwCodeText(x.at)))))];
  const sum=v.criteria.length?gwBuckets():[];
- gwPut(card,h('span',{class:'gw-eyebrow',style:'margin:0'},'Promises'+(v.criteria.length?' · '+v.criteria.length:'')),
+ gwPut(card,h('span',{class:'gw-eyebrow',style:'margin:0'},bare?'Spec notes':'Promises'+(v.criteria.length?' · '+v.criteria.length:'')),
   h('p',{class:'small muted',style:'margin:4px 0 0'},s.spec?'From '+s.spec.source+', '+s.spec.via:s.specMissing?'No spec: '+s.specMissing:'Looking in the PR, linked issues and commits'),
-  sum.length?h('div',{class:'gw-sum','data-testid':'grow-spec-summary','aria-label':v.criteria.length+' promises'},sum.map(([b,n])=>h('span',{class:'gw-sp '+b,title:gwCBT[b]},gwSD(b),n+' '+gwCBL(b,n)))):null,
-  v.criteria.length?h('ol',{class:'gw-plist',role:'list','aria-label':'Promises'},v.criteria.map(c=>{const b=gwCB(c.status),sel=gw.selCrit===c.id;
+  sum.length&&!bare?h('div',{class:'gw-sum','data-testid':'grow-spec-summary','aria-label':v.criteria.length+' promises'},sum.map(([b,n])=>h('span',{class:'gw-sp '+b,title:gwCBT[b]},gwSD(b),n+' '+gwCBL(b,n)))):null,
+  bare?null:v.criteria.length?h('ol',{class:'gw-plist',role:'list','aria-label':'Promises'},v.criteria.map(c=>{const b=gwCB(c.status),sel=gw.selCrit===c.id;
    return h('li',{},h('button',{class:'gw-pr'+(sel?' on':''),type:'button','aria-pressed':sel?'true':'false','data-testid':'grow-promise-'+c.id,title:c.status.text,on:{click:()=>{gw.selCrit=sel?null:c.id;growPaint()}}},
     gwSD(b),h('span',{class:'t'},...gwRich(c.text)),h('span',{class:'w '+b},b==='needs'?'needs you':gwCBL(b,1))),
     sel?h('p',{class:'gw-prd'},s.unbuilt[c.id]?s.unbuilt[c.id]:c.units.length?'In '+c.units.map(id=>(gwUnit(id)||{}).label).join(', ')+'. '+c.status.text+'.':'No part of the change matched its words yet. '+c.status.text+'.'):null)})):null,
@@ -814,8 +818,8 @@ function gwLanes(x){const s=gw.state;const r=s.run[x.id],v=s.real[x.id];
 /* Every scenario this mode leaves not tested yet, the smallest mode's (the riskiest) first, each with its reason in the one word the tree uses and the way
    to test it: Write this flow when it has none, Rerun when it has one. No truncation: the list is the answer to "what is left". */
 /* Not tested yet, in the Outline's order: journey by journey (then part checks, then existing flows), and in each by reason, in
-   the verdict's order (could not run, flow ready, no flow yet); a title said twice gets its part ("... — uiGrove.ts"). Past 8
-   rows the rest folds behind "Show all N". */
+   the verdict's order (could not run, flow ready, no flow yet); a title said twice gets its part ("... — uiGrove.ts").
+   Past 8 rows each group folds on its own. */
 function gwUntestedRows(){const s=gw.state,M=gw.M||gbModel(),rk=k=>['could','ready','nf'].indexOf(k);
  const xs=s.scenarios.filter(x=>gwIn(x)&&(!s.run[x.id]||s.run[x.id].st==='not_run'));
  const J=gbOrderOf(M),gOf=x=>{const n=J.findIndex(j=>(M.leaves[j.id]||[]).includes(x));return n>=0?n:J.length+(x.scenarioKind==='regression'?1:0)};
@@ -824,22 +828,22 @@ function gwUntestedRows(){const s=gw.state,M=gw.M||gbModel(),rk=k=>['could','rea
 function gwUntested(){const s=gw.state;if(!s.done||!s.modeBy)return null;
  const rows=gwUntestedRows();if(!rows.length)return null;const M=gw.M||gbModel(),J=gbOrderOf(M);
  const T=x=>gwPlain(gwVia(x.title).title),seen={};for(const r of rows)seen[T(r.x)]=(seen[T(r.x)]||0)+1;
- const all=!!(gw.open&&gw.open.untested),show=all||rows.length<=8?rows:rows.slice(0,8);
  const head=g=>g<J.length?'Journey '+(g+1)+': '+gwPlain(gwJourneyTitle(J[g])):g===J.length?'Part checks':'Existing flows';
- const items=[];let last=-1;
- for(const {x,g} of show){if(g!==last){items.push(h('li',{class:'gw-ugh'},head(g)));last=g}
-  const w=gwOpenWord(x),fl=gwFlowOf(x),r=s.run[x.id],t=T(x),u=(M.U[x.unit]||{}).label;
-  items.push(h('li',{'data-sid':x.id},h('button',{class:'t gw-lnk',type:'button',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},...gwRich(gwVia(x.title).title),seen[t]>1&&u?h('span',{class:'gw-uctx'},' — ',...gwCodeText(gwPlain(u))):null),
+ const row=x=>{const w=gwOpenWord(x),fl=gwFlowOf(x),r=s.run[x.id],t=T(x),u=(M.U[x.unit]||{}).label;
+  return h('li',{'data-sid':x.id},h('button',{class:'t gw-lnk',type:'button',on:{click:()=>{gw.pinned='s:'+x.id;gw.pinList=null;growPaint()}}},...gwRich(gwVia(x.title).title),seen[t]>1&&u?h('span',{class:'gw-uctx'},' — ',...gwCodeText(gwPlain(u))):null),
    h('span',{class:'w'+(gwOpenKey(x)==='nf'?' nf':''),title:r&&r.why||''},w),
    !fl?h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-write-'+x.id,on:{click:()=>gwDrWrite(x)}},'Write this flow'):
-    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it')))}
- return h('section',{class:'card','aria-label':'Not tested yet','data-testid':'grow-untested'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Not tested yet · '+rows.length),
-  h('ul',{class:'gw-ulist'},items),
-  /* folded, the rest are still named, in the same order, so nothing not tested is hidden: their actions come with Show all */
-  !all&&rows.length>8?h('p',{class:'gw-urest','data-testid':'grow-untested-rest'},(()=>{const out=[],rest=rows.slice(8);let g=-1;
-   for(const r of rest){if(r.g!==g){g=r.g;out.push(h('b',{},(out.length?' ':'')+(g<J.length?'Journey '+(g+1):head(g))+': '))}else out.push(' · ');
-    const t=T(r.x),u=(M.U[r.x.unit]||{}).label;out.push(t+(seen[t]>1&&u?' — '+gwPlain(u):'')+' ('+gwOpenWord(r.x)+')')}return out})()):null,
-  rows.length>8?h('button',{class:'gw-lnk gw-umore',type:'button','data-testid':'grow-untested-all','aria-expanded':String(all),on:{click:()=>{(gw.open||(gw.open={})).untested=!all;growPaint()}}},all?'Show fewer':'Show all '+rows.length):null)}
+    h('button',{class:'btn ghost sm',type:'button','data-testid':'grow-untested-run-'+x.id,disabled:!!ui.running||!!state.compileError,on:{click:()=>{openTab('Run');runNow(fl)}}},'Run it'))};
+ const groups=[];for(const r of rows){const L=groups[groups.length-1];if(L&&L.g===r.g)L.xs.push(r.x);else groups.push({g:r.g,xs:[r.x]})}
+ /* up to 8 rows: one list under group headings. Past 8: one row per group, its count and reasons on the row, each opening on its own
+    (the first open), so the list stays a list and nothing not tested is hidden behind prose */
+ const O=gw.open||(gw.open={}),words=xs=>{const c={};for(const x of xs){const w=gwOpenWord(x);c[w]=(c[w]||0)+1}return Object.entries(c).map(([w,n])=>n+' '+w).join(', ')};
+ const body=rows.length<=8?h('ul',{class:'gw-ulist'},groups.flatMap(G=>[h('li',{class:'gw-ugh'},head(G.g)),...G.xs.map(row)])):
+  h('div',{class:'gw-ugrps'},groups.map((G,i)=>{const k='ug:'+G.g,open=O[k]!=null?O[k]:i===0;
+   /* (a closed group holds only its summary: its rows are built when it opens) */
+   const d=h('details',{class:'gw-ugrp','data-testid':'grow-untested-group-'+G.g,open:open?true:null,on:{toggle:e=>{O[k]=d.open;const u=d.querySelector(':scope>ul');if(d.open&&!u)d.append(h('ul',{class:'gw-ulist'},G.xs.map(row)));else if(!d.open&&u)u.remove()}}},h('summary',{},h('span',{class:'t'},head(G.g)),h('span',{class:'n'},words(G.xs))),open?h('ul',{class:'gw-ulist'},G.xs.map(row)):null);
+   return d}));
+ return h('section',{class:'card','aria-label':'Not tested yet','data-testid':'grow-untested'},h('span',{class:'gw-eyebrow',style:'margin:0'},'Not tested yet · '+rows.length),body)}
 function gwExt(){const s=gw.state;if(!s.extOrder.length)return null;const ids=s.extOrder;const review=ids.filter(x=>s.ext[x].state==='review').length;
  return h('section',{class:'card','aria-label':'Built by the agent','data-testid':'grow-agent-written'},h('details',{class:'gw-notes',open:review?true:null},h('summary',{style:'margin:0;padding:0;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap'},h('span',{class:'gw-eyebrow',style:'margin:0;display:inline'},'Built by the agent · '+ids.length),
   h('span',{class:'small muted'},ids.filter(x=>s.ext[x].state==='proven').length+' proven · '+review+' need review · '+ids.filter(x=>['unproven','draft'].includes(s.ext[x].state)).length+' not used for proof')),
@@ -1301,12 +1305,25 @@ function gwModeIcon(id){const r={min:0,std:1,max:2}[id]||0,g=k=>r>=k?'':' gh';
   sv('path',{d:'M11.5 16.2L14.2 14.8M4.4 11.6L3.4 9.6M19.6 9.2L20.6 7.2',class:'mi-sh'+g(2)}),...[[14.2,14.8],[3.4,9.6],[20.6,7.2]].map(([x,y])=>sv('circle',{cx:x,cy:y,r:1,class:'mi-bud'+g(2)})))}
 /* Pointing at a mode says what it would add by name and what it would cost to run: each added scenario's flow at the time it last
    took, and one a flow does not exist for yet at the time a flow here usually takes. The modes side by side come under it. */
+/* What running these scenarios would take: each flow at its fastest passing run here, and a scenario with no flow (or a flow never
+   run) at the median a flow here takes */
+function gwCost(add){const s=gw.state;const took={};for(const r of Object.values(s.run||{}))if(r&&r.flow&&r.ms!=null&&r.st==='pass')(took[r.flow]=took[r.flow]||[]).push(r.ms);
+ const all=Object.values(took).flat().sort((a,b)=>a-b),med=all.length?all[Math.floor(all.length/2)]:50;
+ const noflow=add.filter(x=>!gwFlowOf(x)).length,ms=add.reduce((t,x)=>{const f=gwFlowOf(x);return t+(f&&took[f]?Math.min(...took[f]):med)},0);
+ return {took,med,noflow,ms}}
+/* The Outline says, without a hover, what each bigger mode would add: every scenario by name and about how long it takes to run */
+function gwOlModes(){const s=gw.state,v=gw.view;if(!s||!s.modeBy||!s.scenarios.length)return null;const cur=s.mode,lbl=q=>GW.modes.find(m=>m.id===q).label;
+ /* each mode says only what it adds over the one before it, so no scenario is named twice */
+ const big=GW.modes.filter(m=>gbRank[m.id]>gbRank[cur]);
+ const rows=big.map((m,i)=>{const from=i?big[i-1].id:cur,add=gbOrd(s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[m.id]&&gbRank[x.mode]>gbRank[from]));if(!add.length)return null;
+  const {ms}=gwCost(add);
+  return h('li',{'data-m':m.id},h('b',{},lbl(m.id)+' adds '+add.length+(i?' more than '+lbl(from):'')+' · about '+gwStep(ms)+' more to run'),h('span',{class:'gw-olmn'},add.map(x=>gwPlain(gwVia(x.title).title)).join(' · ')))}).filter(Boolean);
+ if(!rows.length)return null;
+ return [gbSec('Bigger modes',lbl(cur)+' chosen'),h('ul',{class:'gw-olmodes','data-testid':'grow-ol-modes',role:'list'},rows)]}
 function gwModePop(id,cur,locked){const s=gw.state,v=gw.view,lbl=q=>GW.modes.find(m=>m.id===q).label,blurb=(GW.modes.find(m=>m.id===id)||{}).blurb||'';
  if(!s||!s.scenarios.length)return null;
  const base=locked?cur:null,add=s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[id]&&(base==null||gbRank[x.mode]>gbRank[base]));
- const took={};for(const r of Object.values(s.run||{}))if(r&&r.flow&&r.ms!=null&&r.st==='pass')(took[r.flow]=took[r.flow]||[]).push(r.ms);
- const all=Object.values(took).flat().sort((a,b)=>a-b),med=all.length?all[Math.floor(all.length/2)]:50;
- const noflow=add.filter(x=>!gwFlowOf(x)).length,ms=add.reduce((t,x)=>{const f=gwFlowOf(x);return t+(f&&took[f]?Math.min(...took[f]):med)},0);
+ const {took,med,noflow,ms}=gwCost(add);
  const names=gbOrd(add).slice(0,5).map(x=>gwPlain(gwVia(x.title).title));
  const head=locked&&id===cur?lbl(id)+', chosen: '+v.counts[id]+' scenario'+(v.counts[id]===1?'':'s'):base!=null&&gbRank[id]<gbRank[base]?lbl(id)+' keeps '+v.counts[id]+' of these '+v.counts[base]:lbl(id)+(base!=null?' adds '+add.length:' proves '+add.length)+' scenario'+(add.length===1?'':'s');
  const grows=!(locked&&id===cur)&&!(base!=null&&gbRank[id]<gbRank[base]);
@@ -1347,7 +1364,7 @@ function gwModes(){const s=gw.state,v=gw.view;const asked=s.asked&&!s.modeBy;con
   if(!locked){el.textContent='Preview · '+lbl(id)+' keeps '+n+' of the '+all+' drafted'+(all>n?' and cuts '+(all-n):'')+'.'+(touch?' Tap it again to choose it.':'');return}
   /* what a bigger mode adds, itemised as the tree draws it: on the journeys, and the part checks and existing flows on shoots */
   const c=v.counts[cur],more=s.scenarios.filter(x=>gbRank[x.mode]<=gbRank[id]&&gbRank[x.mode]>gbRank[cur]),kind=gwKindOf();
-  el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+(gw.tree==='outline'?'.':', as ghosts on the tree.'):n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
+  el.textContent='Preview · '+lbl(id)+' grows '+n+(n>c?': '+(n-c)+' more than '+lbl(cur)+(more.length===n-c&&new Set(more.map(kind)).size>1?' ('+gwKinds(more,kind)+')':'')+(gw.tree==='outline'?'.':', as ghosts on the tree.')+(n>c&&more.length<=5?' '+gbOrd(more).map(x=>gwPlain(gwVia(x.title).title)).join(' · ')+'.':'')+(n>c?' About '+gwStep(gwCost(more).ms)+' more to run.':''):n<c?': it keeps '+n+' of these '+c+' and cuts '+(c-n)+'.':', the same as '+lbl(cur)+'.')};
  /* (a card left on the page once its grow has gone, after New grow, previews nothing) */
  const live=()=>!!gw.state&&!!gw.el&&!!gw.el.isConnected;
  const look=id=>{if(!live())return;if((asked||locked)&&gw.preview!==id){gw.preview=id;gbPaint();say(id)}},away=()=>{gw.tapped=null;if(!live()){gw.preview=null;return}if(gw.preview){gw.preview=null;gbPaint();say(null)}};
@@ -1640,7 +1657,7 @@ function growPaint(){if(!gw.el)return;const s=gw.state;const S=gwSlots();
  S.ins.classList.toggle('dr',drOn);
  requestAnimationFrame(gwInsFade);
  /* the Outline is the journey list, so it is not repeated below it */
- gwSet(S.two,gw.tree==='outline'?(()=>{const x=gwExt();return h('div',{class:'gw-two'+(x?'':' solo')},gwSpec(),x)})():h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwUntested(),gwExt())));
+ gwSet(S.two,gw.tree==='outline'?(()=>{const x=gwExt(),sp=gwSpec(true);return sp||x?h('div',{class:'gw-two'+(sp&&x?'':' solo')},sp,x):null})():h('div',{class:'gw-two'},gbJourneys(),h('div',{style:'display:grid;gap:18px;min-width:0'},gwSpec(),gwUntested(),gwExt())));
  gwSet(S.error,gw.error?blocked(gw.error):null);
  /* focus stays where it was across a repaint: on the row, button or part of the tree that was used, or what was let go of */
  const find=k=>k.startsWith('d:')?gw.el.querySelector('[data-dr="'+k.slice(2).replace(/["\\]/g,'')+'"]'):k.startsWith('t:')?gw.el.querySelector('[data-testid="'+k.slice(2).replace(/["\\]/g,'')+'"]'):[...gw.el.querySelectorAll('[data-ol]')].find(e=>e.getAttribute('data-ol')===k)||(gw.tree==='grove'&&gw.svg?[...gw.svg.querySelectorAll('[data-k]')].find(e=>e.getAttribute('data-k')===k):null);
