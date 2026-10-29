@@ -1,0 +1,24 @@
+title: A caller cancels by confirmation number and the slot is released
+tags: [voice, booking]
+steps:
+  - name: book a checkup
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: I need a checkup Thursday at 10am. This is Priya Shah, 555-0177.
+          expect: { calls: [book_appointment], says: [all set, Thursday, 10 AM] }
+    save:
+      appointmentId: toolCalls[0].result.appointment.id
+      confirmation: toolCalls[0].result.appointment.confirmation
+  - name: cancel it on a second call
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Hi, I need to cancel my appointment, confirmation {confirmation}.
+          expect: { calls: [cancel_appointment], says: [cancelled, Thursday] }
+  - name: front desk sees it cancelled
+    GET: /appointments/{appointmentId}
+    observe: true
+    expect: { status: 200, json: { appointment.status: cancelled } }

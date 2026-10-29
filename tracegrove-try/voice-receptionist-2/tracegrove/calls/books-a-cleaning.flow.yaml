@@ -1,0 +1,28 @@
+title: A caller books a cleaning by phone, and the booking really exists
+risk: critical
+tags: [voice, booking]
+steps:
+  - name: caller books a cleaning
+    as: none
+    voice:
+      endpoint: /voice
+      turns:
+        - say: Hi, I'd like to book a cleaning on Tuesday at 3pm.
+          expect: { says: [cleaning, Tuesday, 3 PM, name], noCalls: [book_appointment], within: 1500 }
+        - say: Sure, my name is Dana Lee and my number is 555-0142.
+          expect: { says: [all set, Dana, confirmation number], calls: [book_appointment] }
+    expect:
+      notSays: [medical advice, "911"]
+    save:
+      appointmentId: toolCalls[0].result.appointment.id
+      confirmation: toolCalls[0].result.appointment.confirmation
+  - name: front desk sees the booking
+    GET: /appointments/{appointmentId}
+    observe: true
+    expect:
+      status: 200
+      json: { appointment.status: booked, appointment.service: cleaning, appointment.day: tuesday, appointment.patient: Dana Lee, appointment.phone: 555-0142 }
+  - name: another clinic cannot see it
+    GET: /appointments/{appointmentId}
+    as: other_clinic
+    expect: { status: 403, absent: [appointment] }
