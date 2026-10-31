@@ -13,6 +13,7 @@ export class CaseBrowserSession {
   private elapsed = 0;
   private networkEvents = 0;
   constructor(private readonly input: { origin: string; spec: CaseSpec; persona: Persona; bearer: string | null;
+    entryPath?: string | null; extraOrigins?: readonly string[];
     onNetwork: (observation: BrowserNetworkObservation) => void;
   }) {}
 
@@ -24,6 +25,8 @@ export class CaseBrowserSession {
       this.browser = await BrowserDriver.start({ origin: this.input.origin, deadline, signal,
         allowedMethods: spec.effects.allowedMethods.filter(method => spec.effects.mode !== 'read_only' || method === 'GET' || method === 'HEAD'), allowedResourcePrefixes: spec.effects.allowedResourcePrefixes,
         ...(this.input.bearer ? { bearer: this.input.bearer } : {}),
+        ...(this.input.entryPath ? { entryPath: this.input.entryPath } : {}),
+        ...(this.input.extraOrigins?.length ? { extraOrigins: this.input.extraOrigins } : {}),
         onNetwork: observation => {
           if (++this.networkEvents > 512) throw new BrowserStepError('browser_network_metadata_limit');
           this.input.onNetwork(observation);

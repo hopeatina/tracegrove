@@ -36,6 +36,11 @@ export type HostSession = {
   requestCredentials?: Map<string, RequestCredential>;
   /** Named endpoints this session admits (R4); the primary `origin` is always admitted. */
   endpoints?: Record<string, string>;
+  /**
+   * Third-party origins a browser page may load from (a deployment's auth provider, CDN). They never
+   * receive persona credentials, and browser steps still only navigate on `origin`.
+   */
+  browserOrigins?: readonly string[];
   /** Account class of the application boundary; defaults from boundaryMode. */
   accountClass?: 'local' | 'test_sandbox' | 'designated_production' | 'none';
   /** Ask the credential's issuer whether it is still valid (e.g. a broker token that expired mid-run). */

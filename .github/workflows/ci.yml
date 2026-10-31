@@ -5,6 +5,8 @@ on:
     branches: [codex/bootstrap]
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: read
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -16,12 +18,12 @@ jobs:
     runs-on: ${{ (vars.CI_RUNNER != '' && github.event.pull_request.head.repo.fork != true) && fromJSON(vars.CI_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.13'
       - name: Python samples (FastAPI, Django)
@@ -41,7 +43,7 @@ jobs:
       - name: README first-use journey and verified cleanup
         id: readme-onboarding
         run: npm run test:onboarding
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && steps.readme-onboarding.outcome != 'skipped'
         with:
           name: readme-onboarding
@@ -52,7 +54,7 @@ jobs:
           WORKFLOW_VERIFY_TEST_CLI: compiled
           TRACEGROVE_SOURCE_PROOF_DIR: ${{ runner.temp }}/source-regression-proof
         run: npm test -- tests/cliGitSources.test.ts tests/cliGitSnapshot.test.ts tests/typed-authoring.test.ts --maxWorkers=2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: source-regression-proof
@@ -65,7 +67,7 @@ jobs:
         run: |
           npm run test:container -- native-real
           npm run test:container -- offline-contract
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && steps.container-qualification.outcome != 'skipped'
         with:
           name: container-qualification
@@ -113,7 +115,7 @@ jobs:
           node dist/cli/main.js export --execution "$jobs_execution" --state-dir "$RUNNER_TEMP/jobs-state" --output "$RUNNER_TEMP/jobs-bundle"
           node dist/cli/main.js verify-bundle --bundle "$RUNNER_TEMP/jobs-bundle"
           node dist/cli/main.js test --config "$RUNNER_TEMP/jobs-sample/tracegrove.config.yaml"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: async-job-evidence-bundle
@@ -122,7 +124,7 @@ jobs:
             ${{ runner.temp }}/jobs-run.json
             ${{ runner.temp }}/jobs-sample/.tracegrove/runs/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: browser-evidence-bundle
@@ -130,13 +132,13 @@ jobs:
             ${{ runner.temp }}/browser-bundle
             ${{ runner.temp }}/browser-sample/.tracegrove/runs/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: tracegrove-run
           path: ${{ runner.temp }}/notes-flows/.tracegrove/runs/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: evidence-bundle
@@ -148,8 +150,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -159,7 +161,7 @@ jobs:
         run: |
           npm run test:container -- native-real
           npm run test:container -- offline-contract
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && steps.container-qualification.outcome != 'skipped'
         with:
           name: container-qualification

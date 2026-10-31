@@ -42,7 +42,7 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
   const release = async (signal: AbortSignal) => {
     const results = await Promise.all([...resolved.values()].map(async secret => (secret.revoke ? secret.revoke(signal) : { confirmed: true, detail: 'nothing to revoke' })));
     for (const secret of resolved.values()) secret.value.dispose();
-    for (const credential of credentials.values()) { for (const value of Object.values(credential.headers)) value.dispose(); credential.bearer?.dispose(); }
+    for (const credential of credentials.values()) { for (const value of Object.values(credential.headers)) value.dispose(); credential.bearer?.dispose(); credential.browserEntry?.dispose(); }
     const failed = results.filter(r => !r.confirmed);
     return { confirmed: failed.length === 0, detail: results.length ? results.map(r => r.detail).join('; ') : 'no run-owned identities' };
   };
@@ -69,6 +69,7 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
         const code = error instanceof RecipeError ? error.code : 'auth_recipe_failed';
         throw new Blocked([{ code, detail: `${persona.persona} (${persona.auth.kind}): ${(error as Error).message}`, owner: 'operator', action: `tracegrove whoami --env ${binding.environment} --as ${persona.persona}` }]);
       }
+      if (secret.browserEntry) credential.browserEntry = secret.browserEntry;
       credentials.set(persona.credentialName, credential);
       records.push({ persona: persona.persona, credentialName: persona.credentialName, resolver: persona.from === 'host_issued' ? 'host_issued' : persona.from.split(':')[0]!, ref: persona.from, recipe: persona.auth.kind, expiresAt: credential.expiresAt ?? secret.expiresAt, subject: null, expectedSubject: persona.subject ?? secret.subject ?? null });
     }

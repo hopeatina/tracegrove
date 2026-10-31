@@ -45,6 +45,8 @@ describe('real isolated browser driver', () => {
     await once(outside, 'listening');
     outsideOrigin = `http://127.0.0.1:${(outside.address() as { port: number }).port}`;
     server = createServer((req, res) => {
+      if (req.url?.startsWith('/sign-in?ticket=')) { res.writeHead(302, { location: '/home', 'set-cookie': 'session=ok; Path=/; HttpOnly' }); res.end(); return; }
+      if (req.url === '/whoami') { res.setHeader('content-type', 'text/html'); res.end(`<p data-testid="who">${req.headers.cookie?.includes('session=ok') ? 'signed in' : 'anonymous'}</p>`); return; }
       if (req.url === '/saved') { saved.push('saved'); res.end('ok'); return; }
       if (req.url === '/redirect') { res.writeHead(302, { location: outsideOrigin }); res.end(); return; }
       if (req.url === '/events') {
@@ -69,6 +71,22 @@ describe('real isolated browser driver', () => {
   afterEach(async () => {
     await driver?.dispose(); driver = undefined;
     await Promise.all([new Promise<void>(resolve => server.close(() => resolve())), new Promise<void>(resolve => outside.close(() => resolve()))]);
+  });
+
+  it('signs in through a same-origin entry link before recording, without logging it', async () => {
+    const network: string[] = [];
+    driver = await BrowserDriver.start({ origin, deadline: Deadline.in(10_000), entryPath: '/sign-in?ticket=secret-ticket',
+      allowedResourcePrefixes: ['/whoami'], onNetwork: event => network.push(event.url) });
+    await execute({ kind: 'navigate', path: '/whoami' });
+    expect((await execute({ kind: 'read', target: { by: 'testId', name: 'who' } })).text).toBe('signed in');
+    expect(network.some(url => url.includes('/sign-in') || url.includes('/home'))).toBe(false);
+    // After sign-in the case's own path rules apply again.
+    await expect(execute({ kind: 'navigate', path: '/home' })).rejects.toThrow();
+  });
+
+  it('refuses an entry link that leaves the app origin', async () => {
+    await expect(BrowserDriver.start({ origin, deadline: Deadline.in(10_000), entryPath: '//evil.example/sign-in' })).rejects.toThrow();
+    await expect(BrowserDriver.start({ origin, deadline: Deadline.in(10_000), extraOrigins: ['http://cdn.example'] })).rejects.toThrow();
   });
 
   it.each(['pointer', 'keyboard', 'touch'] as const)('opens native disclosure with %s input', async inputMode => {
