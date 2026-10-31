@@ -41,8 +41,13 @@ Page requests must stay on the admitted origin. A caller may admit extra https o
 (`extraOrigins`) for subresources only, such as an auth provider's frontend API or a CDN; documents from
 those origins are blocked and they never receive the bearer. A caller may also pass a same-origin
 `entryPath` (a sign-in link). The driver opens it before recording starts, follows its same-origin
-redirects regardless of the case's path rules, requires the page to land back on the app's origin, and
-keeps those requests out of the network log. Chromium's CDP Fetch interception
+main-frame GET/HEAD server redirects (at most eight) outside the case's path prefixes,
+requires the page to land back on the app's origin, and keeps those requests out of
+the network log. Bootstrap is bounded to 15 seconds and 64 paused requests. The exact
+entry document is the only new navigation exception: other requests, including
+third-party subresources, retain the case's method and resource-prefix checks.
+Popup protection is installed before entry, and setup errors contain fixed codes,
+never raw Playwright diagnostics or ticket-bearing URLs. Chromium's CDP Fetch interception
 checks every redirect hop while retaining native response streaming. Service
 workers and WebSockets are disabled, and extra pages are closed. This is page
 request filtering, not an operating system network sandbox; arbitrary application
