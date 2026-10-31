@@ -43,6 +43,14 @@ export function observedRelease(binding: NonNullable<HostStartContext['hostPlan'
   return found.present && (typeof found.value === 'string' || typeof found.value === 'number') ? String(found.value) : `missing:${binding.identity.field}`;
 }
 
+/** network.allow hosts (and named endpoints) as https origins a browser page may load from. */
+export function urlBrowserOrigins(binding: NonNullable<HostStartContext['hostPlan']['binding']>, origin: string): string[] {
+  const own = new URL(origin).origin;
+  const fromAllow = binding.network.allow.map(host => (/^[a-z]+:\/\//i.test(host) ? new URL(host).origin : `https://${host}`));
+  const fromEndpoints = Object.values(binding.endpoints).map(url => new URL(url).origin);
+  return [...new Set([...fromAllow, ...fromEndpoints])].filter(value => value !== own && value.startsWith('https://'));
+}
+
 export class UrlHost implements ExecutorHost {
   async start(context: HostStartContext): Promise<HostSession> {
     const binding = context.hostPlan.binding;
@@ -68,6 +76,7 @@ export class UrlHost implements ExecutorHost {
     return {
       origin, lease, observation, attestations: [attestation], credentials: new Map(), requestCredentials: personas.credentials,
       endpoints: binding.endpoints, boundaryMode: 'real', interceptorRefs: [], dataDir: null,
+      browserOrigins: urlBrowserOrigins(binding, origin),
       accountClass: binding.writes === 'none' ? 'designated_production' : 'test_sandbox',
       // The session owns its lease (released on stop) and any identities it minted (revoked on stop).
       ownedResources: [{ entityKey: 'host.session', physicalId: lease.ref.id, boundaryId: 'execution' }, ...personas.owned], credentialRecords: personas.records,

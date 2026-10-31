@@ -39,6 +39,11 @@ export type ResolvedSecret = {
   owned?: { entityKey: string; physicalId: string; boundaryId: string };
   revoke?(signal: AbortSignal): Promise<{ confirmed: boolean; detail: string }>;
   check?(signal: AbortSignal): Promise<CredentialCheck>;
+  /**
+   * A same-origin path that signs a browser in as this persona (an issuer's one-time sign-in link).
+   * Secret: it is a credential. The browser opens it before recording starts and sends no bearer.
+   */
+  browserEntry?: Secret;
 };
 
 export type CredentialResolver<K extends string, R> = {
@@ -66,6 +71,8 @@ export type RequestCredential = {
   /** Present when the recipe is bearer-shaped, for drivers that only speak bearer (browser, MCP, jobs). */
   bearer: Secret | null;
   expiresAt: string | null;
+  /** Carried from the resolver: the browser signs in through this path instead of sending a bearer. */
+  browserEntry?: Secret | null;
 };
 
 export function bearerCredential(token: Secret | string, expiresAt: string | null = null, recipe = 'bearer'): RequestCredential {

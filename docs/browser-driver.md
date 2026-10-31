@@ -37,7 +37,12 @@ context and browser before returning. Calls on one driver are serialized by
 rejecting concurrent operations. Closing is idempotent. A closure acknowledgement
 does not prove cleanup of an operating-system process tree after controller death.
 
-Page requests must stay on the admitted origin. Chromium's CDP Fetch interception
+Page requests must stay on the admitted origin. A caller may admit extra https origins
+(`extraOrigins`) for subresources only, such as an auth provider's frontend API or a CDN; documents from
+those origins are blocked and they never receive the bearer. A caller may also pass a same-origin
+`entryPath` (a sign-in link). The driver opens it before recording starts, follows its same-origin
+redirects regardless of the case's path rules, requires the page to land back on the app's origin, and
+keeps those requests out of the network log. Chromium's CDP Fetch interception
 checks every redirect hop while retaining native response streaming. Service
 workers and WebSockets are disabled, and extra pages are closed. This is page
 request filtering, not an operating system network sandbox; arbitrary application
