@@ -1,3 +1,4 @@
+import { normalizeBrowserTestFailure } from './support/browserFailure.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -2819,6 +2820,8 @@ describe('Grow page', () => {
       }
       expect(bad).toEqual([]);
       expect(met).toBeGreaterThan(4);
+    } catch (error) {
+      throw normalizeBrowserTestFailure(error);
     } finally { await browser.close(); }
   }, 180000);
 
