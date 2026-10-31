@@ -313,7 +313,12 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   };
   if (session?.credentialRecords?.length) log.emit('credentials.resolved', null, { personas: session.credentialRecords });
   const origin = session?.origin ?? '';
-  const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: credentialFor(session, authRecipe.credentialName)?.bearer?.reveal() ?? null,
+  // A persona with a browser sign-in link signs the page in through it (a session cookie) and sends no
+  // bearer: an app that reads Authorization as its own session would otherwise reject the page.
+  const browserCredential = credentialFor(session, authRecipe.credentialName);
+  const browserEntry = browserCredential?.browserEntry?.reveal() ?? null;
+  const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: browserEntry ? null : browserCredential?.bearer?.reveal() ?? null,
+    entryPath: browserEntry, extraOrigins: session?.browserOrigins ?? [],
     onNetwork: observation => { log.emit('browser.network', null, observation); },
   });
   const runtimeVariables: Record<string, unknown> = { execution_nonce: attemptId, lease_namespace: cell.selectionCellId, target_origin: origin };

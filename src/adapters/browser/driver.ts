@@ -28,12 +28,26 @@ export class BrowserDriver {
   static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
     allowedMethods?: readonly string[]; allowedResourcePrefixes?: readonly string[];
     bearer?: string; viewport?: { width: number; height: number }; locale?: string; timezoneId?: string; reducedMotion?: boolean;
+    /** Third-party origins page subresources may load from; never sent the bearer. */
+    extraOrigins?: readonly string[];
+    /** A same-origin sign-in path opened before recording starts; a secret, never recorded. */
+    entryPath?: string;
     inputMode?: 'pointer' | 'keyboard' | 'touch';
     onNetwork?: (observation: BrowserNetworkObservation) => void;
   }): Promise<BrowserDriver> {
     const origin = new URL(input.origin);
     if (!['http:', 'https:'].includes(origin.protocol) || origin.href !== `${origin.origin}/` || origin.username || origin.password) {
       throw new BrowserStepError('invalid_origin');
+    }
+    const extraOrigins = new Set((input.extraOrigins ?? []).map(value => {
+      const extra = new URL(value);
+      if (extra.protocol !== 'https:' || extra.href !== `${extra.origin}/` || extra.username || extra.password) throw new BrowserStepError('invalid_origin');
+      return extra.origin;
+    }));
+    let entry: URL | null = null;
+    if (input.entryPath) {
+      entry = new URL(input.entryPath, origin.origin);
+      if (entry.origin !== origin.origin || !input.entryPath.startsWith('/') || input.entryPath.startsWith('//')) throw new BrowserStepError('origin_not_admitted');
     }
     const signal = input.deadline.signal(input.signal);
     signal.throwIfAborted();
@@ -61,8 +75,10 @@ export class BrowserDriver {
       const page = await context.newPage();
       const requests = new WeakMap<Request, number>();
       let nextRequest = 0;
+      let suppressNetwork = false;
+      let signedIn = entry === null;
       const observeNetwork = (kind: BrowserNetworkObservation['kind'], request: Request, status: number | null) => {
-        if (!input.onNetwork) return;
+        if (!input.onNetwork || suppressNetwork) return;
         try {
           let requestId = requests.get(request);
           if (requestId === undefined) { requestId = ++nextRequest; requests.set(request, requestId); }
@@ -78,17 +94,33 @@ export class BrowserDriver {
       const network = await context.newCDPSession(page);
       network.on('Fetch.requestPaused', event => {
         const url = new URL(event.request.url);
-        const allowed = url.origin === origin.origin
+        const own = url.origin === origin.origin;
+        // The sign-in hop may follow the entry path's own redirects on the app's origin.
+        const signingIn = own && entry !== null && !signedIn;
+        // Third-party origins (an auth provider, a CDN) load as subresources only, never with the bearer.
+        const thirdParty = !own && extraOrigins.has(url.origin) && event.resourceType !== 'Document';
+        const allowed = thirdParty || signingIn || (own
           && (!input.allowedMethods || input.allowedMethods.includes(event.request.method))
-          && (!input.allowedResourcePrefixes || input.allowedResourcePrefixes.some(prefix => url.pathname.startsWith(prefix)));
+          && (!input.allowedResourcePrefixes || input.allowedResourcePrefixes.some(prefix => url.pathname.startsWith(prefix))));
         const operation = allowed
           ? network.send('Fetch.continueRequest', { requestId: event.requestId,
-            ...(input.bearer ? { headers: [...Object.entries(event.request.headers).filter(([name]) => name.toLowerCase() !== 'authorization').map(([name, value]) => ({ name, value: String(value) })), { name: 'Authorization', value: `Bearer ${input.bearer}` }] } : {}),
+            ...(own && input.bearer ? { headers: [...Object.entries(event.request.headers).filter(([name]) => name.toLowerCase() !== 'authorization').map(([name, value]) => ({ name, value: String(value) })), { name: 'Authorization', value: `Bearer ${input.bearer}` }] } : {}),
           })
           : network.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' });
         void operation.catch(() => context.close().catch(() => {}));
       });
       await network.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+      if (entry) {
+        // Before recording: the link is a credential, so it must not appear in the video or the network log.
+        stage = 'page';
+        suppressNetwork = true;
+        await page.goto(entry.href, { timeout: Math.max(1, input.deadline.remainingMs()), waitUntil: 'load' });
+        await page.waitForLoadState('networkidle', { timeout: Math.min(15_000, Math.max(1, input.deadline.remainingMs())) }).catch(() => undefined);
+        if (new URL(page.url()).origin !== origin.origin) throw new BrowserStepError('origin_not_admitted');
+        signedIn = true;
+        suppressNetwork = false;
+        await page.goto('about:blank').catch(() => undefined);
+      }
       context.on('page', extra => { if (extra !== page) void extra.close().catch(() => {}); });
       page.on('dialog', dialog => { void dialog.dismiss().catch(() => {}); });
       signal.throwIfAborted();

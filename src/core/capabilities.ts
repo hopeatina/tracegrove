@@ -24,6 +24,8 @@ const LIVE: readonly HostKind[] = ['local_process', 'mock_loopback', 'url', 'com
 const LOOPBACK: readonly HostKind[] = ['local_process', 'mock_loopback', 'compose', 'container'];
 const DOCKER: readonly HostKind[] = ['compose', 'container'];
 const LAUNCHED: readonly HostKind[] = ['local_process'];
+/** A browser can drive a launched app or a deployment at a URL; it needs no process of its own. */
+const BROWSER: readonly HostKind[] = ['local_process', 'url'];
 const docs = (anchor: string) => `docs/environments.md#${anchor}`;
 
 export const CAPABILITIES = {
@@ -33,9 +35,9 @@ export const CAPABILITIES = {
   'mcp.call': { version: 1, layer: 'surface', summary: 'MCP tool calls over streamable HTTP', providedBy: LAUNCHED, requires: ['http.request'], probe: 'mcp_sdk', writes: false, docs: docs('capabilities') },
   'conversation.run': { version: 1, layer: 'surface', summary: 'Scripted voice or chat conversation (RTVI WebSocket or HTTP chat)', providedBy: LIVE, requires: ['http.request'], probe: null, writes: true, docs: 'docs/voice-and-chat.md' },
   'standin.http': { version: 1, layer: 'surface', summary: 'Recording stand-ins for third parties the app calls, with faults and readback', providedBy: LAUNCHED, requires: ['http.request'], probe: null, writes: false, docs: 'docs/stand-ins.md' },
-  'ui.navigate': { version: 1, layer: 'surface', summary: 'Browser navigation (Playwright)', providedBy: LAUNCHED, requires: ['http.request'], probe: 'playwright', writes: false, docs: docs('capabilities') },
-  'ui.action': { version: 1, layer: 'surface', summary: 'Browser actions (Playwright)', providedBy: LAUNCHED, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
-  'ui.observe': { version: 1, layer: 'surface', summary: 'Browser observations (Playwright)', providedBy: LAUNCHED, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
+  'ui.navigate': { version: 1, layer: 'surface', summary: 'Browser navigation (Playwright)', providedBy: BROWSER, requires: ['http.request'], probe: 'playwright', writes: false, docs: docs('capabilities') },
+  'ui.action': { version: 1, layer: 'surface', summary: 'Browser actions (Playwright)', providedBy: BROWSER, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
+  'ui.observe': { version: 1, layer: 'surface', summary: 'Browser observations (Playwright)', providedBy: BROWSER, requires: ['ui.navigate'], probe: 'playwright', writes: false, docs: docs('capabilities') },
   native_job: { version: 1, layer: 'host', summary: 'Native Node job bridge over IPC', providedBy: LAUNCHED, requires: ['shell'], probe: null, writes: true, docs: docs('capabilities') },
   shell: { version: 1, layer: 'host', summary: 'Launch the app as a local process', providedBy: LAUNCHED, requires: [], probe: null, writes: false, docs: docs('capabilities') },
   'network_origin:loopback': { version: 1, layer: 'host', summary: 'App reachable on loopback', providedBy: LOOPBACK, requires: [], probe: null, writes: false, docs: docs('capabilities') },

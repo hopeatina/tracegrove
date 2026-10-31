@@ -13,6 +13,8 @@ export const BrokerMint = z.object({
   token: z.string().min(8).max(8192),
   expiresAt: z.string().datetime({ offset: true }),
   receiptId: z.string().max(128).nullable().optional(),
+  /** Optional same-origin path that signs a browser in as the persona (a one-time sign-in link). */
+  browserEntry: z.string().regex(/^\/(?![/\\])\S{0,4095}$/).optional(),
 }).strict();
 export const BrokerState = z.object({ id: z.string(), state: z.enum(['active', 'expired', 'revoked']), expiresAt: z.string().datetime({ offset: true }).nullable().optional() }).passthrough();
 
@@ -83,10 +85,11 @@ export const orgxBroker = defineResolver({
     if (result.status !== 201 && result.status !== 200) throw refused(result.status, result.json);
     const minted = BrokerMint.safeParse(result.json);
     if (!minted.success) throw new ResolverError('secret_store_unavailable', 'the broker returned an invalid mint response');
-    const { persona, token, expiresAt } = minted.data;
+    const { persona, token, expiresAt, browserEntry } = minted.data;
     const id = persona.id;
     return {
       value: Secret.of(token), expiresAt, subject: persona.subject,
+      ...(browserEntry ? { browserEntry: Secret.of(browserEntry) } : {}),
       owned: { entityKey: `persona.${ctx.persona}`, physicalId: id, boundaryId: 'identity' },
       check: (signal) => stateOf(ctx, id, signal).then(state => (state === 'gone' ? 'revoked' : state)),
       async revoke(signal) {

@@ -132,7 +132,7 @@ Wire contract (JSON over HTTPS):
 | Call | Request | Success | Meaning |
 | --- | --- | --- | --- |
 | Capabilities (probe) | `GET /api/test-personas/capabilities?environment=<env>` | `200 { enabled: boolean, roles?: string[] }` | `enabled: false` means minting is disabled there; it must be false in production |
-| Mint | `POST /api/test-personas` `{ environment, role, workspace, runId, persona, ttlSeconds }` | `201 { persona: { id, subject, workspaceId, role }, token, expiresAt, receiptId? }` | `subject` becomes the persona's expected whoami subject |
+| Mint | `POST /api/test-personas` `{ environment, role, workspace, runId, persona, ttlSeconds }` | `201 { persona: { id, subject, workspaceId, role }, token, expiresAt, receiptId?, browserEntry? }` | `subject` becomes the persona's expected whoami subject; `browserEntry` is an optional same-origin sign-in path for browser flows |
 | Check | `GET /api/test-personas/<id>` | `200 { id, state: active\|expired\|revoked, expiresAt? }`; `404` when gone | used when the app answers 401 mid-run |
 | Revoke | `DELETE /api/test-personas/<id>` | `204` (or `200`; `404` if already gone), then a check that reads `revoked` or `404` | cleanup; confirmed only by the follow-up check |
 
@@ -146,6 +146,10 @@ Behaviour in a run:
 - If the deployment answers `401` to a persona request, tracegrove asks the broker before blaming the
   app. If the persona is `expired` or `revoked`, the step fails with `persona_credential_expired` rather
   than an assertion about the app, and the run cannot pass.
+- Browser flows on a url environment sign the browser in by opening `browserEntry` (for example a
+  one-time sign-in ticket link) before recording starts. The path must start with a single `/`; it is
+  treated as a secret, kept out of the video and network log, and disposed with the persona. Without
+  `browserEntry`, the persona's bearer token is attached to same-origin page requests instead.
 - The fake in `examples/staging-notes/fakes/identity.mjs` implements this contract, including a control
   route that revokes the owner mid-run, and is what the tests use.
 
@@ -255,8 +259,11 @@ execution id.
 ## Capabilities {#capabilities}
 
 `tracegrove capabilities [--env <env>]` prints a capability-by-environment matrix (supported, missing or
-denied) with the reason and fix for each gap. For example, url targets have no browser engine or MCP
-transport, so browser and MCP flows stay local. The planner blocks a flow that needs a missing capability
+denied) with the reason and fix for each gap. For example, url targets have no MCP transport, so MCP
+flows stay local. Browser flows run against url targets with a local Chromium; page requests stay on the
+deployment's origin, plus https hosts listed in `network.allow` and the binding's endpoints, which may
+serve subresources (scripts, auth-provider calls) but never top-level pages and never receive the
+persona's bearer. The planner blocks a flow that needs a missing capability
 with `capability_not_provided_by_host`.
 
 ## Finding environments you already have {#detect}

@@ -122,6 +122,8 @@ describe('OrgX persona broker (wire contract against the fake)', () => {
     expect(minted.subject).toMatch(/^owner-tp_/);
     expect(minted.owned).toMatchObject({ entityKey: 'persona.owner', boundaryId: 'identity' });
     expect(Date.parse(minted.expiresAt!)).toBeGreaterThan(Date.now());
+    expect(minted.browserEntry?.reveal()).toMatch(/^\/sign-in\?ticket=tok_/);
+    expect(String(minted.browserEntry)).not.toContain('ticket=');
     expect(await minted.check!(AbortSignal.timeout(2000))).toBe('valid');
     expect(await minted.revoke!(AbortSignal.timeout(2000))).toMatchObject({ confirmed: true });
     expect(await minted.check!(AbortSignal.timeout(2000))).toBe('revoked');

@@ -90,7 +90,7 @@ function broker(req, res, url, body) {
     const persona = { id, role: input.role, subject, workspaceId: `ws_${input.runId}`.slice(0, 64), state: 'active', expiresAt: new Date(Date.now() + ttl * 1000).toISOString(), token, runId: input.runId };
     personas.set(id, persona);
     log(`broker minted ${id} role=${input.role} run=${input.runId}`);
-    return json(res, 201, { persona: { id, subject, workspaceId: persona.workspaceId, role: persona.role }, token, expiresAt: persona.expiresAt, receiptId: `awr_${id}` });
+    return json(res, 201, { persona: { id, subject, workspaceId: persona.workspaceId, role: persona.role }, token, expiresAt: persona.expiresAt, receiptId: `awr_${id}`, browserEntry: `/sign-in?ticket=${token}` });
   }
   const m = url.pathname.match(/^\/api\/test-personas\/([A-Za-z0-9_.:-]+)$/);
   const persona = m ? personas.get(m[1]) : null;
