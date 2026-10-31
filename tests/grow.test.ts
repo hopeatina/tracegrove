@@ -1798,20 +1798,20 @@ describe('Grow page', () => {
           const k = await want(l.x + dx, l.y + dy);
           if (!k) continue;
           await page.touchscreen.tap(l.x + dx, l.y + dy);
-          await page.waitForTimeout(60);
-          expect(await pinned(), name + ': tap at ' + l.k + ' +' + dx + ',' + dy).toBe(k);
+          // poll: a slow runner can take longer than one frame to handle the tap
+          await expect.poll(pinned, { message: name + ': tap at ' + l.k + ' +' + dx + ',' + dy, timeout: 2000, interval: 30 }).toBe(k);
           taps++;
           await unpin();
         }
         expect(taps, name).toBeGreaterThan(leaves.length);
         // the card a tap opens closes with its own Close of 44 px, or with a tap anywhere outside it
         const l = leaves.find((q) => q.k.startsWith('s:'))!;
-        await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
-        expect(await pinned(), name).toBe(l.k);
+        await page.touchscreen.tap(l.x, l.y);
+        await expect.poll(pinned, { message: name, timeout: 2000, interval: 30 }).toBe(l.k);
         const x = (await page.locator('.gb-tip .gb-x').boundingBox())!;
         expect(Math.min(x.width, x.height), name).toBeGreaterThanOrEqual(44);
-        await page.locator('.gb-tip .gb-x').tap(); await page.waitForTimeout(60);
-        expect(await pinned(), name).toBe(null);
+        await page.locator('.gb-tip .gb-x').tap();
+        await expect.poll(pinned, { message: name, timeout: 2000, interval: 30 }).toBe(null);
         expect(await page.locator('.gb-tip').isHidden(), name).toBe(true);
         await page.evaluate(() => { const t = document.querySelector('[data-testid="grow"] svg.gb')!; window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 20); });
         await page.touchscreen.tap(l.x, l.y); await page.waitForTimeout(60);
