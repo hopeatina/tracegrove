@@ -6,6 +6,7 @@ import { Deadline } from '../../core/deadline.ts';
 import { readBoundedFile } from '../../core/boundedFile.ts';
 import { BrowserCommand, BrowserObservation, BrowserNetworkObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
 import { BrowserRequestPolicy } from './requestPolicy.ts';
+import type { RequestBudget } from '../../core/requestBudget.ts';
 
 export class BrowserStepError extends Error {
   constructor(readonly code: string, readonly phase?: 'capture' | 'frame' | 'flush') { super(phase ? `${code}:${phase}` : code); this.name = 'BrowserStepError'; }
@@ -24,6 +25,7 @@ export class BrowserDriver {
     private readonly page: Page,
     private readonly mediaDir: string,
     private readonly inputMode: 'pointer' | 'keyboard' | 'touch',
+    private readonly requestBudget?: RequestBudget,
   ) {}
 
   static async start(input: { origin: string; deadline: Deadline; signal?: AbortSignal;
@@ -35,6 +37,7 @@ export class BrowserDriver {
     entryPath?: string;
     inputMode?: 'pointer' | 'keyboard' | 'touch';
     onNetwork?: (observation: BrowserNetworkObservation) => void;
+    requestBudget?: RequestBudget;
   }): Promise<BrowserDriver> {
     let origin: URL;
     try { origin = new URL(input.origin); } catch { throw new BrowserStepError('invalid_origin'); }
@@ -102,7 +105,8 @@ export class BrowserDriver {
       if (!frameTree.frameTree.frame.id) throw new BrowserStepError('browser_setup_failed');
       const policy = new BrowserRequestPolicy({ origin: origin.origin, mainFrameId: frameTree.frameTree.frame.id,
         extraOrigins, ...(input.allowedMethods ? { allowedMethods: input.allowedMethods } : {}),
-        ...(input.allowedResourcePrefixes ? { allowedResourcePrefixes: input.allowedResourcePrefixes } : {}), entry });
+        ...(input.allowedResourcePrefixes ? { allowedResourcePrefixes: input.allowedResourcePrefixes } : {}),
+        ...(input.requestBudget ? { requestBudget: input.requestBudget } : {}), entry });
       network.on('Fetch.requestPaused', event => {
         let url: URL;
         try { url = new URL(event.request.url); } catch {
@@ -110,7 +114,13 @@ export class BrowserDriver {
           return;
         }
         const own = url.origin === origin.origin;
-        const allowed = policy.allows(event);
+        let allowed: boolean;
+        try { allowed = policy.allows(event); }
+        catch {
+          void network.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+          void context.close().catch(() => {});
+          return;
+        }
         const operation = allowed
           ? network.send('Fetch.continueRequest', { requestId: event.requestId,
             ...(own && input.bearer ? { headers: [...Object.entries(event.request.headers).filter(([name]) => name.toLowerCase() !== 'authorization').map(([name, value]) => ({ name, value: String(value) })), { name: 'Authorization', value: `Bearer ${input.bearer}` }] } : {}),
@@ -135,7 +145,7 @@ export class BrowserDriver {
         suppressNetwork = false;
       }
       signal.throwIfAborted();
-      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer');
+      const driver = new BrowserDriver(origin.origin, browser, context, page, mediaDir, input.inputMode ?? 'pointer', input.requestBudget);
       // Keep mobile pixels at their native size; VP9's chroma grid needs even dimensions.
       const viewport = input.viewport ?? { width: 1280, height: 720 };
       const videoSize = { width: Math.ceil(viewport.width / 2) * 2, height: Math.ceil(viewport.height / 2) * 2 };
@@ -148,6 +158,7 @@ export class BrowserDriver {
     } catch (error) {
       await browser?.close().catch(() => {});
       await rm(mediaDir, { recursive: true, force: true }).catch(() => {});
+      input.requestBudget?.throwIfBlocked();
       if (input.signal?.aborted) throw new BrowserStepError('browser_cancelled');
       if (signal.aborted) throw new BrowserStepError('browser_timeout');
       if (error instanceof BrowserStepError) throw error;
@@ -165,6 +176,7 @@ export class BrowserDriver {
   }
 
   async execute(input: unknown, deadline: Deadline, parent?: AbortSignal): Promise<BrowserObservation> {
+    this.requestBudget?.throwIfBlocked();
     const command = BrowserCommand.parse(input);
     if (this.closing) throw new BrowserStepError('browser_closed');
     if (this.busy) throw new BrowserStepError('browser_busy');
@@ -218,12 +230,14 @@ export class BrowserDriver {
       }
       signal.throwIfAborted();
       if (new URL(this.page.url()).origin !== this.origin) throw new BrowserStepError('origin_not_admitted');
+      this.requestBudget?.throwIfBlocked();
       return BrowserObservation.parse({ kind: command.kind, url: this.page.url().slice(0, 4096), status, text, textTruncated });
     } catch (error) {
       const cancelled = parent?.aborted === true;
       const timedOut = deadline.expired() || (error instanceof Error && error.name === 'TimeoutError');
       // Revoke failed mutating actions; a bounded read timeout can retain its video.
       if (cancelled || !timedOut || command.kind !== 'read') await this.close();
+      this.requestBudget?.throwIfBlocked();
       if (cancelled) throw new BrowserStepError('browser_cancelled');
       if (timedOut) throw new BrowserStepError('browser_timeout');
       if (error instanceof BrowserStepError) throw error;

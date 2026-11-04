@@ -36,9 +36,10 @@ export async function attestRelease(context: HostStartContext, release: string, 
 
 async function readyOrFail(origin: string, context: HostStartContext, logs: () => Promise<string>): Promise<unknown> {
   const binding = context.hostPlan.binding!;
-  try { return (await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal)).body; }
+  try { return (await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal, context.requestBudget)).body; }
   catch (error) {
     if (!(error instanceof Blocked)) throw error;
+    if (error.reasons.some(reason => ['budget_exceeded', 'deployment_access_denied'].includes(reason.code))) throw error;
     throw new InfrastructureFailure(`the app did not become ready at ${origin}${binding.readiness.path}; last output:\n${(await logs().catch(() => '')).split('\n').slice(-8).join('\n')}`);
   }
 }

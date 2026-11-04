@@ -5,6 +5,7 @@
  */
 import { applyTemplate, applyTemplateDeep } from '../../core/compiler.ts';
 import { Deadline } from '../../core/deadline.ts';
+import { RequestBudget } from '../../core/requestBudget.ts';
 import { pollObservation } from '../poll.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { evaluatePredicate } from '../../core/reducer.ts';
@@ -80,7 +81,7 @@ export function authHeaders(spec: Pick<HttpRequestSpec, 'auth'>, credentials: Ht
 }
 
 /** Environment limits the driver enforces itself, independent of the planner. */
-export type HttpPolicy = { maxRequests?: number | null; allowedMethods?: readonly string[] | null };
+export type HttpPolicy = { maxRequests?: number | null; allowedMethods?: readonly string[] | null; requestBudget?: RequestBudget };
 
 export class HttpDriver {
   private sent = 0;
@@ -92,6 +93,7 @@ export class HttpDriver {
     if (!this.allowedOrigins.has(spec.origin)) throw new HttpStepError('origin_not_admitted', `${spec.origin} is not an admitted origin`);
     if (this.policy.allowedMethods && !this.policy.allowedMethods.includes(spec.method)) throw new HttpStepError('environment_writes_forbidden', `${spec.method} is not allowed in a read-only environment`);
     if (this.policy.maxRequests !== undefined && this.policy.maxRequests !== null && this.sent >= this.policy.maxRequests) throw new HttpStepError('budget_exceeded', `the environment request budget of ${this.policy.maxRequests} is spent`);
+    this.policy.requestBudget?.claim();
     this.sent++;
     const path = applyTemplate(spec.path, spec.variables);
     if (!path.startsWith('/')) throw new HttpStepError('invalid_path', path);

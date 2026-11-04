@@ -10,6 +10,7 @@ import { Blocked } from '../core/errors.ts';
 import { nowIso } from '../core/clock.ts';
 import { getPath } from '../core/reducer.ts';
 import { sleep } from '../core/deadline.ts';
+import { RequestBudget } from '../core/requestBudget.ts';
 import { buildCapabilityObservation, buildLease } from './local.ts';
 import { establishPersonas } from './personas.ts';
 import { defineHost, type ExecutorHost, type HostCapabilities, type HostSession, type HostStartContext } from './types.ts';
@@ -20,16 +21,22 @@ export const URL_CAPABILITIES = {
 } as const satisfies HostCapabilities;
 
 /** Poll the health path until 2xx; distinguish "nothing answered" from "answered, not ready". */
-export async function waitDeployment(origin: string, path: string, timeoutMs: number, signal: AbortSignal): Promise<{ body: unknown }> {
+export async function waitDeployment(origin: string, path: string, timeoutMs: number, signal: AbortSignal, budget = new RequestBudget(null)): Promise<{ body: unknown }> {
   const until = Date.now() + timeoutMs;
   let last: 'unreachable' | number = 'unreachable';
   let pause = 50;
   while (Date.now() < until && !signal.aborted) {
+    budget.claim(); // Before dispatch, outside the transport-error retry handler.
+    let response: Response | null = null;
     try {
-      const response = await fetch(`${origin}${path}`, { redirect: 'manual', signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(5000, Math.max(1, until - Date.now())))]) });
+      response = await fetch(`${origin}${path}`, { redirect: 'manual', signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(5000, Math.max(1, until - Date.now())))]) });
       if (response.ok) { let body: unknown = null; try { body = await response.json(); } catch { body = null; } return { body }; }
       last = response.status; await response.body?.cancel();
     } catch { last = 'unreachable'; }
+    if (response && (response.status === 401 || response.status === 403)) budget.stop(new Blocked([{ code: 'deployment_access_denied',
+      detail: `${origin}${path} answered ${response.status}; no readiness retry is permitted`, owner: 'operator', action: 'resolve the access refusal before a separately authorized run' }]));
+    if (response && response.status < 500 && ![408, 425, 429].includes(response.status))
+      budget.stop(new Blocked([{ code: 'deployment_not_ready', detail: `${origin}${path} answered ${response.status}; not retryable`, owner: 'operator', action: 'inspect the readiness response before another run' }]));
     await sleep(pause, signal).catch(() => undefined);
     pause = Math.min(pause * 2, 500);
   }
@@ -56,10 +63,11 @@ export class UrlHost implements ExecutorHost {
     const binding = context.hostPlan.binding;
     if (!binding || binding.kind !== 'url' || !binding.origin) throw new Blocked([{ code: 'host_binding_missing', detail: context.hostPlan.ref.id, owner: 'developer', action: 'compile the project with --env <name> for a url environment' }]);
     const origin = binding.origin.replace(/\/$/, '');
-    const { body } = await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal);
+    const budget = context.requestBudget ?? new RequestBudget(binding.budget?.maxRequests ?? null);
+    const { body } = await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal, budget);
     const release = observedRelease(binding, origin, body);
     if (binding.identity.expect && release !== binding.identity.expect) throw new Blocked([{ code: 'identity_mismatch', detail: `${origin} reports ${binding.identity.field ?? 'release'} ${release}; environment ${binding.environment} expects ${binding.identity.expect}`, owner: 'operator', action: `redeploy ${binding.identity.expect}, or update target.release.expect` }]);
-    const personas = await establishPersonas({ binding, origin, requested: context.credentialNames, root: resolve(context.projectRoot, binding.projectRoot), runId: context.executionId, signal: context.signal, hostId: context.hostPlan.ref.id });
+    const personas = await establishPersonas({ binding, origin, requested: context.credentialNames, root: resolve(context.projectRoot, binding.projectRoot), runId: context.executionId, signal: context.signal, hostId: context.hostPlan.ref.id, requestBudget: budget });
     const lease = buildLease(context, null);
     const attestation = parseAs(IdentityAttestation, freeze({
       schemaVersion: 'workflow.identity-attestation/v1' as const,

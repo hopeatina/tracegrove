@@ -1,3 +1,5 @@
+import type { RequestBudget } from '../../core/requestBudget.ts';
+
 /** Request admission is independent of diagnostics, so hidden bootstrap traffic is still bounded. */
 export class BrowserRequestPolicy {
   private bootstrap: { entry: string; lastRequest?: string; redirects: number; requests: number } | null;
@@ -6,6 +8,7 @@ export class BrowserRequestPolicy {
     origin: string; mainFrameId: string; extraOrigins: ReadonlySet<string>;
     allowedMethods?: readonly string[]; allowedResourcePrefixes?: readonly string[];
     entry?: URL | null;
+    requestBudget?: RequestBudget;
   }) {
     this.bootstrap = input.entry ? { entry: input.entry.href, redirects: 0, requests: 0 } : null;
   }
@@ -37,8 +40,10 @@ export class BrowserRequestPolicy {
         if (redirect) bootstrap.redirects++;
       }
     }
-    return entryDocument || !this.input.allowedResourcePrefixes
+    const allowed = entryDocument || !this.input.allowedResourcePrefixes
       || this.input.allowedResourcePrefixes.some(prefix => url.pathname.startsWith(prefix));
+    if (allowed) this.input.requestBudget?.claim();
+    return allowed;
   }
 
   finishBootstrap(): void { this.bootstrap = null; }

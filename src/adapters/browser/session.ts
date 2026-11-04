@@ -4,6 +4,7 @@ import { applyTemplate, applyTemplateDeep } from '../../core/compiler.ts';
 import { Deadline, sleep } from '../../core/deadline.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { evaluatePredicate } from '../../core/reducer.ts';
+import type { RequestBudget } from '../../core/requestBudget.ts';
 
 /** One lazy browser per case; all polls count against the same action budget. */
 export class CaseBrowserSession {
@@ -14,6 +15,7 @@ export class CaseBrowserSession {
   private networkEvents = 0;
   constructor(private readonly input: { origin: string; spec: CaseSpec; persona: Persona; bearer: string | null;
     entryPath?: string | null; extraOrigins?: readonly string[];
+    requestBudget?: RequestBudget;
     onNetwork: (observation: BrowserNetworkObservation) => void;
   }) {}
 
@@ -24,6 +26,7 @@ export class CaseBrowserSession {
       const { persona, spec } = this.input;
       this.browser = await BrowserDriver.start({ origin: this.input.origin, deadline, signal,
         allowedMethods: spec.effects.allowedMethods.filter(method => spec.effects.mode !== 'read_only' || method === 'GET' || method === 'HEAD'), allowedResourcePrefixes: spec.effects.allowedResourcePrefixes,
+        ...(this.input.requestBudget ? { requestBudget: this.input.requestBudget } : {}),
         ...(this.input.bearer ? { bearer: this.input.bearer } : {}),
         ...(this.input.entryPath ? { entryPath: this.input.entryPath } : {}),
         ...(this.input.extraOrigins?.length ? { extraOrigins: this.input.extraOrigins } : {}),

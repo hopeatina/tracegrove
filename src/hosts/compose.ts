@@ -41,9 +41,10 @@ export class ComposeHost implements ExecutorHost {
       await must(this.cli, [...base, 'up', '-d', '--remove-orphans'], 'docker compose up', { env, timeoutMs: 600_000, signal: context.signal });
       const origin = loopbackOrigin(await must(this.cli, [...base, 'port', spec.service, String(spec.port)], 'docker compose port', { env }));
       let body: unknown;
-      try { body = (await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal)).body; }
+      try { body = (await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal, context.requestBudget)).body; }
       catch (error) {
         if (!(error instanceof Blocked)) throw error;
+        if (error.reasons.some(reason => ['budget_exceeded', 'deployment_access_denied'].includes(reason.code))) throw error;
         const logs = await this.cli.run([...base, 'logs', '--tail', '20', spec.service], { env, timeoutMs: 15_000 });
         throw new InfrastructureFailure(`compose service ${spec.service} did not become ready at ${origin}${binding.readiness.path}; last output:\n${logs.stdout.split('\n').slice(-8).join('\n')}`);
       }
