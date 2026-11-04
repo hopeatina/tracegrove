@@ -5,12 +5,13 @@ import { McpToolCall, McpToolObservation } from '../../protocol/index.ts';
 import type { Deadline } from '../../core/deadline.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { HttpStepError } from '../http/driver.ts';
+import type { RequestBudget } from '../../core/requestBudget.ts';
 
 export const MAX_MCP_BYTES = 65_536;
 
 /** One admitted call, no discovery effects, fallback transport, OAuth flow or retry. */
 export class McpDriver {
-  constructor(private readonly origin: string, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly origin: string, private readonly fetcher: typeof fetch = fetch, private readonly requestBudget?: RequestBudget) {}
   async call(raw: McpToolCall, credential: string | null, deadline: Deadline, parent: AbortSignal): Promise<McpToolObservation> {
     const command = McpToolCall.parse(raw);
     const endpoint = new URL(command.endpoint, this.origin);
@@ -25,6 +26,7 @@ export class McpDriver {
       fetch: async (url, init) => {
         if (new URL(String(url)).href !== endpoint.href) throw new Error('MCP request left its endpoint');
         if (typeof init?.body === 'string' && Buffer.byteLength(init.body) > MAX_MCP_BYTES) throw new HttpStepError('mcp_request_too_large', 'MCP wire request exceeds the protocol limit');
+        this.requestBudget?.claim();
         const response = await this.fetcher(url, { ...init, redirect: 'error', signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal });
         if (!response.body) return response;
         let bytes = 0;
@@ -52,6 +54,7 @@ export class McpDriver {
       if (credential && serialized.includes(JSON.stringify(credential).slice(1, -1))) throw new HttpStepError('mcp_secret_echo', 'MCP response echoed an issued credential; observation withheld');
       return observation;
     } catch (error) {
+      this.requestBudget?.throwIfBlocked();
       if (parent.aborted) throw new HttpStepError('cancelled', 'MCP call cancelled; remote side effects remain unknown');
       if (signal.aborted || deadline.expired() || (error instanceof McpError && error.code === ErrorCode.RequestTimeout)) throw new HttpStepError('deadline_exceeded', 'MCP call exceeded its deadline; remote side effects remain unknown');
       if (error instanceof HttpStepError) throw error;

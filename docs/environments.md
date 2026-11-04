@@ -245,9 +245,21 @@ list. `env doctor` shows what is admitted.
 
 ## Budget {#budget}
 
-`budget.maxRequests` (default 500 for url targets) caps the requests a run may make. The planner
-estimates each flow's requests and blocks with `budget_exceeded` before starting if the plan would exceed
-the cap. The driver enforces the same cap at run time. Cleanup is never refused by the budget.
+`budget.maxRequests` (default 500 for url targets) is one shared dispatch ceiling for the selected run,
+not a fresh allowance per flow. The planner aggregates its estimate, including each cell's initial
+readiness request, and blocks with `budget_exceeded` when that estimate exceeds the cap. The estimate
+is not an upper bound: readback polling and browser subresources are metered at dispatch time.
+Readiness attempts, HTTP steps/polls, admitted browser requests/redirect hops, MCP HTTP exchanges,
+conversation requests/connection and outgoing messages, and fetch-based persona setup/checks share
+the same counter. Failed or uncertain requests stay charged; redirects cannot hide
+additional automatic fetches. External credential commands have their own controls, not HTTP accounting.
+Owned-resource cleanup uses its separate reserved path so exhaustion cannot strand a minted persona.
+This includes one fixed disconnect message on an owned voice socket; no additional conversation turn
+is admitted by the cleanup exception. Redirected or unconfirmed cleanup remains a reported failure.
+
+Readiness `401`/`403`, redirects and other non-retryable responses stop the run without another cell
+retrying them. Transient readiness retries consume the same ceiling and remain deadline-bounded.
+This behavior does not clear an access hold or authorize a new production request.
 
 ## Docker {#docker}
 

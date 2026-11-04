@@ -25,6 +25,8 @@ export type ResolveContext = {
   runId: string;
   persona: string;
   fetch: typeof fetch;
+  /** Dedicated owned-resource teardown transport; request exhaustion cannot strand credentials. */
+  cleanupFetch?: typeof fetch;
   exec: ExecFn;
 };
 

@@ -10,6 +10,7 @@ import { execFile } from '../credentials/exec.ts';
 import { applyRecipe, RecipeError } from '../credentials/recipes.ts';
 import { resolveSecret } from '../credentials/registry.ts';
 import { ResolverError, type CredentialCheck, type RequestCredential, type ResolvedSecret } from '../credentials/types.ts';
+import type { RequestBudget } from '../core/requestBudget.ts';
 
 export type CredentialRecord = { persona: string; credentialName: string; resolver: string; ref: string; recipe: string; expiresAt: string | null; subject: string | null; expectedSubject: string | null };
 export type EstablishedPersonas = {
@@ -25,20 +26,22 @@ export function admittedHosts(binding: TargetBinding, origin: string): Set<strin
   return new Set([new URL(origin).host, ...Object.values(binding.endpoints).map(url => new URL(url).host), ...binding.network.allow]);
 }
 
-export async function whoami(origin: string, path: string, subjectPath: string, credential: RequestCredential, signal: AbortSignal): Promise<{ status: number; subject: string | null }> {
+export async function whoami(origin: string, path: string, subjectPath: string, credential: RequestCredential, signal: AbortSignal, transport = globalThis.fetch.bind(globalThis)): Promise<{ status: number; subject: string | null }> {
   const headers = Object.fromEntries(Object.entries(credential.headers).map(([name, value]) => [name, value.reveal()]));
-  const response = await fetch(`${origin}${path}`, { headers, redirect: 'manual', signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) });
+  const response = await transport(`${origin}${path}`, { headers, redirect: 'manual', signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) });
   let body: unknown = null; try { body = await response.json(); } catch { body = null; }
   const found = getPath({ body }, `body.${subjectPath}`);
   return { status: response.status, subject: found.present && (typeof found.value === 'string' || typeof found.value === 'number') ? String(found.value) : null };
 }
 
-export async function establishPersonas(input: { binding: TargetBinding; origin: string; requested: readonly string[]; root: string; runId: string; signal: AbortSignal; hostId: string; verifyIdentity?: boolean }): Promise<EstablishedPersonas> {
+export async function establishPersonas(input: { binding: TargetBinding; origin: string; requested: readonly string[]; root: string; runId: string; signal: AbortSignal; hostId: string; verifyIdentity?: boolean; requestBudget?: RequestBudget }): Promise<EstablishedPersonas> {
   const { binding, origin } = input;
   const credentials = new Map<string, RequestCredential>();
   const records: CredentialRecord[] = [];
   const resolved = new Map<string, ResolvedSecret>();
   const hosts = admittedHosts(binding, origin);
+  const cleanupFetch = globalThis.fetch.bind(globalThis);
+  const transport = input.requestBudget?.wrap(cleanupFetch) ?? cleanupFetch;
   const release = async (signal: AbortSignal) => {
     const results = await Promise.all([...resolved.values()].map(async secret => (secret.revoke ? secret.revoke(signal) : { confirmed: true, detail: 'nothing to revoke' })));
     for (const secret of resolved.values()) secret.value.dispose();
@@ -56,7 +59,7 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
     for (const persona of needed) {
       let secret: ResolvedSecret;
       try {
-        secret = await resolveSecret(persona.from, { root: input.root, env: process.env, signal: input.signal, runId: input.runId, persona: persona.persona, fetch: globalThis.fetch.bind(globalThis), exec: execFile });
+        secret = await resolveSecret(persona.from, { root: input.root, env: process.env, signal: input.signal, runId: input.runId, persona: persona.persona, fetch: transport, cleanupFetch, exec: execFile });
       } catch (error) {
         const e = error as ResolverError;
         throw new Blocked([{ code: 'persona_secret_unresolvable', detail: `${persona.persona} (${persona.from}): ${e instanceof ResolverError ? e.message : 'resolver failed'}`, owner: 'operator', action: e instanceof ResolverError && e.fix ? `run: ${e.fix}` : `tracegrove env doctor ${binding.environment}` }]);
@@ -64,7 +67,7 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
       resolved.set(persona.credentialName, secret);
       let credential: RequestCredential;
       try {
-        credential = await applyRecipe(persona.auth, secret.value, { origin, fetch: globalThis.fetch.bind(globalThis), signal: input.signal, secretExpiresAt: secret.expiresAt, allowHost: url => hosts.has(new URL(url).host) });
+        credential = await applyRecipe(persona.auth, secret.value, { origin, fetch: transport, signal: input.signal, secretExpiresAt: secret.expiresAt, allowHost: url => hosts.has(new URL(url).host) });
       } catch (error) {
         const code = error instanceof RecipeError ? error.code : 'auth_recipe_failed';
         throw new Blocked([{ code, detail: `${persona.persona} (${persona.auth.kind}): ${(error as Error).message}`, owner: 'operator', action: `tracegrove whoami --env ${binding.environment} --as ${persona.persona}` }]);
@@ -73,10 +76,17 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
       credentials.set(persona.credentialName, credential);
       records.push({ persona: persona.persona, credentialName: persona.credentialName, resolver: persona.from === 'host_issued' ? 'host_issued' : persona.from.split(':')[0]!, ref: persona.from, recipe: persona.auth.kind, expiresAt: credential.expiresAt ?? secret.expiresAt, subject: null, expectedSubject: persona.subject ?? secret.subject ?? null });
     }
-    if (binding.whoami && input.verifyIdentity !== false) await proveIdentities(binding, origin, needed, credentials, records, input.signal);
+    if (binding.whoami && input.verifyIdentity !== false) await proveIdentities(binding, origin, needed, credentials, records, input.signal, transport);
   } catch (error) {
-    await release(AbortSignal.timeout(10_000)).catch(() => undefined);
-    throw error;
+    const cleanup = await release(AbortSignal.timeout(10_000)).catch(() => ({ confirmed: false, detail: 'persona teardown did not acknowledge completion' }));
+    let cause = error;
+    try { input.requestBudget?.throwIfBlocked(); } catch (blocked) { cause = blocked; }
+    if (!cleanup.confirmed) throw new Blocked([
+      ...(cause instanceof Blocked ? cause.reasons : [{ code: 'persona_setup_failed', detail: 'persona setup failed' }]),
+      { code: 'deployed_cleanup_unconfirmed', detail: `${[...resolved.values()].flatMap(secret => secret.owned ? [secret.owned.physicalId] : []).join(', ')}: ${cleanup.detail}`,
+        owner: 'operator', action: 'reconcile the run-owned broker identities before repeating acquisition' },
+    ]);
+    throw cause;
   }
   return {
     credentials, records,
@@ -84,7 +94,7 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
     async check(name, signal) {
       const secret = resolved.get(name);
       if (!secret) return 'unknown';
-      if (secret.check) return secret.check(signal).catch(() => 'unknown' as const);
+      if (secret.check) return secret.check(signal).catch(() => { input.requestBudget?.throwIfBlocked(); return 'unknown' as const; });
       const expiresAt = credentials.get(name)?.expiresAt ?? secret.expiresAt;
       return expiresAt && Date.parse(expiresAt) <= Date.now() ? 'expired' : 'unknown';
     },
@@ -92,13 +102,13 @@ export async function establishPersonas(input: { binding: TargetBinding; origin:
   };
 }
 
-async function proveIdentities(binding: TargetBinding, origin: string, personas: PersonaBinding[], credentials: Map<string, RequestCredential>, records: CredentialRecord[], signal: AbortSignal): Promise<void> {
+async function proveIdentities(binding: TargetBinding, origin: string, personas: PersonaBinding[], credentials: Map<string, RequestCredential>, records: CredentialRecord[], signal: AbortSignal, transport: typeof fetch): Promise<void> {
   const problems: Array<{ code: string; detail: string; persona: string }> = [];
   const seen = new Map<string, string>();
   for (const persona of personas) {
     const record = records.find(r => r.credentialName === persona.credentialName)!;
     let result: { status: number; subject: string | null };
-    try { result = await whoami(origin, binding.whoami!.path, binding.whoami!.subject, credentials.get(persona.credentialName)!, signal); }
+    try { result = await whoami(origin, binding.whoami!.path, binding.whoami!.subject, credentials.get(persona.credentialName)!, signal, transport); }
     catch { problems.push({ code: 'deployment_unreachable', detail: `whoami for ${persona.persona} did not answer`, persona: persona.persona }); continue; }
     record.subject = result.subject;
     if (result.status === 401 || result.status === 403) { problems.push({ code: 'auth_recipe_failed', detail: `${persona.persona}: whoami returned ${result.status}; the credential was not accepted`, persona: persona.persona }); continue; }

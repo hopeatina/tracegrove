@@ -32,6 +32,7 @@ import { authorizeRegressionExecution, type RegressionExecutionOwner } from './r
 import { isoPlusMs, monotonicMs, newId, nowIso } from './clock.ts';
 import { applyTemplateDeep } from './compiler.ts';
 import { Deadline } from './deadline.ts';
+import { RequestBudget } from './requestBudget.ts';
 import { Blocked, Conflict, InfrastructureFailure, isInfrastructureStepFailure } from './errors.ts';
 import { EventLog } from './events.ts';
 import type { LocalLedger } from './ledger.ts';
@@ -174,6 +175,8 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
   const campaignDeadline = Deadline.in(request.limits.deadlineMs);
   const receipts: ExecutionReceipt[] = [];
   const hosts = options.hosts;
+  const requestLimits = prepared.flatMap(item => item.hostPlan.binding?.budget ? [item.hostPlan.binding.budget.maxRequests] : []);
+  const requestBudget = new RequestBudget(requestLimits.length ? Math.min(...requestLimits) : null);
   let phaseVersion = ledger.version(executionAggregate);
 
   for (const item of prepared) {
@@ -187,7 +190,7 @@ export async function executeBundle(options: RunOptions): Promise<RunSummary> {
     } : undefined;
     const receipt = await runCell({ item, request, selection, fidelityPlan, campaignFixturePlan, intelligencePolicy, docs, scope,
       executionId: allocation?.executionId ?? executionId, attemptId: allocation?.attemptId ?? attemptId,
-      generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, ownership, executionDir, hosts, bundle, onEvent: options.onEvent, beforeEffect });
+      generation, attemptNumber, predecessor, reservation, campaignDeadline, signal, artifacts, ownership, executionDir, hosts, bundle, requestBudget, onEvent: options.onEvent, beforeEffect });
     receipts.push(receipt);
     phaseVersion = ledger.append(executionAggregate, phaseVersion, 'cell.finalized', { selectionCellId: item.cell.selectionCellId, outcome: receipt.outcome, receiptRef: receipt.ref }).version;
   }
@@ -208,6 +211,7 @@ type CellContext = {
   campaignDeadline: Deadline; signal: AbortSignal; artifacts: LocalArtifactStore; ownership: ExecutionOwnership; executionDir: string;
   hosts: HostOverrides | undefined; bundle: FrozenBundle; onEvent?: RunOptions['onEvent'];
   beforeEffect?: (() => Promise<void>) | undefined;
+  requestBudget: RequestBudget;
 };
 
 async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
@@ -248,7 +252,8 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   try {
     await beforeEffect();
     const host = await hostFor(hostPlan.adapter, ctx.hosts);
-    session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses });
+    ctx.requestBudget.throwIfBlocked();
+    session = await host.start({ hostPlan, projectRoot: ctx.bundle.projectRoot, workspaceDir, scope, campaignId: request.campaignId, executionId, attemptId, generation, actorId: ownerFor(scope), credentialNames, signal, mockResponses, requestBudget: ctx.requestBudget });
     ctx.ownership.observed(hostOwnershipKey, session.ownedResources.map(r => r.physicalId));
     log.emit('host.started', null, { adapter: hostPlan.adapter, origin: session.origin, leaseRef: session.lease.ref, observationRef: session.observation.ref, attestations: session.attestations.map((a) => a.ref) });
     // Every request the app served, attributed to the step that was running when it arrived.
@@ -301,7 +306,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   }), 'environment binding');
 
   const admittedOrigins = session ? new Set([session.origin, ...Object.values(session.endpoints ?? {})]) : new Set<string>();
-  const driver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), admittedOrigins, { maxRequests: session.requestBudget ?? null, allowedMethods: session.allowedMethods ?? null }) : null;
+  const driver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), admittedOrigins, { maxRequests: session.requestBudget ?? null, allowedMethods: session.allowedMethods ?? null, requestBudget: ctx.requestBudget }) : null;
   // Cleanup is never refused by the request budget: owned records must be removable.
   const cleanupDriver = session ? new HttpDriver(sessionCredentials(session, authRecipe.credentialName), admittedOrigins) : null;
   /** A 401 from a deployment may mean the issuer expired or revoked the persona mid-run; ask the issuer before blaming the app. */
@@ -309,6 +314,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     if (status !== 401 || auth.kind === 'none' || !session?.credentialCheck) return;
     const name = auth.kind === 'persona' ? authRecipe.credentialName : auth.name ?? null;
     const state = name ? await session.credentialCheck(name, signal) : 'unknown';
+    ctx.requestBudget.throwIfBlocked();
     if (state === 'expired' || state === 'revoked') throw new HttpStepError('persona_credential_expired', `${name} was ${state} by its issuer mid-run; the 401 says nothing about the app`);
   };
   if (session?.credentialRecords?.length) log.emit('credentials.resolved', null, { personas: session.credentialRecords });
@@ -318,7 +324,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
   const browserCredential = credentialFor(session, authRecipe.credentialName);
   const browserEntry = browserCredential?.browserEntry?.reveal() ?? null;
   const browser = new CaseBrowserSession({ origin, spec, persona: item.persona, bearer: browserEntry ? null : browserCredential?.bearer?.reveal() ?? null,
-    entryPath: browserEntry, extraOrigins: session?.browserOrigins ?? [],
+    entryPath: browserEntry, extraOrigins: session?.browserOrigins ?? [], requestBudget: ctx.requestBudget,
     onNetwork: observation => { log.emit('browser.network', null, observation); },
   });
   const runtimeVariables: Record<string, unknown> = { execution_nonce: attemptId, lease_namespace: cell.selectionCellId, target_origin: origin };
@@ -461,7 +467,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         catch { throw new HttpStepError('mcp_driver_unavailable', 'Install the pinned optional MCP SDK before planning this flow'); }
         integrationOperations++;
         uncertainOperations++;
-        observation = await new module.McpDriver(origin).call(command, credential, deadline, signal);
+        observation = await new module.McpDriver(origin, globalThis.fetch, ctx.requestBudget).call(command, credential, deadline, signal);
         if (!observation.isError) {
           uncertainOperations--;
           captured[stepId] = captureValues({ body: observation }, step.captures);
@@ -472,7 +478,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
         const { ConversationDriver } = await import('../adapters/conversation/driver.ts');
         integrationOperations++;
         uncertainOperations++;
-        observation = await new ConversationDriver(origin).run(command, credential, deadline, signal);
+        observation = await new ConversationDriver(origin, globalThis.fetch, ctx.requestBudget).run(command, credential, deadline, signal);
         uncertainOperations--;
         captured[stepId] = captureValues({ body: observation }, step.captures);
       } else if (step.kind === 'standin.fault' || step.kind === 'standin.observe') {
@@ -506,7 +512,7 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
       stepObservations.push({ stepId, result, reasonCode: toolError ? 'mcp_tool_error' : null, eventIds: [startEvent.eventId, finished.eventId], evidenceRefs: [EventLog.refOf(finished)], inputDigest, outputDigest: digestOfValue(output), output, timing: { startedAt: stepStart, finishedAt: nowIso(), durationMs: monotonicMs() - stepStartedMs } });
       if (toolError) halted = true;
     } catch (error) {
-      const rawCode = error instanceof HttpStepError || error instanceof BrowserStepError || error instanceof NativeJobError ? error.code : 'transport_failure';
+      const rawCode = error instanceof Blocked ? error.reasons[0]!.code : error instanceof HttpStepError || error instanceof BrowserStepError || error instanceof NativeJobError ? error.code : 'transport_failure';
       const code = rawCode === 'browser_cancelled' ? 'cancelled' : rawCode;
       const finished = log.emit('step.finished', stepId, { result: code === 'cancelled' ? 'cancelled' : 'failed', reason: code, message: String((error as Error).message) });
       if (code === 'cancelled' || code === 'browser_cancelled') cancelled = true;
@@ -558,6 +564,11 @@ async function runCell(ctx: CellContext): Promise<ExecutionReceipt> {
     const phase = error instanceof BrowserStepError && ['capture', 'frame', 'flush'].includes(error.phase ?? '') ? error.phase : null;
     infrastructureFailure = true; log.emit('browser.failed', null, { code: 'browser_evidence_collection_failed', cause, phase });
   }
+
+  // A page can exhaust its network budget asynchronously between DOM steps or during capture.
+  try { ctx.requestBudget.throwIfBlocked(); }
+  catch (error) { if (error instanceof Blocked) blockedReasons.push(...error.reasons.map(reason => reason.code)); else throw error; }
+  log.emit('environment.request_budget', null, { scope: 'run', limit: ctx.requestBudget.limit, used: ctx.requestBudget.count, cleanup: 'separate_reserved_path' });
 
   // ---- cleaning: owned fixtures in reverse order, then the host; a cleanup deadline is reserved ----
   // Journal failure must never prevent best-effort cleanup of already acquired resources.

@@ -3,6 +3,7 @@ import { ConversationObservation, ConversationRun, type ConversationToolCall } f
 import type { Deadline } from '../../core/deadline.ts';
 import { monotonicMs } from '../../core/clock.ts';
 import { HttpStepError } from '../http/driver.ts';
+import type { RequestBudget } from '../../core/requestBudget.ts';
 
 export const MAX_CONVERSATION_BYTES = 262_144;
 const MAX_REPLY = 8000;
@@ -15,7 +16,7 @@ type TurnRecord = { index: number; say: string; reply: string; firstReplyMs: num
  * can trigger agent tools (bookings, tickets, messages), so it runs once and records what happened.
  */
 export class ConversationDriver {
-  constructor(private readonly origin: string, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly origin: string, private readonly fetcher: typeof fetch = fetch, private readonly requestBudget?: RequestBudget) {}
 
   async run(raw: unknown, credential: string | null, deadline: Deadline, parent: AbortSignal): Promise<ConversationObservation> {
     const command = ConversationRun.parse(raw);
@@ -30,6 +31,7 @@ export class ConversationDriver {
         ? await this.rtvi(command, endpoint, credential, sessionId, signal)
         : await this.httpChat(command, endpoint, credential, sessionId, signal);
     } catch (error) {
+      this.requestBudget?.throwIfBlocked();
       if (parent.aborted) throw new HttpStepError('cancelled', 'Conversation cancelled; agent side effects remain unknown');
       if (signal.aborted || deadline.expired()) throw new HttpStepError('deadline_exceeded', 'Conversation exceeded its deadline; agent side effects remain unknown');
       if (error instanceof HttpStepError) throw error;
@@ -58,6 +60,7 @@ export class ConversationDriver {
       const body = setPath(setPath({}, command.messageField, turn.say), command.sessionField, sessionId);
       const turnSignal = AbortSignal.any([signal, AbortSignal.timeout(command.turnTimeoutMs)]);
       const t0 = monotonicMs();
+      this.requestBudget?.claim();
       const response = await this.fetcher(endpoint, { method: 'POST', redirect: 'error', signal: turnSignal,
         headers: { 'content-type': 'application/json', accept: 'application/json', ...(credential ? { authorization: `Bearer ${credential}` } : {}) },
         body: JSON.stringify(body) });
@@ -84,6 +87,7 @@ export class ConversationDriver {
   private async rtvi(command: ConversationRun, endpoint: URL, credential: string | null, sessionId: string, signal: AbortSignal): Promise<TurnRecord[]> {
     const url = new URL(endpoint.href); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('session', sessionId);
+    this.requestBudget?.claim();
     const socket = new WebSocket(url, credential ? { headers: { authorization: `Bearer ${credential}` } } as unknown as string[] : undefined);
     const inbox: Array<{ type: string; data: Record<string, unknown>; at: number }> = [];
     let wake: (() => void) | null = null;
@@ -104,7 +108,7 @@ export class ConversationDriver {
     const onAbort = () => socket.close();
     signal.addEventListener('abort', onAbort, { once: true });
     const waitFor = (ms: number) => new Promise<void>((resolve) => { const timer = setTimeout(() => { wake = null; resolve(); }, Math.max(1, ms)); wake = () => { clearTimeout(timer); resolve(); }; });
-    const send = (type: string, data: unknown) => socket.send(JSON.stringify({ label: 'rtvi-ai', type, id: randomUUID().slice(0, 8), data }));
+    const send = (type: string, data: unknown) => { this.requestBudget?.claim(); socket.send(JSON.stringify({ label: 'rtvi-ai', type, id: randomUUID().slice(0, 8), data })); };
     try {
       await new Promise<void>((resolve, reject) => {
         if (socket.readyState === WebSocket.OPEN) { resolve(); return; }
@@ -167,10 +171,14 @@ export class ConversationDriver {
           toolCalls, toolNames: toolCalls.map((call) => call.name), ended });
         if (closed) break;
       }
-      if (!closed) send('disconnect-bot', {});
       return turns;
     } finally {
       signal.removeEventListener('abort', onAbort);
+      // One fixed teardown message on this owned socket is cleanup, not another conversation turn.
+      // Never spend a fresh application allowance or strand it because the run budget is exhausted.
+      if (!closed && socket.readyState === WebSocket.OPEN) {
+        try { socket.send(JSON.stringify({ label: 'rtvi-ai', type: 'disconnect-bot', id: randomUUID().slice(0, 8), data: {} })); } catch { /* closure below remains mandatory */ }
+      }
       try { socket.close(); } catch { /* already closed */ }
     }
   }

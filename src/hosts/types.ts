@@ -1,5 +1,6 @@
 import type { CredentialCheck, RequestCredential } from '../credentials/types.ts';
 import type { HostCapabilityObservation, HostLease, HostPlan, IdentityAttestation, Scope } from '../protocol/index.ts';
+import type { RequestBudget } from '../core/requestBudget.ts';
 
 export type HostStartContext = {
   hostPlan: HostPlan;
@@ -14,6 +15,8 @@ export type HostStartContext = {
   credentialNames: string[];
   signal: AbortSignal;
   mockResponses: import('../protocol/index.ts').MockResponses | null;
+  /** Shared run-wide limit; never recreated for a selection cell. */
+  requestBudget?: RequestBudget;
 };
 
 export type HostSession = {

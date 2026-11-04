@@ -29,7 +29,7 @@ const bounded = (signal: AbortSignal) => AbortSignal.any([signal, AbortSignal.ti
 async function call(ctx: Pick<ResolveContext, 'env' | 'fetch'>, method: string, path: string, signal: AbortSignal, body?: unknown): Promise<{ status: number; json: unknown }> {
   let response: Response;
   try {
-    response = await ctx.fetch(`${base(ctx)}${path}`, { method, signal: bounded(signal),
+    response = await ctx.fetch(`${base(ctx)}${path}`, { method, redirect: 'manual', signal: bounded(signal),
       headers: { ...grant(ctx), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
   } catch (error) {
     if (error instanceof ResolverError) throw error;
@@ -93,10 +93,11 @@ export const orgxBroker = defineResolver({
       owned: { entityKey: `persona.${ctx.persona}`, physicalId: id, boundaryId: 'identity' },
       check: (signal) => stateOf(ctx, id, signal).then(state => (state === 'gone' ? 'revoked' : state)),
       async revoke(signal) {
+        const cleanup = { ...ctx, fetch: ctx.cleanupFetch ?? ctx.fetch };
         try {
-          const deleted = await call(ctx, 'DELETE', `/api/test-personas/${encodeURIComponent(id)}`, signal);
+          const deleted = await call(cleanup, 'DELETE', `/api/test-personas/${encodeURIComponent(id)}`, signal);
           if (deleted.status !== 204 && deleted.status !== 200 && deleted.status !== 404) return { confirmed: false, detail: `broker DELETE returned ${deleted.status}` };
-          const after = await stateOf(ctx, id, signal);
+          const after = await stateOf(cleanup, id, signal);
           const confirmed = after === 'gone' || after === 'revoked';
           return { confirmed, detail: confirmed ? `persona ${id} revoked` : `persona ${id} still ${after} after DELETE` };
         } catch (error) { return { confirmed: false, detail: `revoke failed: ${(error as Error).message}` }; }

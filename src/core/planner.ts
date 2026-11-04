@@ -43,7 +43,7 @@ export function caseWrites(spec: CaseSpec): string[] {
   if (spec.fixturePlanRef) writes.add('owned fixtures');
   return [...writes];
 }
-/** Upper-bound request estimate: one per step, four per fixture entity, plus readback polling slack. */
+/** Planning estimate, not a dispatch allowance: polling and browser traffic are runtime-metered. */
 function estimatedRequests(spec: CaseSpec): number {
   return spec.steps.reduce((n, step) => n + (step.kind === 'observe' ? 5 : 1), 0) + (spec.fixturePlanRef ? 8 : 0);
 }
@@ -117,6 +117,7 @@ export function plan(input: PlanInput): FrozenBundle {
   const fixtureCells: CampaignFixturePlan['cells'] = [];
   const caseRefs: Ref[] = [];
   const requirements = new Set<string>();
+  let estimatedRunRequests = 0;
 
   for (const entry of project.suiteCases) {
     const spec = corpus.getAs(CaseSpec, entry.ref);
@@ -144,7 +145,7 @@ export function plan(input: PlanInput): FrozenBundle {
     }
     const writes = caseWrites(spec);
     if (hostPlan.binding?.writes === 'none' && writes.length) cellBlock('environment_writes_forbidden', `${spec.ref.id} writes (${writes.join(', ')}) but environment ${hostPlan.binding.environment} allows no writes`, 'developer', `run only read-only flows in ${hostPlan.binding.environment}; see tracegrove explain --env ${hostPlan.binding.environment}`);
-    if (hostPlan.binding?.budget && estimatedRequests(spec) > hostPlan.binding.budget.maxRequests) cellBlock('budget_exceeded', `${spec.ref.id} needs about ${estimatedRequests(spec)} requests; environment ${hostPlan.binding.environment} allows ${hostPlan.binding.budget.maxRequests}`, 'operator', 'raise budget.maxRequests or select fewer flows');
+    estimatedRunRequests += estimatedRequests(spec) + (hostPlan.binding ? 1 : 0);
     for (const cap of new Set(spec.requiredCapabilities)) {
       const gap = capabilityGap(cap, hostPlan.adapter);
       if (gap) cellBlock('capability_not_provided_by_host', `${spec.ref.id}: ${gap}`, 'operator', 'choose an environment whose host provides it; run tracegrove capabilities');
@@ -206,6 +207,9 @@ export function plan(input: PlanInput): FrozenBundle {
     fixtureCells.push({ selectionCellId: id, caseFixturePlanRef: caseFixturePlan?.ref ?? null });
   }
 
+  if (hostPlan.binding?.budget && estimatedRunRequests > hostPlan.binding.budget.maxRequests) blockers.push({ code: 'budget_exceeded',
+    detail: `the selected run needs about ${estimatedRunRequests} requests including readiness; environment ${hostPlan.binding.environment} allows ${hostPlan.binding.budget.maxRequests}`,
+    owner: 'operator', action: 'select fewer flows or explicitly revise budget.maxRequests', cellId: null });
   if (cells.filter((c) => c.required).length === 0) blockers.push({ code: 'empty_required_matrix', detail: `no required case applies to profile ${profileName}`, owner: 'operator', action: 'select a suite entry for this profile', cellId: null });
 
   const selection = parseAs(SelectionManifest, freeze({
