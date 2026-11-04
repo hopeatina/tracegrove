@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { waitDeployment } from '../src/hosts/url.ts';
+import { UrlHost, waitDeployment } from '../src/hosts/url.ts';
 import { runTests } from '../src/authoring/run.ts';
 import { RequestBudget } from '../src/core/requestBudget.ts';
 import { Deadline } from '../src/core/deadline.ts';
@@ -22,11 +22,11 @@ import type { HostStartContext } from '../src/hosts/types.ts';
 const roots: string[] = [];
 afterEach(() => { vi.unstubAllGlobals(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const origin = 'https://deployment-fixture.invalid';
-function fixture(maxRequests: number, observe = false) {
+function fixture(maxRequests: number, observe = false, release?: { field: string; expect: string }) {
   const root = mkdtempSync(join(realpathSync(tmpdir()), 'tg-request-budget-')); roots.push(root);
   mkdirSync(join(root, 'tracegrove'));
   writeFileSync(join(root, 'tracegrove.config.yaml'), stringify({ project: 'request-budget', app: { adapter: 'node', entry: 'unused.mjs' }, personas: { visitor: { subject: 'visitor' } },
-    environments: { fixture: { target: { url: origin, health: '/fixture-ready', readyTimeoutMs: 120 }, class: 'deployed_preview', writes: 'none', agents: 'allow', personas: {}, budget: { maxRequests } } } }));
+    environments: { fixture: { target: { url: origin, health: '/fixture-ready', readyTimeoutMs: 120, ...(release ? { release } : {}) }, class: 'deployed_preview', writes: 'none', agents: 'allow', personas: {}, budget: { maxRequests } } } }));
   for (const id of ['first', 'second']) writeFileSync(join(root, 'tracegrove', `${id}.flow.yaml`), stringify({ title: id, envs: ['fixture'], as: 'none', steps: [
     { GET: `/${id}`, ...(observe ? { observe: true, timeoutMs: 1500 } : {}), expect: observe ? { status: 200, json: { ready: true } } : 200 },
   ] }));
@@ -49,6 +49,59 @@ it('never retries a readiness access refusal, including across later selection c
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(report.outcome).toBe('blocked');
   expect(JSON.stringify(report)).toContain('deployment_access_denied');
+});
+
+it.each([
+  { name: 'different release', body: { release: 'previous' } },
+  { name: 'missing release', body: { ready: true } },
+  { name: 'different numeric release', body: { release: 41 } },
+])('latches an identity mismatch across cells: $name', async ({ body }) => {
+  let probes = 0;
+  // A later probe would report the expected release; this run must still stop at the first refusal.
+  const fetch = transport(path => {
+    expect(path).toBe('/fixture-ready');
+    return Response.json(++probes === 1 ? body : { release: 'expected' });
+  });
+  const start = vi.spyOn(UrlHost.prototype, 'start');
+  try {
+    const { report } = await runTests({ configPath: fixture(50, false, { field: 'release', expect: 'expected' }), env: 'fixture' });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(report.outcome).toBe('blocked');
+    expect(report.exitCode).toBe(2);
+    expect(report.cases).toHaveLength(2);
+    for (const cell of report.cases) {
+      expect(cell.outcome).toBe('blocked');
+      expect(cell.failure?.message).toContain('identity_mismatch');
+      expect(cell.steps.every(step => step.result === 'not_run')).toBe(true);
+    }
+  } finally { start.mockRestore(); }
+});
+
+it('acquires and executes later cells when the expected release matches', async () => {
+  const fetch = transport(() => Response.json({ release: 'expected' }));
+  const { report } = await runTests({ configPath: fixture(50, false, { field: 'release', expect: 'expected' }), env: 'fixture' });
+  expect(report.outcome).toBe('passed');
+  expect(report.cases).toHaveLength(2);
+  expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(['/fixture-ready', '/first', '/fixture-ready', '/second']);
+});
+
+it('does not latch an intentional step-level authorization-negative assertion', async () => {
+  const configPath = fixture(50);
+  writeFileSync(join(configPath, '..', 'tracegrove', 'first.flow.yaml'), stringify({ title: 'first', envs: ['fixture'], as: 'none', steps: [{ GET: '/first', expect: 403 }] }));
+  const fetch = transport(path => new Response(null, { status: path === '/first' ? 403 : 200 }));
+  const { report } = await runTests({ configPath, env: 'fixture' });
+  expect(report.outcome).toBe('passed');
+  expect(fetch).toHaveBeenCalledTimes(4);
+  expect(report.cases.every(cell => cell.outcome === 'passed')).toBe(true);
+});
+
+it('does not latch an ordinary failed step assertion across independent cells', async () => {
+  const fetch = transport(path => new Response(null, { status: path === '/first' ? 500 : 200 }));
+  const { report } = await runTests({ configPath: fixture(50), env: 'fixture' });
+  expect(report.outcome).toBe('assertion_failed');
+  expect(fetch).toHaveBeenCalledTimes(4);
+  expect(report.cases.map(cell => cell.outcome)).toEqual(['assertion_failed', 'passed']);
 });
 
 it('does not reset the request ceiling between selection cells or omit readiness', async () => {
