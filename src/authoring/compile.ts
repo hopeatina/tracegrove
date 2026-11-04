@@ -338,11 +338,15 @@ export function compileProject(configPath: string, options: CompileOptions = {})
 
   // ---- shared definitions ----
   const defaultAuth = `./auth/${defaultPersona}.yaml`;
+  // Anonymous is an explicit campaign choice, never inferred from a missing
+  // credential. Authenticated steps still contribute their own credential names.
+  const anonymousDefault = selected.length > 0 && selected.every(({ flow }) => flow.as === 'none');
   for (const name of personas) {
     const bound = binding?.personas.find(p => p.persona === name);
     const hostIssued = !binding || bound?.from === 'host_issued';
     const bearer = !bound || bound.auth.kind === 'bearer';
-    write(compiledDir, `auth/${name}.yaml`, { schemaVersion: 'workflow.auth-recipe/v1', ref: ref(`auth.${name}`), kind: hostIssued ? 'host_issued' : 'env_credential', credentialName: `${name}_token`, header: bearer ? 'authorization' : null, scheme: bearer ? 'Bearer' : null });
+    const anonymous = anonymousDefault && name === defaultPersona;
+    write(compiledDir, `auth/${name}.yaml`, { schemaVersion: 'workflow.auth-recipe/v1', ref: ref(`auth.${name}`), kind: anonymous ? 'none' : hostIssued ? 'host_issued' : 'env_credential', credentialName: anonymous ? null : `${name}_token`, header: anonymous ? null : bearer ? 'authorization' : null, scheme: anonymous ? null : bearer ? 'Bearer' : null });
   }
   write(compiledDir, `personas/${defaultPersona}.yaml`, {
     schemaVersion: 'workflow.persona/v1', ref: ref(`persona.${defaultPersona}`), traits: [], accountBindingRef: null, roleScopes: [], stateRecipeRef: null, dataVolumeRecipeRef: null, entitlementRef: null, connectorStateRef: null,
@@ -446,7 +450,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     let creates = 0;
     const classes = flowEnvironments(flow, environment);
     const flowDefault = flow.as ?? defaultPersona;
-    if (flowDefault !== defaultPersona) fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
+    if (flowDefault !== defaultPersona && flowDefault !== 'none') fail('flow_default_persona', `${rel}: flow-level as: ${flowDefault} differs from the default persona ${defaultPersona}`, 'set as: on the individual steps instead');
+    if (browserFlow && flowDefault === 'none' && !anonymousDefault) fail('mixed_browser_authentication', `${rel}: an anonymous browser flow cannot share a campaign persona with authenticated flows`, 'select only explicitly anonymous flows, or run authenticated browser flows separately');
     flow.steps.forEach((step: FlowStep, index: number) => {
       const label = 'standin' in step ? `standin_${step.standin}` : 'voice' in step ? 'voice_call' : 'chat' in step ? 'chat' : 'mcp' in step ? 'mcp_call' : 'job' in step ? `job_${step.job.action}` : 'browser' in step ? `browser_${step.browser.kind}` : verbOf(step).method.toLowerCase();
       let id = step.name ? snake(step.name) : `${label}_${index + 1}`;
@@ -462,7 +467,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
         const turns = spec.turns.map((turn) => ({ say: bindTemplates(turn.say, scope, inputs, where) as string }));
         const { turns: _turns, transport: _transport, ...options } = spec;
         const command = { channel, transport, ...options, turns };
-        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const auth = authFor(step.as, personas, flowDefault, inputs, where);
         const predicates: Json[] = [];
         spec.turns.forEach((turn, turnIndex) => predicates.push(...conversationPredicates(turn.expect, `body.turns[${turnIndex}].reply`, `body.turns[${turnIndex}].toolNames`, `body.turns[${turnIndex}].firstReplyMs`)));
         predicates.push(...conversationPredicates(step.expect, 'body.replies', 'body.toolNames', 'body.maxFirstReplyMs'));
@@ -507,7 +512,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       if ('mcp' in step) {
         if (statusOf(step.expect) !== null) fail('mcp_http_expectation', where, 'use expect.json for MCP protocol observations');
         const command = { ...step.mcp, arguments: bindTemplates(step.mcp.arguments as Json, scope, inputs, where) };
-        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const auth = authFor(step.as, personas, flowDefault, inputs, where);
         const configured = predicateFor(step.expect);
         const predicate = { kind: 'all', predicates: [{ kind: 'json_path_equals', path: 'body.isError', value: false }, ...(configured ? [configured] : [])] };
         const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
@@ -522,7 +527,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       if ('job' in step) {
         if (statusOf(step.expect) !== null) fail('native_job_http_expectation', where, 'use expect.json for native job facts');
         const command = bindTemplates(step.job as Json, scope, inputs, where);
-        const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+        const auth = authFor(step.as, personas, flowDefault, inputs, where);
         const predicate = predicateFor(step.expect);
         if (step.job.action === 'read' && !predicate) fail('native_job_read_expectation', where, 'add expect.json to bound native readback polling');
         const captures = Object.entries(step.save ?? {}).map(([name, path]) => ({ name, from: 'json', path }));
@@ -546,7 +551,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
       }
       const { method, path } = verbOf(step);
       const boundPath = bindTemplates(path, scope, inputs, where) as string;
-      const auth = authFor(step.as, personas, defaultPersona, inputs, where);
+      const auth = authFor(step.as, personas, flowDefault, inputs, where);
       const predicate = predicateFor(step.expect);
       methods.add(method); prefixes.add(firstSegment(path));
       if (method === 'POST') creates++;

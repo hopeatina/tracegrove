@@ -1582,7 +1582,8 @@ function gbBuild(M,width,key,sap){const s=gw.state;M.kfold=(gw.kfold&&gw.kfold[k
     /* a cushion swells from the fork its twigs leave the wood at, so it starts no sooner than the wood is there (with no twig
        of it drawn yet, from its own foot: the shape's c is its outline, the layout's g.cs[k] has the foot) */
     if(!q||q.s===Infinity){const f=[o[0]+g.cs[k].x,o[1]+g.cs[k].b],w=gbWoodAt(B,f,2),s0=Math.max(now+(pd.b?B.brAt[pd.id]?B.brAt[pd.id](pd.b.pts.length-1):at(pd.b.h)+380+1.5*pd.b.len:tEnd),w<Infinity?w:-Infinity);return {s:s0,e:s0+380,f}}
-    const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s;return {s:s1,e:gbT('cue:'+pd.id+':'+k,Math.max(s1+380,q.e)-now),f}});
+    /* A retained end may precede rebuilt supporting wood: finish at its arrival, without restarting the cushion. */
+    const fs=q.f.length?q.f:q.fh,f=[fs.reduce((a,p)=>a+p[0],0)/fs.length,fs.reduce((a,p)=>a+p[1],0)/fs.length],w=gbWoodAt(B,f,2),s1=w<Infinity?Math.max(q.s,w):q.s;return {s:s1,e:Math.max(s1,gbT('cue:'+pd.id+':'+k,Math.max(s1+380,q.e)-now)),f}});
    /* its name comes once its first cushion is half grown */
    const lblAt=Math.min(...cS.map(c=>c.s+gbCuAt(.5)*(c.e-c.s)));
    /* the wood a leaf's sap runs through on its way down: its own twig, then its branch (or, for the crown, the leader or a

@@ -2763,6 +2763,39 @@ describe('Grow page', () => {
     } finally { await browser.close(); }
   }, 90000);
 
+  it('keeps animation timing valid when rebuilt wood starts after a remembered cushion end', async () => {
+    const server = await startUi({ dir: temp(), port: 0, token: 'tk-0123456789abcdef' }); servers.push(server);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const width of [1440, 390]) {
+        const page = await growPage(browser, server.url, folded('plotline-seats.jsonl'), width, width < 500);
+        const result = await page.evaluate(() => {
+          const w = (0, eval)('({ gw, gbNow, gbBuild })'), now = w.gbNow();
+          const ends = w.gw.seen.gt, keys = Object.keys(ends).filter((key) => key.startsWith('cue:'));
+          // A busy rebuild can move supporting wood later than a retained end.
+          // Keep both ahead of now so Chromium must construct the animation.
+          for (const key of keys) ends[key] = now + 10_000;
+          for (const wood of Object.values(w.gw.seen.gw) as any[]) wood.t0 = now + 20_000;
+          const old = w.gw.B, next = w.gbBuild(w.gw.M, old.width, old.key, false);
+          old.svg.replaceWith(next.svg);
+          const cushions = (Object.values(next.pad) as any[]).flatMap((pad) => pad.cS);
+          return {
+            retained: keys.length, unchanged: keys.every((key) => ends[key] === now + 10_000),
+            minimum: Math.min(...cushions.map((c) => c.e - c.s)),
+            completedAtWood: cushions.filter((c) => c.s > now + 10_000 && c.e === c.s).length,
+          };
+        });
+        expect(result.retained, width + 'px retained cushion clocks').toBeGreaterThan(0);
+        expect(result.unchanged, width + 'px must not restart retained end clocks').toBe(true);
+        expect(result.minimum, width + 'px animation duration').toBeGreaterThanOrEqual(0);
+        expect(result.completedAtWood, width + 'px already-grown cushion waits for its wood').toBeGreaterThan(0);
+        await page.close();
+      }
+    } catch (error) {
+      throw normalizeBrowserTestFailure(error);
+    } finally { await browser.close(); }
+  }, 60000);
+
   /** Every shown name's leader against every count drawn on the tree, in page pixels: the nearest each leader comes to the box
    *  of any count, its own knot's included. */
   const leadersByCounts = () => {
