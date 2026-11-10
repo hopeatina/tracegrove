@@ -186,6 +186,16 @@ describe('init and sources', () => {
     expect(detect(node)).toMatchObject({ adapter: 'command', run: 'npm start' });
   });
 
+  it('does not trust a package.json main that does not exist', () => {
+    const node = mkdtempSync(join(tmpdir(), 'tracegrove-init-')); temps.push(node);
+    writeFileSync(join(node, 'package.json'), JSON.stringify({ main: 'dist/index.js' }));
+    writeFileSync(join(node, 'app.js'), '');
+    expect(detect(node)).toMatchObject({ adapter: 'node', entry: 'app.js' });
+    expect(detect(node).reason).toContain('dist/index.js does not exist');
+    mkdirSync(join(node, 'dist')); writeFileSync(join(node, 'dist', 'index.js'), '');
+    expect(detect(node)).toMatchObject({ adapter: 'node', entry: 'dist/index.js', reason: 'package.json main dist/index.js' });
+  });
+
   it('writes a config that compiles, an example flow and a .gitignore entry, and refuses to overwrite', () => {
     const root = mkdtempSync(join(tmpdir(), 'tracegrove-init-')); temps.push(root);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ main: 'server.js' }));

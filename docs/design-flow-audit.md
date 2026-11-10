@@ -89,7 +89,7 @@ Human sign-off is an actual decision and was not fabricated to make the example 
 - All eleven pages were revisited at 375 px in the final build: document width equalled viewport width on every page, with no browser warnings or errors. Desktop and mobile captures are saved as `artifacts/qa/design-audit/final-<page>-desktop.png` and `final-<page>-mobile.png`.
 - Preview: `http://127.0.0.1:51429/`. Changes are local and uncommitted; no merge, deployment or new npm publication was performed.
 
-[Run, desktop](../artifacts/qa/design-audit/final-run-desktop.png) · [Readiness, desktop](../artifacts/qa/design-audit/final-readiness-desktop.png) · [Run, phone](../artifacts/qa/design-audit/final-run-mobile.png)
+Captures (kept locally under the git-ignored `artifacts/qa/design-audit/`, not in the repository): `final-run-desktop.png`, `final-readiness-desktop.png`, `final-run-mobile.png`.
 
 ## Tree cohesion follow-up
 

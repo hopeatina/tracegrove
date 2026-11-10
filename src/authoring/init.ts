@@ -38,8 +38,12 @@ export function detect(root: string): Detection {
     let pkg: { main?: string; scripts?: Record<string, string> } = {};
     try { pkg = JSON.parse(pkgText); } catch { /* fall through */ }
     if (pkg.scripts?.start) return { adapter: 'command', run: 'npm start', sources: ['src/**', 'server/**', '*.{js,mjs,cjs,ts}'], reason: 'package.json has a start script' };
-    const entry = pkg.main ?? ['server.js', 'index.js', 'app.js', 'src/server.js', 'src/index.js'].find((f) => existsSync(join(root, f))) ?? 'server.js';
-    return { adapter: 'node', entry, sources: ['**/*.{js,mjs,cjs,ts}'], reason: `package.json main ${entry}` };
+    // package.json `main` often names a build output that does not exist yet; only trust it when the file is there.
+    const declared = pkg.main && existsSync(join(root, pkg.main)) ? pkg.main : undefined;
+    const found = declared ?? ['server.js', 'index.js', 'app.js', 'src/server.js', 'src/index.js'].find((f) => existsSync(join(root, f)));
+    const entry = found ?? 'server.js';
+    const reason = declared ? `package.json main ${entry}` : found ? `found ${entry}${pkg.main ? ` (package.json main ${pkg.main} does not exist)` : ''}` : `no entry file found; set app.entry (guessed ${entry})`;
+    return { adapter: 'node', entry, sources: ['**/*.{js,mjs,cjs,ts}'], reason };
   }
   return { adapter: 'command', run: 'echo "set app.run in tracegrove.config.yaml" && exit 1', sources: ['**/*'], reason: 'no framework detected' };
 }
