@@ -297,7 +297,7 @@ async function main(argv: string[]): Promise<number> {
     case 'compile': {
       const configPath = findConfig(flag(args, 'config') ?? '.');
       const compiled = compileProject(configPath, { sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, env: envFor(args, dirname(configPath)) });
-      out(args, compiled, `compiled ${compiled.flows.length} flow(s) for ${compiled.environment.name} (${compiled.environment.class}) into ${compiled.compiledDir}\n${compiled.target ? `target digest ${compiled.sourceDigest.slice(0, 12)}${compiled.target.origin ? ` · ${compiled.target.origin}` : ''}` : `app source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)`}\nlow-level: workflow-verify plan --config ${compiled.workflowConfigPath} --output request.json`);
+      out(args, compiled, `compiled ${compiled.flows.length} flow(s) for ${compiled.environment.name} (${compiled.environment.class}) into ${compiled.compiledDir}\n${compiled.target ? `target digest ${compiled.sourceDigest.slice(0, 12)}${compiled.target.origin ? ` · ${compiled.target.origin}` : ''}` : `app source digest ${compiled.sourceDigest.slice(0, 12)} over ${compiled.sourceFiles.length} file(s)`}\nlow-level: tracegrove plan --config ${compiled.workflowConfigPath} --output request.json`);
       return 0;
     }
 
@@ -586,7 +586,7 @@ async function main(argv: string[]): Promise<number> {
       const sample = args.flags.sample ?? 'notes-api';
       const output = resolve(args.flags['output']);
       const config = writeSample(samplesDir(), sample, output);
-      const next = sample === 'notes-django' ? `install the pinned Python dependencies as described in ${join(output, 'README.md')}, then run doctor` : `workflow-verify doctor --config ${config}`;
+      const next = sample === 'notes-django' ? `install the pinned Python dependencies as described in ${join(output, 'README.md')}, then run doctor` : `tracegrove doctor --config ${config}`;
       out(args, { sample, output, config }, `wrote sample ${sample} to ${output}\nnext: ${next}`);
       return 0;
     }

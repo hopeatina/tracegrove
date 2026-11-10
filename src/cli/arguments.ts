@@ -101,7 +101,7 @@ export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];
 const deny = (code: string, detail: string, command: string): never => {
-  throw new Blocked([{ code, detail, owner: 'operator', action: `workflow-verify ${command} --help` }]);
+  throw new Blocked([{ code, detail, owner: 'operator', action: `tracegrove ${command} --help` }]);
 };
 
 /** Best-effort output selection before parsing can fail. Duplicate flags still fail parsing. */
@@ -162,7 +162,7 @@ export function parseArgs(argv: string[]): Args {
   const parsed = schema.safeParse(flags);
   if (!parsed.success) throw new Blocked(parsed.error.issues.map(issue => ({
     code: Object.hasOwn(flags, String(issue.path[0])) ? 'invalid_argument' : 'missing_argument',
-    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `workflow-verify ${command} --help`,
+    detail: `--${issue.path.join('.')}: ${issue.message}`, owner: 'operator', action: `tracegrove ${command} --help`,
   })));
   return { command: name, flags: parsed.data } as Args;
 }
