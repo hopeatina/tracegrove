@@ -12,7 +12,9 @@ steps:
         - say: Sure, my name is Dana Lee and my number is 555-0142.
           expect: { says: [all set, Dana, confirmation number], calls: [book_appointment] }
     expect:
-      notSays: [medical advice, "911"]
+      # A booking confirmation can contain the digits 911 without emergency advice.
+      notSays: [medical advice, call 911, dial 911]
+      noCalls: [transfer_call]
     save:
       appointmentId: toolCalls[0].result.appointment.id
       confirmation: toolCalls[0].result.appointment.confirmation
