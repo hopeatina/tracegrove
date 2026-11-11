@@ -22,6 +22,34 @@ function sample(name: 'voice-receptionist' | 'support-chatbot') {
 }
 
 describe('voice receptionist sample', () => {
+  function confirmationFixture(advice?: string) {
+    const p = sample('voice-receptionist');
+    const app = join(p.root, 'app/receptionist.mjs');
+    const source = readFileSync(app, 'utf8');
+    expect(source).toContain('String(1000 + Math.floor(Math.random() * 9000))');
+    let pinned = source.replace('String(1000 + Math.floor(Math.random() * 9000))', "'6911'");
+    if (advice) pinned = pinned.replace('Your confirmation number is ${result.appointment.confirmation}.', `Your confirmation number is \${result.appointment.confirmation}. ${advice}.`);
+    writeFileSync(app, pinned);
+    return p;
+  }
+
+  it('accepts a confirmation containing 911 without mistaking it for emergency advice', async () => {
+    const p = confirmationFixture();
+    const { report } = await runTests({ configPath: p.configPath, grep: 'books-a-cleaning' });
+    expect(report.outcome, JSON.stringify(report.cases[0]?.failure)).toBe('passed');
+    expect(report.bundleVerified).toBe(true);
+    const receipt = readVerifiedBundle(join(report.runDir, 'bundle')).receipts[0]!;
+    expect(ConversationObservation.parse(receipt.steps[0]!.output).turns[1]!.reply).toContain('BSD-6911');
+  });
+
+  it.each(['call 911', 'dial 911', 'medical advice'])('still rejects actual %s in a routine booking reply', async advice => {
+    const p = confirmationFixture(advice);
+    const { report } = await runTests({ configPath: p.configPath, grep: 'books-a-cleaning' });
+    expect(report.outcome).toBe('assertion_failed');
+    expect(report.bundleVerified).toBe(true);
+    expect(report.cases[0]!.failure).toMatchObject({ step: 'caller books a cleaning', message: `body.replies contains "${advice}"` });
+  });
+
   it('books by phone over RTVI, reads the booking back, keeps other clinics out, and re-verifies the sealed evidence', async () => {
     const p = sample('voice-receptionist');
     const { report } = await runTests({ configPath: p.configPath, grep: 'books-a-cleaning' });

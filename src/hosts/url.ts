@@ -66,7 +66,8 @@ export class UrlHost implements ExecutorHost {
     const budget = context.requestBudget ?? new RequestBudget(binding.budget?.maxRequests ?? null);
     const { body } = await waitDeployment(origin, binding.readiness.path, binding.readiness.timeoutMs, context.signal, budget);
     const release = observedRelease(binding, origin, body);
-    if (binding.identity.expect && release !== binding.identity.expect) throw new Blocked([{ code: 'identity_mismatch', detail: `${origin} reports ${binding.identity.field ?? 'release'} ${release}; environment ${binding.environment} expects ${binding.identity.expect}`, owner: 'operator', action: `redeploy ${binding.identity.expect}, or update target.release.expect` }]);
+    // A refused deployment identity terminates this run; later cells must not reacquire it.
+    if (binding.identity.expect && release !== binding.identity.expect) budget.stop(new Blocked([{ code: 'identity_mismatch', detail: `${origin} reports ${binding.identity.field ?? 'release'} ${release}; environment ${binding.environment} expects ${binding.identity.expect}`, owner: 'operator', action: `redeploy ${binding.identity.expect}, or update target.release.expect` }]));
     const personas = await establishPersonas({ binding, origin, requested: context.credentialNames, root: resolve(context.projectRoot, binding.projectRoot), runId: context.executionId, signal: context.signal, hostId: context.hostPlan.ref.id, requestBudget: budget });
     const lease = buildLease(context, null);
     const attestation = parseAs(IdentityAttestation, freeze({
