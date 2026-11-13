@@ -6,6 +6,7 @@
  * is `blocked`; a claim with nothing to read it against is `unproven`. Neither is ever a pass.
  */
 import type { ArtifactSpec, CheckFamily, Severity } from './spec.ts';
+import type { MediaFacts } from './media.ts';
 import { isUrl, normalize, parseArtifact, parseList, parseNumber, readable, type Sources } from './read.ts';
 
 export type FindingStatus = 'pass' | 'fail' | 'unproven' | 'blocked' | 'excluded';
@@ -20,6 +21,8 @@ export type Finding = {
 };
 
 export type CheckEnv = {
+  /** Set when the piece is an image or a video. */
+  media?: MediaFacts | null;
   sources: Sources;
   /** Turns a relative link in the artifact into a reference the fetcher understands, or null when it can't be checked. */
   localLink: (link: string) => string | null;
@@ -210,9 +213,38 @@ async function links(spec: ArtifactSpec, text: string, env: CheckEnv): Promise<F
   return findings;
 }
 
+const kb = (bytes: number): string => bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} kB`;
+
+/** Delivery specs, from the file's own bytes. Nothing here looks at what the picture shows. */
+export function media(spec: ArtifactSpec, facts: MediaFacts | null | undefined): Finding[] {
+  const rule = spec.invariants.media!;
+  const base = { check: 'media' as const, severity: rule.severity, line: null, source: null };
+  if (!facts) return [{ ...base, status: 'fail', subject: 'file', detail: 'the piece is not an image or a video this reader knows (png, jpeg, gif, webp, svg, avif, heic, mp4, mov, webm)', fix: 'point `artifact` at the image or video itself' }];
+  const out: Finding[] = [];
+  const add = (subject: string, ok: boolean | null, detail: string, fix: string): void => { out.push({ ...base, status: ok === null ? 'blocked' : ok ? 'pass' : 'fail', subject, detail, fix: ok === false ? fix : null }); };
+  const size = facts.width !== null && facts.height !== null ? `${facts.width}x${facts.height}` : null;
+  if (rule.formats) add('format', rule.formats.map((f) => f.toLowerCase().replace(/^jpg$/, 'jpeg')).includes(facts.format), `is ${facts.format}`, `export as ${rule.formats.join(' or ')}`);
+  for (const [name, value, limit, least] of [['width', facts.width, rule.minWidth, true], ['width', facts.width, rule.maxWidth, false], ['height', facts.height, rule.minHeight, true], ['height', facts.height, rule.maxHeight, false]] as const) {
+    if (limit === undefined) continue;
+    add(`${least ? 'min' : 'max'} ${name}`, value === null ? null : least ? value >= limit : value <= limit, value === null ? `the ${name} could not be read from a ${facts.format} file` : `${name} is ${value} px (${least ? 'at least' : 'at most'} ${limit})`, `make the ${name} ${least ? 'at least' : 'at most'} ${limit} px`);
+  }
+  if (rule.aspect) {
+    const [w, h] = rule.aspect.split(':').map(Number) as [number, number];
+    add('aspect', size === null ? null : Math.abs(facts.width! / facts.height! - w / h) <= 0.01 * (w / h), size === null ? `the size could not be read from a ${facts.format} file` : `is ${size} (asked for ${rule.aspect})`, `crop or re-export at ${rule.aspect}`);
+  }
+  if (rule.maxBytes !== undefined) add('weight', facts.bytes <= rule.maxBytes, `is ${kb(facts.bytes)} (at most ${kb(rule.maxBytes)})`, `compress it below ${kb(rule.maxBytes)}`);
+  for (const [limit, least] of [[rule.minSeconds, true], [rule.maxSeconds, false]] as const) {
+    if (limit === undefined) continue;
+    add(`${least ? 'min' : 'max'} length`, facts.kind !== 'video' ? false : facts.seconds === null ? null : least ? facts.seconds >= limit : facts.seconds <= limit,
+      facts.kind !== 'video' ? 'is not a video' : facts.seconds === null ? `the length could not be read from a ${facts.format} file` : `runs ${facts.seconds.toFixed(1)} s (${least ? 'at least' : 'at most'} ${limit})`, `make it ${least ? 'at least' : 'at most'} ${limit} s`);
+  }
+  return out;
+}
+
 /** Runs one family over the given text. Seeded-defect reruns call this with altered text. */
 export async function runFamily(family: CheckFamily, spec: ArtifactSpec, text: string, env: CheckEnv): Promise<Finding[]> {
   switch (family) {
+    case 'media': return media(spec, env.media);
     case 'contract': return contract(spec, text);
     case 'require': return require_(spec, text);
     case 'forbid': return forbid(spec, text);

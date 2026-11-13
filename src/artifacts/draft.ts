@@ -11,12 +11,15 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import { Blocked } from '../core/errors.ts';
 import type { Ask } from '../authoring/judge.ts';
+import type { Look } from './media.ts';
 import { ArtifactSpec } from './spec.ts';
 import { MAX_BYTES, isUrl, sha256 } from './read.ts';
 import { runArtifactCheck, type Receipt } from './run.ts';
 
 export type DraftOptions = {
   brief: string; artifact: string; out?: string; id?: string; kind?: string; sources?: string; ask?: Ask; by?: string; force?: boolean;
+  /** Shows a model the piece when the trial run needs to read or judge an image or video. Never used while drafting. */
+  look?: Look;
 };
 export type DraftResult = {
   spec: string; id: string; draftedBy: string; promises: number; checks: string[];
@@ -71,6 +74,7 @@ export function buildDraftPrompt(input: { brief: string; artifact: string; sourc
     '    "links": { "requireParams": ["<query parameter every external link must carry>"] },',
     '    "require": [{ "pattern": "<exact wording that the brief itself contains and says must appear, such as a reference number or a name>", "reason": "<why, from the brief>" }],   // never a guess at how the piece will phrase a statement: that is a promise',
     '    "length": { "maxWords": <number>, "minWords": <number> },   // only when the brief sets a length',
+    '    "media": { "formats": ["png"], "minWidth": <px>, "maxWidth": <px>, "minHeight": <px>, "maxHeight": <px>, "aspect": "16:9", "maxBytes": <bytes>, "minSeconds": <s>, "maxSeconds": <s> },   // only when the piece is an image or video and the brief states delivery specs; include only the ones it states',
     '    "forbid": [{ "pattern": "<regular expression>", "example": "<text that matches it>", "reason": "<why, from the brief>" }],',
     '    "audience": { "recipients": "<a source listed below>", "noneIn": ["<a list nobody in recipients may be on>"] }',
     '  }',
@@ -125,7 +129,7 @@ function restrict(raw: Record<string, unknown>, allowedRefs: Set<string> | null,
     if (!(inv.require as unknown[]).length) delete inv.require;
   }
   for (const key of Object.keys(inv)) {
-    if (!['contract', 'require', 'forbid', 'length', 'numbers', 'claims', 'links', 'audience'].includes(key)) { delete inv[key]; dropped.push(`invariants.${key}: not a check`); continue; }
+    if (!['media', 'contract', 'require', 'forbid', 'length', 'numbers', 'claims', 'links', 'audience'].includes(key)) { delete inv[key]; dropped.push(`invariants.${key}: not a check`); continue; }
     // Severity and tolerance stay at their strict defaults: a drafter does not get to soften a check.
     const strip = (rule: unknown): void => { if (rule !== null && typeof rule === 'object') for (const soft of ['severity', 'tolerance', 'resolve', 'unless']) if (soft in (rule as object)) { delete (rule as Record<string, unknown>)[soft]; dropped.push(`${key}.${soft}: left at its default`); } };
     if (Array.isArray(inv[key])) (inv[key] as unknown[]).forEach(strip); else strip(inv[key]);
@@ -146,7 +150,7 @@ export async function draftSpec(options: DraftOptions): Promise<DraftResult> {
   if (existsSync(out) && options.force !== true) throw new Blocked([{ code: 'artifact_spec_exists', owner: 'operator', detail: `${out} already exists`, action: 'a spec is not redrafted to suit the work; pass --force if the brief itself changed' }]);
   const specDir = dirname(out);
   const artifactRef = artifactPath ? posixRel(specDir, artifactPath) : options.artifact;
-  const piece = artifactPath && existsSync(artifactPath) && statSync(artifactPath).isFile() && statSync(artifactPath).size <= MAX_BYTES ? readFileSync(artifactPath, 'utf8') : null;
+  const piece = artifactPath && existsSync(artifactPath) && statSync(artifactPath).isFile() ? true : null;
   const sources = options.sources ? listSources(resolve(options.sources), specDir) : [];
   const id = options.id ?? slug(basename(out).replace(/\.check\.ya?ml$/, ''));
   const fixed = { schemaVersion: 'tracegrove.artifact-check/v1', id, artifact: artifactRef, brief: { ref: posixRel(specDir, briefPath), sha256: sha256(brief) }, ...(options.kind ? { kind: options.kind } : {}) };
@@ -178,7 +182,7 @@ export async function draftSpec(options: DraftOptions): Promise<DraftResult> {
   let trial: DraftResult['trial'] = null;
   if (piece !== null) {
     // The same model judges the promises, so the trial says something about a spec that is mostly promises.
-    const receipt = await runArtifactCheck(out, { write: false, rerun: true, ...(options.ask ? { ask: options.ask } : {}) });
+    const receipt = await runArtifactCheck(out, { write: false, rerun: true, ...(options.ask ? { ask: options.ask } : {}), ...(options.look ? { look: options.look, ...(options.by ? { lookBy: options.by } : {}) } : {}) });
     trial = { verdict: receipt.verdict, reasons: receipt.reasons, unprovenChecks: receipt.proofs.filter((p) => !p.proven).map((p) => p.check),
       attention: receipt.findings.filter((f) => f.status !== 'pass').slice(0, 40).map((f) => ({ check: f.check, status: f.status, detail: f.detail })),
       promises: receipt.promises.filter((p) => p.verdict !== 'not_judged').map((p) => ({ text: p.text, verdict: p.verdict, why: p.why })) };

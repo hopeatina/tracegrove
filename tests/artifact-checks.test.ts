@@ -2,8 +2,9 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, draftSpec, judgeAuthority, loadSpec, recordDecision, renderDraft, renderReceipt, runArtifactCheck, type Fetcher } from '../src/artifacts/index.ts';
-import { parseArtifact, parseList, parseNumber } from '../src/artifacts/read.ts';
+import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, draftSpec, isSetSpec, judgeAuthority, loadSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, sniffMedia, type Fetcher } from '../src/artifacts/index.ts';
+import { crc32, deflateSync } from 'node:zlib';
+import { directUrl, headersFor, parseArtifact, parseList, parseNumber } from '../src/artifacts/read.ts';
 import { findField } from '../src/artifacts/checks.ts';
 import { spawnSync } from 'node:child_process';
 
@@ -216,6 +217,109 @@ describe('pieces that are not shaped like the example', () => {
 
   it('reads a field from a table row', () => {
     expect(findField(['| Owner | Dana |'], 'Owner')).toEqual({ line: 1, filled: true });
+  });
+});
+
+describe('images, video and sets of pieces', () => {
+  /** A real PNG of the given size: one colour, compressed. */
+  const png = (width: number, height: number): Buffer => {
+    const chunk = (type: string, data: Buffer): Buffer => { const body = Buffer.concat([Buffer.from(type, 'latin1'), data]); const out = Buffer.alloc(8 + data.length + 4); out.writeUInt32BE(data.length, 0); body.copy(out, 4); out.writeUInt32BE(crc32(body) >>> 0, 8 + data.length); return out; };
+    const head = Buffer.alloc(13); head.writeUInt32BE(width, 0); head.writeUInt32BE(height, 4); head[8] = 8; head[9] = 2;
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', deflateSync(Buffer.alloc((width * 3 + 1) * height))), chunk('IEND', Buffer.alloc(0))]);
+  };
+  const folder = (files: Record<string, string | Buffer>): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-artifact-')); roots.push(dir);
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body);
+    return dir;
+  };
+  const spec = (body: Record<string, unknown>): string => JSON.stringify({ schemaVersion: 'tracegrove.artifact-check/v1', ...body });
+  /** Stands in for a model that is shown the file: it "reads" fixed words and judges every promise met on line 1. */
+  const seen: string[][] = [];
+  const look = (words: string[]) => async (prompt: string, files: string[]) => { seen.push(files); return prompt.includes('Promises:') ? '{"items":[{"item":1,"verdict":"met","lines":[1],"why":"visible top left"}]}' : JSON.stringify({ text: words, shows: 'An ad with a price.' }); };
+
+  it('tells what a file is from its bytes, not its name', () => {
+    expect(sniffMedia(png(1200, 628))).toMatchObject({ kind: 'image', format: 'png', width: 1200, height: 628 });
+    expect(sniffMedia(Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><text>Hi</text></svg>'))).toMatchObject({ format: 'svg', width: 120, height: 60 });
+    expect(sniffMedia(Buffer.from('GIF89a\x10\x00\x08\x00', 'latin1'))).toMatchObject({ format: 'gif', width: 16, height: 8 });
+    expect(sniffMedia(Buffer.from('# A plan\n\nOwner: Dana'))).toBeNull();
+  });
+
+  it('holds an image to its delivery specs and shows each one can fail', async () => {
+    const dir = folder({ 'ad.png': png(1200, 628), 'ad.check.yaml': spec({ id: 'ad', artifact: 'ad.png', invariants: { media: { formats: ['png', 'jpeg'], aspect: '1.91:1', minWidth: 1200, maxBytes: 100_000 } } }) });
+    const ok = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false });
+    expect(ok.verdict).toBe('ready');
+    expect(ok.artifact.media).toMatchObject({ width: 1200, height: 628 });
+    expect(ok.proofs).toMatchObject([{ check: 'media', proven: true, defects: [{ caught: true }, { caught: true }, { caught: true }, { caught: true }] }]);
+    writeFileSync(join(dir, 'ad.png'), png(1080, 1080));
+    const square = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false });
+    expect(square.verdict).toBe('fix');
+    expect(square.findings.filter((f) => f.status === 'fail').map((f) => f.subject)).toEqual(['min width', 'aspect']);
+    expect(renderReceipt(square)).toContain('1080x1080 png');
+  });
+
+  it('will not run text checks on a picture nobody has read, and runs them on the words once a model has', async () => {
+    const dir = folder({ 'ad.png': png(1200, 628), 'metrics.json': '{"price":49}',
+      'ad.check.yaml': spec({ id: 'ad', artifact: 'ad.png', promises: ['The price is the largest thing in the picture.'], invariants: { numbers: [{ id: 'price', find: '\\$(\\d+) a month', source: { ref: 'metrics.json', path: 'price' } }], forbid: [{ pattern: 'guaranteed', reason: 'no promised outcomes' }] } }) });
+    const unread = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false });
+    expect([unread.verdict, unread.exitCode]).toEqual(['blocked', 2]);
+    expect(unread.findings.every((f) => f.status === 'blocked')).toBe(true);
+
+    const read = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false, look: look(['Monday mornings without the phone queue', '$49 a month']), lookBy: 'test model' });
+    expect(read.verdict).toBe('ready');
+    expect(read.artifact.words).toMatchObject({ from: 'reading', by: 'test model', lines: 2 });
+    expect(read.promises[0]).toMatchObject({ verdict: 'met', lines: [1] });
+    expect(seen.at(-1)).toEqual([join(dir, 'ad.png')]);
+
+    // A different picture is a different reading: the price in it is wrong, and the source says so.
+    writeFileSync(join(dir, 'ad.png'), png(1200, 630));
+    const wrong = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false, look: look(['$39 a month, guaranteed']) });
+    expect(wrong.verdict).toBe('fix');
+    expect(wrong.fixList.map((f) => f.check).sort()).toEqual(['forbid', 'numbers']);
+    expect(wrong.fixList.find((f) => f.check === 'numbers')?.do).toBe('change 39 to 49');
+
+    // A transcript written out by a person needs no model.
+    writeFileSync(join(dir, 'ad.txt'), '$49 a month');
+    writeFileSync(join(dir, 'ad.check.yaml'), spec({ id: 'ad', artifact: 'ad.png', transcript: 'ad.txt', invariants: { numbers: [{ id: 'price', find: '\\$(\\d+) a month', source: { ref: 'metrics.json', path: 'price' } }] } }));
+    expect((await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false })).verdict).toBe('ready');
+  });
+
+  it('checks the piece that was handed over instead of the one the spec names', async () => {
+    const dir = folder({ 'old.md': 'Token RUN-1.', 'p.check.yaml': spec({ id: 'p', artifact: 'old.md', invariants: { require: [{ pattern: 'RUN-2', reason: 'the run token' }] } }) });
+    const made = folder({ 'out.md': 'Token RUN-2.' });
+    expect((await runArtifactCheck(join(dir, 'p.check.yaml'), { now: NOW, write: false })).verdict).toBe('fix');
+    const handed = await runArtifactCheck(join(dir, 'p.check.yaml'), { now: NOW, write: false, artifact: join(made, 'out.md') });
+    expect(handed.verdict).toBe('ready');
+    expect(handed.artifact.ref).toBe(join(made, 'out.md'));
+    expect(headersFor('https://files.example/a.png', { TRACEGROVE_ARTIFACT_HEADERS: '{"files.example":{"authorization":"Bearer t"}}' })).toEqual({ authorization: 'Bearer t' });
+    expect(headersFor('https://other.example/a.png', { TRACEGROVE_ARTIFACT_HEADERS: '{"files.example":{"authorization":"Bearer t"}}' })).toEqual({});
+    expect(directUrl('https://github.com/acme/site/blob/main/plan.json')).toBe('https://raw.githubusercontent.com/acme/site/main/plan.json');
+  });
+
+  it('checks a campaign as one: every piece ready, and the same price everywhere', async () => {
+    const dir = folder({ 'email.md': '# Offer\n\nStart for $49 a month.', 'page.md': '# Pricing\n\nEverything for $49 a month.', 'ad.png': png(1200, 628),
+      'email.check.yaml': spec({ id: 'email', artifact: 'email.md', invariants: { require: [{ pattern: 'a month', reason: 'states the price' }] } }),
+      'page.check.yaml': spec({ id: 'page', artifact: 'page.md', invariants: { require: [{ pattern: 'a month', reason: 'states the price' }] } }),
+      'ad.check.yaml': spec({ id: 'ad', artifact: 'ad.png', invariants: { media: { minWidth: 1200 } } }),
+      'launch.check.yaml': JSON.stringify({ schemaVersion: 'tracegrove.artifact-set/v1', id: 'launch', members: ['email.check.yaml', 'page.check.yaml', 'ad.check.yaml'], agree: [{ id: 'price', find: '\\$(\\d+) a month' }], promises: ['The three pieces make one offer.'] }) });
+    expect(isSetSpec(join(dir, 'launch.check.yaml'))).toBe(true);
+    const reader = look(['$49 a month']);
+    const ok = await runArtifactSet(join(dir, 'launch.check.yaml'), { now: NOW, write: false, look: reader });
+    expect(ok.verdict).toBe('ready');
+    expect(ok.agree[0]).toMatchObject({ status: 'pass', proven: true });
+    expect(ok.agree[0]?.says.map((s) => s.member)).toEqual(['email', 'page', 'ad']);
+    expect(ok.promises[0]?.verdict).toBe('met');
+
+    writeFileSync(join(dir, 'page.md'), '# Pricing\n\nEverything for $59 a month.');
+    const split = await runArtifactSet(join(dir, 'launch.check.yaml'), { now: NOW, write: false, look: reader });
+    expect([split.verdict, split.exitCode]).toEqual(['fix', 1]);
+    expect(split.agree[0]?.detail).toBe('the pieces disagree: 49 (email, ad) but 59 (page)');
+    expect(renderSet(split)).toContain('make price the same everywhere');
+
+    // Without a reader the ad's words are unknown: the set says so and is not ready.
+    writeFileSync(join(dir, 'page.md'), '# Pricing\n\nEverything for $49 a month.');
+    const blind = await runArtifactSet(join(dir, 'launch.check.yaml'), { now: NOW, write: false });
+    expect(blind.verdict).toBe('unproven');
+    expect(blind.agree[0]).toMatchObject({ status: 'unproven' });
   });
 });
 

@@ -81,6 +81,7 @@ the verdict.
 
 | Check | Passes when | Unproven when | Blocked when |
 | --- | --- | --- | --- |
+| `media` | the file meets each delivery spec | | a size or length cannot be read from that format |
 | `contract` | each field is stated, as a heading, a `Label:` line or a table row, with content | | |
 | `require` | each pattern appears | | |
 | `forbid` | the pattern appears nowhere, or only on lines matching `unless` | | |
@@ -96,6 +97,86 @@ piece where every quotation is a claim about what someone said.
 
 A run in which no check found anything of its kind (no links, no quotes, no numbers) and no promise
 was judged ends `unproven` with "nothing was examined". An empty piece cannot come out ready.
+
+## Images, video and pages
+
+Point `artifact` at the file. What kind of file it is comes from its bytes, not its name.
+
+```yaml
+schemaVersion: tracegrove.artifact-check/v1
+id: launch-ad
+artifact: ad-1200x628.png
+promises:
+  - The price is the first thing a reader sees.
+invariants:
+  media: { formats: [png, jpeg], aspect: "1.91:1", minWidth: 1200, maxBytes: 300000 }
+  numbers:
+    - id: price
+      find: '\$(\d+) a month'
+      source: { ref: sources/pricing.json, path: monthly }
+  forbid:
+    - { pattern: guaranteed, reason: no promised outcomes }
+```
+
+Two things are read from an image or a video.
+
+**Facts**, from the file itself, with no model: format, pixel size, weight, and for mp4 and mov the
+length and whether there is sound. `media` holds the piece to the delivery specs the brief states
+(`formats`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `aspect`, `maxBytes`, `minSeconds`,
+`maxSeconds`). Reads png, jpeg, gif, webp, svg, mp4 and mov fully; avif, heic and webm by format only.
+
+**Words**, read off the picture by the judge's model (`--judge`), which is shown the file. Every
+other check then runs on those words exactly as it does on a document: the price in the ad is
+recomputed from its source, a banned phrase is found, a quote is matched to what was said. The
+reading is saved under the hash of the file in `.tracegrove/artifact-cache/`, so one file is read
+once and a rerun checks the same words. The receipt says the words came from a reading and who read
+them. To skip the model, write the words out and name the file with `transcript:`.
+
+Without `--judge` or a transcript, text checks on a picture end `blocked`, never passed.
+
+Promises about a picture are judged by a model looking at it, and it must say where in the picture.
+For a video it is shown six stills (this needs `ffmpeg`); it cannot hear, so a promise about sound
+is `unclear`. An SVG, and an HTML page, are drawn with the browser Tracegrove already uses and the
+judge is shown the drawing, with JavaScript and the network off.
+
+## A campaign: several pieces checked together
+
+Each piece keeps its own spec. A set names them and adds what no single piece can show.
+
+```yaml
+schemaVersion: tracegrove.artifact-set/v1
+id: spring-launch
+members: [email.check.yaml, landing.check.yaml, ad.check.yaml, video.check.yaml]
+agree:                          # the same value wherever it appears
+  - id: price
+    find: '\$(\d+) a month'
+  - id: offer-code
+    find: 'code ([A-Z0-9]{4,})'
+    in: [email, landing]        # these must each state it
+promises:                       # judged with every piece in view
+  - The four pieces make one offer in one voice.
+```
+
+`tracegrove artifact check spring-launch.check.yaml` runs every member, then compares. If the email
+says $49 and the ad says $39 the set is `fix`: "the pieces disagree: 49 (email, landing) but 39 (ad)".
+Each `agree` rule is proven the same way as every other check: one member's value is changed and the
+rule must notice. The set is ready only when every member is. A value that only one piece states, or
+that sits in a picture nobody has read, is `unproven`.
+
+## Handing the piece over
+
+A check can only read what it can reach. Three ways to give it the piece:
+
+- **A path.** `tracegrove artifact check plan.check.yaml --artifact /work/out/plan-v3.md` checks that
+  file instead of the one the spec names. Whatever made the piece passes the path it wrote to. From
+  code: `runArtifactCheck(spec, { artifact })`.
+- **A public URL**, in the spec or with `--artifact`. A GitHub file page is read at its raw address.
+- **A private URL with credentials from the environment**, keyed by host, so nothing secret is in a spec:
+  `TRACEGROVE_ARTIFACT_HEADERS='{"raw.githubusercontent.com":{"authorization":"Bearer ..."}}'`.
+
+Anything else ends `blocked` with `artifact_unreadable`, and says whether credentials were given.
+A path on someone's laptop is not reachable from a runner: upload the file, or run the check where
+the file is.
 
 ## Drafting the spec from the brief
 
@@ -244,8 +325,10 @@ of files and public URLs.
 
 ## Not here yet
 
-- Readers for media (video, audio, images, decks). Today a piece must be text: Markdown, HTML, JSON or plain.
-- Pieces behind a login. A private URL ends `blocked` with `artifact_unreadable`; pass a `fetcher` from code to read your own store.
+- Sound. A video's voice-over and music are not heard, and audio files are not read.
+- Decks, PDFs and design files (Figma, Keynote). Export them to images or a page first.
+- Pixel checks: brand colours, contrast, safe areas. Today those are promises a model judges by looking.
+- A page is drawn once at 1280 px, with scripts off. Other widths and interactive states are not seen.
 - Finding claims in the piece with a model. Today a claim is a quoted passage, a declared number or a `mustCite` line.
 - Craft judged against chosen references by a panel of critics.
 - A second, independent judge family, which a promise would need before it could decide alone.

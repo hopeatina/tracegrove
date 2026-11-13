@@ -35,7 +35,7 @@ import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
 import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { draftSpec, findSpecs, recordDecision, renderDraft, renderReceipt, runArtifactCheck, type Receipt } from '../artifacts/index.ts';
+import { agentLook, draftSpec, findSpecs, isSetSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, setMembers, type Receipt, type SetReceipt } from '../artifacts/index.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
@@ -182,9 +182,12 @@ Work that is not code (plans, briefs, launch copy, audits; see docs/artifact-che
        [--sources <dir>] [--out <spec>] [--kind <k>]   proposed by Claude Code or Codex (--no-agent: by rules), never exclusions or
        [--agent claude|codex] [--no-agent] [--force]   softened checks; when the piece exists the draft is run against it once
   artifact check [<spec.check.yaml>...] [--judge]      check a piece against its own spec: claims quoted from their sources, numbers
-       [--agent claude|codex] [--allow-unproven]       recomputed, links, audience, forbidden wording; every check must first fail on a
-       [--no-prove] [--rerun] [--dir <dir>] [--json]   planted defect; --judge asks a model about the spec's promises (advice until
-                                                       sign-offs earn it more); exits 0 ready, 1 fix, 2 blocked, 3 unproven
+       [--artifact <path|url>] [--agent claude|codex]  recomputed, links, audience, forbidden wording; images and video by their size,
+       [--allow-unproven] [--no-prove] [--rerun]       format, weight and length, with the words in them read by the judge; a set file
+       [--dir <dir>] [--json]                          checks a campaign's pieces together; every check must first fail on a planted
+                                                       defect; --judge asks a model about the promises (advice until sign-offs earn it
+                                                       more); --artifact hands over the file to check; exits 0 ready, 1 fix, 2 blocked,
+                                                       3 unproven
   artifact accept|reject <spec> [--reason <text>]      sign off the latest run; rejections need a reason
        [--by <name>]
 
@@ -954,7 +957,7 @@ async function main(argv: string[]): Promise<number> {
         const settings = args.flags['no-agent'] === true ? null : resolveAgentSettings(projectRoot(root) ?? root, null, { provider: args.flags.agent ?? null });
         const drafted = await draftSpec({ brief: rest[0]!, artifact: args.flags.artifact, ...(args.flags.out ? { out: args.flags.out } : {}), ...(args.flags.id ? { id: args.flags.id } : {}), ...(args.flags.kind ? { kind: args.flags.kind } : {}),
           ...(args.flags.sources ? { sources: args.flags.sources } : {}), force: args.flags.force === true,
-          ...(settings && settings.provider !== 'none' ? { ask: agentAsk(settings), by: `${settings.provider}${settings.model ? ` (${settings.model})` : ''}` } : {}) });
+          ...(settings && settings.provider !== 'none' ? { ask: agentAsk(settings), look: agentLook(settings), by: `${settings.provider}${settings.model ? ` (${settings.model})` : ''}` } : {}) });
         out(args, drafted, renderDraft(drafted));
         return 0;
       }
@@ -962,12 +965,22 @@ async function main(argv: string[]): Promise<number> {
       const dir = resolve(flag(args, 'dir') ?? '.');
       const specs = rest.length ? rest.flatMap((path) => findSpecs(resolve(path)).length ? findSpecs(resolve(path)) : [resolve(path)]) : findSpecs(join(dir, 'tracegrove', 'artifacts'));
       if (!specs.length) throw new Blocked([{ code: 'artifact_spec_missing', owner: 'agent', detail: `no *.check.yaml under ${join(dir, 'tracegrove', 'artifacts')}`, action: 'pass a spec: tracegrove artifact check <spec.check.yaml>' }]);
-      const ask = args.flags.judge === true ? agentAsk(resolveAgentSettings(projectRoot(dir) ?? dir, null, { provider: args.flags.agent ?? null })) : undefined;
-      const receipts: Receipt[] = [];
-      for (const spec of specs) receipts.push(await runArtifactCheck(spec, { ...(ask ? { ask } : {}), prove: args.flags['no-prove'] !== true, allowUnproven: args.flags['allow-unproven'] === true, rerun: args.flags.rerun === true }));
-      out(args, receipts.length === 1 ? receipts[0] : { receipts }, receipts.map(renderReceipt).join('\n\n'));
+      const judgeSettings = args.flags.judge === true ? resolveAgentSettings(projectRoot(dir) ?? dir, null, { provider: args.flags.agent ?? null }) : null;
+      const judging = judgeSettings ? { ask: agentAsk(judgeSettings), look: agentLook(judgeSettings), lookBy: `${judgeSettings.provider}${judgeSettings.model ? ` (${judgeSettings.model})` : ''}` } : {};
+      // The piece handed over by whatever made it: a path in this sandbox, or a URL. It replaces the spec's `artifact` for this run.
+      const handed = args.flags.artifact;
+      if (handed && (specs.length !== 1 || isSetSpec(specs[0]!))) throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: '--artifact hands over one piece, so it goes with exactly one spec, not a set', action: 'tracegrove artifact check <spec.check.yaml> --artifact <path or URL>' }]);
+      const common = { ...judging, prove: args.flags['no-prove'] !== true, allowUnproven: args.flags['allow-unproven'] === true, rerun: args.flags.rerun === true };
+      // A set runs its members itself; they are not run a second time on their own.
+      const inSets = new Set(specs.filter(isSetSpec).flatMap(setMembers));
+      const results: Array<{ exitCode: number; json: Receipt | SetReceipt; text: string }> = [];
+      for (const spec of specs) {
+        if (isSetSpec(spec)) { const receipt = await runArtifactSet(spec, common); results.push({ exitCode: receipt.exitCode, json: receipt, text: renderSet(receipt) }); }
+        else if (!inSets.has(spec)) { const receipt = await runArtifactCheck(spec, { ...common, ...(handed ? { artifact: /^(https?|file):\/\//.test(handed) ? handed : resolve(handed) } : {}) }); results.push({ exitCode: receipt.exitCode, json: receipt, text: renderReceipt(receipt) }); }
+      }
+      out(args, results.length === 1 ? results[0]!.json : { receipts: results.map((r) => r.json) }, results.map((r) => r.text).join('\n\n'));
       // The worst verdict wins: fix, then blocked, then unproven.
-      return [1, 2, 3].find((code) => receipts.some((r) => r.exitCode === code)) ?? 0;
+      return [1, 2, 3].find((code) => results.some((r) => r.exitCode === code)) ?? 0;
     }
     case 'judge': {
       if (args.flags.show) {
