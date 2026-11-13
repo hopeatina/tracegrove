@@ -83,6 +83,12 @@ describe('artifact check', () => {
   it('calls a quote with no source unproven, and an unreadable source blocked, never a pass', async () => {
     const first = plan();
     first.edit('send-plan.md', (text) => text.replace(' ([interview notes](sources/interview-notes.md))', ''));
+    // Quotation marks are also used for draft copy and defined terms, so an unlinked quote is reported without blocking...
+    const noted = await runArtifactCheck(first.spec, { now: NOW, write: false });
+    expect(noted.verdict).toBe('ready');
+    expect(noted.findings.find((f) => f.subject === 'unsourced quotes')).toMatchObject({ status: 'unproven', severity: 'note' });
+    // ...unless the spec says every quotation in this piece is a claim.
+    first.edit('send-plan.check.yaml', (text) => text.replace("mustCite: ['\\d+% of']", "mustCite: ['\\d+% of']\n    unsourcedQuotes: block"));
     const unproven = await runArtifactCheck(first.spec, { now: NOW });
     expect([unproven.verdict, unproven.exitCode]).toEqual(['unproven', 3]);
     expect((await runArtifactCheck(first.spec, { now: NOW, allowUnproven: true, write: false })).verdict).toBe('ready');
@@ -170,6 +176,46 @@ describe('promises and the judge', () => {
   });
 });
 
+describe('pieces that are not shaped like the example', () => {
+  const piece = (text: string, spec: Record<string, unknown>, name = 'piece.md') => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-artifact-')); roots.push(dir);
+    writeFileSync(join(dir, name), text);
+    writeFileSync(join(dir, 'p.check.yaml'), JSON.stringify({ schemaVersion: 'tracegrove.artifact-check/v1', id: 'p', artifact: name, ...spec }));
+    return join(dir, 'p.check.yaml');
+  };
+
+  it('does not call a piece ready when no check found anything to examine', async () => {
+    const empty = await runArtifactCheck(piece('{"meeting":"weekly"}', { promises: ['An executive can decide from this.'], invariants: { claims: {}, links: {} } }, 'piece.json'), { now: NOW, write: false });
+    expect([empty.verdict, empty.exitCode]).toEqual(['unproven', 3]);
+    expect(empty.reasons.join(' ')).toMatch(/nothing was examined/);
+  });
+
+  it('requires wording the brief asked for and holds a piece to its length, and shows both checks can fail', async () => {
+    const spec = { invariants: { require: [{ pattern: 'RUN-20261030', reason: 'the brief asks for the run token' }], length: { maxWords: 12 } } };
+    const ok = await runArtifactCheck(piece('# Filter\n\nToken RUN-20261030. Removing the filter restores the list.', spec), { now: NOW, write: false });
+    expect(ok.verdict).toBe('ready');
+    expect(ok.proofs.map((p) => [p.check, p.proven])).toEqual([['require', true], ['length', true]]);
+    const bad = await runArtifactCheck(piece('# Filter\n\nRemoving the filter restores the list exactly as it was before, every single time, for every view.', spec), { now: NOW, write: false });
+    expect(bad.verdict).toBe('fix');
+    expect(bad.findings.filter((f) => f.status === 'fail').map((f) => f.check)).toEqual(['require', 'length']);
+  });
+
+  it('lets a forbid rule spare a line that names the wording to rule it out, and an exclusion match the detail', async () => {
+    const text = '# Batch\n\nRules: no "game-changing" language.\n\nDraft: a short note about the work.';
+    const strict = await runArtifactCheck(piece(text, { invariants: { forbid: [{ pattern: 'game-changing', reason: 'hype' }] } }), { now: NOW, write: false });
+    expect(strict.verdict).toBe('fix');
+    const spared = await runArtifactCheck(piece(text, { invariants: { forbid: [{ pattern: 'game-changing', reason: 'hype', unless: '\\bno\\b' }] } }), { now: NOW, write: false });
+    expect(spared.verdict).toBe('ready');
+    expect(spared.findings[0]?.detail).toMatch(/only name it/);
+    const used = await runArtifactCheck(piece(`${text}\n\nThis is game-changing.`, { invariants: { forbid: [{ pattern: 'game-changing', reason: 'hype', unless: '\\bno\\b' }] } }), { now: NOW, write: false });
+    expect(used.verdict).toBe('fix');
+  });
+
+  it('reads a field from a table row', () => {
+    expect(findField(['| Owner | Dana |'], 'Owner')).toEqual({ line: 1, filled: true });
+  });
+});
+
 describe('the command', () => {
   it('prints the receipt as JSON and exits with the verdict', () => {
     const { spec, edit } = plan();
@@ -209,6 +255,20 @@ describe('drafting a spec from the brief', () => {
     expect(result.trial?.verdict).toBe('ready');
     expect(existsSync(join(dir, '.tracegrove'))).toBe(false);
     expect(renderDraft(result)).toContain('against the piece as it stands: READY');
+  });
+
+  it('writes the check from the brief alone: the drafter is never shown the piece, and prose briefs still yield promises', async () => {
+    const { dir } = plan();
+    let seen = '';
+    await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), out: join(dir, 'blind.check.yaml'), ask: async (prompt) => { seen ||= prompt; return JSON.stringify({ promises: ['x is stated plainly.'], invariants: { require: [{ pattern: 'Monday', reason: 'asked for' }], length: { maxWords: 400 }, claims: { unsourcedQuotes: 'ignore' }, forbid: [{ pattern: 'guaranteed', reason: 'r', unless: 'no' }] } }); } });
+    expect(seen).not.toContain('we stopped losing Monday mornings');
+    const { spec } = loadSpec(join(dir, 'blind.check.yaml'));
+    expect(spec.invariants.claims?.unsourcedQuotes).toBe('note');
+    expect(spec.invariants.forbid?.[0]?.unless).toBeUndefined();
+    expect(spec.invariants.length?.maxWords).toBe(400);
+    writeFileSync(join(dir, 'prose.md'), 'Kind: sales.document\n\nDraft a batch of ten outreach notes for founders. Every note must name the evidence it rests on. Nothing is sent without review.');
+    const prose = await draftSpec({ brief: join(dir, 'prose.md'), artifact: join(dir, 'later.md'), out: join(dir, 'prose.check.yaml') });
+    expect(prose.promises).toBe(3);
   });
 
   it('drafts before the piece exists, sends a bad reply back once, and refuses to redraft over a spec', async () => {

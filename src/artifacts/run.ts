@@ -13,7 +13,7 @@ import { parseJudgeAnswer, type Ask } from '../authoring/judge.ts';
 import { projectRoot } from '../authoring/status.ts';
 import { ArtifactSpec, familiesIn, type CheckFamily, type Exclusion } from './spec.ts';
 import { defaultFetcher, isUrl, parseArtifact, parseList, sha256, Sources, type Fetcher } from './read.ts';
-import { findField, runFamily, type CheckEnv, type Finding } from './checks.ts';
+import { countWords, findField, runFamily, type CheckEnv, type Finding } from './checks.ts';
 
 export const RECEIPT_VERSION = 'tracegrove.artifact-receipt/v1';
 export const RUNS_DIR = join('.tracegrove', 'artifact-runs');
@@ -139,7 +139,7 @@ export function recordDecision(specPath: string, decision: 'accept' | 'reject', 
 type Seed = { what: string; origin: 'automatic' | 'spec'; text: string; extraRecipients?: string[] } | { what: string; origin: 'automatic' | 'spec'; impossible: string };
 
 /** The defects planted for one family. Each is the smallest change that the check exists to catch. */
-async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, baseline: Finding[], sources: Sources): Promise<Seed[]> {
+async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, baseline: Finding[], sources: Sources, selfLink: string): Promise<Seed[]> {
   const lines = text.split(/\r?\n/);
   const without = (index: number): string => lines.filter((_, i) => i !== index).join('\n');
   const seeds: Seed[] = [];
@@ -148,6 +148,17 @@ async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, b
     const field = spec.invariants.contract!.fields.find((name) => findField(lines, name));
     if (field) seeds.push({ what: `removed "${field}"`, origin: auto, text: without(findField(lines, field)!.line - 1) });
     else seeds.push({ what: 'remove a stated field', origin: auto, impossible: 'no declared field is stated yet, so there is nothing to remove' });
+  }
+  if (family === 'require') for (const rule of spec.invariants.require!) {
+    const pattern = new RegExp(rule.pattern, 'gi');
+    seeds.push(pattern.test(text)
+      ? { what: `removed what matches ${rule.pattern}`, origin: auto, text: text.replace(new RegExp(rule.pattern, 'gi'), '') }
+      : { what: `remove what matches ${rule.pattern}`, origin: auto, impossible: 'the piece does not have it yet, so there is nothing to remove' });
+  }
+  if (family === 'length') {
+    const rule = spec.invariants.length!;
+    if (rule.maxWords !== undefined) seeds.push({ what: `padded the piece past ${rule.maxWords} words`, origin: auto, text: `${text}\n\n${'padding '.repeat(Math.max(1, rule.maxWords - countWords(text) + 1))}\n` });
+    if (rule.minWords !== undefined) seeds.push({ what: `cut the piece below ${rule.minWords} words`, origin: auto, text: text.split(/\s+/).slice(0, Math.max(0, rule.minWords - 1)).join(' ').replace(/[^\s]+$/, '') });
   }
   if (family === 'forbid') for (const rule of spec.invariants.forbid!) {
     const sample = rule.example ?? (plain(rule.pattern) ? rule.pattern : null);
@@ -177,7 +188,9 @@ async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, b
     const artifact = parseArtifact(text, spec.invariants.claims!.minQuoteLength);
     const verified = artifact.quotes.find((quote) => baseline.some((f) => f.status === 'pass' && f.line === quote.line && f.source !== null));
     if (verified) seeds.push({ what: 'changed the wording of a verified quote', origin: auto, text: text.replace(verified.text, `${verified.text.split(' ').slice(0, 2).join(' ')} (words the source never said) ${verified.text.split(' ').slice(2).join(' ')}`) });
-    seeds.push({ what: 'added a quote with no source', origin: auto, text: `${text}\n\n"A quotation planted by the check that no source contains."\n` });
+    // The piece cites itself here: a source that is always readable and never contains the planted words.
+    seeds.push({ what: 'added a quotation its cited source does not contain', origin: auto, text: `${text}\n\n"A quotation planted by the check that no source contains." ([source](<${selfLink}>))\n` });
+    if (spec.invariants.claims!.unsourcedQuotes === 'block') seeds.push({ what: 'added a quote with no source', origin: auto, text: `${text}\n\n"A second quotation planted by the check, with no source at all."\n` });
   }
   if (family === 'links') {
     const rule = spec.invariants.links!;
@@ -245,7 +258,7 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
     const baseline = raws.get(family)!;
     const known = new Set(baseline.map(key));
     const defects: Proof['defects'] = []; const notes: string[] = [];
-    for (const seed of await seedsFor(family, spec, got.text, baseline, sources)) {
+    for (const seed of await seedsFor(family, spec, got.text, baseline, sources, isUrl(spec.artifact) ? spec.artifact : posix.basename(spec.artifact.replace(/\\/g, '/')))) {
       if ('impossible' in seed) { defects.push({ what: seed.what, caught: false, origin: seed.origin }); notes.push(seed.impossible); continue; }
       const after = await runFamily(family, spec, seed.text, { ...env, ...(seed.extraRecipients ? { extraRecipients: seed.extraRecipients } : {}) });
       const caught = after.some((f) => (f.status === 'fail' || f.status === 'unproven') && !known.has(key(f)));
@@ -258,7 +271,7 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   const exclusions = spec.exclusions.map((exclusion) => ({ ...exclusion, state: exclusion.expires >= day ? 'active' as const : 'expired' as const, applied: 0 }));
   const findings = families.flatMap((family) => raws.get(family)!).map((finding): Finding => {
     if (finding.status === 'pass') return finding;
-    const hit = exclusions.find((e) => e.state === 'active' && e.check === finding.check && (e.match === undefined || finding.subject.includes(e.match)));
+    const hit = exclusions.find((e) => e.state === 'active' && e.check === finding.check && (e.match === undefined || finding.subject.includes(e.match) || finding.detail.includes(e.match)));
     if (!hit) return finding;
     hit.applied++;
     return { ...finding, status: 'excluded', excluded: { was: finding.status as Exclude<Finding['status'], 'excluded'>, reason: hit.reason, owner: hit.owner, expires: hit.expires } };
@@ -278,6 +291,8 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   const failed = blocking('fail'); const gated = promises.filter((p) => p.authority === 'gate' && p.verdict === 'not_met');
   const blockedOn = blocking('blocked'); const unproven = blocking('unproven');
   const unprovenChecks = options.prove === false ? families : proofs.filter((p) => !p.proven).map((p) => p.check);
+  // A spec whose checks found nothing to examine, with no judged promise, has said nothing about the piece.
+  const examined = findings.some((f) => f.vacuous !== true) || promises.some((p) => p.verdict !== 'not_judged');
   let verdict: Verdict = 'ready';
   if (failed.length || gated.length) {
     verdict = 'fix';
@@ -288,6 +303,7 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   } else {
     if (unproven.length > spec.shipRule.maxUnproven) reasons.push(`${unproven.length} claim${unproven.length === 1 ? '' : 's'} with nothing to check ${unproven.length === 1 ? 'it' : 'them'} against (allowed: ${spec.shipRule.maxUnproven})`);
     if (spec.shipRule.requireProvenChecks && unprovenChecks.length) reasons.push(options.prove === false ? 'the checks were not shown to fail on a planted defect (--no-prove)' : `not shown to fail on a planted defect: ${unprovenChecks.join(', ')}`);
+    if (!examined) reasons.push(spec.promises.length ? 'nothing was examined: no check found anything of its kind in the piece, and the promises were not judged (pass --judge)' : 'nothing was examined: the spec has no promises, and no check found anything of its kind in the piece');
     if (reasons.length && options.allowUnproven !== true) verdict = 'unproven';
     else if (reasons.length) reasons.push('accepted with --allow-unproven');
   }

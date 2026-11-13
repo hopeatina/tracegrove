@@ -45,11 +45,15 @@ function listSources(dir: string, specDir: string): Array<{ ref: string; head: s
 
 /** With no model: every bullet in the brief becomes a promise, and the checks that need no knowledge of the piece are on. */
 export function draftByRules(brief: string): { promises: string[]; invariants: Record<string, unknown> } {
-  const bullets = brief.split(/\r?\n/).map((line) => /^\s*(?:[-*]|\d+[.)])\s+(.{12,})$/.exec(line)?.[1]?.trim()).filter((line): line is string => !!line);
-  return { promises: [...new Set(bullets)].slice(0, 20).map((line) => line.slice(0, 2000)), invariants: { claims: {}, links: {} } };
+  const lines = brief.split(/\r?\n/);
+  const bullets = lines.map((line) => /^\s*(?:[-*]|\d+[.)])\s+(.{12,})$/.exec(line)?.[1]?.trim()).filter((line): line is string => !!line);
+  // A brief written as prose has no bullets: its sentences are the promises. Headings and "Label: value" lines are not.
+  const sentences = bullets.length ? [] : lines.filter((line) => line.trim() && !/^\s*#/.test(line) && !/^[\w .-]{1,40}:\s*\S/.test(line.trim()))
+    .join(' ').split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/).map((s) => s.trim()).filter((s) => s.length >= 12);
+  return { promises: [...new Set([...bullets, ...sentences])].slice(0, 20).map((line) => line.slice(0, 2000)), invariants: { claims: {}, links: {} } };
 }
 
-export function buildDraftPrompt(input: { brief: string; artifact: string; piece: string | null; sources: Array<{ ref: string; head: string }> }): string {
+export function buildDraftPrompt(input: { brief: string; artifact: string; sources: Array<{ ref: string; head: string }> }): string {
   return [
     'You are writing the acceptance check for one piece of work that is not code, from its brief, before or while it is made.',
     'The check is for this one piece. Do not describe what pieces of this type usually look like, and do not invent requirements the brief does not make.',
@@ -63,8 +67,10 @@ export function buildDraftPrompt(input: { brief: string; artifact: string; piece
     '  "invariants": {',
     '    "contract": { "fields": ["<a label the brief requires the piece to state, such as Owner or Stop condition>"] },',
     '    "numbers": [{ "id": "<kebab-case>", "find": "<regular expression with ONE capture group around the number as the piece will write it>", "source": { "ref": "<a source listed below>", "path": "<dotted path into its JSON>" } }],',
-    '    "claims": { "mustCite": ["<regular expression for wording that must carry a link, such as \\\\d+% of>"] },',
+    '    "claims": { "mustCite": ["<regular expression for wording that must carry a link, such as \\\\d+% of>"], "unsourcedQuotes": "block" },   // unsourcedQuotes only when the brief requires every quotation to be sourced',
     '    "links": { "requireParams": ["<query parameter every external link must carry>"] },',
+    '    "require": [{ "pattern": "<regular expression for wording the brief says must appear, such as a reference number>", "reason": "<why, from the brief>" }],',
+    '    "length": { "maxWords": <number>, "minWords": <number> },   // only when the brief sets a length',
     '    "forbid": [{ "pattern": "<regular expression>", "example": "<text that matches it>", "reason": "<why, from the brief>" }],',
     '    "audience": { "recipients": "<a source listed below>", "noneIn": ["<a list nobody in recipients may be on>"] }',
     '  }',
@@ -77,6 +83,8 @@ export function buildDraftPrompt(input: { brief: string; artifact: string; piece
     '- Use only the source references listed below, exactly as written. Never invent a file or URL.',
     '- Every forbid rule needs an example that matches its pattern.',
     '- Do not write exclusions, waivers, tolerances or anything that would let a failure pass.',
+    '- You are not shown the piece, on purpose: the check must come from what was asked for, not from what was made. If the brief is thin, the spec is short. Do not pad it.',
+    '- A forbid rule fires on any line that contains the wording, including a line that only mentions it. Forbid only wording the brief bans outright, and keep patterns narrow.',
     '',
     `The piece will be at: ${input.artifact}`,
     '',
@@ -85,7 +93,6 @@ export function buildDraftPrompt(input: { brief: string; artifact: string; piece
     '',
     'The brief:',
     input.brief,
-    ...(input.piece === null ? [] : ['', 'The piece as it stands (use it only to write `find` patterns that match how it words its numbers; the brief decides what is required):', input.piece.slice(0, 60_000)]),
   ].join('\n');
 }
 
@@ -110,10 +117,12 @@ function restrict(raw: Record<string, unknown>, allowedRefs: Set<string> | null)
   const audience = inv.audience as { recipients?: unknown; noneIn?: unknown } | undefined;
   if (audience && !(known(audience.recipients) && Array.isArray(audience.noneIn) && audience.noneIn.length && audience.noneIn.every(known))) { delete inv.audience; dropped.push('audience: its lists are not among the listed sources'); }
   for (const key of Object.keys(inv)) {
-    if (!['contract', 'numbers', 'claims', 'links', 'forbid', 'audience'].includes(key)) { delete inv[key]; dropped.push(`invariants.${key}: not a check`); continue; }
+    if (!['contract', 'require', 'forbid', 'length', 'numbers', 'claims', 'links', 'audience'].includes(key)) { delete inv[key]; dropped.push(`invariants.${key}: not a check`); continue; }
     // Severity and tolerance stay at their strict defaults: a drafter does not get to soften a check.
-    const strip = (rule: unknown): void => { if (rule !== null && typeof rule === 'object') for (const soft of ['severity', 'tolerance', 'resolve']) if (soft in (rule as object)) { delete (rule as Record<string, unknown>)[soft]; dropped.push(`${key}.${soft}: left at its default`); } };
+    const strip = (rule: unknown): void => { if (rule !== null && typeof rule === 'object') for (const soft of ['severity', 'tolerance', 'resolve', 'unless']) if (soft in (rule as object)) { delete (rule as Record<string, unknown>)[soft]; dropped.push(`${key}.${soft}: left at its default`); } };
     if (Array.isArray(inv[key])) (inv[key] as unknown[]).forEach(strip); else strip(inv[key]);
+    // The only thing a drafter may say about unsourced quotes is that they must all be sourced.
+    if (key === 'claims' && inv.claims !== null && typeof inv.claims === 'object' && 'unsourcedQuotes' in inv.claims && (inv.claims as { unsourcedQuotes?: unknown }).unsourcedQuotes !== 'block') { delete (inv.claims as Record<string, unknown>).unsourcedQuotes; dropped.push('claims.unsourcedQuotes: left at its default'); }
   }
   proposal.invariants = inv;
   return { proposal, dropped: [...new Set(dropped)] };
@@ -137,7 +146,7 @@ export async function draftSpec(options: DraftOptions): Promise<DraftResult> {
   let draftedBy = 'rules'; let dropped: string[] = []; let proposal: Record<string, unknown> = draftByRules(brief);
   if (options.ask) {
     draftedBy = options.by ?? 'model';
-    const prompt = buildDraftPrompt({ brief, artifact: artifactRef, piece, sources });
+    const prompt = buildDraftPrompt({ brief, artifact: artifactRef, sources });
     let answer = await options.ask(prompt);
     for (let round = 0; ; round++) {
       const raw = parseObject(answer);
@@ -160,7 +169,8 @@ export async function draftSpec(options: DraftOptions): Promise<DraftResult> {
 
   let trial: DraftResult['trial'] = null;
   if (piece !== null) {
-    const receipt = await runArtifactCheck(out, { write: false, rerun: true });
+    // The same model judges the promises, so the trial says something about a spec that is mostly promises.
+    const receipt = await runArtifactCheck(out, { write: false, rerun: true, ...(options.ask ? { ask: options.ask } : {}) });
     trial = { verdict: receipt.verdict, reasons: receipt.reasons, unprovenChecks: receipt.proofs.filter((p) => !p.proven).map((p) => p.check),
       attention: receipt.findings.filter((f) => f.status !== 'pass').slice(0, 40).map((f) => ({ check: f.check, status: f.status, detail: f.detail })) };
   }

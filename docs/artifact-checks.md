@@ -56,13 +56,19 @@ invariants:
     - id: clinics-reached
       find: 'reached ([\d,]+) clinics'
       source: { ref: sources/metrics.json, path: pilot.clinics_reached }
-  claims:                       # every quoted passage must appear word for word in a source linked on its line
+  require:                      # wording the brief says must appear
+    - pattern: 'RUN-\d{8}'
+      reason: the brief asks for the run reference
+  length: { maxWords: 400 }     # or minWords
+  claims:                       # a quoted passage with a link on its line must appear word for word in that source
     mustCite: ['\d+% of']       # lines like this must carry a link
+    unsourcedQuotes: note       # note (default) | block | ignore: quotes with no link on the line
   links: {}                     # every link resolves; requireParams: [utm_source] to require tracking
   forbid:
     - pattern: 'HIPAA[- ]compliant'
       example: HIPAA-compliant  # lets the check be shown to fail
       reason: not certified
+      unless: '\bnot\b'         # a line that also matches this only names the wording, to rule it out
   audience:
     recipients: sources/recipients.csv
     noneIn: [sources/suppressed.csv, sources/customers.csv]
@@ -75,12 +81,21 @@ the verdict.
 
 | Check | Passes when | Unproven when | Blocked when |
 | --- | --- | --- | --- |
-| `contract` | each field is stated, as a heading or a `Label:` line, with content | | |
-| `forbid` | the pattern appears nowhere | | |
+| `contract` | each field is stated, as a heading, a `Label:` line or a table row, with content | | |
+| `require` | each pattern appears | | |
+| `forbid` | the pattern appears nowhere, or only on lines matching `unless` | | |
+| `length` | the word count is within `minWords` and `maxWords` | | |
 | `audience` | no recipient is in any `noneIn` list | | a list cannot be read |
 | `numbers` | the number in the piece equals the source, within `tolerance` | the piece no longer states it | the source cannot be read |
-| `claims` | each quote is in a linked source, word for word | a quote or `mustCite` line has no link | no linked source can be read |
+| `claims` | each linked quote is in its source, word for word | a `mustCite` line has no link, or a quote has none and `unsourcedQuotes: block` | no linked source can be read |
 | `links` | each link answers | a relative link cannot be followed | the host does not answer (a 404 or 410 fails) |
+
+Quotation marks are also how people write draft copy, defined terms and slogans, so a quote with no
+link on its line is counted and reported but does not block. Set `unsourcedQuotes: block` for a
+piece where every quotation is a claim about what someone said.
+
+A run in which no check found anything of its kind (no links, no quotes, no numbers) and no promise
+was judged ends `unproven` with "nothing was examined". An empty piece cannot come out ready.
 
 ## Drafting the spec from the brief
 
@@ -91,13 +106,19 @@ tracegrove artifact draft brief.md --artifact send-plan.md --sources sources/
 ```
 
 Claude Code or Codex reads the brief and the listed sources and proposes promises and checks; with
-`--no-agent`, plain rules turn each bullet of the brief into a promise and switch on the checks that
-need no knowledge of the piece. The piece does not have to exist yet. If it does, the draft is run
-against it once, without recording anything, so a check that matches nothing shows up immediately.
+`--no-agent`, plain rules turn each bullet of the brief (or each sentence, when it has no bullets)
+into a promise and switch on the checks that need no knowledge of the piece. The piece does not have
+to exist yet.
+
+The drafter is never shown the piece, even when it exists. A check written while looking at the work
+describes the work, and the work then passes it. If the piece exists, the finished draft is run
+against it once, with the promises judged and nothing recorded, so a check that matches nothing
+shows up immediately.
 
 The drafter proposes; it cannot excuse. Whatever it writes, the saved spec has no exclusions, no
 extra seeded defects, the default ship rule, every check at `block` with zero tolerance, and every
-promise as advice. A number check pointing at a source that was not listed is removed. The output
+promise as advice, no `unless` on a forbid rule, and unsourced quotes at the default unless it asked
+for `block`. A number check pointing at a source that was not listed is removed. The output
 says what was removed. A reply that does not fit the schema is sent back once, then the draft fails.
 
 The spec records the brief's path and hash (`brief`) and who drafted it (`draftedBy`). A later
@@ -120,7 +141,8 @@ and `shipRule.requireProvenChecks` set the bar per spec.
 
 Before a check counts, the run plants the defect that check exists to catch and confirms the check
 notices: it changes a number, alters a verified quote, removes a stated field, adds a recipient from
-the suppression list, adds a dead link, adds the forbidden phrase. This is automatic and uses the
+the suppression list, adds a dead link, adds the forbidden phrase, removes the required wording,
+pads the piece past its length. This is automatic and uses the
 sources already read, so it adds no network calls. Add your own under `seededDefects` when a piece
 has a failure the automatic ones miss:
 
@@ -138,7 +160,7 @@ shown to fail and the verdict is `unproven`.
 ```yaml
 exclusions:
   - check: links
-    match: recording-page       # only findings about this; leave out to exclude the whole check
+    match: recording-page       # only findings whose subject or detail contains this; leave out for the whole check
     reason: the page goes live on send day
     owner: Dana
     expires: "2026-11-18"
@@ -221,7 +243,8 @@ of files and public URLs.
 
 ## Not here yet
 
-- Readers for media (video, audio, images, decks). Today a piece must be text, Markdown or HTML.
+- Readers for media (video, audio, images, decks). Today a piece must be text: Markdown, HTML, JSON or plain.
+- Pieces behind a login. A private URL ends `blocked` with `artifact_unreadable`; pass a `fetcher` from code to read your own store.
 - Finding claims in the piece with a model. Today a claim is a quoted passage, a declared number or a `mustCite` line.
 - Craft judged against chosen references by a panel of critics.
 - A second, independent judge family, which a promise would need before it could decide alone.
