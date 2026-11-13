@@ -1,6 +1,6 @@
 {
   "name": "tracegrove",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "private": false,
   "description": "End-to-end tests that check what your app actually did: APIs, web UIs, voice agents and chatbots, with independent readbacks and verifiable evidence.",
   "license": "Apache-2.0",
@@ -76,6 +76,7 @@
     "docs/security.md",
     "docs/readiness-and-handoff.md",
     "docs/environments.md",
+    "docs/artifact-checks.md",
     "docs/images/readiness.png",
     "docs/images/voice-run.png",
     "SECURITY.md",
