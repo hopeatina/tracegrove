@@ -139,6 +139,18 @@ For a video it is shown eight stills, so words on screen only between them are m
 is `unclear`. An SVG, and an HTML page, are drawn with the browser Tracegrove already uses and the
 judge is shown the drawing, with JavaScript and the network off.
 
+### Which model looks
+
+By default the judge's own agent (Claude Code or Codex) is shown the file. `--look-with gemini:<model id>`
+has Gemini do the looking instead, with the key in `GEMINI_API_KEY`. Gemini is sent a video whole, so
+it also hears it: spoken words are written down as `SPOKEN:` lines and every text check runs on them,
+and promises about sound can be judged. There is no default model id; name the one to use. Files go
+inline, so pieces over about 14 MB fall back to stills. The receipt records which model read the piece,
+and a reading is cached per file and per reader.
+
+From code, `look` is any function that takes a prompt and file paths and returns the model's answer,
+so another model or an inspection service of your own plugs in the same way.
+
 ## A campaign: several pieces checked together
 
 Each piece keeps its own spec. A set names them and adds what no single piece can show.
@@ -325,7 +337,7 @@ of files and public URLs.
 
 ## Not here yet
 
-- Sound. A video's voice-over and music are not heard, and audio files are not read.
+- Sound, unless Gemini looks (`--look-with`). Audio files on their own are not read.
 - Decks, PDFs and design files (Figma, Keynote). Export them to images or a page first.
 - Pixel checks: brand colours, contrast, safe areas. Today those are promises a model judges by looking.
 - A page is drawn once at 1280 px, with scripts off. Other widths and interactive states are not seen.

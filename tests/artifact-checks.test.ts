@@ -2,7 +2,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, draftSpec, isSetSpec, judgeAuthority, loadSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, sniffMedia, type Fetcher } from '../src/artifacts/index.ts';
+import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, draftSpec, geminiLook, isSetSpec, judgeAuthority, loadSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, sniffMedia, type Fetcher } from '../src/artifacts/index.ts';
 import { crc32, deflateSync } from 'node:zlib';
 import { directUrl, headersFor, parseArtifact, parseList, parseNumber } from '../src/artifacts/read.ts';
 import { findField } from '../src/artifacts/checks.ts';
@@ -293,6 +293,21 @@ describe('images, video and sets of pieces', () => {
     expect(headersFor('https://files.example/a.png', { TRACEGROVE_ARTIFACT_HEADERS: '{"files.example":{"authorization":"Bearer t"}}' })).toEqual({ authorization: 'Bearer t' });
     expect(headersFor('https://other.example/a.png', { TRACEGROVE_ARTIFACT_HEADERS: '{"files.example":{"authorization":"Bearer t"}}' })).toEqual({});
     expect(directUrl('https://github.com/acme/site/blob/main/plan.json')).toBe('https://raw.githubusercontent.com/acme/site/main/plan.json');
+  });
+
+  it('gives a model that takes video the whole video, and sends Gemini the file with the question', async () => {
+    const sent: Array<{ url: string; body: { contents: Array<{ parts: Array<{ text?: string; inline_data?: { mime_type: string } }> }> }; key: string | null }> = [];
+    const send = (async (url: string, init: { body: string; headers: Record<string, string> }) => { sent.push({ url, body: JSON.parse(init.body), key: init.headers['x-goog-api-key'] ?? null });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"text":["Start for $49 a month","SPOKEN: Mondays without the phone queue"],"shows":"An ad."}' }] } }] })); }) as unknown as typeof fetch;
+    const eyes = geminiLook('some-model', { GEMINI_API_KEY: 'k' }, send);
+    expect(eyes.video).toBe(true);
+    expect(() => geminiLook('some-model', {}, send)).toThrow(/GEMINI_API_KEY/);
+    const dir = folder({ 'ad.png': png(1200, 628), 'ad.check.yaml': spec({ id: 'ad', artifact: 'ad.png', invariants: { require: [{ pattern: 'SPOKEN: Mondays', reason: 'the voice-over names the problem' }] } }) });
+    const receipt = await runArtifactCheck(join(dir, 'ad.check.yaml'), { now: NOW, write: false, look: eyes });
+    expect(receipt.verdict).toBe('ready');
+    expect(receipt.artifact.words).toMatchObject({ from: 'reading', by: 'gemini (some-model)' });
+    expect(sent[0]).toMatchObject({ url: 'https://generativelanguage.googleapis.com/v1beta/models/some-model:generateContent', key: 'k' });
+    expect(sent[0]?.body.contents[0]?.parts.map((p) => p.inline_data?.mime_type ?? 'text')).toEqual(['image/png', 'text']);
   });
 
   it('checks a campaign as one: every piece ready, and the same price everywhere', async () => {

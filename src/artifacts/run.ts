@@ -15,7 +15,7 @@ import { projectRoot } from '../authoring/status.ts';
 import { ArtifactSpec, familiesIn, type CheckFamily, type Exclusion } from './spec.ts';
 import { defaultFetcher, isUrl, parseArtifact, parseList, sha256, Sources, type Fetcher } from './read.ts';
 import { countWords, findField, runFamily, type CheckEnv, type Finding } from './checks.ts';
-import { EXTENSION, draw, readWords, sniffMedia, videoStills, type Look, type MediaFacts } from './media.ts';
+import { EXTENSION, GEMINI_INLINE_BYTES, draw, readWords, sniffMedia, videoStills, type Look, type MediaFacts } from './media.ts';
 
 export const RECEIPT_VERSION = 'tracegrove.artifact-receipt/v1';
 export const RUNS_DIR = join('.tracegrove', 'artifact-runs');
@@ -266,7 +266,9 @@ export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: F
   const local = !isUrl(ref) && !ref.startsWith('file://') ? (isAbsolute(ref) ? ref : resolve(dirname(specPath), ref)) : null;
   let onDisk = local !== null && existsSync(local) ? local : null;
   if (onDisk === null) { onDisk = join(mkdtempSync(join(tmpdir(), 'tg-piece-')), `piece.${EXTENSION[media.format] ?? 'bin'}`); writeFileSync(onDisk, raw); }
-  const files = media.kind === 'video' ? videoStills(onDisk, media.seconds) : media.format === 'svg' ? await draw(onDisk, 640) : [onDisk];
+  // A model that takes video whole is given the video, and hears it. Any other is shown stills.
+  const whole = media.kind === 'video' && options.look?.video === true && media.bytes <= GEMINI_INLINE_BYTES;
+  const files = whole ? [onDisk] : media.kind === 'video' ? videoStills(onDisk, media.seconds) : media.format === 'svg' ? await draw(onDisk, 640) : [onDisk];
 
   if (spec.transcript) {
     const words = await fetcher(spec.transcript);
@@ -274,7 +276,7 @@ export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: F
     return { ...head, media, text: words.text, words: { from: 'transcript', by: null, lines: words.text.split(/\r?\n/).length, shows: null }, files };
   }
   if (options.look && files.length) {
-    const reading = await readWords({ sha256: got.sha256, files, look: options.look, by: options.lookBy ?? 'model', cacheDir: join(options.write === false ? join(tmpdir(), 'tracegrove-readings') : join(stateRoot, '.tracegrove', 'artifact-cache')) });
+    const reading = await readWords({ sha256: got.sha256, files, look: options.look, by: options.look.label ?? options.lookBy ?? 'model', whole, cacheDir: join(options.write === false ? join(tmpdir(), 'tracegrove-readings') : join(stateRoot, '.tracegrove', 'artifact-cache')) });
     return { ...head, media, text: reading.lines.join('\n'), words: { from: 'reading', by: reading.by, lines: reading.lines.length, shows: reading.shows || null }, files };
   }
   if (media.format === 'svg') {
@@ -296,7 +298,7 @@ export function describeMedia(facts: MediaFacts): string {
 function buildLookPrompt(spec: ArtifactSpec, promises: string[], piece: Piece, lines: string[]): string {
   return [
     `You are checking one piece of work against the promises its brief made. The piece is ${piece.media ? `${piece.media.kind === 'video' ? 'a video' : 'an image'}, attached` : 'a page; a picture of it as a browser lays it out is attached'}.`,
-    piece.media?.kind === 'video' ? 'The attached files are stills from the video, in order. You cannot hear it: anything about sound, voice or music is "unclear".' : 'Look at every attached file before answering. Several files for a page are that page from top to bottom, in order.',
+    piece.media?.kind === 'video' ? piece.files.length === 1 && !/\.png$/i.test(piece.files[0]!) ? 'The attached file is the whole video, with its sound. Watch and listen to all of it before answering.' : 'The attached files are stills from the video, in order. You cannot hear it: anything about sound, voice or music is "unclear".' : 'Look at every attached file before answering. Several files for a page are that page from top to bottom, in order.',
     'Judge only from what you can see and from the numbered lines below. Do not assume anything that is not there, and do not reward polish.',
     '',
     `Piece: ${spec.title ?? spec.id}${spec.kind ? ` (${spec.kind})` : ''}`,

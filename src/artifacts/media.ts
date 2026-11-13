@@ -25,8 +25,11 @@ export type MediaFacts = {
   hasAudio: boolean | null;
 };
 
-/** Shown one or more files and asked a question about them. */
-export type Look = (prompt: string, files: string[]) => Promise<string>;
+/**
+ * Shown one or more files and asked a question about them. A model that takes video whole (and hears it)
+ * sets `video`; one that does not is shown stills instead.
+ */
+export type Look = ((prompt: string, files: string[]) => Promise<string>) & { video?: boolean; label?: string };
 
 const u32 = (b: Buffer, at: number): number => (at + 4 <= b.length ? b.readUInt32BE(at) : 0);
 const ascii = (b: Buffer, from: number, to: number): string => b.subarray(from, to).toString('latin1');
@@ -145,9 +148,10 @@ const MAX_TILES = 8;
 
 export type Reading = { lines: string[]; shows: string; by: string };
 
-const READING_PROMPT = [
-  'Look at the attached file or files. If there are several they are stills from one video, in order.',
+const READING_PROMPT = (whole: boolean): string => [
+  whole ? 'Watch the attached video from start to end, with its sound.' : 'Look at the attached file or files. If there are several they are stills from one video, in order.',
   'Write down every piece of text that is visible, exactly as written, including small print, buttons, prices, numbers, URLs and watermarks.',
+  ...(whole ? ['After the on-screen text, write down every spoken word you hear, each line starting with "SPOKEN: ".'] : []),
   'One string per line of text, top to bottom, left to right. Do not correct spelling, do not translate, do not add words that are not there.',
   'Then say in one or two plain sentences what is shown.',
   'Reply with JSON only: {"text":["..."],"shows":"..."}',
@@ -162,11 +166,13 @@ function parseReading(answer: string): { lines: string[]; shows: string } | null
 }
 
 /** The words in a media file, read once per distinct file. `cacheDir` null means: do not keep the reading. */
-export async function readWords(input: { sha256: string; files: string[]; look: Look; by: string; cacheDir: string | null }): Promise<Reading> {
-  const cached = input.cacheDir ? join(input.cacheDir, `${input.sha256}.reading.json`) : null;
+export async function readWords(input: { sha256: string; files: string[]; look: Look; by: string; cacheDir: string | null; whole?: boolean }): Promise<Reading> {
+  // One reading per file and per reader: a model that heard the video read more than one that saw stills.
+  const cached = input.cacheDir ? join(input.cacheDir, `${input.sha256}.${input.by.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.reading.json`) : null;
+  const READING = READING_PROMPT(input.whole === true);
   if (cached && existsSync(cached)) { try { return JSON.parse(readFileSync(cached, 'utf8')) as Reading; } catch { /* read it again */ } }
-  let parsed = parseReading(await input.look(READING_PROMPT, input.files));
-  if (!parsed) parsed = parseReading(await input.look(`${READING_PROMPT}\n\nYour last reply was not the JSON object asked for. Reply with that object only.`, input.files));
+  let parsed = parseReading(await input.look(READING, input.files));
+  if (!parsed) parsed = parseReading(await input.look(`${READING}\n\nYour last reply was not the JSON object asked for. Reply with that object only.`, input.files));
   if (!parsed) throw new Blocked([{ code: 'artifact_reading_failed', owner: 'agent', detail: 'the model did not return the words in the file as JSON, twice', action: 'run again, or give the spec `transcript: <file>` with the words written out' }]);
   const reading: Reading = { ...parsed, by: input.by };
   if (cached) { mkdirSync(dirname(cached), { recursive: true }); writeFileSync(cached, `${JSON.stringify(reading, null, 2)}\n`); }
@@ -193,4 +199,39 @@ export function agentLook(settings: AgentSettings): Look {
       try { const parsed = JSON.parse(out) as { result?: unknown }; resolve(typeof parsed.result === 'string' ? parsed.result : out); } catch { resolve(out); }
     });
   });
+}
+
+const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+/** A request to Gemini carries its files inline, and the whole request has a size limit. */
+export const GEMINI_INLINE_BYTES = 14 * 1024 * 1024;
+
+/**
+ * Gemini as the model that looks: `gemini:<model id>` with the key in GEMINI_API_KEY. It is given a video whole,
+ * sound included, where the coding agents only see stills. There is no default model: name the one to use.
+ */
+export function geminiLook(model: string, env: NodeJS.ProcessEnv = process.env, send: typeof fetch = fetch): Look {
+  const key = env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY;
+  if (!model) throw new Blocked([{ code: 'invalid_argument', owner: 'operator', detail: 'no Gemini model was named', action: 'pass --look-with gemini:<model id>, with a model that reads images and video' }]);
+  if (!key) throw new Blocked([{ code: 'agent_not_installed', owner: 'operator', detail: 'GEMINI_API_KEY is not set', action: 'set GEMINI_API_KEY in the environment the check runs in' }]);
+  const look: Look = async (prompt, files) => {
+    const parts: unknown[] = []; let total = 0;
+    for (const file of files) {
+      const mime = MIME[file.split('.').pop()?.toLowerCase() ?? ''];
+      if (!mime) throw new Blocked([{ code: 'artifact_reading_failed', owner: 'agent', detail: `${file}: not a file type Gemini is sent here`, action: 'check an image or an mp4, mov or webm video' }]);
+      const bytes = readFileSync(file); total += bytes.length;
+      if (total > GEMINI_INLINE_BYTES) throw new Blocked([{ code: 'artifact_reading_failed', owner: 'agent', detail: `the files are larger than ${GEMINI_INLINE_BYTES} bytes together, more than one request carries`, action: 'check a smaller export, or use --judge without --look-with so stills are used' }]);
+      parts.push({ inline_data: { mime_type: mime, data: bytes.toString('base64') } });
+    }
+    parts.push({ text: prompt });
+    const response = await send(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', signal: AbortSignal.timeout(180_000),
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { temperature: 0 } }) });
+    const body = await response.text();
+    if (!response.ok) throw new Blocked([{ code: 'judge_failed', owner: 'operator', detail: `Gemini answered ${response.status}: ${body.slice(0, 240)}`, action: 'check the model id and GEMINI_API_KEY' }]);
+    try {
+      const data = JSON.parse(body) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      return (data.candidates?.[0]?.content?.parts ?? []).map((part) => part.text ?? '').join('');
+    } catch { return body; }
+  };
+  look.video = true; look.label = `gemini (${model})`;
+  return look;
 }

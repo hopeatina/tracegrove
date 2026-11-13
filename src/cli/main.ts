@@ -35,7 +35,7 @@ import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
 import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { agentLook, draftSpec, findSpecs, isSetSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, setMembers, type Receipt, type SetReceipt } from '../artifacts/index.ts';
+import { agentLook, geminiLook, draftSpec, findSpecs, isSetSpec, recordDecision, renderDraft, renderReceipt, renderSet, runArtifactCheck, runArtifactSet, setMembers, type Receipt, type SetReceipt } from '../artifacts/index.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
@@ -186,8 +186,9 @@ Work that is not code (plans, briefs, launch copy, audits; see docs/artifact-che
        [--allow-unproven] [--no-prove] [--rerun]       format, weight and length, with the words in them read by the judge; a set file
        [--dir <dir>] [--json]                          checks a campaign's pieces together; every check must first fail on a planted
                                                        defect; --judge asks a model about the promises (advice until sign-offs earn it
-                                                       more); --artifact hands over the file to check; exits 0 ready, 1 fix, 2 blocked,
-                                                       3 unproven
+                                                       more); --artifact hands over the file to check; --look-with gemini:<model> has
+                                                       Gemini read images and watch video whole, with sound (GEMINI_API_KEY); exits
+                                                       0 ready, 1 fix, 2 blocked, 3 unproven
   artifact accept|reject <spec> [--reason <text>]      sign off the latest run; rejections need a reason
        [--by <name>]
 
@@ -966,7 +967,11 @@ async function main(argv: string[]): Promise<number> {
       const specs = rest.length ? rest.flatMap((path) => findSpecs(resolve(path)).length ? findSpecs(resolve(path)) : [resolve(path)]) : findSpecs(join(dir, 'tracegrove', 'artifacts'));
       if (!specs.length) throw new Blocked([{ code: 'artifact_spec_missing', owner: 'agent', detail: `no *.check.yaml under ${join(dir, 'tracegrove', 'artifacts')}`, action: 'pass a spec: tracegrove artifact check <spec.check.yaml>' }]);
       const judgeSettings = args.flags.judge === true ? resolveAgentSettings(projectRoot(dir) ?? dir, null, { provider: args.flags.agent ?? null }) : null;
-      const judging = judgeSettings ? { ask: agentAsk(judgeSettings), look: agentLook(judgeSettings), lookBy: `${judgeSettings.provider}${judgeSettings.model ? ` (${judgeSettings.model})` : ''}` } : {};
+      // --look-with names the model that is shown images and video. Without it, the judge's own agent looks.
+      const lookWith = args.flags['look-with'];
+      if (lookWith && !/^gemini:.+/.test(lookWith)) throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: `--look-with ${lookWith}: only gemini:<model id> is supported`, action: 'pass --look-with gemini:<model id>, or leave it out to use the judge\'s agent' }]);
+      const eyes = lookWith ? geminiLook(lookWith.slice('gemini:'.length)) : null;
+      const judging = judgeSettings ? { ask: agentAsk(judgeSettings), look: eyes ?? agentLook(judgeSettings), lookBy: `${judgeSettings.provider}${judgeSettings.model ? ` (${judgeSettings.model})` : ''}` } : eyes ? { look: eyes } : {};
       // The piece handed over by whatever made it: a path in this sandbox, or a URL. It replaces the spec's `artifact` for this run.
       const handed = args.flags.artifact;
       if (handed && (specs.length !== 1 || isSetSpec(specs[0]!))) throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: '--artifact hands over one piece, so it goes with exactly one spec, not a set', action: 'tracegrove artifact check <spec.check.yaml> --artifact <path or URL>' }]);
