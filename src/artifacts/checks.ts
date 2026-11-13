@@ -14,6 +14,8 @@ export type Finding = {
   /** What the finding is about, stable across runs: a field name, a URL, a quote, a number id. */
   subject: string; detail: string; line: number | null; source: string | null; fix: string | null;
   /** Set when an exclusion applied: what the finding was before, and why it was set aside. */
+  /** True when the check ran but the piece has nothing of that kind (no links, no quotes). It examined nothing. */
+  vacuous?: true;
   excluded?: { was: Exclude<FindingStatus, 'excluded'>; reason: string; owner: string; expires: string };
 };
 
@@ -32,7 +34,7 @@ const escapeRe = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '
 export function findField(lines: string[], field: string): { line: number; filled: boolean } | null {
   const name = escapeRe(field.trim());
   const heading = new RegExp(`^\\s{0,3}#{1,6}\\s+${name}\\s*:?\\s*$`, 'i');
-  const label = new RegExp(`^\\s*(?:[-*]\\s+)?(?:\\*\\*|__)?${name}(?:\\*\\*|__)?\\s*(?::|\\|)\\s*(?:\\*\\*|__)?\\s*(.*)$`, 'i');
+  const label = new RegExp(`^\\s*(?:[-*]\\s+|\\|\\s*)?(?:\\*\\*|__)?${name}(?:\\*\\*|__)?\\s*(?::|\\|)\\s*(?:\\*\\*|__)?\\s*(.*)$`, 'i');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (heading.test(line)) {
@@ -61,13 +63,38 @@ function contract(spec: ArtifactSpec, text: string): Finding[] {
   });
 }
 
+function require_(spec: ArtifactSpec, text: string): Finding[] {
+  const lines = text.split(/\r?\n/);
+  return spec.invariants.require!.map((rule): Finding => {
+    const pattern = new RegExp(rule.pattern, 'i');
+    const at = lines.findIndex((line) => pattern.test(line));
+    const base = { check: 'require' as const, severity: rule.severity, subject: rule.pattern, source: null };
+    return at < 0 ? { ...base, status: 'fail', detail: `nothing matches ${rule.pattern}: ${rule.reason}`, line: null, fix: `add it: ${rule.reason}` }
+      : { ...base, status: 'pass', detail: 'present', line: at + 1, fix: null };
+  });
+}
+
+/** Words a reader would count: runs of letters or digits, so Markdown marks and table bars are not words. */
+export const countWords = (text: string): number => (readable(text).match(/[\p{L}\p{N}][\p{L}\p{N}'’.-]*/gu) ?? []).length;
+
+function length(spec: ArtifactSpec, text: string): Finding[] {
+  const rule = spec.invariants.length!;
+  const words = countWords(text);
+  const base = { check: 'length' as const, severity: rule.severity, subject: 'words', line: null, source: null };
+  if (rule.maxWords !== undefined && words > rule.maxWords) return [{ ...base, status: 'fail', detail: `${words} words; the limit is ${rule.maxWords}`, fix: `cut ${words - rule.maxWords} words` }];
+  if (rule.minWords !== undefined && words < rule.minWords) return [{ ...base, status: 'fail', detail: `${words} words; at least ${rule.minWords} are needed`, fix: `add at least ${rule.minWords - words} words of substance` }];
+  return [{ ...base, status: 'pass', detail: `${words} words`, fix: null }];
+}
+
 function forbid(spec: ArtifactSpec, text: string): Finding[] {
   const lines = text.split(/\r?\n/);
   return spec.invariants.forbid!.flatMap((rule): Finding[] => {
     const pattern = new RegExp(rule.pattern, 'i');
     const base = { check: 'forbid' as const, severity: rule.severity, subject: rule.pattern, source: null };
-    const hits = lines.flatMap((line, index) => { const match = pattern.exec(line); return match ? [{ line: index + 1, text: match[0] }] : []; });
-    if (!hits.length) return [{ ...base, status: 'pass', detail: 'not present', line: null, fix: null }];
+    const unless = rule.unless === undefined ? null : new RegExp(rule.unless, 'i');
+    let spared = 0;
+    const hits = lines.flatMap((line, index) => { const match = pattern.exec(line); if (!match) return []; if (unless?.test(line)) { spared++; return []; } return [{ line: index + 1, text: match[0] }]; });
+    if (!hits.length) return [{ ...base, status: 'pass', detail: spared ? `not used (${spared} line${spared === 1 ? '' : 's'} only name it, under \`unless\`)` : 'not present', line: null, fix: null }];
     return hits.slice(0, 20).map((hit) => ({ ...base, status: 'fail' as const, detail: `"${cut(hit.text, 80)}": ${rule.reason}`, line: hit.line, fix: 'remove or reword it' }));
   });
 }
@@ -124,11 +151,15 @@ async function claims(spec: ArtifactSpec, text: string, env: CheckEnv): Promise<
   const rule = spec.invariants.claims!;
   const artifact = parseArtifact(text, rule.minQuoteLength);
   const base = { check: 'claims' as const, severity: rule.severity };
-  const findings: Finding[] = [];
+  const findings: Finding[] = []; const unsourced: number[] = [];
   for (const quote of artifact.quotes) {
     const subject = cut(quote.text, 120);
     const refs = quote.sources.map((url) => isUrl(url) ? url : env.localLink(url)).filter((ref): ref is string => ref !== null);
-    if (!refs.length) { findings.push({ ...base, status: 'unproven', subject, detail: 'a quoted passage with no source on its line', line: quote.line, source: null, fix: 'link the source next to the quote, or stop presenting it as a quote' }); continue; }
+    if (!refs.length) {
+      if (rule.unsourcedQuotes === 'block') findings.push({ ...base, status: 'unproven', subject, detail: 'a quoted passage with no source on its line', line: quote.line, source: null, fix: 'link the source next to the quote, or stop presenting it as a quote' });
+      else unsourced.push(quote.line);
+      continue;
+    }
     const wanted = normalize(quote.text);
     let found: string | null = null; const problems: string[] = []; let read = 0;
     for (const ref of refs) {
@@ -147,7 +178,9 @@ async function claims(spec: ArtifactSpec, text: string, env: CheckEnv): Promise<
     const hit = mustCite.map((pattern) => pattern.exec(line)).find((match) => match !== null);
     if (hit && !linked.has(index + 1)) findings.push({ ...base, status: 'unproven', subject: cut(line.trim(), 120), detail: `"${cut(hit[0], 60)}" is stated with no source`, line: index + 1, source: null, fix: 'link the source on this line' });
   });
-  if (!findings.length) findings.push({ ...base, status: 'pass', subject: 'claims', detail: 'no quoted passages or lines that need a source', line: null, source: null, fix: null });
+  if (!findings.length) findings.push({ ...base, status: 'pass', subject: 'claims', detail: 'no sourced quotations or lines that need a source', line: null, source: null, fix: null, vacuous: true });
+  // Draft copy, defined terms and slogans sit in quotes too. Unless the spec says every quotation needs a source, they are counted once, visibly, and do not block.
+  if (unsourced.length && rule.unsourcedQuotes === 'note') findings.push({ ...base, severity: 'note', status: 'unproven', vacuous: true, subject: 'unsourced quotes', detail: `${unsourced.length} quoted passage${unsourced.length === 1 ? ' has' : 's have'} no source on the line (first at line ${unsourced[0]}); not checked`, line: unsourced[0] ?? null, source: null, fix: null });
   return findings;
 }
 
@@ -173,7 +206,7 @@ async function links(spec: ArtifactSpec, text: string, env: CheckEnv): Promise<F
     else if (!isUrl(url) || got.status === 404 || got.status === 410) findings.push({ ...base, status: 'fail', subject: url, detail: isUrl(url) ? `the page is gone (status ${got.status})` : got.why, line, source: null, fix: 'point the link at a page that exists' });
     else findings.push({ ...base, status: 'blocked', subject: url, detail: `could not confirm the link: ${got.why}`, line, source: null, fix: null });
   }
-  if (!findings.length) findings.push({ ...base, status: 'pass', subject: 'links', detail: 'no links', line: null, source: null, fix: null });
+  if (!findings.length) findings.push({ ...base, status: 'pass', subject: 'links', detail: 'no links', line: null, source: null, fix: null, vacuous: true });
   return findings;
 }
 
@@ -181,7 +214,9 @@ async function links(spec: ArtifactSpec, text: string, env: CheckEnv): Promise<F
 export async function runFamily(family: CheckFamily, spec: ArtifactSpec, text: string, env: CheckEnv): Promise<Finding[]> {
   switch (family) {
     case 'contract': return contract(spec, text);
+    case 'require': return require_(spec, text);
     case 'forbid': return forbid(spec, text);
+    case 'length': return length(spec, text);
     case 'audience': return audience(spec, env);
     case 'numbers': return numbers(spec, text, env);
     case 'claims': return claims(spec, text, env);

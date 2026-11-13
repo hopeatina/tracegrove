@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const Severity = z.enum(['block', 'warn', 'note']);
 export type Severity = z.infer<typeof Severity>;
-export const CheckFamily = z.enum(['contract', 'claims', 'numbers', 'links', 'forbid', 'audience']);
+export const CheckFamily = z.enum(['contract', 'require', 'forbid', 'length', 'audience', 'numbers', 'claims', 'links']);
 export type CheckFamily = z.infer<typeof CheckFamily>;
 
 const Text = z.string().min(1).max(2000);
@@ -27,6 +27,7 @@ const Contract = z.object({
 const Claims = z.object({
   minQuoteLength: z.number().int().min(4).max(200).default(12),
   mustCite: z.array(Pattern).max(40).default([]).describe('Lines matching any of these must carry a link. A match without one is unproven, not failed.'),
+  unsourcedQuotes: z.enum(['block', 'note', 'ignore']).default('note').describe('Quoted text with no link on its line. Real documents quote draft copy, defined terms and slogans, so by default these are counted in one note. block: every quotation must carry its source.'),
   severity: Severity.default('block'),
 }).strict();
 
@@ -49,8 +50,22 @@ const Forbid = z.object({
   pattern: Pattern,
   reason: Text,
   example: z.string().min(1).max(200).optional().describe('Text that matches the pattern; used to prove the check can fail when the pattern is not a plain phrase.'),
+  unless: Pattern.optional().describe('A line that also matches this is not a hit: for a piece that names the banned wording in order to rule it out.'),
   severity: Severity.default('block'),
 }).strict();
+
+const Require = z.object({
+  pattern: Pattern,
+  reason: Text,
+  severity: Severity.default('block'),
+}).strict();
+
+const Length = z.object({
+  minWords: z.number().int().min(1).max(1_000_000).optional(),
+  maxWords: z.number().int().min(1).max(1_000_000).optional(),
+  severity: Severity.default('block'),
+}).strict().refine((l) => l.minWords !== undefined || l.maxWords !== undefined, 'give minWords, maxWords or both')
+  .refine((l) => l.minWords === undefined || l.maxWords === undefined || l.minWords <= l.maxWords, 'minWords cannot exceed maxWords');
 
 const Audience = z.object({
   recipients: Ref.describe('One recipient per line, or a CSV whose first column is the recipient.'),
@@ -60,7 +75,7 @@ const Audience = z.object({
 
 export const Exclusion = z.object({
   check: CheckFamily,
-  match: z.string().min(1).max(300).optional().describe('Only findings whose subject contains this text. Leave out to exclude the whole check.'),
+  match: z.string().min(1).max(300).optional().describe('Only findings whose subject or detail contains this text. Leave out to exclude the whole check.'),
   reason: Text,
   owner: z.string().min(1).max(120),
   expires: Day,
@@ -94,6 +109,8 @@ export const ArtifactSpec = z.object({
     numbers: z.array(NumberCheck).max(60).optional(),
     links: Links.optional(),
     forbid: z.array(Forbid).max(60).optional(),
+    require: z.array(Require).max(60).optional().describe('Wording that must appear somewhere: a reference number, a disclosure, a named term.'),
+    length: Length.optional(),
     audience: Audience.optional(),
   }).strict().default({}),
   exclusions: z.array(Exclusion).max(60).default([]),
@@ -112,6 +129,6 @@ export type ArtifactSpec = z.infer<typeof ArtifactSpec>;
 /** The check families a spec actually uses, in the order they run (cheapest first). */
 export function familiesIn(spec: ArtifactSpec): CheckFamily[] {
   const i = spec.invariants;
-  return ([['contract', i.contract], ['forbid', i.forbid?.length ? i.forbid : undefined], ['audience', i.audience], ['numbers', i.numbers?.length ? i.numbers : undefined], ['claims', i.claims], ['links', i.links]] as const)
+  return ([['contract', i.contract], ['require', i.require?.length ? i.require : undefined], ['forbid', i.forbid?.length ? i.forbid : undefined], ['length', i.length], ['audience', i.audience], ['numbers', i.numbers?.length ? i.numbers : undefined], ['claims', i.claims], ['links', i.links]] as const)
     .filter(([, value]) => value !== undefined).map(([name]) => name);
 }
