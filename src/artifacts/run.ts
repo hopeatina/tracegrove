@@ -5,7 +5,8 @@
  *
  * Exit codes match `tracegrove grow`: 0 ready, 1 fix, 2 blocked, 3 unproven.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { Blocked } from '../core/errors.ts';
@@ -14,6 +15,7 @@ import { projectRoot } from '../authoring/status.ts';
 import { ArtifactSpec, familiesIn, type CheckFamily, type Exclusion } from './spec.ts';
 import { defaultFetcher, isUrl, parseArtifact, parseList, sha256, Sources, type Fetcher } from './read.ts';
 import { countWords, findField, runFamily, type CheckEnv, type Finding } from './checks.ts';
+import { EXTENSION, GEMINI_INLINE_BYTES, draw, readWords, sniffMedia, videoStills, type Look, type MediaFacts } from './media.ts';
 
 export const RECEIPT_VERSION = 'tracegrove.artifact-receipt/v1';
 export const RUNS_DIR = join('.tracegrove', 'artifact-runs');
@@ -34,7 +36,11 @@ export type Receipt = {
   at: string;
   spec: { id: string; path: string; sha256: string; title: string | null; kind: string | null };
   /** A pointer and the hash of the bytes read. The artifact itself is never copied. */
-  artifact: { ref: string; sha256: string; bytes: number };
+  artifact: { ref: string; sha256: string; bytes: number;
+    /** For an image or video: what the file's own bytes say about it. */
+    media?: MediaFacts | null;
+    /** Where the words the text checks ran on came from. `reading` means a model read them off the picture. */
+    words?: { from: 'piece' | 'transcript' | 'reading' | 'svg text' | null; by: string | null; lines: number; shows: string | null } };
   /** The brief the spec was drafted from. `changed` is true when its bytes differ now, null when it could not be read. */
   brief: { ref: string; sha256: string; changed: boolean | null } | null;
   afterlife: 'once' | 'living' | 'hypothesis'; reviewDate: string | null;
@@ -56,7 +62,12 @@ export type Receipt = {
 };
 
 export type RunOptions = {
-  fetcher?: Fetcher; ask?: Ask; prove?: boolean; allowUnproven?: boolean; rerun?: boolean; write?: boolean; now?: Date;
+  fetcher?: Fetcher; ask?: Ask;
+  /** Shows a model the file itself. Needed to read the words in an image or video, and to judge what it shows. */
+  look?: Look; lookBy?: string;
+  /** The piece to check instead of the spec's `artifact`: a path or URL handed over by whatever produced it. */
+  artifact?: string;
+  prove?: boolean; allowUnproven?: boolean; rerun?: boolean; write?: boolean; now?: Date;
   /** Where `.tracegrove/` lives. Default: the Tracegrove project around the spec, or the spec's folder. */
   stateRoot?: string;
 };
@@ -136,10 +147,25 @@ export function recordDecision(specPath: string, decision: 'accept' | 'reject', 
   return row;
 }
 
-type Seed = { what: string; origin: 'automatic' | 'spec'; text: string; extraRecipients?: string[] } | { what: string; origin: 'automatic' | 'spec'; impossible: string };
+type Seed = { what: string; origin: 'automatic' | 'spec'; text: string; extraRecipients?: string[]; media?: MediaFacts } | { what: string; origin: 'automatic' | 'spec'; impossible: string };
 
 /** The defects planted for one family. Each is the smallest change that the check exists to catch. */
-async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, baseline: Finding[], sources: Sources, selfLink: string): Promise<Seed[]> {
+async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, baseline: Finding[], sources: Sources, selfLink: string, facts: MediaFacts | null = null): Promise<Seed[]> {
+  if (family === 'media') {
+    const rule = spec.invariants.media!; const made: Seed[] = [];
+    if (!facts) return [{ what: 'break a delivery spec', origin: 'automatic', impossible: 'the piece is not an image or video, so there is nothing to measure' }];
+    const plant = (what: string, change: Partial<MediaFacts>): void => { made.push({ what, origin: 'automatic', text, media: { ...facts, ...change } }); };
+    if (rule.formats) plant('saved it as a format that is not allowed', { format: 'bmp' });
+    if (rule.minWidth !== undefined) plant(`made it ${rule.minWidth - 1} px wide`, { width: rule.minWidth - 1 });
+    if (rule.maxWidth !== undefined) plant(`made it ${rule.maxWidth + 1} px wide`, { width: rule.maxWidth + 1 });
+    if (rule.minHeight !== undefined) plant(`made it ${rule.minHeight - 1} px tall`, { height: rule.minHeight - 1 });
+    if (rule.maxHeight !== undefined) plant(`made it ${rule.maxHeight + 1} px tall`, { height: rule.maxHeight + 1 });
+    if (rule.aspect) plant('stretched it to twice the width', { width: (facts.width ?? 100) * 2, height: facts.height ?? 100 });
+    if (rule.maxBytes !== undefined) plant('made the file heavier than allowed', { bytes: rule.maxBytes + 1 });
+    if (rule.minSeconds !== undefined) plant('cut it shorter than allowed', { kind: 'video', seconds: Math.max(0, rule.minSeconds - 1) });
+    if (rule.maxSeconds !== undefined) plant('ran it longer than allowed', { kind: 'video', seconds: rule.maxSeconds + 1 });
+    return made;
+  }
   const lines = text.split(/\r?\n/);
   const without = (index: number): string => lines.filter((_, i) => i !== index).join('\n');
   const seeds: Seed[] = [];
@@ -205,6 +231,90 @@ async function seedsFor(family: CheckFamily, spec: ArtifactSpec, text: string, b
   return seeds;
 }
 
+export type Piece = {
+  ref: string; sha256: string; bytes: number;
+  media: MediaFacts | null;
+  /** The words the text checks run on. Null for an image or video whose words nobody has read. */
+  text: string | null;
+  words: NonNullable<Receipt['artifact']['words']>;
+  /** What a model is shown when it looks at the piece: the image, a drawing of the SVG, or stills from the video. */
+  files: string[];
+};
+
+const HOW_TO_PASS = 'pass the file itself with --artifact <path>, make the URL public, or give credentials for its host in TRACEGROVE_ARTIFACT_HEADERS';
+
+/** Reads the piece: its bytes, what kind of file it is, and its words. */
+export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: Fetcher, options: Pick<RunOptions, 'look' | 'lookBy' | 'artifact' | 'write'>, stateRoot: string): Promise<Piece> {
+  const ref = options.artifact ?? spec.artifact;
+  const got = await fetcher(ref);
+  if (!got.ok) throw new Blocked([{ code: 'artifact_unreadable', owner: 'agent', detail: `${ref}: ${got.why}`, action: HOW_TO_PASS }]);
+  const raw = got.raw ?? Buffer.from(got.text);
+  const media = sniffMedia(raw);
+  const head = { ref, sha256: got.sha256, bytes: got.bytes };
+  if (!media) {
+    // A page is also something to look at: when a model can be shown it, draw it as a browser would.
+    let files: string[] = [];
+    if (options.look && /<(?:html|body|table|div|section|main)\b/i.test(got.text.slice(0, 20_000))) {
+      let page = !isUrl(ref) && !ref.startsWith('file://') ? (isAbsolute(ref) ? ref : resolve(dirname(specPath), ref)) : null;
+      if (page === null || !/\.x?html?$/i.test(page)) { page = join(mkdtempSync(join(tmpdir(), 'tg-piece-')), 'piece.html'); writeFileSync(page, raw); }
+      files = await draw(page);
+    }
+    return { ...head, media: null, text: got.text, words: { from: 'piece', by: null, lines: got.text.split(/\r?\n/).length, shows: null }, files };
+  }
+
+  // A model reads a file from disk: use the piece where it lies, or a private copy of what was fetched.
+  const local = !isUrl(ref) && !ref.startsWith('file://') ? (isAbsolute(ref) ? ref : resolve(dirname(specPath), ref)) : null;
+  let onDisk = local !== null && existsSync(local) ? local : null;
+  if (onDisk === null) { onDisk = join(mkdtempSync(join(tmpdir(), 'tg-piece-')), `piece.${EXTENSION[media.format] ?? 'bin'}`); writeFileSync(onDisk, raw); }
+  // A model that takes video whole is given the video, and hears it. Any other is shown stills.
+  const whole = media.kind === 'video' && options.look?.video === true && media.bytes <= GEMINI_INLINE_BYTES;
+  const files = whole ? [onDisk] : media.kind === 'video' ? videoStills(onDisk, media.seconds) : media.format === 'svg' ? await draw(onDisk, 640) : [onDisk];
+
+  if (spec.transcript) {
+    const words = await fetcher(spec.transcript);
+    if (!words.ok) throw new Blocked([{ code: 'artifact_unreadable', owner: 'agent', detail: `transcript ${spec.transcript}: ${words.why}`, action: 'fix the `transcript` path in the spec, or remove it to have the words read by a model' }]);
+    return { ...head, media, text: words.text, words: { from: 'transcript', by: null, lines: words.text.split(/\r?\n/).length, shows: null }, files };
+  }
+  if (options.look && files.length) {
+    const reading = await readWords({ sha256: got.sha256, files, look: options.look, by: options.look.label ?? options.lookBy ?? 'model', whole, cacheDir: options.write === false ? null : join(stateRoot, '.tracegrove', 'artifact-cache') });
+    return { ...head, media, text: reading.lines.join('\n'), words: { from: 'reading', by: reading.by, lines: reading.lines.length, shows: reading.shows || null }, files };
+  }
+  if (media.format === 'svg') {
+    const lines = [...raw.toString('utf8').matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/gi)].map((m) => (m[1] ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    return { ...head, media, text: lines.join('\n'), words: { from: 'svg text', by: null, lines: lines.length, shows: null }, files };
+  }
+  return { ...head, media, text: null, words: { from: null, by: null, lines: 0, shows: null }, files };
+}
+
+/** Text checks on a picture nobody has read cannot say anything: that is a block, not a pass. */
+const unread = (family: CheckFamily, spec: ArtifactSpec): Finding[] => [{ check: family, severity: 'block', status: 'blocked', subject: 'words in the piece', line: null, source: null, fix: null,
+  detail: `the words in this ${spec.transcript ? 'piece' : 'image or video'} have not been read, so ${family} has nothing to run on: pass --judge to have a model read them, or give the spec \`transcript: <file>\`` }];
+
+export function describeMedia(facts: MediaFacts): string {
+  const size = facts.width !== null && facts.height !== null ? `${facts.width}x${facts.height} ` : '';
+  return `${size}${facts.format}${facts.seconds !== null ? `, ${facts.seconds.toFixed(1)} s` : ''}${facts.animated ? ', animated' : ''}${facts.hasAudio === true ? ', with sound' : facts.hasAudio === false ? ', silent' : ''}`;
+}
+
+function buildLookPrompt(spec: ArtifactSpec, promises: string[], piece: Piece, lines: string[]): string {
+  return [
+    `You are checking one piece of work against the promises its brief made. The piece is ${piece.media ? `${piece.media.kind === 'video' ? 'a video' : 'an image'}, attached` : 'a page; a picture of it as a browser lays it out is attached'}.`,
+    piece.media?.kind === 'video' ? piece.files.length === 1 && !/\.png$/i.test(piece.files[0]!) ? 'The attached file is the whole video, with its sound. Watch and listen to all of it before answering.' : 'The attached files are stills from the video, in order. You cannot hear it: anything about sound, voice or music is "unclear".' : 'Look at every attached file before answering. Several files for a page are that page from top to bottom, in order.',
+    'Judge only from what you can see and from the numbered lines below. Do not assume anything that is not there, and do not reward polish.',
+    '',
+    `Piece: ${spec.title ?? spec.id}${spec.kind ? ` (${spec.kind})` : ''}`,
+    '',
+    'Promises:',
+    ...promises.map((item, i) => `${i + 1}. ${item}`),
+    '',
+    'Line 1 stands for the picture itself: cite it for anything you can see that is not written in words. The other lines are the words in the piece.',
+    ...lines.map((line, i) => `${i + 1}: ${line}`),
+    '',
+    'For every promise answer "met", "not_met" or "unclear", cite the line numbers that show it, and say why in one sentence a maker could act on, naming where in the picture.',
+    'Use "unclear" when you cannot tell either way. "met" and "not_met" must cite at least one line.',
+    'Reply with JSON only, no prose: {"items":[{"item":<promise number>,"verdict":"met|not_met|unclear","lines":[<numbers>],"why":"..."}]}',
+  ].join('\n');
+}
+
 function buildPromisePrompt(spec: ArtifactSpec, promises: string[], lines: string[]): string {
   return [
     'You are checking one piece of work against the promises its brief made. The piece is not code.',
@@ -231,8 +341,9 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   const base = options.fetcher ?? defaultFetcher(dirname(path));
   const fetcher: Fetcher = async (ref) => ref === DEAD_LINK ? { ok: false, why: 'planted dead link', status: 404 } : base(ref);
 
-  const got = await fetcher(spec.artifact);
-  if (!got.ok) throw new Blocked([{ code: 'artifact_unreadable', owner: 'agent', detail: `${spec.artifact}: ${got.why}`, action: 'check the `artifact` path or URL in the spec' }]);
+  const got = await readPiece(spec, path, fetcher, options, stateRoot);
+  const pieceRef = got.ref;
+  const text = got.text ?? '';
   const specHash = sha256(raw);
   const previous = lastReceipt(stateRoot, spec.id);
   // A piece that shipped once is not checked again, unless that verdict leaned on an exclusion that has since run out.
@@ -241,26 +352,28 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
     && spec.exclusions.every((e) => e.expires >= day)) return { ...previous, reused: true };
 
   const sources = new Sources(fetcher);
-  const artifactDir = isUrl(spec.artifact) ? null : posix.dirname(spec.artifact.replace(/\\/g, '/'));
+  const artifactDir = isUrl(pieceRef) ? null : posix.dirname(pieceRef.replace(/\\/g, '/'));
   const localLink = (link: string): string | null => {
     if (!link || link.startsWith('#')) return null;
-    if (isUrl(spec.artifact)) { try { return new URL(link, spec.artifact).href; } catch { return null; } }
+    if (isUrl(pieceRef)) { try { return new URL(link, pieceRef).href; } catch { return null; } }
     return isAbsolute(link) ? null : posix.normalize(posix.join(artifactDir ?? '.', link));
   };
-  const env: CheckEnv = { sources, localLink };
+  const env: CheckEnv = { sources, localLink, media: got.media };
+  const readable = (family: CheckFamily): boolean => family === 'media' || family === 'audience' || got.text !== null;
 
   const families = familiesIn(spec);
   const raws = new Map<CheckFamily, Finding[]>();
-  for (const family of families) raws.set(family, await runFamily(family, spec, got.text, env));
+  for (const family of families) raws.set(family, readable(family) ? await runFamily(family, spec, text, env) : unread(family, spec));
 
   const proofs: Proof[] = [];
   if (options.prove !== false) for (const family of families) {
     const baseline = raws.get(family)!;
     const known = new Set(baseline.map(key));
     const defects: Proof['defects'] = []; const notes: string[] = [];
-    for (const seed of await seedsFor(family, spec, got.text, baseline, sources, isUrl(spec.artifact) ? spec.artifact : posix.basename(spec.artifact.replace(/\\/g, '/')))) {
+    if (!readable(family)) { proofs.push({ check: family, proven: false, defects: [], note: 'the words in the piece were not read, so nothing could be planted' }); continue; }
+    for (const seed of await seedsFor(family, spec, text, baseline, sources, isUrl(pieceRef) ? pieceRef : posix.basename(pieceRef.replace(/\\/g, '/')), got.media)) {
       if ('impossible' in seed) { defects.push({ what: seed.what, caught: false, origin: seed.origin }); notes.push(seed.impossible); continue; }
-      const after = await runFamily(family, spec, seed.text, { ...env, ...(seed.extraRecipients ? { extraRecipients: seed.extraRecipients } : {}) });
+      const after = await runFamily(family, spec, seed.text, { ...env, ...(seed.extraRecipients ? { extraRecipients: seed.extraRecipients } : {}), ...(seed.media ? { media: seed.media } : {}) });
       const caught = after.some((f) => (f.status === 'fail' || f.status === 'unproven') && !known.has(key(f)));
       defects.push({ what: seed.what, caught, origin: seed.origin });
       if (!caught) notes.push(`the check did not notice: ${seed.what}`);
@@ -279,10 +392,15 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
 
   const authority = judgeAuthority(stateRoot, spec.kind ?? null);
   let promises: PromiseResult[] = spec.promises.map((p) => ({ text: p.text, authority: p.authority === 'gate' && authority.gateEarned ? 'gate' : 'advice', verdict: 'not_judged', lines: [], why: '' }));
-  if (options.ask && spec.promises.length) {
-    const lines = got.text.split(/\r?\n/).slice(0, 1500).map((line) => line.slice(0, 600));
+  // A picture is judged by a model that is shown the picture. One that can only be sent text does not judge it.
+  const shown = options.look !== undefined && got.files.length > 0;
+  const canJudge = shown || (!got.media && options.ask !== undefined);
+  if (canJudge && spec.promises.length) {
+    const words = text.split(/\r?\n/).slice(0, 1500).map((line) => line.slice(0, 600));
+    const lines = shown ? [got.media ? `[the ${got.media.kind} itself: ${describeMedia(got.media)}]` : '[the page as a browser lays it out, 1280 px wide]', ...words] : words;
     const rubric = spec.promises.map((p) => p.text);
-    const items = parseJudgeAnswer(await options.ask(buildPromisePrompt(spec, rubric, lines)), rubric, lines.length);
+    const answer = shown ? await options.look!(buildLookPrompt(spec, rubric, got, lines), got.files) : await options.ask!(buildPromisePrompt(spec, rubric, lines));
+    const items = parseJudgeAnswer(answer, rubric, lines.length);
     promises = promises.map((p, i) => ({ ...p, verdict: items[i]?.verdict ?? 'unclear', lines: items[i]?.lines ?? [], why: items[i]?.why ?? '' }));
   }
 
@@ -308,7 +426,7 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
     if (unproven.length > spec.shipRule.maxUnproven) reasons.push(`${unproven.length} claim${unproven.length === 1 ? '' : 's'} with nothing to check ${unproven.length === 1 ? 'it' : 'them'} against (allowed: ${spec.shipRule.maxUnproven})`);
     if (spec.shipRule.requireProvenChecks && unprovenChecks.length) reasons.push(options.prove === false ? 'the checks were not shown to fail on a planted defect (--no-prove)' : `not shown to fail on a planted defect: ${unprovenChecks.join(', ')}`);
     if (!examined) reasons.push(judged ? `no check found anything of its kind in the piece, and the judge did not find every promise met (${promises.filter((p) => p.verdict !== 'met').length} of ${promises.length} not met or unclear)`
-      : spec.promises.length ? 'nothing was examined: no check found anything of its kind in the piece, and the promises were not judged (pass --judge)' : 'nothing was examined: the spec has no promises, and no check found anything of its kind in the piece');
+      : spec.promises.length ? `nothing was examined: no check found anything of its kind in the piece, and the promises were not judged (${got.media && options.look && !got.files.length ? got.media.kind === 'video' ? 'install ffmpeg so stills can be taken from the video' : 'no browser is installed to draw this file for a model to look at: run `npx playwright install chromium`' : 'pass --judge'})` : 'nothing was examined: the spec has no promises, and no check found anything of its kind in the piece');
     if (reasons.length && options.allowUnproven !== true) verdict = 'unproven';
     else if (reasons.length) reasons.push('accepted with --allow-unproven');
   }
@@ -331,10 +449,10 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   const body = {
     schemaVersion: RECEIPT_VERSION, at: now.toISOString(),
     spec: { id: spec.id, path: relative(stateRoot, path).replace(/\\/g, '/'), sha256: specHash, title: spec.title ?? null, kind: spec.kind ?? null },
-    artifact: { ref: spec.artifact, sha256: got.sha256, bytes: got.bytes },
+    artifact: { ref: pieceRef, sha256: got.sha256, bytes: got.bytes, ...(got.media ? { media: got.media, words: got.words } : {}) },
     brief, afterlife: spec.afterlife, reviewDate: spec.reviewDate ?? null,
     verdict, exitCode: EXIT[verdict], reasons, counts, findings, proofs, promises,
-    judge: { asked: options.ask !== undefined && spec.promises.length > 0, ...authority },
+    judge: { asked: canJudge && spec.promises.length > 0, ...authority },
     exclusions, sources: (await sources.record()).filter((s) => s.ref !== DEAD_LINK), fixList,
     previous: previous?.receiptHash ?? null,
   } as const;
@@ -358,6 +476,11 @@ export function renderReceipt(receipt: Receipt): string {
   out.push(`${receipt.verdict.toUpperCase()}  ${name}${receipt.reused ? '  (shipped once and unchanged: not checked again)' : ''}`);
   for (const reason of receipt.reasons) out.push(`  ${reason}`);
   out.push(`  ${receipt.artifact.ref}  sha256 ${receipt.artifact.sha256.slice(0, 12)}  ${receipt.counts.pass} ok, ${receipt.counts.fail} failed, ${receipt.counts.unproven} unproven, ${receipt.counts.blocked} blocked, ${receipt.counts.excluded} excluded`);
+  if (receipt.artifact.media) {
+    const words = receipt.artifact.words;
+    out.push(`  ${describeMedia(receipt.artifact.media)}, ${Math.max(1, Math.round(receipt.artifact.bytes / 1024))} kB; ${!words || words.from === null ? 'words not read' : `${words.lines} line${words.lines === 1 ? '' : 's'} of words from ${words.from === 'reading' ? `a reading by ${words.by}` : words.from === 'transcript' ? 'the transcript' : 'the SVG text'}`}`);
+    if (words?.shows) out.push(`  shows: ${words.shows}`);
+  }
   const attention = receipt.findings.filter((f) => f.status !== 'pass');
   if (attention.length) out.push('');
   for (const f of attention) {

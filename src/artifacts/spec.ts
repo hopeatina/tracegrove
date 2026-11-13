@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const Severity = z.enum(['block', 'warn', 'note']);
 export type Severity = z.infer<typeof Severity>;
-export const CheckFamily = z.enum(['contract', 'require', 'forbid', 'length', 'audience', 'numbers', 'claims', 'links']);
+export const CheckFamily = z.enum(['media', 'contract', 'require', 'forbid', 'length', 'audience', 'numbers', 'claims', 'links']);
 export type CheckFamily = z.infer<typeof CheckFamily>;
 
 const Text = z.string().min(1).max(2000);
@@ -67,6 +67,16 @@ const Length = z.object({
 }).strict().refine((l) => l.minWords !== undefined || l.maxWords !== undefined, 'give minWords, maxWords or both')
   .refine((l) => l.minWords === undefined || l.maxWords === undefined || l.minWords <= l.maxWords, 'minWords cannot exceed maxWords');
 
+const Media = z.object({
+  formats: z.array(z.string().min(2).max(10)).min(1).max(12).optional().describe('Allowed file formats, read from the bytes and not the file name: png, jpeg, gif, webp, svg, avif, mp4, mov, webm.'),
+  minWidth: z.number().int().min(1).max(100_000).optional(), maxWidth: z.number().int().min(1).max(100_000).optional(),
+  minHeight: z.number().int().min(1).max(100_000).optional(), maxHeight: z.number().int().min(1).max(100_000).optional(),
+  aspect: z.string().regex(/^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/, 'write it as width:height, such as 16:9').optional().describe('Width to height, within 1%.'),
+  maxBytes: z.number().int().min(1).optional(),
+  minSeconds: z.number().min(0).max(86_400).optional(), maxSeconds: z.number().min(0).max(86_400).optional(),
+  severity: Severity.default('block'),
+}).strict().refine((m) => Object.keys(m).some((key) => key !== 'severity'), 'give at least one delivery spec');
+
 const Audience = z.object({
   recipients: Ref.describe('One recipient per line, or a CSV whose first column is the recipient.'),
   noneIn: z.array(Ref).min(1).max(10).describe('Lists nobody in recipients may appear in: suppressed, unsubscribed, existing customers.'),
@@ -97,6 +107,7 @@ export const ArtifactSpec = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/, 'lowercase letters, digits, dot, dash, underscore').max(120),
   title: z.string().min(1).max(200).optional(),
   artifact: Ref,
+  transcript: Ref.optional().describe('For an image or video: a text file with the words in it, written out. Without one, the words are read by a model when a judge is available.'),
   kind: z.string().min(1).max(120).optional().describe('A label such as sales.send_plan. It never selects checks.'),
   brief: z.object({ ref: Ref, sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict().optional().describe('The brief this spec was drafted from, and the hash of the bytes read. A check run reports when the brief has changed since.'),
   draftedBy: z.string().min(1).max(120).optional().describe('Who or what drafted the spec: a model name, or rules.'),
@@ -104,6 +115,7 @@ export const ArtifactSpec = z.object({
   reviewDate: Day.optional(),
   promises: z.array(Promise_).max(20).default([]).describe('What this piece must do, in plain words, drafted from its brief. Graded by a judge with cited lines.'),
   invariants: z.object({
+    media: Media.optional().describe('Delivery specs for an image or video, read from the file itself.'),
     contract: Contract.optional(),
     claims: Claims.optional(),
     numbers: z.array(NumberCheck).max(60).optional(),
@@ -129,6 +141,28 @@ export type ArtifactSpec = z.infer<typeof ArtifactSpec>;
 /** The check families a spec actually uses, in the order they run (cheapest first). */
 export function familiesIn(spec: ArtifactSpec): CheckFamily[] {
   const i = spec.invariants;
-  return ([['contract', i.contract], ['require', i.require?.length ? i.require : undefined], ['forbid', i.forbid?.length ? i.forbid : undefined], ['length', i.length], ['audience', i.audience], ['numbers', i.numbers?.length ? i.numbers : undefined], ['claims', i.claims], ['links', i.links]] as const)
+  return ([['media', i.media], ['contract', i.contract], ['require', i.require?.length ? i.require : undefined], ['forbid', i.forbid?.length ? i.forbid : undefined], ['length', i.length], ['audience', i.audience], ['numbers', i.numbers?.length ? i.numbers : undefined], ['claims', i.claims], ['links', i.links]] as const)
     .filter(([, value]) => value !== undefined).map(([name]) => name);
 }
+
+const Agree = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/).max(64),
+  find: Pattern.describe('A regular expression with one capture group around the value: a price, a date, a code, a link.'),
+  in: z.array(z.string().min(1).max(120)).min(2).max(40).optional().describe('Member ids that must each state it. Left out: every member that states it must state the same thing.'),
+  severity: Severity.default('block'),
+}).strict();
+
+/** Several pieces released together: a campaign, a launch. Each member keeps its own spec; the set checks what must hold across them. */
+export const ArtifactSet = z.object({
+  schemaVersion: z.literal('tracegrove.artifact-set/v1'),
+  id: z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/, 'lowercase letters, digits, dot, dash, underscore').max(120),
+  title: z.string().min(1).max(200).optional(),
+  kind: z.string().min(1).max(120).optional(),
+  members: z.array(Ref).min(2).max(40).describe('Paths to the check spec of each piece, relative to this file.'),
+  agree: z.array(Agree).max(40).default([]).describe('Values that must be the same wherever they appear: the price in the email, on the page and in the ad.'),
+  promises: z.array(Promise_).max(20).default([]).describe('What the pieces must do together, judged with all of them in view.'),
+}).strict().superRefine((set, ctx) => {
+  const ids = set.agree.map((a) => a.id);
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', path: ['agree'], message: 'agree ids must be unique' });
+});
+export type ArtifactSet = z.infer<typeof ArtifactSet>;
