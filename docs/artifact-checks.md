@@ -118,7 +118,8 @@ shows up immediately.
 The drafter proposes; it cannot excuse. Whatever it writes, the saved spec has no exclusions, no
 extra seeded defects, the default ship rule, every check at `block` with zero tolerance, and every
 promise as advice, no `unless` on a forbid rule, and unsourced quotes at the default unless it asked
-for `block`. A number check pointing at a source that was not listed is removed. The output
+for `block`. A drafted `require` is kept only when its wording is in the brief or a source: a pattern
+guessing how the piece will phrase something is removed, because that is a promise. A number check pointing at a source that was not listed is removed. The output
 says what was removed. A reply that does not fit the schema is sent back once, then the draft fails.
 
 The spec records the brief's path and hash (`brief`) and who drafted it (`draftedBy`). A later

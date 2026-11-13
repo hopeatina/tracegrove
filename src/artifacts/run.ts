@@ -291,8 +291,12 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   const failed = blocking('fail'); const gated = promises.filter((p) => p.authority === 'gate' && p.verdict === 'not_met');
   const blockedOn = blocking('blocked'); const unproven = blocking('unproven');
   const unprovenChecks = options.prove === false ? families : proofs.filter((p) => !p.proven).map((p) => p.check);
-  // A spec whose checks found nothing to examine, with no judged promise, has said nothing about the piece.
-  const examined = findings.some((f) => f.vacuous !== true) || promises.some((p) => p.verdict !== 'not_judged');
+  // A spec whose checks found nothing to examine has said nothing about the piece. Promises can stand in for
+  // the checks only when a judge read the piece and found every one met: an advisory judge cannot make a piece
+  // fail, but it is the only evidence here, so its doubts are not a pass either.
+  const judged = promises.length > 0 && promises.every((p) => p.verdict !== 'not_judged');
+  const mechanical = findings.some((f) => f.vacuous !== true);
+  const examined = mechanical || (judged && promises.every((p) => p.verdict === 'met'));
   let verdict: Verdict = 'ready';
   if (failed.length || gated.length) {
     verdict = 'fix';
@@ -303,7 +307,8 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
   } else {
     if (unproven.length > spec.shipRule.maxUnproven) reasons.push(`${unproven.length} claim${unproven.length === 1 ? '' : 's'} with nothing to check ${unproven.length === 1 ? 'it' : 'them'} against (allowed: ${spec.shipRule.maxUnproven})`);
     if (spec.shipRule.requireProvenChecks && unprovenChecks.length) reasons.push(options.prove === false ? 'the checks were not shown to fail on a planted defect (--no-prove)' : `not shown to fail on a planted defect: ${unprovenChecks.join(', ')}`);
-    if (!examined) reasons.push(spec.promises.length ? 'nothing was examined: no check found anything of its kind in the piece, and the promises were not judged (pass --judge)' : 'nothing was examined: the spec has no promises, and no check found anything of its kind in the piece');
+    if (!examined) reasons.push(judged ? `no check found anything of its kind in the piece, and the judge did not find every promise met (${promises.filter((p) => p.verdict !== 'met').length} of ${promises.length} not met or unclear)`
+      : spec.promises.length ? 'nothing was examined: no check found anything of its kind in the piece, and the promises were not judged (pass --judge)' : 'nothing was examined: the spec has no promises, and no check found anything of its kind in the piece');
     if (reasons.length && options.allowUnproven !== true) verdict = 'unproven';
     else if (reasons.length) reasons.push('accepted with --allow-unproven');
   }

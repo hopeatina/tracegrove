@@ -188,6 +188,9 @@ describe('pieces that are not shaped like the example', () => {
     const empty = await runArtifactCheck(piece('{"meeting":"weekly"}', { promises: ['An executive can decide from this.'], invariants: { claims: {}, links: {} } }, 'piece.json'), { now: NOW, write: false });
     expect([empty.verdict, empty.exitCode]).toEqual(['unproven', 3]);
     expect(empty.reasons.join(' ')).toMatch(/nothing was examined/);
+    const doubted = await runArtifactCheck(piece('{"meeting":"weekly"}', { promises: ['An executive can decide from this.'], invariants: { claims: {}, links: {} } }, 'piece.json'), { now: NOW, write: false, ask: async () => '{"items":[{"item":1,"verdict":"not_met","lines":[1],"why":"there is no decision here"}]}' });
+    expect(doubted.verdict).toBe('unproven');
+    expect(doubted.reasons.join(' ')).toMatch(/did not find every promise met/);
   });
 
   it('requires wording the brief asked for and holds a piece to its length, and shows both checks can fail', async () => {
@@ -260,12 +263,13 @@ describe('drafting a spec from the brief', () => {
   it('writes the check from the brief alone: the drafter is never shown the piece, and prose briefs still yield promises', async () => {
     const { dir } = plan();
     let seen = '';
-    await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), out: join(dir, 'blind.check.yaml'), ask: async (prompt) => { seen ||= prompt; return JSON.stringify({ promises: ['x is stated plainly.'], invariants: { require: [{ pattern: 'Monday', reason: 'asked for' }], length: { maxWords: 400 }, claims: { unsourcedQuotes: 'ignore' }, forbid: [{ pattern: 'guaranteed', reason: 'r', unless: 'no' }] } }); } });
+    await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), out: join(dir, 'blind.check.yaml'), ask: async (prompt) => { seen ||= prompt; return JSON.stringify({ promises: ['x is stated plainly.'], invariants: { require: [{ pattern: 'clinic owners?', reason: 'asked for' }, { pattern: 'nothing[^.]*sent', reason: 'a guess at phrasing' }], length: { maxWords: 400 }, claims: { unsourcedQuotes: 'ignore' }, forbid: [{ pattern: 'guaranteed', reason: 'r', unless: 'no' }] } }); } });
     expect(seen).not.toContain('we stopped losing Monday mornings');
     const { spec } = loadSpec(join(dir, 'blind.check.yaml'));
     expect(spec.invariants.claims?.unsourcedQuotes).toBe('note');
     expect(spec.invariants.forbid?.[0]?.unless).toBeUndefined();
     expect(spec.invariants.length?.maxWords).toBe(400);
+    expect(spec.invariants.require?.map((r) => r.pattern)).toEqual(['clinic owners?']);
     writeFileSync(join(dir, 'prose.md'), 'Kind: sales.document\n\nDraft a batch of ten outreach notes for founders. Every note must name the evidence it rests on. Nothing is sent without review.');
     const prose = await draftSpec({ brief: join(dir, 'prose.md'), artifact: join(dir, 'later.md'), out: join(dir, 'prose.check.yaml') });
     expect(prose.promises).toBe(3);
