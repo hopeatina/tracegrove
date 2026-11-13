@@ -23,6 +23,10 @@
       "types": "./dist/integrations/awr/index.d.ts",
       "default": "./dist/integrations/awr/index.js"
     },
+    "./artifacts": {
+      "types": "./dist/artifacts/index.d.ts",
+      "default": "./dist/artifacts/index.js"
+    },
     "./authoring": {
       "types": "./dist/authoring/index.d.ts",
       "default": "./dist/authoring/index.js"

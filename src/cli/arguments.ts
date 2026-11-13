@@ -86,6 +86,7 @@ export const COMMAND_SCHEMAS = {
   waive: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   reject: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text }).strict(),
   challenge: z.object({ ...common, dir: Text.optional(), _: Positionals(1, 1), by: Text.optional(), reason: Text, step: Text.optional() }).strict(),
+  artifact: z.object({ ...common, _: Positionals(1, 33), dir: Text.optional(), judge: Bool, agent: Text.optional(), 'allow-unproven': Bool, 'no-prove': Bool, rerun: Bool, reason: Text.optional(), by: Text.optional() }).strict(),
   judge: z.object({ ...common, run: Text.optional(), grep: Text.optional(), agent: Text.optional(), show: Text.optional() }).strict(),
   'import-call': z.object({ ...common, _: Positionals(1, 1), out: Text.optional(), name: Text.optional(), channel: z.enum(['voice', 'chat']).optional(), endpoint: Text.optional(), 'keep-client-data': Bool, force: Bool }).strict(),
   card: z.object({ ...common, _: Positionals(0, 32).optional(), commit: Text.optional(), link: Text.optional(), title: Text.optional(), out: Text.optional() }).strict(),
@@ -96,7 +97,7 @@ export const COMMAND_SCHEMAS = {
   unseal: z.object({ ...common, _: Positionals(1, 1), out: Text }).strict(),
 } as const satisfies Record<z.infer<typeof CliCommandName>, z.ZodType>;
 /** Most positional words each command accepts (its schema's `_` array validates the rest). */
-const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, try: 1, card: 32, 'import-call': 1, waive: 1, reject: 1, challenge: 1, unseal: 1 };
+const POSITIONAL_MAX: Partial<Record<keyof typeof COMMAND_SCHEMAS, number>> = { env: 2, explain: 1, config: 3, accept: 1, try: 1, card: 32, 'import-call': 1, waive: 1, reject: 1, challenge: 1, unseal: 1, artifact: 33 };
 export type Args = {
   [Name in keyof typeof COMMAND_SCHEMAS]: { command: Name; flags: z.infer<typeof COMMAND_SCHEMAS[Name]> }
 }[keyof typeof COMMAND_SCHEMAS];

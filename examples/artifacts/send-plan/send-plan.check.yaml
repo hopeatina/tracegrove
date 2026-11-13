@@ -1,0 +1,40 @@
+# A check spec is written for one piece of work, from its own brief.
+# Nothing here says what a send plan must look like. It says what must be true of this one.
+schemaVersion: tracegrove.artifact-check/v1
+id: clinic-reactivation-send-plan
+title: "Send plan: clinic owners, reactivation"
+artifact: send-plan.md
+kind: sales.send_plan
+afterlife: once            # sent once; never rechecked after it is ready
+
+# Plain-language promises from the brief. A judge grades these with cited lines (--judge).
+# They are advice until people's sign-offs show the judge can be trusted.
+promises:
+  - The message offers one concrete next step and says how long it takes.
+  - The plan says when to stop sending, in terms someone can measure.
+
+invariants:
+  contract:
+    fields: [Owner, Send date, Stop condition]
+  numbers:
+    - id: clinics-reached
+      find: 'reached ([\d,]+) clinics'
+      source: { ref: sources/metrics.json, path: pilot.clinics_reached }
+    - id: second-call-rate
+      find: '(\d+)% of them booked'
+      source: { ref: sources/metrics.json, path: pilot.second_call_rate_pct }
+  claims:
+    mustCite: ['\d+% of']
+  links: {}
+  forbid:
+    - pattern: guaranteed
+      reason: we do not promise outcomes in outbound mail
+    - pattern: 'HIPAA[- ]compliant'
+      example: HIPAA-compliant
+      reason: not certified; legal has not approved this claim
+  audience:
+    recipients: sources/recipients.csv
+    noneIn: [sources/suppressed.csv, sources/customers.csv]
+
+# An exclusion always has a scope, a reason, an owner and an end date. It never shows as a pass.
+exclusions: []
