@@ -102,7 +102,7 @@ export function sniffMedia(bytes: Buffer): MediaFacts | null {
 export const EXTENSION: Record<string, string> = { png: 'png', jpeg: 'jpg', gif: 'gif', webp: 'webp', avif: 'avif', heic: 'heic', svg: 'svg', mp4: 'mp4', mov: 'mov', webm: 'webm' };
 
 /** Stills a model can look at for a video: evenly spaced, at most `count`. Empty when ffmpeg is not installed. */
-export function videoStills(path: string, seconds: number | null, count = 6): string[] {
+export function videoStills(path: string, seconds: number | null, count = 8): string[] {
   const dir = mkdtempSync(join(tmpdir(), 'tg-stills-'));
   const every = seconds && seconds > 0 ? Math.max(seconds / count, 0.2) : 2;
   const run = spawnSync('ffmpeg', ['-v', 'error', '-i', path, '-vf', `fps=1/${every.toFixed(3)},scale='min(1280,iw)':-2`, '-frames:v', String(count), join(dir, 'still-%02d.png')], { stdio: 'ignore', timeout: 60_000 });
@@ -111,25 +111,37 @@ export function videoStills(path: string, seconds: number | null, count = 6): st
 }
 
 /**
- * A picture of something a model cannot open as one: an SVG, or an HTML page as a browser lays it out.
- * Drawn with the browser Tracegrove already uses for flows; null when no browser is installed.
+ * Pictures of something a model cannot open as one: an SVG, or an HTML page as a browser lays it out.
+ * Drawn with the browser Tracegrove already uses for flows. A long page becomes several pictures, top to
+ * bottom, so small type stays readable. Empty when no browser is installed.
  */
-export async function draw(path: string, width = 1280): Promise<string | null> {
-  const out = join(mkdtempSync(join(tmpdir(), 'tg-drawn-')), 'piece.png');
+export async function draw(path: string, width = 1280): Promise<string[]> {
+  const dir = mkdtempSync(join(tmpdir(), 'tg-drawn-'));
   try {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch({ headless: true, timeout: 20_000, ...(process.env.TRACEGROVE_CHROMIUM_PATH ? { executablePath: process.env.TRACEGROVE_CHROMIUM_PATH } : {}) });
     try {
-      // No network: the drawing is of the file as handed over, and a page under check does not get to phone anywhere.
-      const context = await browser.newContext({ viewport: { width, height: 800 }, offline: true, javaScriptEnabled: false });
+      // The page's own scripts run, since many pages draw themselves, but with no network: the drawing is of the file as handed over.
+      const context = await browser.newContext({ viewport: { width, height: 1600 }, offline: true });
       const page = await context.newPage();
-      await page.goto(pathToFileURL(path).href, { timeout: 20_000, waitUntil: 'load' });
-      const height = await page.evaluate('Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)') as number;
-      await page.screenshot({ path: out, clip: { x: 0, y: 0, width, height: Math.min(Math.max(height, 200), 6000) }, fullPage: true });
+      const svg = /\.svg$/i.test(path);
+      let target = path;
+      // An SVG is shown as an image on a white page, at a size a person would see it, from a file so the browser may load it.
+      if (svg) { target = join(dir, 'frame.html'); writeFileSync(target, `<!doctype html><body style="margin:0;background:#fff"><img src="${pathToFileURL(path).href}" style="display:block;width:${width}px"></body>`); }
+      await page.goto(pathToFileURL(target).href, { timeout: 20_000, waitUntil: 'load' });
+      await page.waitForTimeout(400);
+      const height = Math.max(svg ? 16 : 200, Math.min(await page.evaluate(svg ? 'Math.ceil(document.querySelector("img").getBoundingClientRect().height)' : 'Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)') as number, MAX_TILES * 1600));
+      const files: string[] = [];
+      for (let top = 0; top < height; top += 1600) {
+        const file = join(dir, `part-${String(files.length + 1).padStart(2, '0')}.png`);
+        await page.screenshot({ path: file, fullPage: true, clip: { x: 0, y: top, width, height: Math.min(1600, height - top) } });
+        files.push(file);
+      }
+      return files;
     } finally { await browser.close(); }
-    return existsSync(out) ? out : null;
-  } catch { return null; }
+  } catch { return []; }
 }
+const MAX_TILES = 8;
 
 export type Reading = { lines: string[]; shows: string; by: string };
 

@@ -135,7 +135,7 @@ them. To skip the model, write the words out and name the file with `transcript:
 Without `--judge` or a transcript, text checks on a picture end `blocked`, never passed.
 
 Promises about a picture are judged by a model looking at it, and it must say where in the picture.
-For a video it is shown six stills (this needs `ffmpeg`); it cannot hear, so a promise about sound
+For a video it is shown eight stills, so words on screen only between them are missed (this needs `ffmpeg`); it cannot hear, so a promise about sound
 is `unclear`. An SVG, and an HTML page, are drawn with the browser Tracegrove already uses and the
 judge is shown the drawing, with JavaScript and the network off.
 

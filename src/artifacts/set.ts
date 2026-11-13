@@ -94,6 +94,8 @@ function agree(rule: ArtifactSet['agree'][number], texts: Text[]): AgreeResult {
   if (result.status === 'pass' && first) {
     const planted = texts.map((t) => t.member !== first.member || t.text === null ? t : { member: t.member, text: t.text.split(/\r?\n/).map((line, index) => index === first.line - 1 ? line.replace(first.value, /\d/.test(first.value) ? first.value.replace(/\d/g, (d) => String((Number(d) + 1) % 10)) : `${first.value} (changed)`) : line).join('\n') });
     proven = agreeOne(rule, planted).status === 'fail';
+    // A rule whose value is fixed wording cannot disagree, only go missing: for one that names its members, take the line out of one.
+    if (!proven && rule.in) proven = agreeOne(rule, texts.map((t) => t.member !== first.member || t.text === null ? t : { member: t.member, text: t.text.split(/\r?\n/).filter((line) => !new RegExp(rule.find, 'i').test(line)).join('\n') })).status === 'fail';
   }
   return { ...result, proven };
 }

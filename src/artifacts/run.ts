@@ -257,8 +257,7 @@ export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: F
     if (options.look && /<(?:html|body|table|div|section|main)\b/i.test(got.text.slice(0, 20_000))) {
       let page = !isUrl(ref) && !ref.startsWith('file://') ? (isAbsolute(ref) ? ref : resolve(dirname(specPath), ref)) : null;
       if (page === null || !/\.x?html?$/i.test(page)) { page = join(mkdtempSync(join(tmpdir(), 'tg-piece-')), 'piece.html'); writeFileSync(page, raw); }
-      const drawn = await draw(page);
-      if (drawn) files = [drawn];
+      files = await draw(page);
     }
     return { ...head, media: null, text: got.text, words: { from: 'piece', by: null, lines: got.text.split(/\r?\n/).length, shows: null }, files };
   }
@@ -267,7 +266,7 @@ export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: F
   const local = !isUrl(ref) && !ref.startsWith('file://') ? (isAbsolute(ref) ? ref : resolve(dirname(specPath), ref)) : null;
   let onDisk = local !== null && existsSync(local) ? local : null;
   if (onDisk === null) { onDisk = join(mkdtempSync(join(tmpdir(), 'tg-piece-')), `piece.${EXTENSION[media.format] ?? 'bin'}`); writeFileSync(onDisk, raw); }
-  const files = media.kind === 'video' ? videoStills(onDisk, media.seconds) : media.format === 'svg' ? [await draw(onDisk, 640)].filter((f): f is string => f !== null) : [onDisk];
+  const files = media.kind === 'video' ? videoStills(onDisk, media.seconds) : media.format === 'svg' ? await draw(onDisk, 640) : [onDisk];
 
   if (spec.transcript) {
     const words = await fetcher(spec.transcript);
@@ -297,7 +296,7 @@ export function describeMedia(facts: MediaFacts): string {
 function buildLookPrompt(spec: ArtifactSpec, promises: string[], piece: Piece, lines: string[]): string {
   return [
     `You are checking one piece of work against the promises its brief made. The piece is ${piece.media ? `${piece.media.kind === 'video' ? 'a video' : 'an image'}, attached` : 'a page; a picture of it as a browser lays it out is attached'}.`,
-    piece.media?.kind === 'video' ? 'The attached files are stills from the video, in order. You cannot hear it: anything about sound, voice or music is "unclear".' : 'Look at the attached file before answering.',
+    piece.media?.kind === 'video' ? 'The attached files are stills from the video, in order. You cannot hear it: anything about sound, voice or music is "unclear".' : 'Look at every attached file before answering. Several files for a page are that page from top to bottom, in order.',
     'Judge only from what you can see and from the numbered lines below. Do not assume anything that is not there, and do not reward polish.',
     '',
     `Piece: ${spec.title ?? spec.id}${spec.kind ? ` (${spec.kind})` : ''}`,
