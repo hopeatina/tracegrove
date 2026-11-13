@@ -82,6 +82,28 @@ the verdict.
 | `claims` | each quote is in a linked source, word for word | a quote or `mustCite` line has no link | no linked source can be read |
 | `links` | each link answers | a relative link cannot be followed | the host does not answer (a 404 or 410 fails) |
 
+## Drafting the spec from the brief
+
+Write the spec before the work, from the brief, so every piece starts with its check attached:
+
+```
+tracegrove artifact draft brief.md --artifact send-plan.md --sources sources/
+```
+
+Claude Code or Codex reads the brief and the listed sources and proposes promises and checks; with
+`--no-agent`, plain rules turn each bullet of the brief into a promise and switch on the checks that
+need no knowledge of the piece. The piece does not have to exist yet. If it does, the draft is run
+against it once, without recording anything, so a check that matches nothing shows up immediately.
+
+The drafter proposes; it cannot excuse. Whatever it writes, the saved spec has no exclusions, no
+extra seeded defects, the default ship rule, every check at `block` with zero tolerance, and every
+promise as advice. A number check pointing at a source that was not listed is removed. The output
+says what was removed. A reply that does not fit the schema is sent back once, then the draft fails.
+
+The spec records the brief's path and hash (`brief`) and who drafted it (`draftedBy`). A later
+check says when the brief has changed since. `draft` refuses to overwrite an existing spec without
+`--force`: a spec is redrafted when the brief changes, not when the work falls short.
+
 ## Verdicts
 
 | Verdict | Exit | Meaning |
@@ -200,7 +222,7 @@ of files and public URLs.
 ## Not here yet
 
 - Readers for media (video, audio, images, decks). Today a piece must be text, Markdown or HTML.
-- Finding claims with a model. Today a claim is a quoted passage, a declared number or a `mustCite` line.
+- Finding claims in the piece with a model. Today a claim is a quoted passage, a declared number or a `mustCite` line.
 - Craft judged against chosen references by a panel of critics.
 - A second, independent judge family, which a promise would need before it could decide alone.
 - A page for a release in the Grove UI.

@@ -35,7 +35,7 @@ import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
 import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
-import { findSpecs, recordDecision, renderReceipt, runArtifactCheck, type Receipt } from '../artifacts/index.ts';
+import { draftSpec, findSpecs, recordDecision, renderDraft, renderReceipt, runArtifactCheck, type Receipt } from '../artifacts/index.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
@@ -178,6 +178,9 @@ Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
                                                        leaves are green only where a real flow passed
 
 Work that is not code (plans, briefs, launch copy, audits; see docs/artifact-checks.md):
+  artifact draft <brief> --artifact <piece>            write the check spec from the brief, before the work: promises and checks
+       [--sources <dir>] [--out <spec>] [--kind <k>]   proposed by Claude Code or Codex (--no-agent: by rules), never exclusions or
+       [--agent claude|codex] [--no-agent] [--force]   softened checks; when the piece exists the draft is run against it once
   artifact check [<spec.check.yaml>...] [--judge]      check a piece against its own spec: claims quoted from their sources, numbers
        [--agent claude|codex] [--allow-unproven]       recomputed, links, audience, forbidden wording; every check must first fail on a
        [--no-prove] [--rerun] [--dir <dir>] [--json]   planted defect; --judge asks a model about the spec's promises (advice until
@@ -945,7 +948,17 @@ async function main(argv: string[]): Promise<number> {
         out(args, row, `${sub === 'accept' ? 'accepted' : 'rejected'} ${row.spec} (run ${row.receiptHash.slice(0, 8)})${row.agreed === null ? '' : row.agreed ? '; the judge agreed' : '; the judge disagreed'}`);
         return 0;
       }
-      if (sub !== 'check') throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: `artifact ${sub ?? ''}: use check, accept or reject`, action: 'tracegrove artifact check <spec.check.yaml>' }]);
+      if (sub === 'draft') {
+        if (rest.length !== 1 || !args.flags.artifact) throw new Blocked([{ code: 'missing_argument', owner: 'agent', detail: 'artifact draft takes one brief and --artifact', action: 'tracegrove artifact draft <brief.md> --artifact <piece.md>' }]);
+        const root = resolve(flag(args, 'dir') ?? '.');
+        const settings = args.flags['no-agent'] === true ? null : resolveAgentSettings(projectRoot(root) ?? root, null, { provider: args.flags.agent ?? null });
+        const drafted = await draftSpec({ brief: rest[0]!, artifact: args.flags.artifact, ...(args.flags.out ? { out: args.flags.out } : {}), ...(args.flags.id ? { id: args.flags.id } : {}), ...(args.flags.kind ? { kind: args.flags.kind } : {}),
+          ...(args.flags.sources ? { sources: args.flags.sources } : {}), force: args.flags.force === true,
+          ...(settings && settings.provider !== 'none' ? { ask: agentAsk(settings), by: `${settings.provider}${settings.model ? ` (${settings.model})` : ''}` } : {}) });
+        out(args, drafted, renderDraft(drafted));
+        return 0;
+      }
+      if (sub !== 'check') throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: `artifact ${sub ?? ''}: use draft, check, accept or reject`, action: 'tracegrove artifact check <spec.check.yaml>' }]);
       const dir = resolve(flag(args, 'dir') ?? '.');
       const specs = rest.length ? rest.flatMap((path) => findSpecs(resolve(path)).length ? findSpecs(resolve(path)) : [resolve(path)]) : findSpecs(join(dir, 'tracegrove', 'artifacts'));
       if (!specs.length) throw new Blocked([{ code: 'artifact_spec_missing', owner: 'agent', detail: `no *.check.yaml under ${join(dir, 'tracegrove', 'artifacts')}`, action: 'pass a spec: tracegrove artifact check <spec.check.yaml>' }]);

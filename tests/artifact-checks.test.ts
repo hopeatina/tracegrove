@@ -2,7 +2,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, judgeAuthority, recordDecision, renderReceipt, runArtifactCheck, type Fetcher } from '../src/artifacts/index.ts';
+import { ArtifactSpec, DEAD_LINK, GATE_MIN_DECISIONS, defaultFetcher, draftSpec, judgeAuthority, loadSpec, recordDecision, renderDraft, renderReceipt, runArtifactCheck, type Fetcher } from '../src/artifacts/index.ts';
 import { parseArtifact, parseList, parseNumber } from '../src/artifacts/read.ts';
 import { findField } from '../src/artifacts/checks.ts';
 import { spawnSync } from 'node:child_process';
@@ -181,5 +181,60 @@ describe('the command', () => {
     const fix = cli();
     expect(fix.status).toBe(1);
     expect(JSON.parse(fix.stdout).fixList[0].do).toBe('change 1300 to 1204');
+  });
+});
+
+describe('drafting a spec from the brief', () => {
+  const proposal = { title: 'Reactivation send', afterlife: 'once', promises: ['The message offers one concrete next step.', { text: 'The plan says when to stop.', authority: 'gate' }],
+    invariants: { contract: { fields: ['Owner', 'Send date'], severity: 'note' },
+      numbers: [{ id: 'clinics', find: 'reached ([\\d,]+) clinics', source: { ref: 'sources/metrics.json', path: 'pilot.clinics_reached' }, tolerance: 500 }, { id: 'made-up', find: '(\\d+) replies', source: { ref: 'sources/replies.json', path: 'n' } }],
+      claims: {}, links: {}, forbid: [{ pattern: 'guaranteed', reason: 'no promised outcomes' }], audience: { recipients: 'sources/recipients.csv', noneIn: ['sources/suppressed.csv'] } },
+    exclusions: [{ check: 'links', reason: 'trust me', owner: 'the maker', expires: '2099-01-01' }], shipRule: { maxUnproven: 99 } };
+
+  it('keeps what the drafter may propose, removes anything that would let a failure pass, and tries the draft on the piece', async () => {
+    const { dir } = plan();
+    const result = await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), sources: join(dir, 'sources'), out: join(dir, 'drafted.check.yaml'), by: 'test model', ask: async () => JSON.stringify(proposal) });
+    const { spec } = loadSpec(result.spec);
+    expect(spec.exclusions).toEqual([]);
+    expect(spec.shipRule.maxUnproven).toBe(0);
+    expect(spec.promises.map((p) => p.authority)).toEqual(['advice', 'advice']);
+    expect(spec.invariants.contract?.severity).toBe('block');
+    expect(spec.invariants.numbers?.map((n) => [n.id, n.tolerance])).toEqual([['clinics', 0]]);
+    expect(spec.brief?.ref).toBe('brief.md');
+    expect(spec.draftedBy).toBe('test model');
+    expect(result.dropped.join('\n')).toMatch(/exclusions/);
+    expect(result.dropped.join('\n')).toMatch(/shipRule/);
+    expect(result.dropped.join('\n')).toMatch(/gate/);
+    expect(result.dropped.join('\n')).toMatch(/made-up/);
+    expect(result.trial?.verdict).toBe('ready');
+    expect(existsSync(join(dir, '.tracegrove'))).toBe(false);
+    expect(renderDraft(result)).toContain('against the piece as it stands: READY');
+  });
+
+  it('drafts before the piece exists, sends a bad reply back once, and refuses to redraft over a spec', async () => {
+    const { dir } = plan();
+    rmSync(join(dir, 'send-plan.md')); rmSync(join(dir, 'send-plan.check.yaml'));
+    const prompts: string[] = [];
+    const ask = async (prompt: string) => { prompts.push(prompt); return prompts.length === 1 ? 'Here you go: {"promises": "not a list", "invariants": {"numbers": "many"}}' : JSON.stringify({ promises: ['It says when to stop.'], invariants: { links: {} } }); };
+    const result = await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), ask });
+    expect(result.spec).toBe(join(dir, 'send-plan.check.yaml'));
+    expect(result.trial).toBeNull();
+    expect(prompts.length).toBe(2);
+    expect(prompts[1]).toContain('could not be used');
+    expect(prompts[0]).not.toContain('The piece as it stands');
+    await expect(draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), ask })).rejects.toThrow(/artifact_spec_exists/);
+    await expect(draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'other.md'), ask: async () => 'no json at all' })).rejects.toThrow(/artifact_draft_invalid/);
+  });
+
+  it('drafts by rules with no model, and a later check says when the brief has changed', async () => {
+    const { dir, edit } = plan();
+    const result = await draftSpec({ brief: join(dir, 'brief.md'), artifact: join(dir, 'send-plan.md'), out: join(dir, 'rules.check.yaml') });
+    expect([result.draftedBy, result.promises, result.checks]).toEqual(['rules', 6, ['claims', 'links']]);
+    const before = await runArtifactCheck(result.spec, { now: NOW, write: false });
+    expect(before.brief?.changed).toBe(false);
+    edit('brief.md', (text) => `${text}- Mention the price.\n`);
+    const after = await runArtifactCheck(result.spec, { now: NOW, write: false });
+    expect(after.brief?.changed).toBe(true);
+    expect(after.reasons.join(' ')).toContain('the brief (brief.md) has changed');
   });
 });

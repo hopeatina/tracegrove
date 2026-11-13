@@ -83,6 +83,8 @@ export const ArtifactSpec = z.object({
   title: z.string().min(1).max(200).optional(),
   artifact: Ref,
   kind: z.string().min(1).max(120).optional().describe('A label such as sales.send_plan. It never selects checks.'),
+  brief: z.object({ ref: Ref, sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict().optional().describe('The brief this spec was drafted from, and the hash of the bytes read. A check run reports when the brief has changed since.'),
+  draftedBy: z.string().min(1).max(120).optional().describe('Who or what drafted the spec: a model name, or rules.'),
   afterlife: z.enum(['once', 'living', 'hypothesis']).default('once').describe('once: never rechecked after release. living: recheck when a source changes. hypothesis: one more run on reviewDate.'),
   reviewDate: Day.optional(),
   promises: z.array(Promise_).max(20).default([]).describe('What this piece must do, in plain words, drafted from its brief. Graded by a judge with cited lines.'),

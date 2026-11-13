@@ -35,6 +35,8 @@ export type Receipt = {
   spec: { id: string; path: string; sha256: string; title: string | null; kind: string | null };
   /** A pointer and the hash of the bytes read. The artifact itself is never copied. */
   artifact: { ref: string; sha256: string; bytes: number };
+  /** The brief the spec was drafted from. `changed` is true when its bytes differ now, null when it could not be read. */
+  brief: { ref: string; sha256: string; changed: boolean | null } | null;
   afterlife: 'once' | 'living' | 'hypothesis'; reviewDate: string | null;
   verdict: Verdict; exitCode: number; reasons: string[];
   counts: Record<Finding['status'], number>;
@@ -290,6 +292,12 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
     else if (reasons.length) reasons.push('accepted with --allow-unproven');
   }
   for (const e of exclusions) if (e.state === 'expired') reasons.push(`the exclusion on ${e.check}${e.match ? ` ("${e.match}")` : ''} expired on ${e.expires}, so that check counts again`);
+  let brief: Receipt['brief'] = null;
+  if (spec.brief) {
+    const now_ = await base(spec.brief.ref);
+    brief = { ...spec.brief, changed: now_.ok ? now_.sha256 !== spec.brief.sha256 : null };
+    if (brief.changed) reasons.push(`the brief (${spec.brief.ref}) has changed since this spec was drafted from it: the spec may no longer say what ready means`);
+  }
   if (spec.afterlife === 'hypothesis' && spec.reviewDate && spec.reviewDate <= day) reasons.push(`the review date ${spec.reviewDate} has arrived: check what this piece predicted against what happened`);
 
   const order = { block: 0, warn: 1, note: 2 } as const;
@@ -303,7 +311,7 @@ export async function runArtifactCheck(specPath: string, options: RunOptions = {
     schemaVersion: RECEIPT_VERSION, at: now.toISOString(),
     spec: { id: spec.id, path: relative(stateRoot, path).replace(/\\/g, '/'), sha256: specHash, title: spec.title ?? null, kind: spec.kind ?? null },
     artifact: { ref: spec.artifact, sha256: got.sha256, bytes: got.bytes },
-    afterlife: spec.afterlife, reviewDate: spec.reviewDate ?? null,
+    brief, afterlife: spec.afterlife, reviewDate: spec.reviewDate ?? null,
     verdict, exitCode: EXIT[verdict], reasons, counts, findings, proofs, promises,
     judge: { asked: options.ask !== undefined && spec.promises.length > 0, ...authority },
     exclusions, sources: (await sources.record()).filter((s) => s.ref !== DEAD_LINK), fixList,
