@@ -276,7 +276,7 @@ export async function readPiece(spec: ArtifactSpec, specPath: string, fetcher: F
     return { ...head, media, text: words.text, words: { from: 'transcript', by: null, lines: words.text.split(/\r?\n/).length, shows: null }, files };
   }
   if (options.look && files.length) {
-    const reading = await readWords({ sha256: got.sha256, files, look: options.look, by: options.look.label ?? options.lookBy ?? 'model', whole, cacheDir: join(options.write === false ? join(tmpdir(), 'tracegrove-readings') : join(stateRoot, '.tracegrove', 'artifact-cache')) });
+    const reading = await readWords({ sha256: got.sha256, files, look: options.look, by: options.look.label ?? options.lookBy ?? 'model', whole, cacheDir: options.write === false ? null : join(stateRoot, '.tracegrove', 'artifact-cache') });
     return { ...head, media, text: reading.lines.join('\n'), words: { from: 'reading', by: reading.by, lines: reading.lines.length, shows: reading.shows || null }, files };
   }
   if (media.format === 'svg') {
