@@ -75,7 +75,8 @@
             "seal",
             "unseal",
             "keygen",
-            "sign"
+            "sign",
+            "artifact"
           ],
           "type": "string"
         },

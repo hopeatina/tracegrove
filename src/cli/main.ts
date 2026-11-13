@@ -35,6 +35,7 @@ import { jsonRequested, parseArgs, type Args } from './arguments.ts';
 import { cliErrorReport } from './errors.ts';
 import { inspectRecoveryStatus } from '../core/recoveryStatus.ts';
 import { Blocked, Conflict, InfrastructureFailure } from '../core/errors.ts';
+import { findSpecs, recordDecision, renderReceipt, runArtifactCheck, type Receipt } from '../artifacts/index.ts';
 import { SchemaViolation, CaseFixturePlan, CaseSpec, SeedRecipe, LogicalPayload, ExecutionReceipt, CampaignResult, HostPlan, RunRequest, parseAs, refKey, type Ref } from '../protocol/index.ts';
 import { inspectDoctor, doctorFailure } from './doctor.ts';
 import { writeSample } from './samples/write.ts';
@@ -73,7 +74,7 @@ import { decide, defaultReviewer, readiness } from '../authoring/readiness.ts';
 import { renderHandoff } from '../authoring/handoff.ts';
 import { renderCard } from '../authoring/card.ts';
 import { importCall } from '../authoring/importCall.ts';
-import { judge, readJudgment } from '../authoring/judge.ts';
+import { agentAsk, judge, readJudgment } from '../authoring/judge.ts';
 import { renderReadiness } from './renderReadiness.ts';
 import { sealRun, unsealRun } from '../core/seal.ts';
 
@@ -176,6 +177,13 @@ Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
   clip [--log <file>] [--out <dir>] [--no-video]      the last grow as a 9:16 clip to post: grove.mp4, grove.html, grove.svg, grove.png;
                                                        leaves are green only where a real flow passed
 
+Work that is not code (plans, briefs, launch copy, audits; see docs/artifact-checks.md):
+  artifact check [<spec.check.yaml>...] [--judge]      check a piece against its own spec: claims quoted from their sources, numbers
+       [--agent claude|codex] [--allow-unproven]       recomputed, links, audience, forbidden wording; every check must first fail on a
+       [--no-prove] [--rerun] [--dir <dir>] [--json]   planted defect; --judge asks a model about the spec's promises (advice until
+                                                       sign-offs earn it more); exits 0 ready, 1 fix, 2 blocked, 3 unproven
+  artifact accept|reject <spec> [--reason <text>]      sign off the latest run; rejections need a reason
+       [--by <name>]
 
 Agent-friendly commands (every one takes --json and never starts the app):
   discover [--dir <dir>] [--branch <branch>] [--save]  routes from code, the catalog and served traffic vs. flows and actions;
@@ -928,6 +936,25 @@ async function main(argv: string[]): Promise<number> {
       if (args.flags.out) { mkdirSync(dirname(resolve(args.flags.out)), { recursive: true }); writeFileSync(resolve(args.flags.out), card.markdown); }
       out(args, card, card.markdown.trimEnd());
       return 0;
+    }
+    case 'artifact': {
+      const [sub, ...rest] = args.flags._;
+      if (sub === 'accept' || sub === 'reject') {
+        if (rest.length !== 1) throw new Blocked([{ code: 'missing_argument', owner: 'agent', detail: `artifact ${sub} takes one spec`, action: `tracegrove artifact ${sub} <spec.check.yaml>` }]);
+        const row = recordDecision(rest[0]!, sub, { reason: args.flags.reason ?? null, by: args.flags.by ?? null });
+        out(args, row, `${sub === 'accept' ? 'accepted' : 'rejected'} ${row.spec} (run ${row.receiptHash.slice(0, 8)})${row.agreed === null ? '' : row.agreed ? '; the judge agreed' : '; the judge disagreed'}`);
+        return 0;
+      }
+      if (sub !== 'check') throw new Blocked([{ code: 'invalid_argument', owner: 'agent', detail: `artifact ${sub ?? ''}: use check, accept or reject`, action: 'tracegrove artifact check <spec.check.yaml>' }]);
+      const dir = resolve(flag(args, 'dir') ?? '.');
+      const specs = rest.length ? rest.flatMap((path) => findSpecs(resolve(path)).length ? findSpecs(resolve(path)) : [resolve(path)]) : findSpecs(join(dir, 'tracegrove', 'artifacts'));
+      if (!specs.length) throw new Blocked([{ code: 'artifact_spec_missing', owner: 'agent', detail: `no *.check.yaml under ${join(dir, 'tracegrove', 'artifacts')}`, action: 'pass a spec: tracegrove artifact check <spec.check.yaml>' }]);
+      const ask = args.flags.judge === true ? agentAsk(resolveAgentSettings(projectRoot(dir) ?? dir, null, { provider: args.flags.agent ?? null })) : undefined;
+      const receipts: Receipt[] = [];
+      for (const spec of specs) receipts.push(await runArtifactCheck(spec, { ...(ask ? { ask } : {}), prove: args.flags['no-prove'] !== true, allowUnproven: args.flags['allow-unproven'] === true, rerun: args.flags.rerun === true }));
+      out(args, receipts.length === 1 ? receipts[0] : { receipts }, receipts.map(renderReceipt).join('\n\n'));
+      // The worst verdict wins: fix, then blocked, then unproven.
+      return [1, 2, 3].find((code) => receipts.some((r) => r.exitCode === code)) ?? 0;
     }
     case 'judge': {
       if (args.flags.show) {

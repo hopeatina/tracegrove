@@ -418,6 +418,7 @@ Every command also takes `--json`, with stable exit codes: `0` passed, `1` a che
 | [Signed evidence](docs/signed-evidence.md) | Sign runs with a committed key; GitHub attestations for handoff reports |
 | [Stand-ins](docs/stand-ins.md) | Replace calendars, CRMs and webhooks; read back what was sent; inject failures |
 | [Readiness and handoff](docs/readiness-and-handoff.md) | Claims, sign-off, client reports |
+| [Checking work that is not code](docs/artifact-checks.md) | Plans, briefs and launch copy checked against their sources: `tracegrove artifact check` |
 | [Environments](docs/environments.md) | Docker, staging, production, secret stores |
 | [PR proof card](docs/pr-proof-card.md) | The GitHub Action and `tracegrove card` |
 | [Security](docs/security.md) | Credentials, redaction, sealed runs |
