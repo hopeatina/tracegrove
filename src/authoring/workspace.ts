@@ -1,3 +1,4 @@
+import { projectFaults, challengeFault } from './faultProof.ts';
 /**
  * The project-level operations shared by the CLI and `tracegrove ui`: discover routes against
  * the compiled flows, check authoring files without launching the application, and draft flows with a
@@ -242,7 +243,16 @@ async function proveFile(configPath: string, root: string, file: string, signal?
   const failure = first?.failure ? `${first.failure.step}: ${first.failure.message}`.slice(0, 400) : first ? first.outcome : cases.length ? null : blocker?.detail ?? 'no case from this file ran';
   const flow = { ...base, caseIds: cases.map((c) => c.caseId), served, run: basename(report.runDir), caseOutcome, failure, verified: report.bundleVerified };
   if (report.bundleVerified !== true) return { flow: { ...flow, outcome: 'failed', detail: 'the run evidence did not verify' }, failures: [] };
-  if (cases.length > 0 && failed.length === 0) return { flow: { ...flow, outcome: 'proven', detail: null }, failures: [] };
+  if (cases.length > 0 && failed.length === 0) {
+    for (const fault of projectFaults(root).filter(f => flow.caseIds.includes(f.caseId))) {
+      const { proof } = await challengeFault(configPath, fault, report, signal);
+      if (!proof.caught) {
+        const detail = 'Named fault ' + fault.name + ' unproven: ' + proof.reason;
+        return { flow: { ...flow, outcome: 'failed', detail, failure: detail }, failures: [{ file, caseId: fault.caseId, step: fault.step, message: detail, observed: null }] };
+      }
+    }
+    return { flow: { ...flow, outcome: 'proven', detail: null }, failures: [] };
+  }
   const failures = failed.map((c) => ({ file, caseId: c.caseId, step: c.failure?.step ?? '(setup)', message: c.failure?.message ?? c.outcome, observed: c.failure?.observed ?? null }));
   return { flow: { ...flow, outcome: 'failed', detail: failures[0]?.message.slice(0, 400) ?? blocker?.detail ?? 'no case ran' }, failures: failures.length ? failures : [{ file, caseId: '(run)', step: '(run)', message: blocker ? `${blocker.detail}; ${blocker.action}` : 'no case from this file ran', observed: null }] };
 }

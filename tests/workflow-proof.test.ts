@@ -10,7 +10,8 @@ import { runImpact } from '../src/authoring/impact.ts';
 import { runTests } from '../src/authoring/run.ts';
 import { recordFlow } from '../src/cli/record.ts';
 import { renderCard } from '../src/authoring/card.ts';
-import { faultPage } from '../src/authoring/faultPage.ts';
+import { startUi } from '../src/authoring/ui.ts';
+import { grow } from '../src/authoring/grow.ts';
 
 const roots: string[] = [];
 function sample(name: string) {
@@ -29,7 +30,18 @@ describe('paired evidence', () => {
     const { proof, report: broken } = await challengeFault(config, fault, report);
     expect(proof).toMatchObject({ caught: true, healthy: 200, broken: 404 });
     expect(renderCard({ dirs: [root] }).markdown).toContain('200 | 404 | Caught');
-    expect(faultPage(root, basename(report.runDir), fault.name)).toContain('Call transcript');
+    const ui = await startUi({ dir: root });
+    try {
+      const url = new URL('/fault-proof', ui.url);
+      url.searchParams.set('run', basename(report.runDir));
+      url.searchParams.set('fault', fault.name);
+      const response = await fetch(url);
+      expect(response.status).toBe(200);
+      const page = await response.text();
+      expect(page).toContain('Call transcript');
+      expect(page).toContain('Healthy control');
+      expect(page).toContain('Fault enabled');
+    } finally { await ui.close(); }
     for (const change of [{ caseId: 'other' }, { step: 'other' }, { check: 'other' }, { got: 500 }, { expected: 201 }])
       expect(inspectFault(root, basename(report.runDir), { ...fault, ...change }).caught).toBe(false);
     writeFileSync(join(broken.runDir, 'bundle/manifest.json'), '{}');
@@ -81,4 +93,21 @@ it('shadows a selected flow against the full suite and widens on an unknown chan
   mkdirSync(join(root,'shared')); writeFileSync(join(root,'shared/change.txt'),'changed');git('add','.');git('commit','-qm','unknown');
   const widened = await runImpact(config,base,basename(report.runDir),true);
   expect(widened.plan.full).toBe(true);
+}, 45000);
+
+it('Grow leaves a passing flow unproven when its declared fault survives', async () => {
+  const { root } = sample('notes-api');
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.name', 'Tracegrove'); git('config', 'user.email', 'test@example.test');
+  git('add', '.'); git('commit', '-qm', 'Notes sample'); git('switch', '-qc', 'counter');
+  const app = join(root, 'app/app.mjs');
+  writeFileSync(app, readFileSync(app, 'utf8').replace('  const match = url.pathname.match(',
+    "  if (req.method === 'GET' && url.pathname === '/count') return send(res, 200, { count: 0 });\n  const match = url.pathname.match("));
+  writeFileSync(join(root, 'tracegrove/notes/count.flow.yaml'), 'title: Count starts empty\nsteps:\n  - name: count\n    GET: /count\n    expect: { status: 200, json: { count: 0 } }\n');
+  writeFileSync(join(root, 'tracegrove.faults.json'), JSON.stringify([{ name: 'wrong_count', caseId: 'notes.count', step: 'count',
+    check: 'body.count', expected: 0, got: 1, env: { NOTES_BUG: 'wrong_count' } }]));
+  git('add', '.'); git('commit', '-qm', 'Count notes\n\n## Acceptance criteria\n- [ ] GET /count starts at zero');
+  const { state } = await grow({ dir: root, branch: 'counter', base: 'main', mode: 'min', prove: true, gh: false, agent: { off: true } });
+  expect(Object.values(state.run).some(r => r.st === 'not_run' && r.why?.includes('wrong_count unproven'))).toBe(true);
 }, 45000);

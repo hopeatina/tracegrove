@@ -62,7 +62,17 @@ export type CompileResult = {
   /** Deployed or containerized target: origin (url only) and the release the plan pins, if any. */
   target: { origin: string | null; expectedRelease: string | null } | null;
 };
-export type CompileOptions = { caseIds?: string[]; storage?: string; draftFlow?: { file: string; flow: Flow }; fault?: { storage: string; env: Record<string, string> }; grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined; env?: string | undefined };
+export type CompileOptions = {
+  grep?: string | undefined;
+  tags?: string[] | undefined;
+  sourceSnapshot?: string | undefined;
+  sourceRepositoryRole?: string | undefined;
+  env?: string | undefined;
+  caseIds?: string[];
+  storage?: string;
+  draftFlow?: { file: string; flow: Flow };
+  fault?: { storage: string; env: Record<string, string> };
+};
 
 type Json = unknown;
 

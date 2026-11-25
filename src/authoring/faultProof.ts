@@ -65,7 +65,7 @@ export function inspectFault(root: string, controlName: string, fault: Fault) {
       throw new Error('Source or case changed between runs');
     if (a.env[key] === setting || !equal({ ...a.env, ...fault.env }, b.env)) throw new Error('Fault switch does not distinguish the two launches');
     if (a.report.outcome !== 'passed' || a.check?.held !== true) throw new Error('Healthy control did not pass the named assertion');
-    if (b.report.outcome !== 'assertion_failed' || b.c.outcome !== 'assertion_failed' || b.check?.held !== false ||
+    if (b.report.outcome !== 'assertion_failed' || b.c.outcome !== 'assertion_failed' || b.c.failure?.step !== b.step?.name || b.check?.held !== false ||
       b.step?.compared?.check !== fault.check || !equal(b.check.got, fault.got)) throw new Error('The fault did not fail the expected assertion with the specified observation');
     result.caught = true;
   } catch (e) { result.reason = e instanceof Error ? e.message : 'Evidence unavailable'; }

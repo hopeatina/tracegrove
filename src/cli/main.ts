@@ -342,6 +342,8 @@ async function main(argv: string[]): Promise<number> {
     }
     case 'test': {
       const configPath = findConfig(flag(args, 'config') ?? '.');
+      const env = envFor(args, dirname(configPath));
+      if (args.flags['prove-faults'] && env && env !== 'local') throw new Blocked([{ code: 'fault_requires_local_launch', detail: 'Use the local environment' }]);
       const controller = new AbortController();
       const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
       process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
@@ -349,7 +351,7 @@ async function main(argv: string[]): Promise<number> {
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
         live.update('Compiling flows and starting the app');
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env: envFor(args, dirname(configPath)), agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env, agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
           onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
             if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
             else live.update(runActivity(event).label);
@@ -369,13 +371,14 @@ async function main(argv: string[]): Promise<number> {
           return healed.exitCode;
         }
         if (args.flags['prove-faults'] && report.outcome === 'passed') {
-          if (compiled.environment.name !== 'local') throw new Blocked([{ code: 'fault_requires_local_launch', detail: 'Use the local environment' }]);
           const proofs = [];
           for (const fault of projectFaults(compiled.root).filter(f => report.cases.some(c => c.caseId === f.caseId))) {
             proofs.push((await challengeFault(configPath, fault, report, controller.signal)).proof);
           }
-          out(args, { ...report, proofs }, renderTree(report, compiled.root, p) + '\n' + proofTable(proofs));
-          return proofs.some(p => !p.caught) ? 2 : report.exitCode;
+          const exitCode = proofs.some(p => !p.caught) ? 2 : report.exitCode;
+          out(args, { schemaVersion: 'tracegrove.fault-run/v1', control: report, proofs, exitCode },
+            renderTree(report, compiled.root, p) + '\n' + proofTable(proofs));
+          return exitCode;
         }
         out(args, report, renderTree(report, compiled.root, p));
         return report.exitCode;

@@ -36,6 +36,14 @@ export function impactPlan(compiled: CompileResult, base: string, baseline: stri
       if (!routes.length || reached.some(u => !u.root && u.kind !== 'route') || file.isNew || file.added.length < file.adds ||
         file.added.some(a => a.text.trim() && !routes.some(u => u.added.some(line => line.line === a.line))))
         return full('Unmapped dependency in ' + file.path);
+      for (const boundary of reached.filter(u => u.root)) {
+        const touched = report.cases.filter(c => c.services?.some(s => s.name.toLowerCase() === boundary.label.toLowerCase() && s.calls === 'recorded'));
+        if (!touched.length) return full('Unmapped service dependency: ' + boundary.label);
+        for (const c of touched) {
+          selected.add(c.caseId);
+          reasons.push(boundary.label + ' recorded in ' + c.caseId);
+        }
+      }
       for (const route of routes) {
         const touches = report.cases.filter(c => c.requests?.some(r => r.method === route.method && matchesTemplate(route.path!, r.path)));
         if (!touches.length || report.cases.some(c => !c.requests?.length || c.requests.length >= MAX_OBSERVED_PER_CASE))

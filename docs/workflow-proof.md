@@ -33,7 +33,7 @@ Place `tracegrove.faults.json` beside the project config. The test app implement
 }]
 ```
 
-Run `tracegrove test --prove-faults`. Grow challenges existing flows with matching declarations, and agent-assisted heal repeats the challenge before accepting a repaired flow. A successful challenge needs matching source and case digests, the declared launch environment change, a passing healthy check and the exact failed comparison. Fault executions have their own state directory. The ordinary suite history retains the healthy result. The PR card rechecks both bundles when reading an attempted challenge. A plain test run still reports its ordinary assertions.
+Run `tracegrove test --prove-faults`. Grow challenges existing and newly drafted flows with matching declarations, and agent-assisted heal repeats the challenge before accepting a repaired flow. A successful challenge needs matching source and case digests, the declared launch environment change, a passing healthy check and the exact failed comparison. Fault executions have their own state directory. The ordinary suite history retains the healthy result. The PR card rechecks both bundles when reading an attempted challenge. A plain test run still reports its ordinary assertions.
 
 Run `tracegrove try voice-receptionist --bug drop_booking` for the side-by-side demo. The healthy booking returns 200 on the appointment read. The faulty receptionist still confirms the booking, then the read returns 404. The billing demo uses `--bug double_charge` with `saas-billing`. It checks whether the second processor request reused the idempotency key.
 
