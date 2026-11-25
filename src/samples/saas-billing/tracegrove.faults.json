@@ -1,0 +1,35 @@
+[
+  {
+    "name": "double_charge",
+    "env": {
+      "BILLING_BUG": "double_charge"
+    },
+    "caseId": "billing.processor-hiccup",
+    "step": "the_retry_reused_the_idempotency_key",
+    "check": "body.calls[1].repeat",
+    "expected": true,
+    "got": false
+  },
+  {
+    "name": "replay_webhooks",
+    "env": {
+      "BILLING_BUG": "replay_webhooks"
+    },
+    "caseId": "billing.webhook-replay",
+    "step": "credits_went_up_by_500_exactly_once",
+    "check": "body.account.credits",
+    "expected": 500,
+    "got": 1000
+  },
+  {
+    "name": "trust_client_price",
+    "env": {
+      "BILLING_BUG": "trust_client_price"
+    },
+    "caseId": "billing.upgrade-charges-once",
+    "step": "the_card_was_charged_the_team_price_once",
+    "check": "body.calls[0].json.amount",
+    "expected": 4900,
+    "got": 1
+  }
+]

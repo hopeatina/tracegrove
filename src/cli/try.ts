@@ -4,11 +4,12 @@
  * default (folder, ports) is chosen and printed; `--json` returns the same facts for agents and CI.
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { parseDocument } from 'yaml';
 import { Blocked } from '../core/errors.ts';
+import { challengeFault, projectFaults, proofTable, type FaultProof } from '../authoring/faultProof.ts';
 import { runTests } from '../authoring/run.ts';
 import { runActivity } from '../authoring/activity.ts';
 import { startUi } from '../authoring/ui.ts';
@@ -82,7 +83,8 @@ export async function tryExample(input: TryInput): Promise<number> {
   const folder = input.out ? resolve(input.out) : freshFolder(bug ? `${example.name}-${bug.name}` : example.name);
   writeSample(input.samplesRoot, example.name, folder);
   const configPath = join(folder, 'tracegrove.config.yaml');
-  if (bug) applyBug(configPath, bug);
+  const fault = bug ? projectFaults(folder).find(f => f.name === bug.name) : undefined;
+  if (bug && !fault) throw new Error('Missing fault contract for ' + bug.name);
   const shown = relative(process.cwd(), folder) || folder;
   if (!input.json) process.stdout.write(`${p.moss('✓')} wrote ${p.bold(example.title)} to ${shown}${bug ? `  ${p.amber(`bug on: ${bug.what}`)}` : ''}\n`);
 
@@ -91,21 +93,36 @@ export async function tryExample(input: TryInput): Promise<number> {
   const onSignal = () => controller.abort(new Error('user_cancelled'));
   process.on('SIGINT', onSignal);
   let report;
+  let proof: FaultProof | null = null;
+  let controlName: string | null = null;
+  let replayConfig = configPath;
   try {
     live.update('Starting the app and running every scenario');
     ({ report } = await runTests({ configPath, signal: controller.signal, onEvent: (event) => live.update(runActivity(event).label) }));
+    if (fault && bug) {
+      controlName = basename(report.runDir);
+      live.update('Running the named fault and comparing sealed observations');
+      const result = await challengeFault(configPath, fault, report, controller.signal);
+      proof = result.proof;
+      report = result.report;
+      replayConfig = join(folder, 'tracegrove.fault.yaml');
+      writeFileSync(replayConfig, readFileSync(configPath), { flag: 'wx' });
+      applyBug(replayConfig, bug);
+    }
   } finally { live.done(); process.off('SIGINT', onSignal); }
 
-  const caught = bug ? report.cases.find((c) => c.failure && c.failure.step === bug.caughtBy) ?? report.cases.find((c) => c.failure) ?? null : null;
-  const facts = { schemaVersion: 'tracegrove.try/v1', example: example.name, bug: bug?.name ?? null, folder, configPath,
+  const witness = proof?.caught ? report.cases.find(c => c.caseId === proof.caseId)?.steps.find(s => s.id === proof.step) : null;
+  const caught = witness && proof ? { caseId: proof.caseId, step: witness.name, message: witness.checked?.find(c => c.check === proof.check && c.held === false)?.says ?? 'Expected assertion failed' } : null;
+  const facts = { schemaVersion: 'tracegrove.try/v1', example: example.name, bug: bug?.name ?? null, folder, configPath: replayConfig, proof,
     outcome: report.outcome, exitCode: report.exitCode, bundleVerified: report.bundleVerified, runDir: report.runDir, totals: report.totals,
-    caught: caught ? { caseId: caught.caseId, step: caught.failure!.step, message: caught.failure!.message } : null,
-    next: { ui: `tracegrove ui --dir ${shown}`, rerun: `tracegrove test --config ${relative(process.cwd(), configPath) || configPath}` } };
+    caught,
+    next: { ui: `tracegrove ui --dir ${shown}`, rerun: `tracegrove test --config ${relative(process.cwd(), replayConfig) || replayConfig}` } };
 
   const lines = [renderTree(report, folder, p, { next: false }), ''];
   if (bug) {
-    lines.push(caught ? `${p.moss('✓ caught')} ${bug.what}: ${p.bold(caught.failure!.step)} failed with ${p.red(caught.failure!.message.split('\n')[0]!)}`
-      : `${p.amber('!')} the ${bug.name} bug was switched on but no scenario failed; please report this as a tracegrove bug`);
+    lines.push(caught ? `${p.moss('✓ caught')} ${bug.what}: ${p.bold(caught.step)} failed with ${p.red(caught.message.split('\n')[0]!)}`
+      : `${p.amber('!')} ${proof?.reason ?? 'Named fault was not established'}`);
+    if (proof) lines.push('', proofTable([proof]));
   } else if (report.outcome === 'passed') {
     const first = example.bugs[0];
     if (first) lines.push(`${p.bold('Now break it:')}  ${p.moss(`tracegrove try ${example.name} --bug ${first.name}`)}  ${p.dim(first.what)}`);
@@ -119,7 +136,7 @@ export async function tryExample(input: TryInput): Promise<number> {
   if (!input.open || !interactive) return exitCode;
   const server = await startUi({ dir: folder, example: example.name, branch: null, ...(input.port ? { port: Number(input.port) } : {}) });
   process.stdout.write(`\n${p.bold('Look around:')} ${server.url}  ${p.dim('(Ctrl+C to stop)')}\n`);
-  openBrowser(server.url);
+  openBrowser(proof && controlName ? new URL('/fault-proof?run=' + encodeURIComponent(controlName) + '&fault=' + encodeURIComponent(proof.name), server.url).href : server.url);
   await new Promise<void>((done) => {
     const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); void server.close().finally(done); };
     process.on('SIGINT', stop); process.on('SIGTERM', stop);

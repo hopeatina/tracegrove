@@ -1,3 +1,4 @@
+import { projectFaults, challengeFault } from './faultProof.ts';
 /**
  * `tracegrove heal`: look at what went wrong, fix what is safe to fix, prove each fix by
  * re-running, and keep only fixes that verify. Setup mistakes (wrong health path, missing
@@ -353,7 +354,8 @@ async function healWithAgent(ctx: Ctx, input: { failing: CaseReport[]; issues: C
   const testDir = resolve(ctx.root, input.config?.testDir ?? 'tracegrove');
   const allowed = new Set([...input.failing.map((c) => join(ctx.root, c.file)), ...input.issues.map((i) => i.detail.match(/^(\S+\.(?:flow|fixture)\.yaml)/)?.[1]).filter((f): f is string => !!f).map((f) => join(ctx.root, f))]);
   const appRoot = resolve(ctx.root, input.config?.app.root ?? '.');
-  const watched = [...new Set([ctx.configPath, ...walkFiles(testDir, (n) => n.endsWith('.yaml')), ...walkFiles(appRoot, (n) => /\.(?:m?js|cjs|ts|tsx|py|json|ya?ml|html|css)$/.test(n))])];
+  const declaredFaults = projectFaults(ctx.root);
+  const watched = [...new Set([ctx.configPath, ...(declaredFaults.length ? [join(ctx.root, 'tracegrove.faults.json')] : []), ...walkFiles(testDir, (n) => n.endsWith('.yaml')), ...walkFiles(appRoot, (n) => /\.(?:m?js|cjs|ts|tsx|py|json|ya?ml|html|css)$/.test(n))])];
   const before = snapshot(watched);
   const existed = new Set(walkFiles(ctx.root, () => true));
   ctx.progress('Asking the agent', `${settings.provider}${settings.model ? ` · ${settings.model}` : ''}: ${input.failing.length} failing case(s), ${input.issues.length} authoring issue(s)`);
@@ -426,13 +428,20 @@ async function healWithAgent(ctx: Ctx, input: { failing: CaseReport[]; issues: C
       const caseId = input.failing.find((c) => join(ctx.root, c.file) === file)?.caseId;
       const passes = check.ok && (caseId ? report?.cases.find((c) => c.caseId === caseId)?.outcome === 'passed' : true);
       const finding = input.findings.find((f) => (caseId ? f.caseId === caseId : f.file === rel));
-      if (passes) {
+      let faultIssue = '';
+      if (passes && report && caseId) {
+        for (const fault of declaredFaults.filter(f => f.caseId === caseId)) {
+          const { proof } = await challengeFault(ctx.configPath, fault, report, ctx.signal);
+          if (!proof.caught) { faultIssue = fault.name + ': ' + proof.reason; break; }
+        }
+      }
+      if (passes && !faultIssue) {
         ctx.changes.push({ file: rel, reason: (caseId && verdictFor.get(caseId)?.reason) || 'repaired authoring issue', diff: lineDiff(original, edited, rel), status: 'kept', by: 'agent', note: caseId ? 'verified: the case now passes' : 'verified: check is clean' });
         if (finding) { finding.status = 'fixed'; if (finding.kind === 'assertion') finding.kind = 'test_drift'; }
       } else {
         writeFileSync(file, original);
         ctx.backups.delete(file);
-        ctx.changes.push({ file: rel, reason: (caseId && verdictFor.get(caseId)?.reason) || 'agent repair', diff: lineDiff(original, edited, rel), status: 'reverted', by: 'agent', note: check.ok ? 'the case still fails with this edit' : 'the edit does not compile' });
+        ctx.changes.push({ file: rel, reason: (caseId && verdictFor.get(caseId)?.reason) || 'agent repair', diff: lineDiff(original, edited, rel), status: 'reverted', by: 'agent', note: faultIssue || (check.ok ? 'the case still fails with this edit' : 'the edit does not compile') });
       }
     }
   }

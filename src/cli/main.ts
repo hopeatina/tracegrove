@@ -7,6 +7,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
+import { projectFaults, challengeFault, proofTable } from '../authoring/faultProof.ts';
+import { runImpact } from '../authoring/impact.ts';
 import { tryExample } from './try.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
@@ -163,6 +165,10 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
   keygen [--name <you>]                                Ed25519 signing key: private in .tracegrove/keys, public in tracegrove/signers/ (commit it)
   sign [--run latest|<dir>] [--key <pem>]              sign a verified run's bundle (TRACEGROVE_SIGNING_KEY signs every test run in CI)
+
+  record --url <local-url> --name <slug> --title <promise> [--headed]  record browser steps and prove a selected independent readback
+  impact --base <git-ref> --baseline <saved-run>        select affected cases and shadow the full suite; --selected-only opts out of shadow
+  test --prove-faults                                  compare declared local faults with verified healthy controls
 
 Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
   grow [--branch <b>] [--base <b>] [--spec <file>]     read the change and its spec (PR, linked issue, commits or --spec), grow its tree,
@@ -323,8 +329,21 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case 'impact': {
+      const result = await runImpact(findConfig(args.flags.config ?? '.'), args.flags.base, args.flags.baseline, args.flags['selected-only'] === true);
+      out(args, result, [result.plan.reasons.join('\n'), 'Selected ' + result.plan.caseIds.length + ' cases in ' + result.selected.elapsedMs + ' ms',
+        ...(result.shadow ? ['Full suite ' + result.shadow.elapsedMs + ' ms; missed failures: ' + (result.missed.join(', ') || 'none')] : [])].join('\n'));
+      return result.exitCode;
+    }
+    case 'record': {
+      const { recordFlow } = await import('./record.ts');
+      await recordFlow({ config: findConfig(args.flags.config ?? '.'), url: args.flags.url, name: args.flags.name, title: args.flags.title, headed: args.flags.headed === true });
+      return 0;
+    }
     case 'test': {
       const configPath = findConfig(flag(args, 'config') ?? '.');
+      const env = envFor(args, dirname(configPath));
+      if (args.flags['prove-faults'] && env && env !== 'local') throw new Blocked([{ code: 'fault_requires_local_launch', detail: 'Use the local environment' }]);
       const controller = new AbortController();
       const onSignal = () => { process.stderr.write('stop requested; revoking action authority, cleanup continues\n'); controller.abort(new Error('user_cancelled')); };
       process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
@@ -332,7 +351,7 @@ async function main(argv: string[]): Promise<number> {
       try {
         const tags = flag(args, 'tag')?.split(',').map((t) => t.trim()).filter(Boolean);
         live.update('Compiling flows and starting the app');
-        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env: envFor(args, dirname(configPath)), agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
+        const { report, compiled } = await runTests({ configPath, grep: flag(args, 'grep') ?? undefined, tags, env, agent: detectAgent(process.env, flag(args, 'agent')), sourceSnapshot: flag(args, 'source-snapshot') ? resolve(flag(args, 'source-snapshot')!) : undefined, sourceRepositoryRole: flag(args, 'source-repository-role') ?? undefined, signal: controller.signal,
           onEvent: (event: { kind: string; stepId: string | null; redactedPayload: Record<string, unknown>; at: string }) => {
             if (args.flags.jsonl) process.stdout.write(`${JSON.stringify(event)}\n`);
             else live.update(runActivity(event).label);
@@ -350,6 +369,16 @@ async function main(argv: string[]): Promise<number> {
           live.done();
           out(args, { report, heal: healed }, renderHeal(healed, compiled.root, p));
           return healed.exitCode;
+        }
+        if (args.flags['prove-faults'] && report.outcome === 'passed') {
+          const proofs = [];
+          for (const fault of projectFaults(compiled.root).filter(f => report.cases.some(c => c.caseId === f.caseId))) {
+            proofs.push((await challengeFault(configPath, fault, report, controller.signal)).proof);
+          }
+          const exitCode = proofs.some(p => !p.caught) ? 2 : report.exitCode;
+          out(args, { schemaVersion: 'tracegrove.fault-run/v1', control: report, proofs, exitCode },
+            renderTree(report, compiled.root, p) + '\n' + proofTable(proofs));
+          return exitCode;
         }
         out(args, report, renderTree(report, compiled.root, p));
         return report.exitCode;

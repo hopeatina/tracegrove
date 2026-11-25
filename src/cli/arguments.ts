@@ -12,7 +12,9 @@ const ExecutionId = Text.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'execution ID mus
 export const COMMAND_SCHEMAS = {
   help: z.object({ help: Bool }).strict(),
   init: z.object({ ...common, dir: Text.optional(), force: Bool }).strict(),
-  test: z.object({ ...common, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, heal: Bool, 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional(), env: EnvName.optional(), agent: Text.optional() }).strict(),
+  record: z.object({ config: Text.optional(), url: Text, name: Text, title: Text, headed: Bool, help: Bool }).strict(),
+  impact: z.object({ ...common, config: Text.optional(), base: Text, baseline: Text, 'selected-only': Bool }).strict(),
+  test: z.object({ ...common, 'prove-faults': Bool, config: Text.optional(), grep: Text.optional(), tag: Text.optional(), jsonl: Bool, heal: Bool, 'source-snapshot': Text.optional(), 'source-repository-role': Text.optional(), env: EnvName.optional(), agent: Text.optional() }).strict(),
   env: z.object({ ...common, config: Text.optional(), _: Positionals(1, 2), url: Text.optional(), persona: z.array(Text).max(32).optional(), class: Text.optional(), writes: Text.optional(),
     agents: Text.optional(), health: Text.optional(), whoami: Text.optional(), 'dry-run': Bool, 'no-whoami': Bool, agent: Text.optional() }).strict(),
   whoami: z.object({ ...common, config: Text.optional(), env: EnvName.optional(), as: Text.optional() }).strict(),

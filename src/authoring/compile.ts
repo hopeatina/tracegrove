@@ -62,7 +62,17 @@ export type CompileResult = {
   /** Deployed or containerized target: origin (url only) and the release the plan pins, if any. */
   target: { origin: string | null; expectedRelease: string | null } | null;
 };
-export type CompileOptions = { grep?: string | undefined; tags?: string[] | undefined; sourceSnapshot?: string | undefined; sourceRepositoryRole?: string | undefined; env?: string | undefined };
+export type CompileOptions = {
+  grep?: string | undefined;
+  tags?: string[] | undefined;
+  sourceSnapshot?: string | undefined;
+  sourceRepositoryRole?: string | undefined;
+  env?: string | undefined;
+  caseIds?: string[];
+  storage?: string;
+  draftFlow?: { file: string; flow: Flow };
+  fault?: { storage: string; env: Record<string, string> };
+};
 
 type Json = unknown;
 
@@ -257,7 +267,8 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   if (!launched && snapshotSource) fail('snapshot_requires_launch', `environment ${environment.name} is not launched from source, so --source-snapshot does not apply`, 'drop --source-snapshot, or run against a launched environment');
   const testDir = resolve(root, config.testDir);
   const appRoot = resolve(snapshotSource?.root ?? root, config.app.root);
-  const compiledDir = join(root, STATE_DIR, 'compiled');
+  if (options.fault && (!launched || environment.class !== 'isolated_candidate')) fail('fault_requires_local_launch', 'Named faults need an isolated app launch', 'select the local environment');
+  const compiledDir = join(options.fault?.storage ?? options.storage ?? join(root, STATE_DIR), 'compiled');
   const personas = Object.keys(config.personas);
   const defaultPersona = personas[0]!;
 
@@ -272,6 +283,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   }
   for (const [name, file] of fixturePaths) fixtures.set(name, readAuthoring(Fixture, file, root));
   const flowFiles = [...findFiles(testDir, '.flow.yaml'), ...findFiles(testDir, '.flow.yml'), ...findFiles(testDir, '.flow.ts')].sort();
+  if (options.draftFlow) flowFiles.push(options.draftFlow.file);
   if (flowFiles.length === 0) fail('no_flows', `no *.flow.yaml under ${relative(root, testDir) || '.'}`, 'write a flow, or run tracegrove init for an example');
   const indexedFlows = flowFiles.map((file) => ({ file, caseId: caseIdFor(config.project, testDir, file) }));
   const seen = new Set<string>();
@@ -281,9 +293,9 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   }
   // Reusable actions expand into ordinary steps before anything else sees the flow.
   const library = loadActionLibrary(testDir, (file) => readAuthoring(Action, file, root));
-  const parsedFlows = indexedFlows.map(row => ({ ...row, flow: expandFlow(readAuthoring(Flow, row.file, root), library, relative(root, row.file)) }));
+  const parsedFlows = indexedFlows.map(row => ({ ...row, flow: expandFlow(row.file === options.draftFlow?.file ? options.draftFlow.flow : readAuthoring(Flow, row.file, root), library, relative(root, row.file)) }));
   const matched = parsedFlows.filter(({ caseId, flow, file }) =>
-    (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
+    (!options.caseIds || options.caseIds.includes(caseId)) && (!options.grep || caseId.includes(options.grep) || flow.title.toLowerCase().includes(options.grep.toLowerCase()) || relative(root, file).includes(options.grep))
     && (!options.tags?.length || options.tags.some((tag) => flow.tags.includes(tag))));
   const selected = matched.filter(({ flow }) => flowEnabledIn(flow, environment.name));
   if (matched.length > 0 && selected.length === 0) fail('no_flows_for_environment', `none of the ${matched.length} matching flow(s) lists ${environment.name} under envs:`, `add envs: [${environment.name}] to flows that may run there (flows default to [local])`);
@@ -377,7 +389,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     schemaVersion: 'workflow.host-plan/v1', ref: ref('host'), placement: 'local', adapter: 'local_process',
     launch: {
       componentId: APP_ID, command: launch.command, args: launch.args, cwd: relative(compiledDir, launchCwd).split(sep).join('/') || '.',
-      env: config.app.env, portEnv: config.app.inject.port, dataDirEnv: config.app.inject.dataDir, credentialsEnv: config.app.inject.tokens,
+      env: { ...config.app.env, ...options.fault?.env }, portEnv: config.app.inject.port, dataDirEnv: config.app.inject.dataDir, credentialsEnv: config.app.inject.tokens,
       readiness: { path: config.app.health, timeoutMs: config.app.readyTimeoutMs },
       identitySourceFiles: identity.entries.map((entry) => entry.path),
       issuedCredentials: personas.map((name) => ({ name: `${name}_token`, subject: config.personas[name]!.subject })),

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "any_record",
+    "env": {
+      "PORTAL_BUG": "any_record"
+    },
+    "caseId": "portal.own-results-only",
+    "step": "another_patient_s_record_is_not_found",
+    "check": "status",
+    "expected": 404,
+    "got": 200
+  },
+  {
+    "name": "phi_in_sms",
+    "env": {
+      "PORTAL_BUG": "phi_in_sms"
+    },
+    "caseId": "portal.message-alert-has-no-phi",
+    "step": "the_on_call_phone_got_one_generic_text",
+    "check": "body.calls[0].json.body",
+    "expected": "New patient message in the Riverbend portal. Log in to read it.",
+    "got": "New portal message from alice: My A1C came back at 5.4 and I am still dizzy after the new metformin dose."
+  },
+  {
+    "name": "skip_audit",
+    "env": {
+      "PORTAL_BUG": "skip_audit"
+    },
+    "caseId": "portal.staff-reads-are-audited",
+    "step": "the_audit_log_got_one_chart_read",
+    "check": "audit POST /events call count",
+    "expected": 1,
+    "got": 0
+  }
+]

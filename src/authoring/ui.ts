@@ -1,3 +1,4 @@
+import { faultPage } from './faultPage.ts';
 import { FAVICON_SVG } from './uiBrand.ts';
 import { z } from 'zod';
 /**
@@ -160,6 +161,8 @@ export async function startUi(options: { dir: string; branch?: string | null; po
     if (closing && req.method === 'POST') return send(409, { error: 'UI is closing; new work is not admitted.' });
     try {
       if (req.method === 'GET' && (url.pathname === '/favicon.svg' || url.pathname === '/favicon.ico')) return send(200, FAVICON_SVG, 'image/svg+xml');
+      if (req.method === 'GET' && url.pathname === '/fault-proof')
+        return send(200, faultPage(dir, url.searchParams.get('run') ?? '', url.searchParams.get('fault') ?? ''), 'text/html; charset=utf-8');
       if (req.method === 'GET' && url.pathname === '/') {
         const scriptJson = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c');
         return send(200, UI_HTML.replace('__TOKEN__', token).replace('__BRANCH__', scriptJson(options.branch ?? null)).replace('__DEFAULT_MODELS__', scriptJson(DEFAULT_MODELS)), 'text/html; charset=utf-8');

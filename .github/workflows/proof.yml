@@ -27,9 +27,23 @@ jobs:
       - name: Run the examples and tracegrove's own UI self-test
         run: |
           for example in voice-receptionist vet-receptionist support-chatbot saas-billing clinic-portal notes-api notes-mcp report-jobs; do
-            node dist/cli/main.js try "$example" --out "proof/$example" --no-open || true
+            case "$example" in
+              voice-receptionist) bug=(--bug drop_booking) ;;
+              saas-billing) bug=(--bug double_charge) ;;
+              *) bug=() ;;
+            esac
+            node dist/cli/main.js try "$example" "${bug[@]}" --out "proof/$example" --no-open
           done
           node dist/cli/main.js test --config dogfood || true
+      - name: Retain both sides of the booking and billing checks
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: paired-workflow-evidence
+          include-hidden-files: true
+          path: |
+            proof/*/.tracegrove/runs/*/bundle/
+            proof/*/.tracegrove/challenges/*/runs/*/bundle/
       - uses: ./
         with:
           run: 'false'
@@ -37,6 +51,7 @@ jobs:
           title: tracegrove on this PR
           directories: |
             proof/voice-receptionist
+            proof/saas-billing
             proof/support-chatbot
             proof/notes-api
             proof/notes-mcp
