@@ -1,0 +1,24 @@
+[
+  {
+    "name": "keep_on_delete",
+    "env": {
+      "NOTES_BUG": "keep_on_delete"
+    },
+    "caseId": "notes.create-read-delete",
+    "step": "gone",
+    "check": "status",
+    "expected": 404,
+    "got": 200
+  },
+  {
+    "name": "share_with_strangers",
+    "env": {
+      "NOTES_BUG": "share_with_strangers"
+    },
+    "caseId": "notes.create-read-delete",
+    "step": "intruder_is_denied",
+    "check": "status",
+    "expected": 403,
+    "got": 200
+  }
+]

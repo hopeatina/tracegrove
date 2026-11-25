@@ -1,3 +1,4 @@
+import { challengeFault, projectFaults } from './faultProof.ts';
 /**
  * `tracegrove grow`: live discovery of a change. It reads the branch and its spec, grows the change's
  * tree, traces every unit five ways (rules first, then a coding agent in parallel lanes when one is
@@ -829,6 +830,7 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
     const before = c.steps.slice(0, i).reverse().find(http);
     return before ? { hop: `${before.method} ${before.path}`, after: true } : {};
   };
+  const faults = projectFaults(dirname(config));
   const runFlow = async (caseId: string) => {
     const cached = results.get(caseId); if (cached) return cached;
     const flow = flows.find((f) => f.caseId === caseId);
@@ -843,6 +845,15 @@ async function prove(ctx: Ctx, config: string | null, agent: AgentSettings | nul
       result = { ok, checked, ms: c?.durationMs ?? Date.now() - t, run: basename(report.runDir), outcome: c?.outcome ?? report.outcome,
         why: ok ? '' : checked ? said : c?.outcome === 'passed' || (!c && report.bundleVerified === false) ? 'Not proven: the run evidence did not verify' : couldNotRun(said),
         ...(checked ? hopOf(c) : {}) };
+      if (ok) {
+        for (const fault of faults.filter(f => f.caseId === caseId)) {
+          const { proof } = await challengeFault(config, fault, report, ctx.signal);
+          if (!proof.caught) {
+            result = { ...result, ok: false, checked: false, why: 'Named fault ' + fault.name + ' unproven: ' + proof.reason };
+            break;
+          }
+        }
+      }
     } catch (error) {
       result = { ok: false, checked: false, ms: Date.now() - t, run: null, why: couldNotRun((error instanceof Blocked ? error.reasons.map((x) => x.detail).join('; ') : (error as Error).message).slice(0, 400)) };
     }

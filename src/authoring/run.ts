@@ -272,13 +272,14 @@ export type TestOptions = CompileOptions & {
 
 export async function runTests(options: TestOptions): Promise<{ report: TestRunReport; compiled: CompileResult }> {
   const startedAt = new Date();
-  const compiled = compileProject(options.configPath, { grep: options.grep, tags: options.tags, sourceSnapshot: options.sourceSnapshot, sourceRepositoryRole: options.sourceRepositoryRole, env: options.env });
+  const compiled = compileProject(options.configPath, options);
   const policy = enforceAgentPolicy(compiled.root, compiled.environment, options.agent ?? detectAgent(process.env));
   const project = loadProject(compiled.workflowConfigPath);
   const scope = localScope();
   const bundle: FrozenBundle = plan({ project, profileName: 'real', scope });
-  const runsDir = join(compiled.root, STATE_DIR, 'runs');
-  const stateDir = join(compiled.root, STATE_DIR, 'state');
+  const storage = options.fault?.storage ?? options.storage ?? join(compiled.root, STATE_DIR);
+  const runsDir = join(storage, 'runs');
+  const stateDir = join(storage, 'state');
   let summary: RunSummary | null = null;
   if (bundle.request) {
     let ledger: LocalLedger | null = null;

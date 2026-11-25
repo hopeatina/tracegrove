@@ -1,3 +1,4 @@
+import { hasFaultAttempt, inspectFault, projectFaults, proofTable } from './faultProof.ts';
 /**
  * The PR proof card: one Markdown comment that says whether every claim held on this commit, built from
  * the same readiness state as `tracegrove readiness`. It reads saved runs only and never starts an app,
@@ -25,6 +26,7 @@ export type Card = {
   /** Runs behind the claims, and how many carry a signature from a committed key (trusted), another key, or one that fails to verify. */
   signatures: { runs: number; trusted: number; untrusted: number; invalid: number; signers: string[] };
   projects: Array<{ project: string; dir: string; claims: number; supported: number; contradicted: number; awaitingSignOff: number }>;
+  faultProofs: ReturnType<typeof inspectFault>[];
   markdown: string;
 };
 
@@ -49,22 +51,28 @@ export function renderCard(input: CardInput): Card {
   const totals = { projects: states.length, claims: all.length, supported: all.filter(({ claim }) => claim.assessment === 'supported').length, contradicted: failures.length,
     rejected: disputes.filter((d) => d.decision === 'rejected').length, challenged: disputes.filter((d) => d.decision === 'challenged').length,
     notRun: all.filter(({ claim }) => claim.execution === 'not_run' || claim.assessment === 'inconclusive').length, awaitingSignOff: all.filter(({ claim }) => awaiting(claim)).length };
+  const paired = states.flatMap(state => projectFaults(state.root).flatMap(fault => {
+    const claim = state.claims.find(c => c.caseId === fault.caseId);
+    return claim?.run && claim.validity === 'current' && hasFaultAttempt(state.root, claim.run, fault) ? [inspectFault(state.root, claim.run, fault)] : [];
+  }));
   const signatures = states.map((s) => { const config = configInDirectory(s.root); return config ? summarizeSignatures(s.root, loadAuthoringConfig(config).testDir, s.claims.map((c) => c.run), (run) => resolveRun(s.root, run)) : null; })
     .filter((x): x is SignatureSummary => !!x);
   const signed = { runs: sum(signatures, 'runs'), trusted: sum(signatures, 'trusted'), untrusted: sum(signatures, 'untrusted'), invalid: sum(signatures, 'invalid'), signers: [...new Set(signatures.flatMap((s) => s.signers))] };
   // A person saying "this is wrong" outranks passing evidence: rejected fails the card, challenged leaves it incomplete.
   // Evidence whose signature doesn't verify was changed after signing, so the card fails.
-  const verdict: Card['verdict'] = totals.contradicted || totals.rejected || signed.invalid ? 'fails' : totals.claims === 0 || totals.notRun || totals.challenged || totals.supported < totals.claims ? 'incomplete' : 'holds';
+  const verdict: Card['verdict'] = totals.contradicted || totals.rejected || signed.invalid ? 'fails' : paired.some(p => !p.caught) || totals.claims === 0 || totals.notRun || totals.challenged || totals.supported < totals.claims ? 'incomplete' : 'holds';
   const commit = input.commit ? input.commit.slice(0, 12) : null;
   const on = commit ? ` on \`${commit}\`` : '';
   const failing = totals.contradicted + disputes.filter((d) => d.decision === 'rejected' && !failures.some((f) => f.project === d.project && f.caseId === d.caseId)).length;
   const headline = verdict === 'holds' ? `${totals.supported} of ${totals.claims} claims hold${on}`
     : verdict === 'fails' && !failing ? `signed evidence was changed after it was signed${on}`
     : verdict === 'fails' ? `${failing} of ${totals.claims} claims fail${on}`
+    : paired.some(p => !p.caught) ? 'A named fault check is inconclusive' + on
     : totals.challenged && !totals.notRun ? `${totals.supported} of ${totals.claims} claims have passing evidence${on}; ${totals.challenged} check${totals.challenged === 1 ? ' is' : 's are'} disputed`
     : `${totals.supported} of ${totals.claims} claims have passing evidence${on}; ${totals.claims - totals.supported - totals.contradicted} did not run to a verdict`;
 
   const lines = [CARD_MARKER, `### ${ICON[verdict]} ${input.title ?? 'tracegrove'}: ${headline}`, ''];
+  if (paired.length) lines.push(proofTable(paired), '');
   if (signed.invalid) lines.push(`**${signed.invalid} run${signed.invalid === 1 ? '' : 's'} carr${signed.invalid === 1 ? 'ies' : 'y'} a signature that does not verify**: the evidence changed after it was signed. \`tracegrove verify-bundle\` shows which.`, '');
   if (totals.awaitingSignOff) lines.push(`${totals.awaitingSignOff} critical claim${totals.awaitingSignOff === 1 ? ' passes and waits' : 's pass and wait'} for a person: \`tracegrove accept <claim>\`.`, '');
   for (const f of failures) lines.push(`- **${f.project} › ${f.title}** failed: ${cell(f.failure).slice(0, 300)}  \n  \`${f.file}\``);
@@ -91,5 +99,5 @@ export function renderCard(input: CardInput): Card {
   return { schemaVersion: 'tracegrove.card/v1', verdict, commit, totals, failures, disputes, signatures: signed,
     projects: states.map((s, i) => ({ project: s.project, dir: relative(process.cwd(), resolve(input.dirs[i]!)) || '.', claims: s.counts.claims, supported: s.counts.supported, contradicted: s.counts.contradicted,
       awaitingSignOff: s.claims.filter(awaiting).length })),
-    markdown: `${lines.join('\n')}\n` };
+    faultProofs: paired, markdown: `${lines.join('\n')}\n` };
 }

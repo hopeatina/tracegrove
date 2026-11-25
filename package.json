@@ -55,6 +55,7 @@
     "docs/local-execution-recovery.md",
     "docs/verified-bundles.md",
     "docs/browser-driver.md",
+    "docs/workflow-proof.md",
     "docs/native-jobs.md",
     "docs/mcp-driver.md",
     "docs/images/notes-run.png",

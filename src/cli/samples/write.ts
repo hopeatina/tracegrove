@@ -35,6 +35,7 @@ export function writeSample(samplesRoot: string, name: SampleName, output: strin
     return compileProject(join(output, 'tracegrove.config.yaml')).workflowConfigPath;
   }
   cpSync(join(samplesRoot, 'notes-api'), output, { recursive: true });
+  if (name !== 'notes-api') rmSync(join(output, 'tracegrove.faults.json'), { force: true });
   if (name === 'notes-mcp') {
     for (const owned of ['tracegrove', 'verification', 'app/app.mjs']) rmSync(join(output, owned), { recursive: true, force: true });
     cpSync(join(samplesRoot, name), output, { recursive: true });

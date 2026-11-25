@@ -7,6 +7,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { SampleName } from './samples/catalog.ts';
+import { projectFaults, challengeFault, proofTable } from '../authoring/faultProof.ts';
+import { runImpact } from '../authoring/impact.ts';
 import { tryExample } from './try.ts';
 import { loadProject, localScope } from '../core/corpus.ts';
 import { plan, type FrozenBundle } from '../core/planner.ts';
@@ -163,6 +165,10 @@ Readiness and handoff (four states per claim: ran, evidence, still valid, sign-o
   unseal <file> --out <dir>                            decrypt a sealed run; then verify-bundle it
   keygen [--name <you>]                                Ed25519 signing key: private in .tracegrove/keys, public in tracegrove/signers/ (commit it)
   sign [--run latest|<dir>] [--key <pem>]              sign a verified run's bundle (TRACEGROVE_SIGNING_KEY signs every test run in CI)
+
+  record --url <local-url> --name <slug> --title <promise> [--headed]  record browser steps and prove a selected independent readback
+  impact --base <git-ref> --baseline <saved-run>        select affected cases and shadow the full suite; --selected-only opts out of shadow
+  test --prove-faults                                  compare declared local faults with verified healthy controls
 
 Grow a change (live discovery of a branch: tree, depth, spec, scenarios, proof):
   grow [--branch <b>] [--base <b>] [--spec <file>]     read the change and its spec (PR, linked issue, commits or --spec), grow its tree,
@@ -323,6 +329,17 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case 'impact': {
+      const result = await runImpact(findConfig(args.flags.config ?? '.'), args.flags.base, args.flags.baseline, args.flags['selected-only'] === true);
+      out(args, result, [result.plan.reasons.join('\n'), 'Selected ' + result.plan.caseIds.length + ' cases in ' + result.selected.elapsedMs + ' ms',
+        ...(result.shadow ? ['Full suite ' + result.shadow.elapsedMs + ' ms; missed failures: ' + (result.missed.join(', ') || 'none')] : [])].join('\n'));
+      return result.exitCode;
+    }
+    case 'record': {
+      const { recordFlow } = await import('./record.ts');
+      await recordFlow({ config: findConfig(args.flags.config ?? '.'), url: args.flags.url, name: args.flags.name, title: args.flags.title, headed: args.flags.headed === true });
+      return 0;
+    }
     case 'test': {
       const configPath = findConfig(flag(args, 'config') ?? '.');
       const controller = new AbortController();
@@ -350,6 +367,15 @@ async function main(argv: string[]): Promise<number> {
           live.done();
           out(args, { report, heal: healed }, renderHeal(healed, compiled.root, p));
           return healed.exitCode;
+        }
+        if (args.flags['prove-faults'] && report.outcome === 'passed') {
+          if (compiled.environment.name !== 'local') throw new Blocked([{ code: 'fault_requires_local_launch', detail: 'Use the local environment' }]);
+          const proofs = [];
+          for (const fault of projectFaults(compiled.root).filter(f => report.cases.some(c => c.caseId === f.caseId))) {
+            proofs.push((await challengeFault(configPath, fault, report, controller.signal)).proof);
+          }
+          out(args, { ...report, proofs }, renderTree(report, compiled.root, p) + '\n' + proofTable(proofs));
+          return proofs.some(p => !p.caught) ? 2 : report.exitCode;
         }
         out(args, report, renderTree(report, compiled.root, p));
         return report.exitCode;

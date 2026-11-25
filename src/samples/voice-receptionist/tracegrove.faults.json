@@ -1,0 +1,13 @@
+[
+  {
+    "name": "drop_booking",
+    "env": {
+      "RECEPTIONIST_BUG": "drop_booking"
+    },
+    "caseId": "calls.books-a-cleaning",
+    "step": "front_desk_sees_the_booking",
+    "check": "status",
+    "expected": 200,
+    "got": 404
+  }
+]

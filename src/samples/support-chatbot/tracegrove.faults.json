@@ -1,0 +1,15 @@
+[
+  {
+    "name": "leak_orders",
+    "env": {
+      "SHOP_BUG": "leak_orders"
+    },
+    "caseId": "support.privacy",
+    "step": "customer_asks_about_someone_else_s_order",
+    "check": "body.turns[0].reply",
+    "expected": [
+      "own account"
+    ],
+    "got": "Order 1043 is going to the address on your account. You can see or change it under Account, Addresses."
+  }
+]

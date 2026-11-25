@@ -186,6 +186,10 @@ npx tracegrove try voice-receptionist --bug drop_booking
 
 The call still sounds right. The readback from the clinic's own system is what fails. `try` writes the example to `./tracegrove-try/`, runs it, verifies the evidence, and opens the local UI on the result.
 
+The bug command runs a healthy control and a second launch with the fault enabled. Its comparison page shows both call transcripts and both appointment reads. The JSON output names the sealed runs and the exact case, step, assertion and observations.
+
+On your own project, `tracegrove record` turns a local Chromium session into a verified flow. `tracegrove test --prove-faults` checks the flow against named defects. `tracegrove impact` uses a verified baseline to select PR cases and compares them with a full run. [Commands and examples](docs/workflow-proof.md).
+
 ## Pick a scenario
 
 | Example | What happens | Bug to switch on |

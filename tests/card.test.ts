@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { runTests } from '../src/authoring/run.ts';
 import { tryExample } from '../src/cli/try.ts';
 import { CARD_MARKER, renderCard } from '../src/authoring/card.ts';
 import { decide, readiness } from '../src/authoring/readiness.ts';
@@ -24,6 +25,8 @@ it('says every claim holds, or names the failing one with a repository path, fro
   expect(held.markdown).toContain('2 of 2 claims hold on `0123456789ab`');
 
   const bad = await example(root, 'notes-api', 'keep_on_delete');
+  // The isolated challenge leaves the healthy control current. Now run the broken app as the candidate.
+  await runTests({ configPath: join(bad, 'tracegrove.fault.yaml') });
   const failed = renderCard({ dirs: [good, bad], link: 'https://example.com/report' });
   expect(failed.verdict).toBe('fails');
   expect(failed.failures).toEqual([expect.objectContaining({ project: 'notes (keep_on_delete)', failure: expect.stringContaining('gone: status 200 != 404'),

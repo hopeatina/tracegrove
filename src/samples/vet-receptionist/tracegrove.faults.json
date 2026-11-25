@@ -1,0 +1,28 @@
+[
+  {
+    "name": "double_book",
+    "env": {
+      "VET_BUG": "double_book"
+    },
+    "caseId": "calls.books-a-visit",
+    "step": "the_calendar_automation_got_one_booking",
+    "check": "automation POST /webhook/book-appointment call count",
+    "expected": 1,
+    "got": 2
+  },
+  {
+    "name": "ignore_automation_errors",
+    "env": {
+      "VET_BUG": "ignore_automation_errors"
+    },
+    "caseId": "calls.automation-down",
+    "step": "caller_tries_to_book",
+    "check": "body.turns[0].reply",
+    "expected": [
+      "couldn't confirm",
+      "call you back",
+      "555-0177"
+    ],
+    "got": "You're all set, Ana. Pepper is booked for Thursday at 11 AM. You'll get a text confirmation shortly."
+  }
+]
