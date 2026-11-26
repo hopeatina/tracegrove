@@ -1,0 +1,9 @@
+<!doctype html><title>Swatch export</title><script src="/dist/html2canvas.js"></script>
+<div id="swatch" style="width:32px;height:32px;background:rgb(22,100,49)"></div>
+<button id="render">Export swatch</button><output id="pixel"></output>
+<script>
+  render.onclick = async () => {
+    const canvas = await html2canvas(swatch, { scale: 1, logging: false });
+    pixel.textContent = Array.from(canvas.getContext('2d').getImageData(16, 16, 1, 1).data).join(',');
+  };
+</script>

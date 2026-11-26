@@ -1,0 +1,5 @@
+<!doctype html><title>Shipment list</title><script src="/bliss.shy.js"></script>
+<button id="append">Add shipment</button><ol id="shipments"></ol>
+<script>
+  append.onclick = () => shipments.appendChild(Bliss.create('li', { textContent: 'Packed', id: 'shipment-status' }));
+</script>

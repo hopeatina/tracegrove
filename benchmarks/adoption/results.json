@@ -11,9 +11,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_9f4cf240af0091e1",
+        "execution": "exec_378e7658d46d4377",
         "source": "0d5b0a91492a5094cb4dc24665bbe676381f7f1ad44a13d6714e04f537f060d4",
-        "manifestSha256": "3527b1433929577d721aa338707890ee8b0fdae4b1a4d6f085f42ac339d7742a",
+        "manifestSha256": "b52cf6eb41bb05020f03d10f424c84fdd61f529bc934a1d75209e2f8c52ffe4c",
         "cases": [
           {
             "id": "page",
@@ -76,9 +76,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_16d606ede17b57d2",
+        "execution": "exec_55b91baacb4035be",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "37f910b1de9aef60b442262cd3852f053f4f1359200b01c2657e72e3c9c86069",
+        "manifestSha256": "ed8f44ff1fd879a4a712d9de1e236ccab5e1572eceb66f08d7ea38bc92032548",
         "cases": [
           {
             "id": "page",
@@ -109,6 +109,7 @@
       },
       "caught": true,
       "workflow": "Set a color and read the value of the separate original input",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "passed"
@@ -122,9 +123,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_37c496e55dd9cbf1",
+        "execution": "exec_ce5e965c22879d8f",
         "source": "01e2952f58d3be6e921696b7f4152a55b8d5fcc9103dcee99a4562d7afaad5f6",
-        "manifestSha256": "d6884c2dd926bf3b38adc3f49050c682625f49eb3f4f99f03d92cfb547865662",
+        "manifestSha256": "43b09bce7be67ae541f60185b0e8fc7319696e29cd1a2a1e89754096f361c024",
         "cases": [
           {
             "id": "page",
@@ -180,9 +181,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_20433e1a963da7e8",
+        "execution": "exec_cbc0fcfc805ec1f7",
         "source": "855a4d241da0c9b2d2029ea85914bd401a47d8a128de80e39911111507503e06",
-        "manifestSha256": "c20271e2c6f11b50ee2328d63bf2fbcc4f80202425455e6606935cd095a121fa",
+        "manifestSha256": "e93eea25c5b1567646bf5280727198d2c3a067ae3bb4e9c01069a7c13c9e9031",
         "cases": [
           {
             "id": "page",
@@ -213,6 +214,7 @@
       },
       "caught": true,
       "workflow": "Replace the body with the response to a button click",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"
@@ -228,9 +230,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_642f346da30199a2",
+        "execution": "exec_2307ca91a4001ded",
         "source": "72fd9469f475b255931cb00cd514266db54b6d21a00761b7b1bba16db885311b",
-        "manifestSha256": "3a52431638fe748acf4def99aa30b0ea9f2a4c5357d62b7e7726794abe06fd97",
+        "manifestSha256": "93a52eea244a4af1c5c402d3ed623189090dcb5f058131c778ccd9e7e911576f",
         "cases": [
           {
             "id": "page",
@@ -293,9 +295,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_1fe54209f58831a2",
+        "execution": "exec_271115cb1fe72947",
         "source": "582dce9d40cd2dd6919df4ac8c137dd26256fd9f9fd5510a421c791b225bfa33",
-        "manifestSha256": "873b8140e2573191d2e653383a7ccfcad5bd25548d91d1989d6f8a27295c9b95",
+        "manifestSha256": "854c936773ef2bb9f0b0ac5ea4a60768ce382b726bba7d3924cf873b5d39d76e",
         "cases": [
           {
             "id": "page",
@@ -326,6 +328,7 @@
       },
       "caught": true,
       "workflow": "Show a toast and read the rendered message",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "passed"
@@ -342,9 +345,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_bd8d895589d719d1",
+        "execution": "exec_60d90836b6b38616",
         "source": "2acd7df1711155faaaf3ffc8823ded9005169907d54d89d9ebf0c76eb5281359",
-        "manifestSha256": "8a47a16ece0aa2b43d0118c9ad81fac9227b612cc40d582736a0bb134a1170d9",
+        "manifestSha256": "c11a8b0cb20c941b648dccfbdd9a7caf169776a363f916ce488bd795d19c2fd8",
         "cases": [
           {
             "id": "page",
@@ -400,9 +403,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_a19da9b139911c5e",
+        "execution": "exec_e59d9aa6f4d41ed9",
         "source": "fefe2568a456d2335b2956a80d8e146576760c0b1e3427c4b61632aff807fce4",
-        "manifestSha256": "a95f8cfe09bb3730bc6fdbcda011068748ac0860baa70ac75b218fd0d965bd60",
+        "manifestSha256": "b7271c2149e9ad640c3577beb91d7a84c480c544c765b2951327d556966330c3",
         "cases": [
           {
             "id": "page",
@@ -433,6 +436,7 @@
       },
       "caught": true,
       "workflow": "Light the fire and reveal the stoke control",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "command_adapter_unqualified"
@@ -444,9 +448,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_e154bd2582344335",
+        "execution": "exec_6b51f6e1546ec715",
         "source": "36ccb2b5a5e708fa590b0335c0bcec8cd897c1b594b86f57abf5b8444398b606",
-        "manifestSha256": "2ceb92675bc1bbf0b69f70eae668ecd7796f5dd28e32e8410a7b264c7898aacd",
+        "manifestSha256": "6f1cb8953be9e22ab3171200aeb8a6ae59ebb3618c2af8b005a6a80cf5c1f63e",
         "cases": [
           {
             "id": "workflow",
@@ -492,7 +496,8 @@
           }
         ]
       },
-      "workflow": "Delete a user from the example service and independently read its removal"
+      "workflow": "Delete a user from the example service and independently read its removal",
+      "workflowSurface": "upstream application or example"
     },
     {
       "repo": "fastapi/fastapi",
@@ -500,9 +505,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_c194714afa0ac494",
+        "execution": "exec_2fa62949c9f4b83e",
         "source": "e85022969b2032437ae288ad41758df1b9602df252a934eab6caa57987150752",
-        "manifestSha256": "a7140a2c90779bb1a357eb7cc81fb59ebe3b2e077280033aad225e1bf1bcb8c4",
+        "manifestSha256": "4231b877a15e339fc03455c78dbf81fc59f27f3ba88e2ea8181d40cbf9a4ac87",
         "cases": [
           {
             "id": "workflow",
@@ -549,7 +554,8 @@
         "broken": 50.2,
         "reason": ""
       },
-      "workflow": "PATCH one field and independently read the price and preserved name"
+      "workflow": "PATCH one field and independently read the price and preserved name",
+      "workflowSurface": "upstream application or example"
     },
     {
       "repo": "fengyuanchen/viewerjs",
@@ -563,9 +569,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_7b066251863c1d8b",
+        "execution": "exec_2fd923c59f37dec4",
         "source": "3fc326117285a9748580bdc8f6d2a5ff56e0bb7a9ae3b05f36940533316f6bca",
-        "manifestSha256": "286ef7e9bc83faf857402a7ac0af5ed2143e50b91a3c50366820fcbdeba77c89",
+        "manifestSha256": "279510b422cb6c2a313578cc1518bcb8b9f27258d44ebe5de0e1385e985a604c",
         "cases": [
           {
             "id": "page",
@@ -621,9 +627,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_f0037d0b38426a62",
+        "execution": "exec_0a35a5f7838ea790",
         "source": "af541c1ee1a13959fd90b186ffa5e03bfe71a42a419964f2727dedf1da0bfb4e",
-        "manifestSha256": "617d2ac2be1cdacfc6387f7358809186c42b46fbf80608b874b52e1a4752fe59",
+        "manifestSha256": "8aacf1a2dfa1b9c59af4e6b50369a035c309fe6719e4e228a47c9fcc58cf886c",
         "cases": [
           {
             "id": "page",
@@ -654,6 +660,7 @@
       },
       "caught": true,
       "workflow": "Follow the custom-title example link and check the destination",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "command_adapter_unqualified"
@@ -667,9 +674,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_fafef93bbc73695a",
-        "source": "a545a3d4f270d1c1c9913ac12ee644d08691de773d9644584c86c11e06620649",
-        "manifestSha256": "4c50f14bd210a3aeec5ffa120b36fe6f8c9bcf0b27cbfc30fc319c4e2e1d8684",
+        "execution": "exec_e4cf81170090b458",
+        "source": "8eb7e9e9dee2f95bd0818e937fef989d2301c131271360666b1ce61c895d1e67",
+        "manifestSha256": "dc9a5d69ed49c8d1bd9babc2a10e9a0ee7a232415bb357f47355a83d68b0e943",
         "cases": [
           {
             "id": "page",
@@ -691,15 +698,50 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Tile 4, score 4",
+                "observed": "Tile 4, score 4",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_96ff4113fa4fa0a2",
-        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "b1030eecf29b9b5e814a8ae7156395aa81a035da1c307b34793880066f600c15",
+        "execution": "exec_517c36acfa7fa273",
+        "source": "b8547268e2c3079782e7a5696a835c3fe7c4415389e788a511e1e5e595baf987",
+        "manifestSha256": "77ce1162aa59a72834d614248eb2cbdd176d4dd6f17f41350603d2d575cfc02e",
         "cases": [
           {
             "id": "page",
@@ -729,7 +771,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Merge two tiles and read the saved board and score",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -746,9 +789,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_3d96a28259133f72",
-        "source": "34def459197b240e72bff4291946bb90f00cca7269291a7736a2e1b3d1093d4b",
-        "manifestSha256": "6553ac1d59735d1121babb3fe53ee6d821f26b12282735c559c9040a938371cf",
+        "execution": "exec_4667a05b6a4c9a2e",
+        "source": "4b42c25fdce9c14fb80ecfe5950785d6b6df36a23711a35a7d43b0f66dcd413b",
+        "manifestSha256": "28c5fbf26ead9d2fda67795fbd2ff528f7fcaed17e7438dc454329abb7384080",
         "cases": [
           {
             "id": "page",
@@ -770,15 +813,50 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "100, 80, 75",
+                "observed": "100, 80, 75",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_0260ebf2f0e85a90",
-        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "6234ec0b85d8c0a8c2b43bef1a517283d9c14bc2be252a1ee803233d650cf58a",
+        "execution": "exec_2e280fa795e1af7b",
+        "source": "378fe4c067c494a96e6fa9ee29ccb53592a790aa497e7d9e6f9dee48f27d65c5",
+        "manifestSha256": "49f6adb6749881f15958804bf0981b2810125054179bb3dbf7abde66a431aaba",
         "cases": [
           {
             "id": "page",
@@ -808,7 +886,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Persist a round and reload the sorted top three scores",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -822,9 +901,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_50c6e274137ad7a0",
-        "source": "852b8d18a31e7a83380b9f86cd8acc03467456f17e839f007d2529f92812111d",
-        "manifestSha256": "25461746cb441fd2129887b0d85087d01cbc8902a7a3ce4212e5d38320df3ea0",
+        "execution": "exec_4abaad9c1a4ad4aa",
+        "source": "c4f632a3c4773a6ad1b08dfe889df1649b86b4d647225d63bf853e85c1c5891d",
+        "manifestSha256": "2eb58586ace94edb4ce5556627b534e3df7076a992c84072690d1b645bac8558",
         "cases": [
           {
             "id": "page",
@@ -846,15 +925,50 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "All lines fit",
+                "observed": "All lines fit",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_49d46c92eaa20c43",
-        "source": "5885c4ab86d8842650f0aaf2b6ba26dc5ce8763d5566267c534254351f7d0585",
-        "manifestSha256": "046eead8f486cf893f275bb763e3c4a629814a846f773277910573fe188ad949",
+        "execution": "exec_ff3a5818c1711d7c",
+        "source": "3387c12ceb463f9ea7f883d814ce6171990ae377321b45e3dfe1b49d81430094",
+        "manifestSha256": "19c4ed3340ebe9b4c27d3493e48b20a5e38766c22b53e0e99f7dadef0ea07174",
         "cases": [
           {
             "id": "page",
@@ -884,7 +998,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Fit a multiline note without clipping its textarea",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "passed"
@@ -898,9 +1013,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_5c467b67cfbe0a06",
+        "execution": "exec_d79c3194d313d4c1",
         "source": "15f1ac2cbf7b00b41cc10dbb2e8ab386b952032cec87e08173a46f524e265188",
-        "manifestSha256": "42448f8b09d004c97ac6216ea5aea8ff6890f40ef7f821baec07cc2a9fab67d9",
+        "manifestSha256": "a325a0ea3a7cac118f209ccc9b04881a7ca4f792ed5dadebe087a8972acbba1b",
         "cases": [
           {
             "id": "page",
@@ -956,9 +1071,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_17b00b4a263c165f",
+        "execution": "exec_8b3d806eb69760b9",
         "source": "8054b9b3d1a68d6c19963a45e26bd86f6041620305b7361eede8c5bf2f305d83",
-        "manifestSha256": "f0e845dad5d4990f6d861f693d31ea88f95fa0e6ed08abf365928f9d5c5b7507",
+        "manifestSha256": "959b27c32980a1f99bf5d6c2f754b4c7f72a64e75efbe97db5b111a48a4c18dd",
         "cases": [
           {
             "id": "page",
@@ -989,6 +1104,7 @@
       },
       "caught": true,
       "workflow": "Open the inline dialog and read its close control",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"
@@ -998,15 +1114,13 @@
       "repo": "jackmoore/zoom",
       "commit": "13eed6ebaf8976ede2f32258acf9086d26ed5a78",
       "missingAssets": [],
-      "externalAssetOrigins": [
-        "http://ajax.googleapis.com"
-      ],
+      "externalAssetOrigins": [],
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_79b33a3fc3635a91",
-        "source": "ce61f3cc656f4ffb45eba00bf1d413b00b2712c6ae4cdaac3e8a7f60077a2705",
-        "manifestSha256": "374b2ac28f1cd9dd9e3c48ff2740caed5ec7bfd3a44889449fb676c16701f848",
+        "execution": "exec_b6345460aef3c9c5",
+        "source": "1fbe8dfca8c05bdfd979d192a0ffcd21e94027a77132d3ce98865264d764321b",
+        "manifestSha256": "099eb1f8d54c23df13948c269727ae11aa7ad81ffb5c920d7934955f4c65a39b",
         "cases": [
           {
             "id": "page",
@@ -1028,15 +1142,57 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "Loaded",
+                "observed": "Loaded",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_4",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_5",
+                "field": "browser.text",
+                "expected": "Magnified",
+                "observed": "Magnified",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_e560f63474ea1964",
-        "source": "582dce9d40cd2dd6919df4ac8c137dd26256fd9f9fd5510a421c791b225bfa33",
-        "manifestSha256": "849fee1a4c7991cb06d66b31be8f7e6c9db14a0b1e4292281af9aaf42ec0e4f9",
+        "execution": "exec_ee3b3569166b61ed",
+        "source": "d97bcb0874ef070dc2b2a320c905a575b4bedf1ee7682365d58aa0837c13cc3b",
+        "manifestSha256": "86b307102eb793f9162ca42da591340551750b0ba9e39d1cf54ec9d1da9c2842",
         "cases": [
           {
             "id": "page",
@@ -1066,7 +1222,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Toggle magnification and measure the visible zoomed image",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "passed"
@@ -1080,9 +1237,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_8dd495bdebf1e61d",
+        "execution": "exec_3bb7e46a829eaf1f",
         "source": "6de65b16527355aefb3a2b49c09345414ff11b621bb8953325c9607e951dcdb0",
-        "manifestSha256": "37f2c899908b75822c59f3e4cfe6e8a71b59668e23d78d1cd432069aa40ee5f8",
+        "manifestSha256": "13b729f1db67558ee24b576328760dda1676893f66dbae20cf2b69ee06847353",
         "cases": [
           {
             "id": "page",
@@ -1152,9 +1309,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_273dedef1e9c8615",
+        "execution": "exec_04b2d75ee3087f31",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "c44b1cc1d791c778411eb7f87413715d47bf09c63745743a76ef299b4b7783e3",
+        "manifestSha256": "82d70efe70e200d01db34d07b0c9d576baac5a0d29c73728f71795730e7b9e9e",
         "cases": [
           {
             "id": "page",
@@ -1185,6 +1342,7 @@
       },
       "caught": true,
       "workflow": "Advance the level, refresh and read the persisted choice",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -1198,9 +1356,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_d902846bf159c21a",
+        "execution": "exec_189e3e4ce61c97f5",
         "source": "02ef388763faa3caa2b0d629472ffc45f95e790434eb6394e48eedbcecc7fda9",
-        "manifestSha256": "808deec96e2999914d60cec1ab5c69a8acf4d6466eb50c27d706a6e651dc52cd",
+        "manifestSha256": "311c0eae2c07be5a144aadf8e3cd19e2234f014effb3b0c4616e7d8896a51e7e",
         "cases": [
           {
             "id": "page",
@@ -1256,9 +1414,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_9330b47a958d4ad6",
+        "execution": "exec_2933af724455401a",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "8a3601b6ce7349535a13bddf6363f49b6e71bc9a962afd1365971adfe746edf5",
+        "manifestSha256": "ae1a36938f4c136acd484fa8d9ecb697c7e7ab6d30b99001738e4684ae954429",
         "cases": [
           {
             "id": "page",
@@ -1289,6 +1447,7 @@
       },
       "caught": true,
       "workflow": "Start the game and read its opening row count",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -1302,9 +1461,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_b25f9714567eeae8",
+        "execution": "exec_63594d72ce3c6c26",
         "source": "d4ebf8b4ff32dcc75c948c17176c671bd584d2bbdad9d32ad64b43e2988cb02e",
-        "manifestSha256": "5014abc9cb01c6a5b7a6370692675ee561b19e602460501f37a52d8d473345ff",
+        "manifestSha256": "1542a15e97856ea0bd386a1898732c1b6aea9a508ae887627d749a9405e194c8",
         "cases": [
           {
             "id": "page",
@@ -1353,9 +1512,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_41f7456e5136cfd1",
+        "execution": "exec_78f49cff05357acd",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "77e0ed65b673589cf0ebd9ca41196e918ac55ce09ff741f974aa40b92df298df",
+        "manifestSha256": "525cbc913ce2e5b098c22bc95919631d147aa95f89319ad107710d7395a529d9",
         "cases": [
           {
             "id": "page",
@@ -1386,6 +1545,7 @@
       },
       "caught": true,
       "workflow": "Read the rendered heading in the live Markdown preview",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "assertion_failed"
@@ -1399,9 +1559,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_4663437879da4066",
-        "source": "f81376b129f73b954ab76200c5dbbb6bb636f2bdbc169d4bab372d596fbdcaa5",
-        "manifestSha256": "7cfbf0f338bc089bede6c7f51b4380e8fdf18f85a26361f3c580f89c426203d5",
+        "execution": "exec_aec4019dcb4a3875",
+        "source": "3e8a098e28d65d97791d5804d2f261ff5c64c1ef30257ca025822a39f13addf8",
+        "manifestSha256": "fd4f5281928ffe73f9cccc467a712878f2edfe97c6f3f85bbe9f3485c99c9ad3",
         "cases": [
           {
             "id": "page",
@@ -1423,15 +1583,43 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Review opened",
+                "observed": "Review opened",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_be38a91b20d7fe5e",
-        "source": "83fa4ffd74ed0b03a443232ec86474193ca800335223da5047247cde41a6318b",
-        "manifestSha256": "466189ae32c41533e2609e0159551a180b4dd96ba9a99f3d0d07bfc2b9031142",
+        "execution": "exec_e4308a94f91f639f",
+        "source": "87c5291d97257c226944b64897932d272bf32d98dc38f4d96575bf9df1601253",
+        "manifestSha256": "9b9f73ac56a1587344a3ec255df9bdc96e401d8d6f638f0b72650dc930fb69e6",
         "cases": [
           {
             "id": "page",
@@ -1461,7 +1649,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Type a registered command and observe the keyboard handler",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"
@@ -1475,9 +1664,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_cc263a9aa52e2a58",
+        "execution": "exec_c3b38c173895c891",
         "source": "5e2c14c585e13845974ee7937417ccae10172b3c805b80695998bc31a5162382",
-        "manifestSha256": "3e6dfbab31fc138615298d78a81dadf25fb70ad811ebc89987eb5834ba94fac2",
+        "manifestSha256": "39dcf4f26a256c3deb2608441f37797713407bab97f4d1f65c111b84e6c73efb",
         "cases": [
           {
             "id": "page",
@@ -1540,9 +1729,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_a03cae99f5349f28",
+        "execution": "exec_0f11abe5183b5847",
         "source": "081e09cf06855d0e637723e6ca33f765e1c5d308d871c8bc948a8acfa8c026a8",
-        "manifestSha256": "0e70d5d2232238a985269d37e92d2e069a03bfc88d966dcc627ef919ff77a0cd",
+        "manifestSha256": "604608263c1f8d8a21e76d1edcd719f8d1d2c869d36b79814e4d6f1ec57ebc00",
         "cases": [
           {
             "id": "page",
@@ -1573,6 +1762,7 @@
       },
       "caught": true,
       "workflow": "Switch the actual editor from tree to form mode",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "command_adapter_unqualified"
@@ -1586,9 +1776,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_a1a0b171a6a0a618",
+        "execution": "exec_14c145be2b523332",
         "source": "e7d6a3b46748dbe7ed6dac3fa6f65a7ea4d4a54ba796aaa61fed7abaabd4e130",
-        "manifestSha256": "9ee7816145fbccc4c2a2894603c9ede9d27e2aadb0e01f0e9b0e3ef2b175769c",
+        "manifestSha256": "08d76cacb0ced230264738c91b1d6d307fb1a837183fbb0e53e4a137e684ca2f",
         "cases": [
           {
             "id": "page",
@@ -1644,9 +1834,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_5c24b6a611b69d88",
+        "execution": "exec_740c6419d15d52f5",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "c63bcf947ad2664e8ea7d7bbb82a5ee2b3dfa9a45cd23f4f5b8d0df544857e5e",
+        "manifestSha256": "ee83fee981d7567bf75a8decde4e8202dd883b1ab548c19eb0d94e38496b9d17",
         "cases": [
           {
             "id": "page",
@@ -1677,6 +1867,7 @@
       },
       "caught": true,
       "workflow": "Evaluate an edited arithmetic expression in the code editor",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "prerequisite_unavailable",
         "after": "too_many_source_files"
@@ -1690,9 +1881,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_d29ca2fa9211a80b",
+        "execution": "exec_a547c43302f7ec5d",
         "source": "e30f24684cf9f2cb38b733fe355eefbcd694149af3d2ad664ba1f098d56e2ca1",
-        "manifestSha256": "498cb5867ed014a1eff268143356557a3f33def10874f0cf8da6263a637f392b",
+        "manifestSha256": "c407047d26e639fae52f6d14a1e03628a3b9eea3335fc01cb51f7a97f1e9d684",
         "cases": [
           {
             "id": "page",
@@ -1748,9 +1939,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_28253ab4a4be28b3",
+        "execution": "exec_a959f5bd955e58f6",
         "source": "3cb22f7b9562434da63f101a9bb3cfbfbdff1b4e7bcf3b77b5325eb00f8b49d0",
-        "manifestSha256": "0802568b870900e572bb6b8a7219aab10c03b8698a02d0055ad06cb2f3ed255c",
+        "manifestSha256": "d5a80187a4349a261a2b7ae454e812484898816c7f4175c9e4e5d1dee48d8589",
         "cases": [
           {
             "id": "page",
@@ -1781,6 +1972,7 @@
       },
       "caught": true,
       "workflow": "Follow the accordion example link and check the destination",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "prerequisite_unavailable",
         "after": "passed"
@@ -1796,9 +1988,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_815be1aecc0d0fd8",
-        "source": "95c6cca9429cd8432004c5c8fa1c0951eaa8898dace5a03d59984c49dfbdd172",
-        "manifestSha256": "47eb7e1156f9dafcb556ea4e726f877dab3379d028bd2e5d696d54d5a2e73de0",
+        "execution": "exec_19a8ca1bd876677d",
+        "source": "4eb6c82082bbf1dc7361164e54ca86125bef0506d38111cfa476c22245fb97ca",
+        "manifestSha256": "1355626287df70db2d6e4a3339f32a7204aa7eee675f79a8d45e79361fdbc5dd",
         "cases": [
           {
             "id": "page",
@@ -1820,15 +2012,43 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Packed",
+                "observed": "Packed",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_6adde74389f68284",
-        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "9dfa821e24c47c47baa8a46028f92d2d04199d32496dbc9ddfc597b4c2bd9ce8",
+        "execution": "exec_667ab339a986501f",
+        "source": "2df24708f00972d816ff19ca8d48ed9ac13347360d335c6d8c12226372da8efd",
+        "manifestSha256": "38b5474261e97c40a9b7bf62c1e78f380658b6bd5fa2bc69e033818a2306fe41",
         "cases": [
           {
             "id": "page",
@@ -1858,7 +2078,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Create and attach a shipment status element with the library API",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"
@@ -1876,9 +2097,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_9f00f4ffb9b81a94",
+        "execution": "exec_522a671c91e99a4d",
         "source": "2ca3601072b07ee936a43150959fa615194ce0b01585c1ef8d45a03795991f82",
-        "manifestSha256": "63ab236e0259b783a7c6b5779d9288497fb84c7f77801e15d177185fd8fe1da7",
+        "manifestSha256": "3cc94dd4f0211b2a6143b5e10a5d467ce5b8cc611e199eb1f1a70801e48f0bfb",
         "cases": [
           {
             "id": "page",
@@ -1934,9 +2155,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_6924b1e74e388425",
+        "execution": "exec_eb380ed81b9e0b97",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "c31421af1f39a1ccc74e6cff996e4865b28f4f7b0f3da994d3ac4b2726e0d730",
+        "manifestSha256": "24801aed7672a8dcf5c94cb49f868cc9bb92f093b998827028841c219220e4be",
         "cases": [
           {
             "id": "page",
@@ -1967,6 +2188,7 @@
       },
       "caught": true,
       "workflow": "Expand the Carbon fibre pattern and read the revealed credit",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -1983,9 +2205,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_1f7fd738ba7a74e2",
+        "execution": "exec_41d96e5e43e2b875",
         "source": "c8f576331a983189b7d09e20fcca9c867be37b94f10b32cb3bad618ec1c47dca",
-        "manifestSha256": "c67a4bfc3b93fc62ab3b7bdb85db3f0d7920f761acc7d1530f77af7c8156424d",
+        "manifestSha256": "fa995343b5b096bdd0c7f09ff3ab5f03ee0b9af9e611fdcc5d3b01989c7a89c9",
         "cases": [
           {
             "id": "page",
@@ -2034,9 +2256,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_1b4628505487632c",
+        "execution": "exec_702081524761310a",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "6a84c9845140e0a5c7135ebac558f0723d4cef3b1dc7fd275b6df679654f75d7",
+        "manifestSha256": "817ffba70cdc7d16355ca3d7720f41f26a95ca0d5838cd99fec054ec360b504d",
         "cases": [
           {
             "id": "page",
@@ -2067,6 +2289,7 @@
       },
       "caught": true,
       "workflow": "Open a bookmarked curve and read its four coordinates",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "assertion_failed"
@@ -2083,9 +2306,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_45165422e4786601",
+        "execution": "exec_9ca4b97863e02e12",
         "source": "cd6629fa8cf0c5b9a7203f1899a7e9e134322a947bd20b56534e53f70ffe8830",
-        "manifestSha256": "d0ae0f959bc6098a6b46721183a36b48c59bb16f9877d315089473230fbdc9b8",
+        "manifestSha256": "9a111c914bdbefe5be62951e04e03979ceb68a990f9bc54f07ebc6ca27231715",
         "cases": [
           {
             "id": "page",
@@ -2141,9 +2364,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_f483ca4d52110671",
+        "execution": "exec_dad010ae1c3a581c",
         "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "1ac45b26487c88034db2899b787445d1e51db31e999f24c7796fb4f19b303ee3",
+        "manifestSha256": "eea242e192cc9b89d945af7a2cd34e0a021860899f3d395b66810ee5e66a42e7",
         "cases": [
           {
             "id": "page",
@@ -2174,6 +2397,7 @@
       },
       "caught": true,
       "workflow": "Open the FAQ and read its heading",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "passed"
@@ -2184,15 +2408,14 @@
       "commit": "8e16e3acea7af5733c6a3b671194199327e0a8b2",
       "missingAssets": [],
       "externalAssetOrigins": [
-        "https://ajax.googleapis.com",
         "https://fonts.googleapis.com"
       ],
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_d5e9795f843ee666",
-        "source": "bdba9cd6b99e83cdd1ad6909eca428caa560bd53c51cd48beaa2ce4773f5485b",
-        "manifestSha256": "2c6e29917af134f8781c1cd1e86ce4779b62836a5ba16b654f3c2046f19fe3af",
+        "execution": "exec_4747cdc5ea2ee809",
+        "source": "aea97ea417273e7f231c8d0e739d0eaa05a12649b6ae71a1d04ebf971801c969",
+        "manifestSha256": "1a14a714cb4edd258af2ee672690bdfa0d2479e7b4a9065bf2ff45d8ca921e92",
         "cases": [
           {
             "id": "page",
@@ -2214,15 +2437,50 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Apple, apple",
+                "observed": "Apple, apple",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_5890d9dddc0a6d23",
-        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "58fa2cfe7606eb6e59e5845d83796c76e78a06769e7f0200a9a22e35d79e2ab7",
+        "execution": "exec_21eeba9c76dcc2b0",
+        "source": "6bde8994b27393e8d1ea54309b008a46f90a6f234bde6da46f186cca09e90e6c",
+        "manifestSha256": "ac177ed4f23b46fe63415f51e1bdf287d17b2997f39c8dc77c723a9dbf8ebb17",
         "cases": [
           {
             "id": "page",
@@ -2252,7 +2510,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Type mixed-case matches and read the generated highlight elements",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "passed"
@@ -2266,9 +2525,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_775b1e5968035c92",
-        "source": "e26d35f9231b23522fbc4df1838d2b2a30c824b9927b8a5ec31cb1977feec009",
-        "manifestSha256": "b7e27696bb685e30ae4396022661b2d19c6700066dc801b4bf68f14fdcac6b48",
+        "execution": "exec_149b3b752a65d125",
+        "source": "79839ee0caf2afc33941b528e3d45f1abcdefa5644ebfa25e3558531da227444",
+        "manifestSha256": "70c4864eb88e04c9107831a1f86ced3f7c0623b212bb927219c5c051dee350dd",
         "cases": [
           {
             "id": "page",
@@ -2290,15 +2549,43 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "22,100,49,255",
+                "observed": "22,100,49,255",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_90a47f97422e1c38",
-        "source": "efab278a47c132292e4f5dae59aab7136950102eecbd715894aabbbe308b5f9f",
-        "manifestSha256": "4fcf44245402d3d63cecd0a86270be711363f2e06143d797b15a003fc1e6d503",
+        "execution": "exec_7fc5a3ace5511421",
+        "source": "f7c83bcfff752016c8a89a016d748aa8e5e20036d4998529ab99303bc92f3cac",
+        "manifestSha256": "89c44f5029f22b23e87abca3c7cdade87314bf27222f01e3eab6f758bd544342",
         "cases": [
           {
             "id": "page",
@@ -2328,7 +2615,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Export a color swatch and read the pixel from the rendered canvas",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "command_adapter_unqualified",
         "after": "command_adapter_unqualified"
@@ -2340,9 +2628,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_fdb3d7b573a30273",
+        "execution": "exec_7982d228af1988c9",
         "source": "96a9be511bc4a92e5055d71469548ff1289355d390956a17ad3f332eb641c365",
-        "manifestSha256": "7b4069010a0576812b693e4fc4ebca8e914d341dd42779bc0956fe648ce4a77b",
+        "manifestSha256": "c134de4f8022e30d1b39d509a883d660e82142bc4214595390cbc47fb8239417",
         "cases": [
           {
             "id": "workflow",
@@ -2396,7 +2684,8 @@
         "broken": "43",
         "reason": ""
       },
-      "workflow": "Submit two numbers and observe the server sum in the browser"
+      "workflow": "Submit two numbers and observe the server sum in the browser",
+      "workflowSurface": "upstream application or example"
     },
     {
       "repo": "postmanlabs/httpbin",
@@ -2404,9 +2693,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_043b3dd1d7157534",
+        "execution": "exec_87fe7b95d0d6798e",
         "source": "77af68eb213e8baae42c749371737da54a3400a6dd1c21e5126a8305736090e9",
-        "manifestSha256": "9c5a668743ac24f9afdff5899370f773932a9a5c0c8cbcbb3f6090779965fee4",
+        "manifestSha256": "30b46e7119bd9a92e9e0079145e878e24b3092049b672b6a8158dc8ea5e75df5",
         "cases": [
           {
             "id": "workflow",
@@ -2445,7 +2734,8 @@
           }
         ]
       },
-      "workflow": "Observe the method and structured payload echoed by the live service"
+      "workflow": "Observe the method and structured payload echoed by the live service",
+      "workflowSurface": "upstream application or example"
     },
     {
       "repo": "SortableJS/Sortable",
@@ -2458,9 +2748,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_a15c8382642f8241",
-        "source": "bde86644ca43a953cdeabd3a2cbc299e6b3b6c2910b003b5a3b97b125ce98443",
-        "manifestSha256": "45171d9754612d98dabffd5e84002b385dc77545c571c89d02acbd509199bbbb",
+        "execution": "exec_af67ea84ca92bb54",
+        "source": "e1652f1356c38ea354a632580b03f4643f4ac489aa6c3bff2e5102531e8601d0",
+        "manifestSha256": "b96785c9b7aa9004451fd646d9e56848417c6aeccca45b3da8662c271d831b89",
         "cases": [
           {
             "id": "page",
@@ -2482,15 +2772,50 @@
                 "held": true
               }
             ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "DraftReview",
+                "observed": "DraftReview",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "ReviewDraft",
+                "observed": "ReviewDraft",
+                "held": true
+              }
+            ]
           }
         ]
       },
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_c5fd1da792a4988b",
-        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
-        "manifestSha256": "8db25759777b482f54c48773d23f746ecd4f6d75f597cf5c2c26aa4895fc2565",
+        "execution": "exec_0a8341c7c28965a4",
+        "source": "f6a3ecc2f72292879f22bed0e83f6e09ca50d4b5cbf2f7fb8c8de8f031542bb0",
+        "manifestSha256": "feb3ff2ecabb7f328910c6c152526964c98c57d3feeb429c31433a7234a05ad1",
         "cases": [
           {
             "id": "page",
@@ -2520,7 +2845,8 @@
         ]
       },
       "caught": true,
-      "workflow": "Page navigation and exact document title",
+      "workflow": "Restore a saved queue order and read the reordered DOM",
+      "workflowSurface": "integration fixture",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"
@@ -2534,9 +2860,9 @@
       "healthy": {
         "outcome": "passed",
         "verified": true,
-        "execution": "exec_6c7cb849af63f7f8",
+        "execution": "exec_34f324e45137f255",
         "source": "de1df5a77132bfcf5c773db11b0c23106d9e456313d12beaab70e2a4599ec2d2",
-        "manifestSha256": "f53354d5f6ea6a4ce656d6607fc0ebca61acd279fffa141e410010449c42d4e6",
+        "manifestSha256": "cb16703f75b5f474a41cc47f473a981340e2c7f0cb9983b5225ad4fe431de0fc",
         "cases": [
           {
             "id": "page",
@@ -2599,9 +2925,9 @@
       "control": {
         "outcome": "assertion_failed",
         "verified": true,
-        "execution": "exec_f22770f510859b70",
+        "execution": "exec_d036747d76c6ac85",
         "source": "28fcf8485cbac80a85737e5dd4b63187c31e8a3483df0acb8408184e343bf6ac",
-        "manifestSha256": "d0346a09ced2f4ea1e15668d7fc6b5c408149fd7885e51c5a5194d68bf0b3b9d",
+        "manifestSha256": "22853f87dcd582029d9a3667df956990568fc422ae71fd9e34fe57134a182f38",
         "cases": [
           {
             "id": "page",
@@ -2632,6 +2958,7 @@
       },
       "caught": true,
       "workflow": "Enter a number and invoke the clipboard control",
+      "workflowSurface": "upstream application or example",
       "ordinaryInit": {
         "before": "infrastructure_failed",
         "after": "infrastructure_failed"

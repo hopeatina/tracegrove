@@ -1,0 +1,8 @@
+<!doctype html><title>Leaderboard</title>
+<script src="/js/save-state.js"></script>
+<button id="finish">Finish round</button><button id="load">Read stored leaderboard</button><output id="result"></output>
+<script>
+  var highscores = [75, 30, 100];
+  finish.onclick = () => { highscores.push(80); writeHighScores(); };
+  load.onclick = () => { result.textContent = JSON.parse(localStorage.getItem('highscores')).join(', '); };
+</script>

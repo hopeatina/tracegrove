@@ -4,6 +4,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -90,8 +91,12 @@ def replay(row, options):
             raise RuntimeError(str(init))
         result.update(missingAssets=init["missingAssets"], externalAssetOrigins=init["externalAssetOrigins"])
         cfg = yaml.safe_load(config_file.read_text())
-        if "sources" in row:
-            cfg["app"]["sources"] = row["sources"]
+        sources = list(row.get("sources", []))
+        if "fixture" in row:
+            shutil.copyfile(HERE / "fixtures" / row["fixture"], root / "adoption-fixture.html")
+            sources.append("adoption-fixture.html")
+        if sources:
+            cfg["app"]["sources"] = sources
     else:
         app = dict(row["app"])
         if app["adapter"] != "node":
@@ -102,7 +107,7 @@ def replay(row, options):
             (checkout / app["entry"]).write_text("require(" + json.dumps(row["nodeExport"]) + ").listen(Number(process.env.PORT), '127.0.0.1');\n")
         cfg = {"project": "adoption", "app": app}
         flow_dir.mkdir()
-    cfg["personas"] = {"visitor": {"subject": "visitor", "inputMode": "pointer"}}
+    cfg["personas"] = {"visitor": {"subject": "visitor", "inputMode": row.get("inputMode", "pointer")}}
     write(config_file, cfg)
     if row.get("steps"):
         steps = list(row["steps"])

@@ -2,7 +2,42 @@
   {
     "repo": "gabrielecirulli/2048",
     "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
-    "page": "index.html"
+    "page": "index.html",
+    "fixture": "2048.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Merge two tiles and read the saved board and score",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "move"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "reload"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Tile 4, score 4"
+        }
+      }
+    ]
   },
   {
     "repo": "jakesgordon/javascript-tetris",
@@ -87,7 +122,42 @@
   {
     "repo": "hextris/hextris",
     "commit": "3f4847dc8fd7dab3d1c87e6324b9159d92fbd396",
-    "page": "index.html"
+    "page": "index.html",
+    "fixture": "hextris.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Persist a round and reload the sorted top three scores",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "finish"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "load"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "100, 80, 75"
+        }
+      }
+    ]
   },
   {
     "repo": "doublespeakgames/adarkroom",
@@ -146,7 +216,45 @@
   {
     "repo": "SortableJS/Sortable",
     "commit": "48b626bbc61afbb0f179730c1dd3cca3dcc8b788",
-    "page": "index.html"
+    "page": "index.html",
+    "fixture": "sortable.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Restore a saved queue order and read the reordered DOM",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "queue"
+          }
+        },
+        "expect": {
+          "text": "DraftReview"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "restore"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "queue"
+          }
+        },
+        "expect": {
+          "text": "ReviewDraft"
+        }
+      }
+    ]
   },
   {
     "repo": "CodeSeven/toastr",
@@ -285,6 +393,32 @@
       "bliss.js",
       "bliss.shy.js",
       "bliss._.js"
+    ],
+    "fixture": "bliss.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Create and attach a shipment status element with the library API",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "append"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "shipment-status"
+          }
+        },
+        "expect": {
+          "text": "Packed"
+        }
+      }
     ]
   },
   {
@@ -365,17 +499,146 @@
   {
     "repo": "jackmoore/zoom",
     "commit": "13eed6ebaf8976ede2f32258acf9086d26ed5a78",
-    "page": "demo.html"
+    "page": "demo.html",
+    "fixture": "zoom.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Toggle magnification and measure the visible zoomed image",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "ready"
+          }
+        },
+        "expect": {
+          "text": "Loaded"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "photo"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "inspect"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Magnified"
+        }
+      }
+    ],
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "original": "http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "sha256": "89a15e9c40bc6b14809f236ee8cd3ed1ea42393c1f6ca55c7855cd779b3f922e"
+    }
   },
   {
     "repo": "jackmoore/autosize",
     "commit": "1e0229b9bb9f51c2b6a2756d901a023b475fa950",
-    "page": "example/index.html"
+    "page": "example/index.html",
+    "fixture": "autosize.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Fit a multiline note without clipping its textarea",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "note"
+          },
+          "value": "one\ntwo\nthree\nfour"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "measure"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "All lines fit"
+        }
+      }
+    ]
   },
   {
     "repo": "lonekorean/highlight-within-textarea",
     "commit": "8e16e3acea7af5733c6a3b671194199327e0a8b2",
-    "page": "index.html"
+    "page": "index.html",
+    "fixture": "highlight.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Type mixed-case matches and read the generated highlight elements",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "note"
+          },
+          "value": "Apple pear apple"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "inspect"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Apple, apple"
+        }
+      }
+    ],
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js",
+      "original": "https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js",
+      "sha256": "87083882cc6015984eb0411a99d3981817f5dc5c90ba24f0940420c5548d82de"
+    }
   },
   {
     "repo": "zenorocha/clipboard.js",
@@ -617,7 +880,35 @@
     "repo": "jeresig/jquery.hotkeys",
     "commit": "f24f1da275aab7881ab501055c256add6f690de4",
     "page": "test-static-01.html",
-    "expectedTitle": ""
+    "expectedTitle": "",
+    "fixture": "hotkeys.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Type a registered command and observe the keyboard handler",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "command"
+          },
+          "value": "r"
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Review opened"
+        }
+      }
+    ],
+    "inputMode": "keyboard"
   },
   {
     "repo": "niklasvh/html2canvas",
@@ -634,6 +925,32 @@
         "run",
         "build"
       ]
+    ],
+    "fixture": "html2canvas.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Export a color swatch and read the pixel from the rendered canvas",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "render"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "pixel"
+          }
+        },
+        "expect": {
+          "text": "22,100,49,255"
+        }
+      }
     ]
   },
   {

@@ -1,0 +1,7 @@
+<!doctype html><title>Highlighted matches</title><script src="/adoption-jquery.min.js"></script>
+<script src="/jquery.highlight-within-textarea.js"></script>
+<label>Search notes <textarea id="note"></textarea></label><button id="inspect">Read highlights</button><output id="result"></output>
+<script>
+  $('#note').highlightWithinTextarea({ highlight: 'apple' });
+  inspect.onclick = () => { result.textContent = Array.from(document.querySelectorAll('mark'), mark => mark.textContent).join(', '); };
+</script>
