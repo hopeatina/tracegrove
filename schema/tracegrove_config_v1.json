@@ -71,17 +71,19 @@
       "additionalProperties": false,
       "properties": {
         "adapter": {
-          "description": "Launch preset: node, fastapi, django or command.",
+          "description": "Launch preset: node, fastapi, flask, django, static or command.",
           "enum": [
             "node",
             "fastapi",
+            "flask",
             "django",
+            "static",
             "command"
           ],
           "type": "string"
         },
         "entry": {
-          "description": "node: script path; fastapi: module:app; django: folder containing manage.py.",
+          "description": "node: script path; fastapi/flask: module:app; django: folder containing manage.py; static: public HTML entry relative to root.",
           "type": "string"
         },
         "env": {
@@ -130,7 +132,7 @@
           "type": "string"
         },
         "python": {
-          "description": "fastapi/django: interpreter (default .venv/bin/python when present, else python3).",
+          "description": "Python adapter: interpreter (default .venv/bin/python when present, else python3).",
           "type": "string"
         },
         "readyTimeoutMs": {

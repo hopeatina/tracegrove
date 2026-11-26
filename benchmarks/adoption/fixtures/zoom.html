@@ -1,0 +1,10 @@
+<!doctype html><title>Product magnification</title><script src="/adoption-jquery.min.js"></script><script src="/jquery.zoom.js"></script>
+<div id="photo" style="width:160px;height:120px"><img src="/daisy.jpg" alt="Product detail" width="160"></div>
+<button id="inspect">Measure magnified image</button><output id="ready"></output><output id="result"></output>
+<script>
+  $('#photo').zoom({ on: 'toggle', duration: 0, callback() { ready.textContent = 'Loaded'; } });
+  inspect.onclick = () => {
+    const image = document.querySelector('#photo .zoomImg');
+    result.textContent = image && Number(getComputedStyle(image).opacity) === 1 && image.width > photo.clientWidth ? 'Magnified' : 'Original';
+  };
+</script>

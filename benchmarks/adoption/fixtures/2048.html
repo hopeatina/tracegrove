@@ -1,0 +1,19 @@
+<!doctype html><title>Saved board</title>
+<script src="/js/grid.js"></script><script src="/js/tile.js"></script>
+<script src="/js/local_storage_manager.js"></script><script src="/js/game_manager.js"></script>
+<button id="move">Move left</button><button id="reload">Read saved board</button><output id="result"></output>
+<script>
+  const storage = new LocalStorageManager();
+  const grid = new Grid(4);
+  grid.insertTile(new Tile({ x: 0, y: 0 }, 2));
+  grid.insertTile(new Tile({ x: 1, y: 0 }, 2));
+  storage.setGameState({ grid: grid.serialize(), score: 0, over: false, won: false, keepPlaying: false });
+  class Inputs { on() {} }
+  class Screen { actuate() {} }
+  const game = new GameManager(4, Inputs, Screen, LocalStorageManager);
+  move.onclick = () => game.move(3);
+  reload.onclick = () => {
+    const saved = new LocalStorageManager().getGameState();
+    result.textContent = 'Tile ' + saved.grid.cells[0][0].value + ', score ' + saved.score;
+  };
+</script>

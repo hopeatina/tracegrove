@@ -1,15 +1,16 @@
 /** Trusted local owner: the IPC channel closes even when the controller is killed. */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { readGitSnapshotSource, readGitSnapshotTree, writeGitSnapshotTree } from '../source/snapshotTree.ts';
 import { sourceIdentityDigest } from './sourceIdentity.ts';
 import type { LaunchRecipe } from '../protocol/schemas/definitions.ts';
+import { staticExecutable } from './staticSite.ts';
 import { pinnedArguments } from './pinnedArguments.ts';
 import { NativeJobRequest, MAX_NATIVE_JOB_MESSAGE_BYTES } from '../protocol/schemas/nativeJob.ts';
 
 type Launch = { command: string; args: string[]; cwd: string; env: Record<string, string>; workspaceDir: string;
-  sourceSnapshot?: LaunchRecipe['sourceSnapshot']; nativeJobs?: LaunchRecipe['nativeJobs']; identitySourceFiles: string[]; runtimeFamily: 'node' | 'python' };
+  sourceSnapshot?: LaunchRecipe['sourceSnapshot']; nativeJobs?: LaunchRecipe['nativeJobs']; identitySourceFiles: string[]; staticIdentity?: {path: string; sha256: string}[]; runtimeFamily: 'node' | 'python' };
 let app: ChildProcess | null = null;
 let workspaceDir: string | null = null;
 let stopping = false;
@@ -74,6 +75,11 @@ process.once('message', (message: Launch) => {
     }
   }
   if (stopping || !process.connected) { void stop(); return; }
+  if (message.runtimeFamily === 'node' && args[0] === staticExecutable) {
+    const manifest = join(workspaceDir, 'static-files.json');
+    writeFileSync(manifest, JSON.stringify(message.staticIdentity ?? []), { mode: 0o600 });
+    message.env.TRACEGROVE_STATIC_MANIFEST = manifest;
+  }
   app = spawn(message.command, args, {
     cwd, env: message.env, detached: process.platform !== 'win32',
     stdio: message.nativeJobs ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],

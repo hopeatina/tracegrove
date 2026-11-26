@@ -3,6 +3,7 @@
  * directory and issued credentials; attests the actual source identity independently of
  * anything the application says about itself; confirms termination on stop.
  */
+import { staticExecutable } from './staticSite.ts';
 import { fork, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
@@ -165,7 +166,7 @@ export class LocalProcessHost implements ExecutorHost {
       child.stdout?.resume();
       child.on('exit', (code) => reject(new InfrastructureFailure(`application exited before becoming ready (code ${code})`, 'app_exited_early')));
       child.on('error', (error) => reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`, 'app_spawn_failed')));
-      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
+      child.send({ command: runtime.executable, args: launchArgs, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, ...(launch.args[0] === staticExecutable ? { staticIdentity: identity.entries } : {}), runtimeFamily: runtime.family, ...sourceLaunch });
       resolvePort(assignedPort);
     }) : await new Promise<number>((resolvePort, reject) => {
       let buffer = '';
@@ -177,7 +178,7 @@ export class LocalProcessHost implements ExecutorHost {
       });
       child.on('exit', (code) => { clearTimeout(timer); reject(new InfrastructureFailure(`application exited before listening (code ${code})`, 'app_exited_early')); });
       child.on('error', (error) => { clearTimeout(timer); reject(new InfrastructureFailure(`failed to spawn ${launch.command}: ${error.message}`, 'app_spawn_failed')); });
-      child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, runtimeFamily: runtime.family, ...sourceLaunch });
+      child.send({ command: runtime.executable, args: launch.args, cwd, env, workspaceDir: context.workspaceDir, identitySourceFiles: launch.identitySourceFiles, ...(launch.args[0] === staticExecutable ? { staticIdentity: identity.entries } : {}), runtimeFamily: runtime.family, ...sourceLaunch });
     });
     const origin = `http://127.0.0.1:${port}`;
     const stopPolling = new AbortController();

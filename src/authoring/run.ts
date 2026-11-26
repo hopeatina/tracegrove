@@ -97,7 +97,8 @@ function explainDiffers(message: string, output: unknown, assertions: Assertions
   const predicate = assertions.filter((a) => a.stepId === stepId).flatMap((a) => flat(a.predicate)).find((p) => p.kind === 'json_path_equals' && p.path === m[1]);
   if (!predicate || predicate.kind !== 'json_path_equals') return message;
   const o = output as { status?: unknown; body?: unknown } | null;
-  const got = [getPath({ body: output }, m[1]!), getPath({ status: o?.status, body: o?.body }, m[1]!)].find((g) => g.present);
+  const browser = BrowserObservation.safeParse(output);
+  const got = [getPath(browser.success ? { browser: browser.data } : {}, m[1]!), getPath({ body: output }, m[1]!), getPath({ status: o?.status, body: o?.body }, m[1]!)].find((g) => g.present);
   return `${m[1]} is ${got ? brief(got.value) : 'missing'}, expected ${brief(predicate.value)}`;
 }
 

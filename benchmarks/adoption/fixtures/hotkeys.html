@@ -1,0 +1,5 @@
+<!doctype html><title>Command keys</title><script src="/jquery-1.4.2.js"></script><script src="/jquery.hotkeys.js"></script>
+<label>Command <input id="command"></label><output id="result">Waiting</output>
+<script>
+  $('#command').bind('keydown', 'r', () => { result.textContent = 'Review opened'; });
+</script>

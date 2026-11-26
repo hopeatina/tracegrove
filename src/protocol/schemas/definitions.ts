@@ -4,7 +4,7 @@
  * host plan. Each carries `schemaVersion`, `ref` and `scope`; `ref.digest` is the self digest.
  */
 import { z } from 'zod';
-import { BrowserAction, BrowserLocator } from './browser.ts';
+import { BrowserAction, BrowserReadTarget } from './browser.ts';
 import { GitSnapshotBinding } from './gitSources.ts';
 import { NativeJobAction } from './nativeJob.ts';
 import { McpToolCall } from './mcp.ts';
@@ -128,7 +128,7 @@ export const UnsupportedStep = z.object({
 
 export const BrowserNavigateStep = z.object({ ...stepCommon, kind: z.literal('ui.navigate'), path: HttpTemplatePath }).strict();
 export const BrowserActionStep = z.object({ ...stepCommon, kind: z.literal('ui.action'), command: BrowserAction }).strict();
-export const BrowserObserveStep = z.object({ ...stepCommon, kind: z.literal('ui.observe'), target: BrowserLocator, predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();
+export const BrowserObserveStep = z.object({ ...stepCommon, kind: z.literal('ui.observe'), target: BrowserReadTarget, predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();
 const jobCommon = { ...stepCommon, auth: HttpAuth, captures: z.array(Capture.extend({ from: z.literal('json') })).max(32) };
 export const JobSubmitStep = z.object({ ...jobCommon, kind: z.literal('job.submit'), command: NativeJobAction.options[0] }).strict();
 export const JobObserveStep = z.object({ ...jobCommon, kind: z.literal('job.observe'), command: NativeJobAction.options[1], predicate: Predicate, pollIntervalMs: PositiveMillis }).strict();

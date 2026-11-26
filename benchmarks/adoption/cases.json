@@ -1,0 +1,1163 @@
+[
+  {
+    "repo": "gabrielecirulli/2048",
+    "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+    "page": "index.html",
+    "fixture": "2048.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Merge two tiles and read the saved board and score",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "move"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "reload"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Tile 4, score 4"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jakesgordon/javascript-tetris",
+    "commit": "e5c0c42f7dac0f3514a55eff656c6e22e95d68ed",
+    "page": "index.html",
+    "case": "Start the game and read its opening row count",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Press Space to Play.",
+            "role": "link"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "rows"
+          }
+        },
+        "expect": {
+          "text": "0"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jakesgordon/javascript-breakout",
+    "commit": "eed59e2affa9423b93d2ac8ff93061bb88b33284",
+    "page": "index.html",
+    "case": "Advance the level, refresh and read the persisted choice",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "next"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "level"
+          }
+        },
+        "expect": {
+          "text": "2"
+        }
+      },
+      {
+        "browser": {
+          "kind": "navigate",
+          "path": "/index.html"
+        },
+        "expect": {
+          "status": 200
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "level"
+          }
+        },
+        "expect": {
+          "text": "2"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "hextris/hextris",
+    "commit": "3f4847dc8fd7dab3d1c87e6324b9159d92fbd396",
+    "page": "index.html",
+    "fixture": "hextris.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Persist a round and reload the sorted top three scores",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "finish"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "load"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "100, 80, 75"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "doublespeakgames/adarkroom",
+    "commit": "1fada4620b6c66bd07bf15a3f1eb8223df8bc1d7",
+    "page": "index.html",
+    "case": "Light the fire and reveal the stoke control",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "lightButton"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "stokeButton"
+          }
+        },
+        "expect": {
+          "text": "stoke firewood1"
+        }
+      }
+    ],
+    "sources": [
+      "lib/jquery.min.js"
+    ]
+  },
+  {
+    "repo": "jbt/markdown-editor",
+    "commit": "58aa8bfe18c5a30af2c6fb08221b00b841688dd9",
+    "page": "index.html",
+    "case": "Read the rendered heading in the live Markdown preview",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "role",
+            "name": "New Document",
+            "role": "heading"
+          }
+        },
+        "expect": {
+          "text": "New Document"
+        }
+      }
+    ],
+    "expectedTitle": "New Document"
+  },
+  {
+    "repo": "SortableJS/Sortable",
+    "commit": "48b626bbc61afbb0f179730c1dd3cca3dcc8b788",
+    "page": "index.html",
+    "fixture": "sortable.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Restore a saved queue order and read the reordered DOM",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "queue"
+          }
+        },
+        "expect": {
+          "text": "DraftReview"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "restore"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "queue"
+          }
+        },
+        "expect": {
+          "text": "ReviewDraft"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "CodeSeven/toastr",
+    "commit": "50092cc604850a16c985520b63df184d3e0b4086",
+    "page": "demo.html",
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js",
+      "original": "//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js",
+      "sha256": "c12f6098e641aaca96c60215800f18f5671039aecf812217fab3c0d152f6adb4"
+    },
+    "case": "Show a toast and read the rendered message",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "role",
+            "name": "Message",
+            "role": "textbox"
+          },
+          "value": "Shipment ready"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Show Toast",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "toast-container"
+          }
+        },
+        "expect": {
+          "text": "Shipment ready"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "LeaVerou/prefixfree",
+    "commit": "cf4c0051cf54f353c1473b6a7733e931e51f8176",
+    "page": "index.html",
+    "case": "Open the FAQ and read its heading",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "FAQ",
+            "role": "link"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "role",
+            "name": "FAQ",
+            "role": "heading"
+          }
+        },
+        "expect": {
+          "text": "FAQ"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "LeaVerou/cubic-bezier",
+    "commit": "a95f0a4674ef56eb760e0413276dc13d9a70f2fa",
+    "page": "index.html",
+    "case": "Open a bookmarked curve and read its four coordinates",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "values"
+          }
+        },
+        "expect": {
+          "text": "0,0,1,1"
+        }
+      }
+    ],
+    "expectedTitle": "cubic-bezier(.17,.67,.83,.67) ✿ cubic-bezier.com",
+    "workflowEntry": "/index.html#0,0,1,1"
+  },
+  {
+    "repo": "LeaVerou/css3patterns",
+    "commit": "98adf4d231ee9f50be2b9713cbb210606385732f",
+    "page": "index.html",
+    "case": "Expand the Carbon fibre pattern and read the revealed credit",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "carbon-fibre"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "role",
+            "name": "Carbon fibre",
+            "role": "link"
+          }
+        },
+        "expect": {
+          "text": "Carbon fibre"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "LeaVerou/bliss",
+    "commit": "497bd7b9c21774e5c154209a45d8ceb168715e03",
+    "page": "index.html",
+    "concat": [
+      "bliss.js",
+      "bliss.shy.js",
+      "bliss._.js"
+    ],
+    "fixture": "bliss.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Create and attach a shipment status element with the library API",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "append"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "shipment-status"
+          }
+        },
+        "expect": {
+          "text": "Packed"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "bgrins/spectrum",
+    "commit": "101b05c1d977fbc529ae4c3b6865b1f7ab70c6e0",
+    "page": "index.html",
+    "case": "Set a color and read the value of the separate original input",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "enterAColor"
+          },
+          "value": "#123456"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "btnEnterAColor"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "triggerSet",
+            "property": "value"
+          }
+        },
+        "expect": {
+          "text": "#123456"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jackmoore/colorbox",
+    "commit": "d6490ea29cfe6ce80908011b52d5aff58114facc",
+    "page": "example1/index.html",
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "original": "https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "sha256": "89a15e9c40bc6b14809f236ee8cd3ed1ea42393c1f6ca55c7855cd779b3f922e"
+    },
+    "case": "Open the inline dialog and read its close control",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Inline HTML",
+            "role": "link"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "cboxClose"
+          }
+        },
+        "expect": {
+          "text": "close"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jackmoore/zoom",
+    "commit": "13eed6ebaf8976ede2f32258acf9086d26ed5a78",
+    "page": "demo.html",
+    "fixture": "zoom.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Toggle magnification and measure the visible zoomed image",
+    "steps": [
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "ready"
+          }
+        },
+        "expect": {
+          "text": "Loaded"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "photo"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "inspect"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Magnified"
+        }
+      }
+    ],
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "original": "http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js",
+      "sha256": "89a15e9c40bc6b14809f236ee8cd3ed1ea42393c1f6ca55c7855cd779b3f922e"
+    }
+  },
+  {
+    "repo": "jackmoore/autosize",
+    "commit": "1e0229b9bb9f51c2b6a2756d901a023b475fa950",
+    "page": "example/index.html",
+    "fixture": "autosize.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Fit a multiline note without clipping its textarea",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "note"
+          },
+          "value": "one\ntwo\nthree\nfour"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "measure"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "All lines fit"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "lonekorean/highlight-within-textarea",
+    "commit": "8e16e3acea7af5733c6a3b671194199327e0a8b2",
+    "page": "index.html",
+    "fixture": "highlight.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Type mixed-case matches and read the generated highlight elements",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "note"
+          },
+          "value": "Apple pear apple"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "inspect"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Apple, apple"
+        }
+      }
+    ],
+    "mirror": {
+      "url": "https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js",
+      "original": "https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js",
+      "sha256": "87083882cc6015984eb0411a99d3981817f5dc5c90ba24f0940420c5548d82de"
+    }
+  },
+  {
+    "repo": "zenorocha/clipboard.js",
+    "commit": "899378dee9681dcf4cb3d702c23a3f3cd9f473d8",
+    "page": "demo/target-input-number.html",
+    "case": "Enter a number and invoke the clipboard control",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "foo"
+          },
+          "value": "42"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Copy",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "foo",
+            "property": "value"
+          }
+        },
+        "expect": {
+          "text": "42"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jquery/jquery-ui",
+    "commit": "dcf10556bbcfdf3e10e3ea30966482e201191411",
+    "page": "demos/accordion/index.html",
+    "case": "Follow the accordion example link and check the destination",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Default functionality",
+            "role": "link"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "document",
+            "name": "title"
+          }
+        },
+        "expect": {
+          "text": "jQuery UI Accordion - Default functionality"
+        }
+      }
+    ],
+    "sources": [
+      "demos/accordion/default.html",
+      "ui/**/*.js",
+      "external/jquery/jquery.js"
+    ]
+  },
+  {
+    "repo": "bigskysoftware/htmx",
+    "commit": "51c3e67bcedc5568b2a968b079888f13aedf4eb7",
+    "page": "test/manual/body-swap/index.html",
+    "case": "Replace the body with the response to a button click",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Swap Body With outerHTML",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "role",
+            "name": "A New Body, should still have a red border",
+            "role": "heading"
+          }
+        },
+        "expect": {
+          "text": "A New Body, should still have a red border"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "fengyuanchen/viewerjs",
+    "commit": "b6ddf87b94b9e466409aa955e2991f99a84c5d7c",
+    "page": "docs/index.html",
+    "case": "Follow the custom-title example link and check the destination",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Custom title",
+            "role": "link"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "document",
+            "name": "title"
+          }
+        },
+        "expect": {
+          "text": "Viewer.js"
+        }
+      }
+    ],
+    "sources": [
+      "docs/examples/custom-title.html"
+    ]
+  },
+  {
+    "repo": "josdejong/jsoneditor",
+    "commit": "85dfeee8129f2a47ca67d8475327f9e3716797d5",
+    "page": "examples/03_switch_mode.html",
+    "case": "Switch the actual editor from tree to form mode",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Tree ▾",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Form",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "role",
+            "name": "Form ▾",
+            "role": "button"
+          }
+        },
+        "expect": {
+          "text": "Form ▾"
+        }
+      }
+    ],
+    "build": [
+      [
+        "npm",
+        "ci"
+      ],
+      [
+        "npm",
+        "run",
+        "build"
+      ]
+    ]
+  },
+  {
+    "repo": "josdejong/mathjs",
+    "commit": "0f5c9095c38db71180a175990c73407db4a0db70",
+    "page": "index.html",
+    "buildDir": "examples/code_editor",
+    "build": [
+      [
+        "npm",
+        "ci"
+      ],
+      [
+        "npm",
+        "run",
+        "build"
+      ]
+    ],
+    "siteRoot": "examples/code_editor/dist",
+    "case": "Evaluate an edited arithmetic expression in the code editor",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "role",
+            "name": "",
+            "role": "textbox"
+          },
+          "value": "6 * 7"
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "42"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "jeresig/jquery.hotkeys",
+    "commit": "f24f1da275aab7881ab501055c256add6f690de4",
+    "page": "test-static-01.html",
+    "expectedTitle": "",
+    "fixture": "hotkeys.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Type a registered command and observe the keyboard handler",
+    "steps": [
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "id",
+            "name": "command"
+          },
+          "value": "r"
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "Review opened"
+        }
+      }
+    ],
+    "inputMode": "keyboard"
+  },
+  {
+    "repo": "niklasvh/html2canvas",
+    "commit": "6020386bbeed60ad68e675fdcaa6220e292fd35a",
+    "page": "examples/demo.html",
+    "build": [
+      [
+        "npm",
+        "ci",
+        "--legacy-peer-deps"
+      ],
+      [
+        "npm",
+        "run",
+        "build"
+      ]
+    ],
+    "fixture": "html2canvas.html",
+    "workflowEntry": "/adoption-fixture.html",
+    "case": "Export a color swatch and read the pixel from the rendered canvas",
+    "steps": [
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "id",
+            "name": "render"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "pixel"
+          }
+        },
+        "expect": {
+          "text": "22,100,49,255"
+        }
+      }
+    ]
+  },
+  {
+    "repo": "pallets/flask",
+    "commit": "49943b5a94413a530761350f04e896f76e8d620e",
+    "app": {
+      "adapter": "flask",
+      "root": "examples/javascript",
+      "entry": "js_example:app",
+      "health": "/",
+      "sources": [
+        "js_example/**/*.py",
+        "js_example/templates/*.html"
+      ]
+    },
+    "steps": [
+      {
+        "browser": {
+          "kind": "navigate",
+          "path": "/"
+        },
+        "expect": {
+          "status": 200
+        }
+      },
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "label",
+            "name": "a"
+          },
+          "value": "19"
+        }
+      },
+      {
+        "browser": {
+          "kind": "fill",
+          "target": {
+            "by": "label",
+            "name": "b"
+          },
+          "value": "23"
+        }
+      },
+      {
+        "browser": {
+          "kind": "click",
+          "target": {
+            "by": "role",
+            "name": "Calculate",
+            "role": "button"
+          }
+        }
+      },
+      {
+        "browser": {
+          "kind": "read",
+          "target": {
+            "by": "id",
+            "name": "result"
+          }
+        },
+        "expect": {
+          "text": "42"
+        }
+      }
+    ],
+    "case": "Submit two numbers and observe the server sum in the browser",
+    "pythonPath": "src",
+    "fault": {
+      "file": "examples/javascript/js_example/views.py",
+      "before": "return jsonify(result=a + b)",
+      "after": "return jsonify(result=a + b + int(__import__(\"os\").environ.get(\"ADOPTION_BUG\") == \"wrong_sum\"))",
+      "name": "wrong_sum",
+      "step": "browser_read_5",
+      "check": "browser.text",
+      "expected": "42",
+      "got": "43"
+    }
+  },
+  {
+    "repo": "fastapi/fastapi",
+    "commit": "05e6df7e906c3decba377c37548019973f40bf15",
+    "app": {
+      "adapter": "fastapi",
+      "root": "docs_src/body_updates",
+      "entry": "tutorial002:app",
+      "health": "/items/foo",
+      "sources": [
+        "tutorial002.py"
+      ]
+    },
+    "steps": [
+      {
+        "PATCH": "/items/foo",
+        "json": {
+          "price": 73
+        },
+        "expect": 200
+      },
+      {
+        "GET": "/items/foo",
+        "observe": true,
+        "expect": {
+          "status": 200,
+          "json": {
+            "name": "Foo",
+            "price": 73
+          }
+        }
+      }
+    ],
+    "case": "PATCH one field and independently read the price and preserved name",
+    "pythonPath": ".",
+    "fault": {
+      "file": "docs_src/body_updates/tutorial002.py",
+      "before": "    items[item_id] = jsonable_encoder(updated_item)",
+      "after": "    if __import__(\"os\").environ.get(\"ADOPTION_BUG\") != \"drop_write\":\n        items[item_id] = jsonable_encoder(updated_item)",
+      "name": "drop_write",
+      "step": "get_2",
+      "check": "body.price",
+      "expected": 73,
+      "got": 50.2
+    }
+  },
+  {
+    "repo": "postmanlabs/httpbin",
+    "commit": "2c4572bb82727dca9f9fe56b835d2232bc15d531",
+    "app": {
+      "adapter": "flask",
+      "root": ".",
+      "entry": "httpbin.core:app",
+      "health": "/get",
+      "sources": [
+        "httpbin/**/*.py"
+      ]
+    },
+    "steps": [
+      {
+        "POST": "/anything",
+        "json": {
+          "order": "bench-order",
+          "quantity": 3
+        },
+        "expect": {
+          "status": 200,
+          "json": {
+            "method": "POST",
+            "json.order": "bench-order",
+            "json.quantity": 3
+          }
+        }
+      }
+    ],
+    "case": "Observe the method and structured payload echoed by the live service"
+  },
+  {
+    "repo": "expressjs/express",
+    "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+    "app": {
+      "adapter": "node",
+      "root": ".",
+      "entry": "bench-listen.cjs",
+      "health": "/",
+      "sources": [
+        "index.js",
+        "lib/**/*.js",
+        "examples/resource/index.js",
+        "bench-listen.cjs"
+      ]
+    },
+    "steps": [
+      {
+        "GET": "/users/1",
+        "observe": true,
+        "expect": {
+          "status": 200,
+          "json": {
+            "name": "ciaran"
+          }
+        }
+      },
+      {
+        "DELETE": "/users/1",
+        "expect": 200
+      },
+      {
+        "GET": "/users/1",
+        "observe": true,
+        "expect": {
+          "status": 200,
+          "json": {
+            "error": "Cannot find user"
+          }
+        }
+      }
+    ],
+    "case": "Delete a user from the example service and independently read its removal",
+    "build": [
+      [
+        "npm",
+        "install",
+        "--no-audit",
+        "--no-fund"
+      ]
+    ],
+    "nodeExport": "./examples/resource"
+  }
+]

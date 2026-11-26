@@ -1,0 +1,2990 @@
+{
+  "repositories": [
+    {
+      "repo": "bgrins/spectrum",
+      "commit": "101b05c1d977fbc529ae4c3b6865b1f7ab70c6e0",
+      "missingAssets": [
+        "img/glyphicons-halflings-white.png",
+        "img/glyphicons-halflings.png"
+      ],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_378e7658d46d4377",
+        "source": "0d5b0a91492a5094cb4dc24665bbe676381f7f1ad44a13d6714e04f537f060d4",
+        "manifestSha256": "b52cf6eb41bb05020f03d10f424c84fdd61f529bc934a1d75209e2f8c52ffe4c",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Spectrum - The No Hassle jQuery Colorpicker",
+                "observed": "Spectrum - The No Hassle jQuery Colorpicker",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "#123456",
+                "observed": "#123456",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_55b91baacb4035be",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "ed8f44ff1fd879a4a712d9de1e236ccab5e1572eceb66f08d7ea38bc92032548",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Spectrum - The No Hassle jQuery Colorpicker\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Spectrum - The No Hassle jQuery Colorpicker",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Set a color and read the value of the separate original input",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "bigskysoftware/htmx",
+      "commit": "51c3e67bcedc5568b2a968b079888f13aedf4eb7",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_ce5e965c22879d8f",
+        "source": "01e2952f58d3be6e921696b7f4152a55b8d5fcc9103dcee99a4562d7afaad5f6",
+        "manifestSha256": "43b09bce7be67ae541f60185b0e8fc7319696e29cd1a2a1e89754096f361c024",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Body Swap Test",
+                "observed": "Body Swap Test",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "A New Body, should still have a red border",
+                "observed": "A New Body, should still have a red border",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_cbc0fcfc805ec1f7",
+        "source": "855a4d241da0c9b2d2029ea85914bd401a47d8a128de80e39911111507503e06",
+        "manifestSha256": "e93eea25c5b1567646bf5280727198d2c3a067ae3bb4e9c01069a7c13c9e9031",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Body Swap Test\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Body Swap Test",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Replace the body with the response to a button click",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    },
+    {
+      "repo": "CodeSeven/toastr",
+      "commit": "50092cc604850a16c985520b63df184d3e0b4086",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "http://netdna.bootstrapcdn.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_2307ca91a4001ded",
+        "source": "72fd9469f475b255931cb00cd514266db54b6d21a00761b7b1bba16db885311b",
+        "manifestSha256": "93a52eea244a4af1c5c402d3ed623189090dcb5f058131c778ccd9e7e911576f",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "toastr examples",
+                "observed": "toastr examples",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Shipment ready",
+                "observed": "Shipment ready",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_271115cb1fe72947",
+        "source": "582dce9d40cd2dd6919df4ac8c137dd26256fd9f9fd5510a421c791b225bfa33",
+        "manifestSha256": "854c936773ef2bb9f0b0ac5ea4a60768ce382b726bba7d3924cf873b5d39d76e",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"toastr examples\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "toastr examples",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Show a toast and read the rendered message",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "doublespeakgames/adarkroom",
+      "commit": "1fada4620b6c66bd07bf15a3f1eb8223df8bc1d7",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://ajax.googleapis.com",
+        "https://www.googletagmanager.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_60d90836b6b38616",
+        "source": "2acd7df1711155faaaf3ffc8823ded9005169907d54d89d9ebf0c76eb5281359",
+        "manifestSha256": "c11a8b0cb20c941b648dccfbdd9a7caf169776a363f916ce488bd795d19c2fd8",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "A Dark Room",
+                "observed": "A Dark Room",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "stoke firewood1",
+                "observed": "stoke firewood1",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_e59d9aa6f4d41ed9",
+        "source": "fefe2568a456d2335b2956a80d8e146576760c0b1e3427c4b61632aff807fce4",
+        "manifestSha256": "b7271c2149e9ad640c3577beb91d7a84c480c544c765b2951327d556966330c3",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"A Dark Room\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "A Dark Room",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Light the fire and reveal the stoke control",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "command_adapter_unqualified"
+      }
+    },
+    {
+      "repo": "expressjs/express",
+      "commit": "43fca52d28a422c8be48fd489cbd4f2d6152bab6",
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_6b51f6e1546ec715",
+        "source": "36ccb2b5a5e708fa590b0335c0bcec8cd897c1b594b86f57abf5b8444398b606",
+        "manifestSha256": "6f1cb8953be9e22ab3171200aeb8a6ae59ebb3618c2af8b005a6a80cf5c1f63e",
+        "cases": [
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "get_1",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "get_1",
+                "field": "body.name",
+                "expected": "ciaran",
+                "observed": "ciaran",
+                "held": true
+              },
+              {
+                "step": "delete_2",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "get_3",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "get_3",
+                "field": "body.error",
+                "expected": "Cannot find user",
+                "observed": "Cannot find user",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "workflow": "Delete a user from the example service and independently read its removal",
+      "workflowSurface": "upstream application or example"
+    },
+    {
+      "repo": "fastapi/fastapi",
+      "commit": "05e6df7e906c3decba377c37548019973f40bf15",
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_2fa62949c9f4b83e",
+        "source": "e85022969b2032437ae288ad41758df1b9602df252a934eab6caa57987150752",
+        "manifestSha256": "4231b877a15e339fc03455c78dbf81fc59f27f3ba88e2ea8181d40cbf9a4ac87",
+        "cases": [
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "patch_1",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "get_2",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "get_2",
+                "field": "body.name",
+                "expected": "Foo",
+                "observed": "Foo",
+                "held": true
+              },
+              {
+                "step": "get_2",
+                "field": "body.price",
+                "expected": 73,
+                "observed": 73,
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "namedFault": {
+        "name": "drop_write",
+        "caught": true,
+        "check": "body.price",
+        "healthy": 73,
+        "broken": 50.2,
+        "reason": ""
+      },
+      "workflow": "PATCH one field and independently read the price and preserved name",
+      "workflowSurface": "upstream application or example"
+    },
+    {
+      "repo": "fengyuanchen/viewerjs",
+      "commit": "b6ddf87b94b9e466409aa955e2991f99a84c5d7c",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://cdn.carbonads.com",
+        "https://fengyuanchen.github.io",
+        "https://unpkg.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_2fd923c59f37dec4",
+        "source": "3fc326117285a9748580bdc8f6d2a5ff56e0bb7a9ae3b05f36940533316f6bca",
+        "manifestSha256": "279510b422cb6c2a313578cc1518bcb8b9f27258d44ebe5de0e1385e985a604c",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Viewer.js",
+                "observed": "Viewer.js",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Viewer.js",
+                "observed": "Viewer.js",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_0a35a5f7838ea790",
+        "source": "af541c1ee1a13959fd90b186ffa5e03bfe71a42a419964f2727dedf1da0bfb4e",
+        "manifestSha256": "8aacf1a2dfa1b9c59af4e6b50369a035c309fe6719e4e228a47c9fcc58cf886c",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Viewer.js\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Viewer.js",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Follow the custom-title example link and check the destination",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "command_adapter_unqualified"
+      }
+    },
+    {
+      "repo": "gabrielecirulli/2048",
+      "commit": "478b6ec346e3787f589e4af751378d06ded4cbbc",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_e4cf81170090b458",
+        "source": "8eb7e9e9dee2f95bd0818e937fef989d2301c131271360666b1ce61c895d1e67",
+        "manifestSha256": "dc9a5d69ed49c8d1bd9babc2a10e9a0ee7a232415bb357f47355a83d68b0e943",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "2048",
+                "observed": "2048",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Tile 4, score 4",
+                "observed": "Tile 4, score 4",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_517c36acfa7fa273",
+        "source": "b8547268e2c3079782e7a5696a835c3fe7c4415389e788a511e1e5e595baf987",
+        "manifestSha256": "77ce1162aa59a72834d614248eb2cbdd176d4dd6f17f41350603d2d575cfc02e",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"2048\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "2048",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Merge two tiles and read the saved board and score",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "hextris/hextris",
+      "commit": "3f4847dc8fd7dab3d1c87e6324b9159d92fbd396",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "http://fonts.googleapis.com",
+        "https://pagead2.googlesyndication.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_4667a05b6a4c9a2e",
+        "source": "4b42c25fdce9c14fb80ecfe5950785d6b6df36a23711a35a7d43b0f66dcd413b",
+        "manifestSha256": "28c5fbf26ead9d2fda67795fbd2ff528f7fcaed17e7438dc454329abb7384080",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Hextris",
+                "observed": "Hextris",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "100, 80, 75",
+                "observed": "100, 80, 75",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_2e280fa795e1af7b",
+        "source": "378fe4c067c494a96e6fa9ee29ccb53592a790aa497e7d9e6f9dee48f27d65c5",
+        "manifestSha256": "49f6adb6749881f15958804bf0981b2810125054179bb3dbf7abde66a431aaba",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Hextris\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Hextris",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Persist a round and reload the sorted top three scores",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "jackmoore/autosize",
+      "commit": "1e0229b9bb9f51c2b6a2756d901a023b475fa950",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_4abaad9c1a4ad4aa",
+        "source": "c4f632a3c4773a6ad1b08dfe889df1649b86b4d647225d63bf853e85c1c5891d",
+        "manifestSha256": "2eb58586ace94edb4ce5556627b534e3df7076a992c84072690d1b645bac8558",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Simple Autosize for textareas",
+                "observed": "Simple Autosize for textareas",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "All lines fit",
+                "observed": "All lines fit",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_ff3a5818c1711d7c",
+        "source": "3387c12ceb463f9ea7f883d814ce6171990ae377321b45e3dfe1b49d81430094",
+        "manifestSha256": "19c4ed3340ebe9b4c27d3493e48b20a5e38766c22b53e0e99f7dadef0ea07174",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Simple Autosize for textareas\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Simple Autosize for textareas",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Fit a multiline note without clipping its textarea",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "jackmoore/colorbox",
+      "commit": "d6490ea29cfe6ce80908011b52d5aff58114facc",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_d79c3194d313d4c1",
+        "source": "15f1ac2cbf7b00b41cc10dbb2e8ab386b952032cec87e08173a46f524e265188",
+        "manifestSha256": "a325a0ea3a7cac118f209ccc9b04881a7ca4f792ed5dadebe087a8972acbba1b",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Colorbox Examples",
+                "observed": "Colorbox Examples",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "close",
+                "observed": "close",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_8b3d806eb69760b9",
+        "source": "8054b9b3d1a68d6c19963a45e26bd86f6041620305b7361eede8c5bf2f305d83",
+        "manifestSha256": "959b27c32980a1f99bf5d6c2f754b4c7f72a64e75efbe97db5b111a48a4c18dd",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Colorbox Examples\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Colorbox Examples",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Open the inline dialog and read its close control",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    },
+    {
+      "repo": "jackmoore/zoom",
+      "commit": "13eed6ebaf8976ede2f32258acf9086d26ed5a78",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_b6345460aef3c9c5",
+        "source": "1fbe8dfca8c05bdfd979d192a0ffcd21e94027a77132d3ce98865264d764321b",
+        "manifestSha256": "099eb1f8d54c23df13948c269727ae11aa7ad81ffb5c920d7934955f4c65a39b",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "jQuery Zoom Demo",
+                "observed": "jQuery Zoom Demo",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "Loaded",
+                "observed": "Loaded",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_4",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_5",
+                "field": "browser.text",
+                "expected": "Magnified",
+                "observed": "Magnified",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_ee3b3569166b61ed",
+        "source": "d97bcb0874ef070dc2b2a320c905a575b4bedf1ee7682365d58aa0837c13cc3b",
+        "manifestSha256": "86b307102eb793f9162ca42da591340551750b0ba9e39d1cf54ec9d1da9c2842",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"jQuery Zoom Demo\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "jQuery Zoom Demo",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Toggle magnification and measure the visible zoomed image",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "jakesgordon/javascript-breakout",
+      "commit": "eed59e2affa9423b93d2ac8ff93061bb88b33284",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_3bb7e46a829eaf1f",
+        "source": "6de65b16527355aefb3a2b49c09345414ff11b621bb8953325c9607e951dcdb0",
+        "manifestSha256": "13b729f1db67558ee24b576328760dda1676893f66dbae20cf2b69ee06847353",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Javascript Breakout",
+                "observed": "Javascript Breakout",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "2",
+                "observed": "2",
+                "held": true
+              },
+              {
+                "step": "browser_navigate_4",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_5",
+                "field": "browser.text",
+                "expected": "2",
+                "observed": "2",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_04b2d75ee3087f31",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "82d70efe70e200d01db34d07b0c9d576baac5a0d29c73728f71795730e7b9e9e",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Javascript Breakout\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Javascript Breakout",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Advance the level, refresh and read the persisted choice",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "jakesgordon/javascript-tetris",
+      "commit": "e5c0c42f7dac0f3514a55eff656c6e22e95d68ed",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_189e3e4ce61c97f5",
+        "source": "02ef388763faa3caa2b0d629472ffc45f95e790434eb6394e48eedbcecc7fda9",
+        "manifestSha256": "311c0eae2c07be5a144aadf8e3cd19e2234f014effb3b0c4616e7d8896a51e7e",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Javascript Tetris",
+                "observed": "Javascript Tetris",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "0",
+                "observed": "0",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_2933af724455401a",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "ae1a36938f4c136acd484fa8d9ecb697c7e7ab6d30b99001738e4684ae954429",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Javascript Tetris\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Javascript Tetris",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Start the game and read its opening row count",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "jbt/markdown-editor",
+      "commit": "58aa8bfe18c5a30af2c6fb08221b00b841688dd9",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_63594d72ce3c6c26",
+        "source": "d4ebf8b4ff32dcc75c948c17176c671bd584d2bbdad9d32ad64b43e2988cb02e",
+        "manifestSha256": "1542a15e97856ea0bd386a1898732c1b6aea9a508ae887627d749a9405e194c8",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "New Document",
+                "observed": "New Document",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "New Document",
+                "observed": "New Document",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_78f49cff05357acd",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "525cbc913ce2e5b098c22bc95919631d147aa95f89319ad107710d7395a529d9",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"New Document\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "New Document",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Read the rendered heading in the live Markdown preview",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "assertion_failed"
+      }
+    },
+    {
+      "repo": "jeresig/jquery.hotkeys",
+      "commit": "f24f1da275aab7881ab501055c256add6f690de4",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_aec4019dcb4a3875",
+        "source": "3e8a098e28d65d97791d5804d2f261ff5c64c1ef30257ca025822a39f13addf8",
+        "manifestSha256": "fd4f5281928ffe73f9cccc467a712878f2edfe97c6f3f85bbe9f3485c99c9ad3",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "",
+                "observed": "",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Review opened",
+                "observed": "Review opened",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_e4308a94f91f639f",
+        "source": "87c5291d97257c226944b64897932d272bf32d98dc38f4d96575bf9df1601253",
+        "manifestSha256": "9b9f73ac56a1587344a3ec255df9bdc96e401d8d6f638f0b72650dc930fb69e6",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Type a registered command and observe the keyboard handler",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    },
+    {
+      "repo": "josdejong/jsoneditor",
+      "commit": "85dfeee8129f2a47ca67d8475327f9e3716797d5",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_c3b38c173895c891",
+        "source": "5e2c14c585e13845974ee7937417ccae10172b3c805b80695998bc31a5162382",
+        "manifestSha256": "39dcf4f26a256c3deb2608441f37797713407bab97f4d1f65c111b84e6c73efb",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "JSONEditor | Switch mode",
+                "observed": "JSONEditor | Switch mode",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Form ▾",
+                "observed": "Form ▾",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_0f11abe5183b5847",
+        "source": "081e09cf06855d0e637723e6ca33f765e1c5d308d871c8bc948a8acfa8c026a8",
+        "manifestSha256": "604608263c1f8d8a21e76d1edcd719f8d1d2c869d36b79814e4d6f1ec57ebc00",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"JSONEditor | Switch mode\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "JSONEditor | Switch mode",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Switch the actual editor from tree to form mode",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "command_adapter_unqualified"
+      }
+    },
+    {
+      "repo": "josdejong/mathjs",
+      "commit": "0f5c9095c38db71180a175990c73407db4a0db70",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_14c145be2b523332",
+        "source": "e7d6a3b46748dbe7ed6dac3fa6f65a7ea4d4a54ba796aaa61fed7abaabd4e130",
+        "manifestSha256": "08d76cacb0ced230264738c91b1d6d307fb1a837183fbb0e53e4a137e684ca2f",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "math.js | code editor",
+                "observed": "math.js | code editor",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "42",
+                "observed": "42",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_740c6419d15d52f5",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "ee83fee981d7567bf75a8decde4e8202dd883b1ab548c19eb0d94e38496b9d17",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"math.js | code editor\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "math.js | code editor",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Evaluate an edited arithmetic expression in the code editor",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "prerequisite_unavailable",
+        "after": "too_many_source_files"
+      }
+    },
+    {
+      "repo": "jquery/jquery-ui",
+      "commit": "dcf10556bbcfdf3e10e3ea30966482e201191411",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_a547c43302f7ec5d",
+        "source": "e30f24684cf9f2cb38b733fe355eefbcd694149af3d2ad664ba1f098d56e2ca1",
+        "manifestSha256": "c407047d26e639fae52f6d14a1e03628a3b9eea3335fc01cb51f7a97f1e9d684",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "jQuery UI Accordion Demos",
+                "observed": "jQuery UI Accordion Demos",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "jQuery UI Accordion - Default functionality",
+                "observed": "jQuery UI Accordion - Default functionality",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_a959f5bd955e58f6",
+        "source": "3cb22f7b9562434da63f101a9bb3cfbfbdff1b4e7bcf3b77b5325eb00f8b49d0",
+        "manifestSha256": "d5a80187a4349a261a2b7ae454e812484898816c7f4175c9e4e5d1dee48d8589",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"jQuery UI Accordion Demos\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "jQuery UI Accordion Demos",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Follow the accordion example link and check the destination",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "prerequisite_unavailable",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "LeaVerou/bliss",
+      "commit": "497bd7b9c21774e5c154209a45d8ceb168715e03",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://polyfill.io"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_19a8ca1bd876677d",
+        "source": "4eb6c82082bbf1dc7361164e54ca86125bef0506d38111cfa476c22245fb97ca",
+        "manifestSha256": "1355626287df70db2d6e4a3339f32a7204aa7eee675f79a8d45e79361fdbc5dd",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Bliss.js — Heavenly JavaScript!",
+                "observed": "Bliss.js — Heavenly JavaScript!",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Packed",
+                "observed": "Packed",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_667ab339a986501f",
+        "source": "2df24708f00972d816ff19ca8d48ed9ac13347360d335c6d8c12226372da8efd",
+        "manifestSha256": "38b5474261e97c40a9b7bf62c1e78f380658b6bd5fa2bc69e033818a2306fe41",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Bliss.js — Heavenly JavaScript!\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Bliss.js — Heavenly JavaScript!",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Create and attach a shipment status element with the library API",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    },
+    {
+      "repo": "LeaVerou/css3patterns",
+      "commit": "98adf4d231ee9f50be2b9713cbb210606385732f",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "http://bytesizematters.com",
+        "https://leaverou.github.io",
+        "https://www.google-analytics.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_522a671c91e99a4d",
+        "source": "2ca3601072b07ee936a43150959fa615194ce0b01585c1ef8d45a03795991f82",
+        "manifestSha256": "3cc94dd4f0211b2a6143b5e10a5d467ce5b8cc611e199eb1f1a70801e48f0bfb",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "CSS3 Patterns Gallery",
+                "observed": "CSS3 Patterns Gallery",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "Carbon fibre",
+                "observed": "Carbon fibre",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_eb380ed81b9e0b97",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "24801aed7672a8dcf5c94cb49f868cc9bb92f093b998827028841c219220e4be",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"CSS3 Patterns Gallery\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "CSS3 Patterns Gallery",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Expand the Carbon fibre pattern and read the revealed credit",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "LeaVerou/cubic-bezier",
+      "commit": "a95f0a4674ef56eb760e0413276dc13d9a70f2fa",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "http://cdn.carbonads.com",
+        "https://www.google-analytics.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_41d96e5e43e2b875",
+        "source": "c8f576331a983189b7d09e20fcca9c867be37b94f10b32cb3bad618ec1c47dca",
+        "manifestSha256": "fa995343b5b096bdd0c7f09ff3ab5f03ee0b9af9e611fdcc5d3b01989c7a89c9",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "cubic-bezier(.17,.67,.83,.67) ✿ cubic-bezier.com",
+                "observed": "cubic-bezier(.17,.67,.83,.67) ✿ cubic-bezier.com",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "0,0,1,1",
+                "observed": "0,0,1,1",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_702081524761310a",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "817ffba70cdc7d16355ca3d7720f41f26a95ca0d5838cd99fec054ec360b504d",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"cubic-bezier(.17,.67,.83,.67) ✿ cubic-bezier.com\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "cubic-bezier(.17,.67,.83,.67) ✿ cubic-bezier.com",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Open a bookmarked curve and read its four coordinates",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "assertion_failed"
+      }
+    },
+    {
+      "repo": "LeaVerou/prefixfree",
+      "commit": "cf4c0051cf54f353c1473b6a7733e931e51f8176",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://platform.twitter.com",
+        "https://www.google-analytics.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_9ca4b97863e02e12",
+        "source": "cd6629fa8cf0c5b9a7203f1899a7e9e134322a947bd20b56534e53f70ffe8830",
+        "manifestSha256": "9a111c914bdbefe5be62951e04e03979ceb68a990f9bc54f07ebc6ca27231715",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Prefix free: Break free from CSS vendor prefix hell!",
+                "observed": "Prefix free: Break free from CSS vendor prefix hell!",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "FAQ",
+                "observed": "FAQ",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_dad010ae1c3a581c",
+        "source": "e7e428aeee5b63278fc48bd3559f64ca8c266db3964736f20c88dab067552b45",
+        "manifestSha256": "eea242e192cc9b89d945af7a2cd34e0a021860899f3d395b66810ee5e66a42e7",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Prefix free: Break free from CSS vendor prefix hell!\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Prefix free: Break free from CSS vendor prefix hell!",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Open the FAQ and read its heading",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "lonekorean/highlight-within-textarea",
+      "commit": "8e16e3acea7af5733c6a3b671194199327e0a8b2",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://fonts.googleapis.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_4747cdc5ea2ee809",
+        "source": "aea97ea417273e7f231c8d0e739d0eaa05a12649b6ae71a1d04ebf971801c969",
+        "manifestSha256": "1a14a714cb4edd258af2ee672690bdfa0d2479e7b4a9065bf2ff45d8ca921e92",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Highlight Within Textarea",
+                "observed": "Highlight Within Textarea",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "Apple, apple",
+                "observed": "Apple, apple",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_21eeba9c76dcc2b0",
+        "source": "6bde8994b27393e8d1ea54309b008a46f90a6f234bde6da46f186cca09e90e6c",
+        "manifestSha256": "ac177ed4f23b46fe63415f51e1bdf287d17b2997f39c8dc77c723a9dbf8ebb17",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"Highlight Within Textarea\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "Highlight Within Textarea",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Type mixed-case matches and read the generated highlight elements",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "passed"
+      }
+    },
+    {
+      "repo": "niklasvh/html2canvas",
+      "commit": "6020386bbeed60ad68e675fdcaa6220e292fd35a",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_149b3b752a65d125",
+        "source": "79839ee0caf2afc33941b528e3d45f1abcdefa5644ebfa25e3558531da227444",
+        "manifestSha256": "70c4864eb88e04c9107831a1f86ced3f7c0623b212bb927219c5c051dee350dd",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "display/box/float/clear test",
+                "observed": "display/box/float/clear test",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_click_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_3",
+                "field": "browser.text",
+                "expected": "22,100,49,255",
+                "observed": "22,100,49,255",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_7fc5a3ace5511421",
+        "source": "f7c83bcfff752016c8a89a016d748aa8e5e20036d4998529ab99303bc92f3cac",
+        "manifestSha256": "89c44f5029f22b23e87abca3c7cdade87314bf27222f01e3eab6f758bd544342",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"display/box/float/clear test\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "display/box/float/clear test",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Export a color swatch and read the pixel from the rendered canvas",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "command_adapter_unqualified",
+        "after": "command_adapter_unqualified"
+      }
+    },
+    {
+      "repo": "pallets/flask",
+      "commit": "49943b5a94413a530761350f04e896f76e8d620e",
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_7982d228af1988c9",
+        "source": "96a9be511bc4a92e5055d71469548ff1289355d390956a17ad3f332eb641c365",
+        "manifestSha256": "c134de4f8022e30d1b39d509a883d660e82142bc4214595390cbc47fb8239417",
+        "cases": [
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_fill_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_4",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_5",
+                "field": "browser.text",
+                "expected": "42",
+                "observed": "42",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "namedFault": {
+        "name": "wrong_sum",
+        "caught": true,
+        "check": "browser.text",
+        "healthy": "42",
+        "broken": "43",
+        "reason": ""
+      },
+      "workflow": "Submit two numbers and observe the server sum in the browser",
+      "workflowSurface": "upstream application or example"
+    },
+    {
+      "repo": "postmanlabs/httpbin",
+      "commit": "2c4572bb82727dca9f9fe56b835d2232bc15d531",
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_87fe7b95d0d6798e",
+        "source": "77af68eb213e8baae42c749371737da54a3400a6dd1c21e5126a8305736090e9",
+        "manifestSha256": "30b46e7119bd9a92e9e0079145e878e24b3092049b672b6a8158dc8ea5e75df5",
+        "cases": [
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "post_1",
+                "field": "status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "post_1",
+                "field": "body.method",
+                "expected": "POST",
+                "observed": "POST",
+                "held": true
+              },
+              {
+                "step": "post_1",
+                "field": "body.json.order",
+                "expected": "bench-order",
+                "observed": "bench-order",
+                "held": true
+              },
+              {
+                "step": "post_1",
+                "field": "body.json.quantity",
+                "expected": 3,
+                "observed": 3,
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "workflow": "Observe the method and structured payload echoed by the live service",
+      "workflowSurface": "upstream application or example"
+    },
+    {
+      "repo": "SortableJS/Sortable",
+      "commit": "48b626bbc61afbb0f179730c1dd3cca3dcc8b788",
+      "missingAssets": [],
+      "externalAssetOrigins": [
+        "https://stackpath.bootstrapcdn.com",
+        "https://use.fontawesome.com"
+      ],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_af67ea84ca92bb54",
+        "source": "e1652f1356c38ea354a632580b03f4643f4ac489aa6c3bff2e5102531e8601d0",
+        "manifestSha256": "b96785c9b7aa9004451fd646d9e56848417c6aeccca45b3da8662c271d831b89",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "SortableJS",
+                "observed": "SortableJS",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_read_2",
+                "field": "browser.text",
+                "expected": "DraftReview",
+                "observed": "DraftReview",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "ReviewDraft",
+                "observed": "ReviewDraft",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_0a8341c7c28965a4",
+        "source": "f6a3ecc2f72292879f22bed0e83f6e09ca50d4b5cbf2f7fb8c8de8f031542bb0",
+        "manifestSha256": "feb3ff2ecabb7f328910c6c152526964c98c57d3feeb429c31433a7234a05ad1",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"SortableJS\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "SortableJS",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Restore a saved queue order and read the reordered DOM",
+      "workflowSurface": "integration fixture",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    },
+    {
+      "repo": "zenorocha/clipboard.js",
+      "commit": "899378dee9681dcf4cb3d702c23a3f3cd9f473d8",
+      "missingAssets": [],
+      "externalAssetOrigins": [],
+      "healthy": {
+        "outcome": "passed",
+        "verified": true,
+        "execution": "exec_34f324e45137f255",
+        "source": "de1df5a77132bfcf5c773db11b0c23106d9e456313d12beaab70e2a4599ec2d2",
+        "manifestSha256": "cb16703f75b5f474a41cc47f473a981340e2c7f0cb9983b5225ad4fe431de0fc",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "target-input-number",
+                "observed": "target-input-number",
+                "held": true
+              }
+            ]
+          },
+          {
+            "id": "workflow",
+            "outcome": "passed",
+            "failure": null,
+            "checks": [
+              {
+                "step": "browser_navigate_1",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "browser_fill_2",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_click_3",
+                "field": "step result",
+                "expected": "completed",
+                "observed": "completed",
+                "held": true
+              },
+              {
+                "step": "browser_read_4",
+                "field": "browser.text",
+                "expected": "42",
+                "observed": "42",
+                "held": true
+              }
+            ]
+          }
+        ]
+      },
+      "control": {
+        "outcome": "assertion_failed",
+        "verified": true,
+        "execution": "exec_d036747d76c6ac85",
+        "source": "28fcf8485cbac80a85737e5dd4b63187c31e8a3483df0acb8408184e343bf6ac",
+        "manifestSha256": "22853f87dcd582029d9a3667df956990568fc422ae71fd9e34fe57134a182f38",
+        "cases": [
+          {
+            "id": "page",
+            "outcome": "assertion_failed",
+            "failure": {
+              "step": "check the document title",
+              "message": "browser.text is \"TraceGrove wrong deployment control\", expected \"target-input-number\"",
+              "observed": "TraceGrove wrong deployment control"
+            },
+            "checks": [
+              {
+                "step": "open_the_page",
+                "field": "browser.status",
+                "expected": 200,
+                "observed": 200,
+                "held": true
+              },
+              {
+                "step": "check_the_document_title",
+                "field": "browser.text",
+                "expected": "target-input-number",
+                "observed": "TraceGrove wrong deployment control",
+                "held": false
+              }
+            ]
+          }
+        ]
+      },
+      "caught": true,
+      "workflow": "Enter a number and invoke the clipboard control",
+      "workflowSurface": "upstream application or example",
+      "ordinaryInit": {
+        "before": "infrastructure_failed",
+        "after": "infrastructure_failed"
+      }
+    }
+  ],
+  "recordingAndImpact": {
+    "repo": "jakesgordon/javascript-breakout",
+    "commit": "eed59e2affa9423b93d2ac8ff93061bb88b33284",
+    "recorder": {
+      "independentVerification": true,
+      "outcome": "passed",
+      "transition": [
+        "1",
+        "2"
+      ]
+    },
+    "impact": {
+      "selected": [
+        "advance-level"
+      ],
+      "full": false,
+      "baselineCases": 2,
+      "referenceOutcome": "passed",
+      "selectedOutcome": "passed",
+      "missed": []
+    }
+  }
+}

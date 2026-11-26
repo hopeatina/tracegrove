@@ -118,7 +118,7 @@ Start here:
 
 Everyday commands (tracegrove.config.yaml or tracegrove.config.ts, found by walking up from the current folder):
   (no command)                                         where this project stands and what to run next
-  init [--dir <dir>] [--force]                         detect FastAPI / Django / Node and write a config + example flow
+  init [--dir <dir>] [--static <page.html>] [--force]   initialize a service or a local static site
   test [--grep <text>] [--tag a,b] [--json|--jsonl]    compile, plan, run and verify; writes .tracegrove/runs/<run>/
        [--env <name>] [--agent <name>]                 run in a declared environment (default: TRACEGROVE_ENV, settings, local)
        [--heal]                                        on failure, heal and re-run (see heal)
@@ -310,8 +310,8 @@ async function main(argv: string[]): Promise<number> {
 
     case 'init': {
       const dir = resolve(flag(args, 'dir') ?? '.');
-      const result = initProject(dir, { force: args.flags.force === true });
-      out(args, result, `${result.detection.reason}: adapter ${result.detection.adapter}\nwrote:\n${result.files.map((f) => `  ${f}`).join('\n')}\n\nAdd this to your app's test-mode auth so personas work:\n\n${result.snippet}\n\nnext: tracegrove test`);
+      const result = initProject(dir, { force: args.flags.force === true, ...(args.flags.static ? { staticEntry: args.flags.static } : {}), ...(args.flags.title ? { expectedTitle: args.flags.title } : {}) });
+      out(args, result, `${result.detection.reason}: adapter ${result.detection.adapter}\nwrote:\n${result.files.map((f) => `  ${f}`).join('\n')}\n\n${result.detection.adapter === 'static' ? result.snippet : `Add this to your app's test-mode auth so personas work:\n\n${result.snippet}`}\n\nnext: tracegrove test`);
       return 0;
     }
 

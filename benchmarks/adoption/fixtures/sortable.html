@@ -1,0 +1,7 @@
+<!doctype html><title>Queue order</title><script src="/Sortable.min.js"></script>
+<ol id="queue"><li data-id="draft">Draft</li><li data-id="review">Review</li></ol>
+<button id="restore">Restore saved order</button>
+<script>
+  const sortable = Sortable.create(queue);
+  restore.onclick = () => sortable.sort(['review', 'draft']);
+</script>

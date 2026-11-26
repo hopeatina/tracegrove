@@ -188,6 +188,8 @@ The call still sounds right. The readback from the clinic's own system is what f
 
 The bug command runs a healthy control and a second launch with the fault enabled. Its comparison page shows both call transcripts and both appointment reads. The JSON output names the sealed runs and the exact case, step, assertion and observations.
 
+For a static site or a library's browser demo, run `tracegrove init --static path/to/index.html`, `tracegrove setup browsers`, then `tracegrove test`. Flask apps can use a native `module:app` or factory entry. [Setup and workflow examples](docs/workflow-proof.md) · [Results on 29 external repositories](benchmarks/adoption/README.md).
+
 On your own project, `tracegrove record` turns a local Chromium session into a verified flow. `tracegrove test --prove-faults` checks the flow against named defects. `tracegrove impact` uses a verified baseline to select PR cases and compares them with a full run. [Commands and examples](docs/workflow-proof.md).
 
 ## Pick a scenario

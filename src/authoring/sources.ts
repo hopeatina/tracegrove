@@ -50,9 +50,11 @@ export function defaultSourceGlobs(): string[] {
   return [`**/*.{${DEFAULT_EXTENSIONS.join(',')}}`];
 }
 
-export function expandSources(root: string, globs: string[], extraSkip: string[] = []): string[] {
+export function expandSources(root: string, globs: string[], extraSkip: string[] = [], includeBuildOutput = false): string[] {
   const files: string[] = [];
-  walk(root, '', files, new Set([...SKIP_DIRS, ...extraSkip]));
+  const skip = new Set([...SKIP_DIRS, ...extraSkip]);
+  if (includeBuildOutput) { skip.delete('build'); skip.delete('dist'); }
+  walk(root, '', files, skip);
   const patterns = globs.map(globToRegExp);
   const matched = files.filter((file) => patterns.some((pattern) => pattern.test(file))).sort();
   if (matched.length === 0) throw new Blocked([{ code: 'no_source_files', detail: `app.sources ${JSON.stringify(globs)} matched no files under ${root}`, owner: 'test author', action: 'set app.sources to the files that make up the app' }]);

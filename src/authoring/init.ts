@@ -1,7 +1,9 @@
 /** `tracegrove init`: detect the framework, write a config, an example flow and a .gitignore entry. */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { Blocked } from '../core/errors.ts';
+import { stringify } from 'yaml';
+import { staticPage, pageRoute } from './staticPage.ts';
 import { ADAPTERS } from './schema.ts';
 import { CONFIG_FILE, STATE_DIR, configInDirectory } from './compile.ts';
 
@@ -23,28 +25,45 @@ export function detect(root: string): Detection {
   const managePy = existsSync(join(root, 'manage.py')) ? '.' : readdirSync(root, { withFileTypes: true }).find((e) => e.isDirectory() && existsSync(join(root, e.name, 'manage.py')))?.name;
   if (managePy) return { adapter: 'django', entry: managePy, sources: [`${managePy === '.' ? '' : `${managePy}/`}**/*.py`], reason: `found ${managePy === '.' ? '' : `${managePy}/`}manage.py` };
   const pyDeps = read(join(root, 'pyproject.toml')) + read(join(root, 'requirements.txt'));
-  if (/fastapi/i.test(pyDeps) || existsSync(join(root, 'main.py'))) {
+  const flask = /\bflask\b/i.test(pyDeps);
+  if (/fastapi/i.test(pyDeps) || flask || ['app.py', 'main.py'].some(file => existsSync(join(root, file)))) {
     for (const file of pyFiles(root)) {
-      const match = read(file).match(/^(\w+)\s*=\s*FastAPI\(/m);
-      if (match) {
-        const module = relative(root, file).replace(/\.py$/, '').split(sep).join('.');
-        return { adapter: 'fastapi', entry: `${module}:${match[1]}`, sources: ['**/*.py'], reason: `found FastAPI app in ${relative(root, file)}` };
+      const source = read(file);
+      const match = source.match(/^(\w+)\s*=\s*(FastAPI|Flask)\(/m);
+      const factory = !match && /\bFlask\(/.test(source) && /^def create_app\(/m.test(source);
+      if (match || factory) {
+        const module = relative(root, file).replace(/\.py$/, '').split(sep).join('.').replace(/\.__init__$/, '');
+        const adapter = match?.[2] === 'FastAPI' ? 'fastapi' : 'flask';
+        return { adapter, entry: `${module}:${match?.[1] ?? 'create_app'}`, sources: ['**/*.py'], reason: `found ${match?.[2] ?? 'Flask factory'} app in ${relative(root, file)}` };
       }
     }
-    return { adapter: 'fastapi', entry: 'app.main:app', sources: ['**/*.py'], reason: 'fastapi dependency found; set app.entry to module:app' };
+    if (flask && !/fastapi/i.test(pyDeps)) return { adapter: 'flask', entry: 'app:app', sources: ['**/*.py'], reason: 'Flask dependency found; set app.entry to module:app' };
+    if (/fastapi/i.test(pyDeps) || existsSync(join(root, 'main.py'))) return { adapter: 'fastapi', entry: 'app.main:app', sources: ['**/*.py'], reason: 'fastapi dependency found; set app.entry to module:app' };
   }
+  const examplePage = ['index.html', 'demo.html', 'example/index.html', 'examples/index.html', 'demo/index.html', 'demos/index.html', 'docs/index.html'].find(path => existsSync(join(root, path)));
+  const staticEntry = (entry: string): Detection => ({ adapter: 'static', entry, sources: [], reason: `found a browser entry in ${entry}` });
   const pkgText = read(join(root, 'package.json'));
   if (pkgText) {
     let pkg: { main?: string; scripts?: Record<string, string> } = {};
     try { pkg = JSON.parse(pkgText); } catch { /* fall through */ }
+    const start = /^node (?:\.\/)?([\w/-]+\.(?:c?js|mjs))$/.exec(pkg.scripts?.start ?? '')?.[1];
+    if (start && /process\.env\.PORT\b/.test(read(join(root, start)))) {
+      return { adapter: 'node', entry: start, sources: ['**/*.{js,mjs,cjs,ts}'], reason: `start script runs ${start} on the assigned port` };
+    }
     if (pkg.scripts?.start) return { adapter: 'command', run: 'npm start', sources: ['src/**', 'server/**', '*.{js,mjs,cjs,ts}'], reason: 'package.json has a start script' };
     // package.json `main` often names a build output that does not exist yet; only trust it when the file is there.
     const declared = pkg.main && existsSync(join(root, pkg.main)) ? pkg.main : undefined;
     const found = declared ?? ['server.js', 'index.js', 'app.js', 'src/server.js', 'src/index.js'].find((f) => existsSync(join(root, f)));
+    if (examplePage) {
+      const declaredAsset = declared?.replace(/^\.\//, '');
+      const demoOfLibrary = examplePage !== 'index.html' && declared && !/(^|\/)(app|server|index)\.[cm]?js$/.test(declared) && !/\.listen\s*\(/.test(read(join(root, declared)));
+      if (!found || demoOfLibrary || (declaredAsset && staticPage(root, examplePage).assets.includes(declaredAsset))) return staticEntry(examplePage);
+    }
     const entry = found ?? 'server.js';
     const reason = declared ? `package.json main ${entry}` : found ? `found ${entry}${pkg.main ? ` (package.json main ${pkg.main} does not exist)` : ''}` : `no entry file found; set app.entry (guessed ${entry})`;
     return { adapter: 'node', entry, sources: ['**/*.{js,mjs,cjs,ts}'], reason };
   }
+  if (examplePage) return staticEntry(examplePage);
   return { adapter: 'command', run: 'echo "set app.run in tracegrove.config.yaml" && exit 1', sources: ['**/*'], reason: 'no framework detected' };
 }
 
@@ -58,6 +77,8 @@ def current_user(authorization: str = Header("")):
     if not subject:
         raise HTTPException(status_code=401)
     return subject`,
+  flask: `# In a test-only Flask before_request hook, look up the request's Bearer token in
+# json.loads(os.environ["TRACEGROVE_TOKENS"]) to identify the caller.`,
   django: `# settings.py MIDDLEWARE += ["yourapp.tracegrove.auth"]  (test mode only)
 import json, os
 from django.contrib.auth import get_user_model
@@ -72,6 +93,7 @@ def auth(get_response):
   node: `// Accept tracegrove's per-run tokens (test mode only)
 const tokens = JSON.parse(process.env.TRACEGROVE_TOKENS ?? '{}');
 app.use((req, _res, next) => { req.user = tokens[(req.headers.authorization ?? '').replace(/^Bearer /, '')]; next(); });`,
+  static: 'Run tracegrove setup browsers, then tracegrove test. Add a flow for one interaction that matters to the people using this page.',
   command: `Read TRACEGROVE_TOKENS (JSON {token: subject}) and treat "Authorization: Bearer <token>" as that subject.`,
 };
 
@@ -110,25 +132,39 @@ Environments (local, docker, staging, production; see docs/environments.md):
   \`persona_credential_expired\` and \`environment_writes_forbidden\` go to a person, not to heal.
 `;
 
-export function initProject(root: string, options: { force?: boolean } = {}): { files: string[]; detection: Detection; snippet: string } {
+const HEALTH_FLOW = `title: The app is up and answers its health check\ntags: [smoke]\nsteps:\n  - name: health\n    GET: /health\n    as: none\n    expect: 200\n`;
+
+export function initProject(root: string, options: { force?: boolean; staticEntry?: string; expectedTitle?: string } = {}): { files: string[]; detection: Detection; snippet: string; missingAssets?: string[]; externalAssetOrigins?: string[] } {
   const configPath = join(root, CONFIG_FILE);
   const existing = configInDirectory(root);
   if (existing && existing !== configPath) throw new Blocked([{ code: 'config_exists', detail: existing, owner: 'operator', action: 'edit the existing TypeScript config; init does not replace another format' }]);
   if (existsSync(configPath) && !options.force) throw new Blocked([{ code: 'config_exists', detail: configPath, owner: 'operator', action: 'edit it, or rerun with --force to overwrite' }]);
-  const d = detect(root);
+  const d: Detection = options.staticEntry
+    ? { adapter: 'static', entry: options.staticEntry, sources: [], reason: 'selected static HTML entry' } : detect(root);
+  const page = d.adapter === 'static' ? staticPage(root, d.entry!) : null;
+  if (options.expectedTitle !== undefined && !page) throw new Blocked([{ code: 'invalid_argument', detail: '--title requires a static page', action: 'select a static HTML entry' }]);
+  if (page) d.entry = page.file;
   const appLines = [`  adapter: ${d.adapter}`];
-  if (d.entry) appLines.push(`  entry: ${d.entry}`);
+  if (d.entry) appLines.push(`  entry: ${page ? JSON.stringify(d.entry) : d.entry}`);
   if (d.run) appLines.push(`  run: ${JSON.stringify(d.run)}`);
-  appLines.push('  health: /health', `  sources: ${JSON.stringify(d.sources)}`);
+  appLines.push(`  health: ${page ? JSON.stringify(pageRoute(page.file)) : '/health'}`);
+  if (d.sources.length) appLines.push(`  sources: ${JSON.stringify(d.sources)}`);
   if (d.adapter === 'django') appLines.push('  # point DATABASES at os.environ["TRACEGROVE_DATA_DIR"] for a fresh database per run');
-  const config = `# tracegrove: ${d.reason}\nproject: ${(root.split(sep).pop() ?? 'app').replace(/[^A-Za-z0-9_-]/g, '-').replace(/^[^A-Za-z]+/, '') || 'app'}\napp:\n${appLines.join('\n')}\npersonas:\n  user: { subject: alice }\n  stranger: { subject: bob }\n`;
+  const config = `# tracegrove: ${d.reason}\nproject: ${(root.split(sep).pop() ?? 'app').replace(/[^A-Za-z0-9_-]/g, '-').replace(/^[^A-Za-z]+/, '') || 'app'}\napp:\n${appLines.join('\n')}\npersonas:\n  user: { subject: alice${page ? ', inputMode: pointer' : ''} }\n  stranger: { subject: bob }\n`;
   const flowDir = join(root, 'tracegrove');
-  const flow = `title: The app is up and answers its health check\ntags: [smoke]\nsteps:\n  - name: health\n    GET: /health\n    as: none\n    expect: 200\n`;
+  const flow = page ? stringify({
+    title: 'The selected page opens in a browser', tags: ['smoke'], as: 'none',
+    browser: { allowPaths: ['/'], allowMethods: ['GET', 'HEAD'], maxActions: 256 },
+    steps: [{ name: 'open the page', browser: { kind: 'navigate', path: pageRoute(page.file) }, expect: { status: 200 } },
+      { name: 'check the document title', browser: { kind: 'read', target: { by: 'document', name: 'title' } }, expect: { text: options.expectedTitle ?? page.title } }],
+  }) : HEALTH_FLOW;
   mkdirSync(flowDir, { recursive: true });
   writeFileSync(configPath, config);
-  const flowPath = join(flowDir, 'health.flow.yaml');
+  const flowPath = join(flowDir, page ? 'page.flow.yaml' : 'health.flow.yaml');
   const files = [configPath];
   if (!existsSync(flowPath)) { writeFileSync(flowPath, flow); files.push(flowPath); }
+  const oldHealth = join(flowDir, 'health.flow.yaml');
+  if (page && existing && options.force && read(oldHealth) === HEALTH_FLOW) unlinkSync(oldHealth);
   const agents = join(flowDir, 'AGENTS.md');
   if (!existsSync(agents)) { writeFileSync(agents, AGENTS_GUIDE); files.push(agents); }
   const gitignore = join(root, '.gitignore');
@@ -136,5 +172,5 @@ export function initProject(root: string, options: { force?: boolean } = {}): { 
     appendFileSync(gitignore, `${read(gitignore) && !read(gitignore).endsWith('\n') ? '\n' : ''}${STATE_DIR}/\n`);
     files.push(gitignore);
   }
-  return { files, detection: d, snippet: AUTH_SNIPPETS[d.adapter] };
+  return { files, detection: d, snippet: AUTH_SNIPPETS[d.adapter] + (page?.missing.length ? `\nMissing local assets: ${page.missing.join(', ')}. Build or supply these assets before checking dependent interactions.` : '') + (page?.externalOrigins.length ? `\nExternal scripts or stylesheets are outside local replay: ${page.externalOrigins.join(', ')}. Use a self-contained build for workflows that depend on them.` : ''), ...(page ? { missingAssets: page.missing, externalAssetOrigins: page.externalOrigins } : {}) };
 }

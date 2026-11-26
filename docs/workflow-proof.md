@@ -46,3 +46,35 @@ tracegrove impact --base origin/main --baseline "$BASELINE_RUN_NAME" --json
 ```
 
 Impact uses Grow's branch analysis, exact flow filenames and observed app requests. Its report names the selected cases, route and service evidence, selection time, execution times and missed failing cases. It widens to the suite for missing evidence, dirty trees and unmapped dependencies. By default it runs the selected cases and the full suite concurrently in separate workspaces. A failing reference run fails the command. Use `--selected-only` once the project's shadow results justify it. Both paths execute authored actions and fresh assertions without authoring-model calls.
+
+## Adopt a static site
+
+From the web root, select the HTML file that users actually open. A shipped example or a built application can be the entry.
+
+```sh
+tracegrove init --static demos/checkout.html
+tracegrove setup browsers
+tracegrove test
+```
+
+TraceGrove starts a private loopback server and verifies the document response and rendered title in Chromium. It follows local HTML asset references and CSS URLs. The server checks each file against its admitted digest before serving it. Missing local scripts and stylesheets block the run. Initialization reports missing optional assets and the origins of external scripts and stylesheets. For a bundler with absolute asset paths, build first and initialize inside the published directory. A page that sets its title at runtime can specify its expected value with `--title "New Document"`.
+
+Use `app.sources` for runtime-loaded files such as chunks, translation JSON, linked example pages or a local CDN fallback. TraceGrove also resolves the HTML and CSS dependencies of explicitly included files. Up to 256 public files fit in one source attestation. A passing starter check covers page delivery and title. Add an interaction and assert the resulting state to cover application behavior.
+
+For example, a color picker can fill an input, trigger the picker, and read the value written to a separate form control:
+
+```yaml
+steps:
+  - browser: { kind: navigate, path: / }
+    expect: { status: 200 }
+  - browser: { kind: fill, target: { by: id, name: enterAColor }, value: "#123456" }
+  - browser: { kind: click, target: { by: id, name: btnEnterAColor } }
+  - browser: { kind: read, target: { by: id, name: triggerSet, property: value } }
+    expect: { text: "#123456" }
+```
+
+The static recorder accepts a visible state transition. Read a result, act on a separate control, then read the changed result at the same locator. Saving requires a passing replay against a fresh launch. The recorded flow runs anonymously alongside the generated page check.
+
+## Adopt a Flask application
+
+Use `app.adapter: flask` with `app.entry: package:app` or `package:create_app`. Set `app.health` to an existing GET route, and install the app's dependencies in its environment. TraceGrove launches Flask on an assigned loopback port with the debugger and reloader disabled. Browser and HTTP flows use the same assertion and evidence machinery as the other local adapters.

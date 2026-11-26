@@ -1,10 +1,11 @@
-import type { Browser, BrowserContext, Locator, Page, Request } from 'playwright';
+import type { Browser, BrowserContext, Page, Request } from 'playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Deadline } from '../../core/deadline.ts';
 import { readBoundedFile } from '../../core/boundedFile.ts';
-import { BrowserCommand, BrowserObservation, BrowserNetworkObservation, type BrowserLocator } from '../../protocol/schemas/browser.ts';
+import { browserLocator } from './locator.ts';
+import { BrowserCommand, BrowserObservation, BrowserNetworkObservation } from '../../protocol/schemas/browser.ts';
 import { BrowserRequestPolicy } from './requestPolicy.ts';
 import type { RequestBudget } from '../../core/requestBudget.ts';
 
@@ -167,14 +168,6 @@ export class BrowserDriver {
     } finally { signal.removeEventListener('abort', abort); }
   }
 
-  private locator(target: BrowserLocator): Locator {
-    switch (target.by) {
-      case 'role': return this.page.getByRole(target.role, { name: target.name, exact: true });
-      case 'label': return this.page.getByLabel(target.name, { exact: true });
-      case 'testId': return this.page.getByTestId(target.name);
-    }
-  }
-
   async execute(input: unknown, deadline: Deadline, parent?: AbortSignal): Promise<BrowserObservation> {
     this.requestBudget?.throwIfBlocked();
     const command = BrowserCommand.parse(input);
@@ -199,8 +192,12 @@ export class BrowserDriver {
         const url = new URL(command.path, this.origin);
         if (url.origin !== this.origin || url.username || url.password) throw new BrowserStepError('origin_not_admitted');
         status = (await this.page.goto(url.href, { timeout, waitUntil: 'domcontentloaded' }))?.status() ?? null;
+      } else if (command.kind === 'read' && command.target.by === 'document') {
+        const value = await this.page.title();
+        text = value.slice(0, 8192); textTruncated = value.length > 8192;
       } else {
-        const locator = this.locator(command.target);
+        if (command.target.by === 'document') throw new BrowserStepError('browser_operation_failed');
+        const locator = browserLocator(this.page, command.target);
         if (command.kind === 'click') {
           if (this.inputMode === 'touch') await locator.tap({ timeout });
           else if (this.inputMode === 'keyboard') {
@@ -221,10 +218,12 @@ export class BrowserDriver {
         if (command.kind === 'read') {
           await locator.waitFor({ state: 'visible', timeout });
           // Bound the text before transporting it out of the page.
-          const result = await locator.evaluate(element => {
-            const value = element.textContent ?? '';
+          const result = await locator.evaluate((element, property) => {
+            if (property === 'value' && !(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) throw new Error('expected a form control');
+            if (property === 'value' && element instanceof HTMLInputElement && (element.type === 'password' || /password|one-time-code|^cc-/.test(element.autocomplete))) throw new Error('sensitive form control');
+            const value = property === 'value' ? (element as HTMLInputElement).value : element.textContent ?? '';
             return { text: value.slice(0, 8192), truncated: value.length > 8192 };
-          }, undefined, { timeout: Math.max(1, deadline.remainingMs()) });
+          }, command.target.property, { timeout: Math.max(1, deadline.remainingMs()) });
           text = result.text; textTruncated = result.truncated;
         }
       }

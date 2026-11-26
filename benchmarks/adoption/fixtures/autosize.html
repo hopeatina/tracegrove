@@ -1,0 +1,8 @@
+<!doctype html><title>Expandable note</title><script src="/dist/autosize.js"></script>
+<label>Note <textarea id="note" rows="1" style="width:180px"></textarea></label>
+<button id="measure">Measure</button><output id="result"></output>
+<script>
+  autosize(note);
+  const originalHeight = note.clientHeight;
+  measure.onclick = () => { result.textContent = note.clientHeight > originalHeight && note.scrollHeight <= note.clientHeight + 1 ? 'All lines fit' : 'Clipped or unchanged'; };
+</script>

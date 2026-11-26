@@ -32,7 +32,7 @@ export function previewVerificationSource(root: string, path: string, config: Au
   const cwd = applicationCwd(config.app, resolve(source.root, config.app.root));
   source.bind(cwd, root);
   const launch = applicationLaunch(config, root, resolve(source.root, config.app.root));
-  pinnedArguments(launch.args.map(arg => arg.replaceAll('{port}', '1')), cwd, source.root, source.snapshot, config.app.adapter === 'node' ? 'node' : 'python');
+  pinnedArguments(launch.args.map(arg => arg.replaceAll('{port}', '1')), cwd, source.root, source.snapshot, (config.app.adapter === 'node' || config.app.adapter === 'static') ? 'node' : 'python');
   return { selection: VerificationSourceSelection.parse({ kind: 'snapshot', path: relative(root, absolute).split(sep).join('/') || '.', ref: source.snapshot.ref }), binding: describeSnapshot(source.snapshot) };
 }
 export function saveVerificationSource(root: string, input: unknown, config: AuthoringConfig) {
