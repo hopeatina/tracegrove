@@ -10,7 +10,6 @@
         },
         "name": {
           "maxLength": 512,
-          "minLength": 1,
           "type": "string"
         },
         "role": {
@@ -56,6 +55,25 @@
       "properties": {
         "by": {
           "const": "testId",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "name"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "id",
           "type": "string"
         },
         "name": {

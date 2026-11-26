@@ -16,7 +16,7 @@ const Path = z.string().regex(/^\//, 'paths start with /');
 const Status = z.number().int().min(100).max(599);
 const Json: z.ZodType<unknown> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(Json), z.record(z.string(), Json)]));
 
-export const ADAPTERS = ['node', 'fastapi', 'django', 'command'] as const;
+export const ADAPTERS = ['node', 'fastapi', 'flask', 'django', 'static', 'command'] as const;
 export const AGENT_PROVIDERS = ['claude', 'codex', 'none'] as const;
 export type AgentProvider = typeof AGENT_PROVIDERS[number];
 
@@ -25,12 +25,12 @@ export const AuthoringConfig = z.object({
   project: Name.describe('Short project name, shown in reports and run summaries.'),
   testDir: z.string().default('tracegrove').describe('Folder holding *.flow.yaml and fixtures/, relative to this file.'),
   app: z.object({
-    adapter: z.enum(ADAPTERS).describe('Launch preset: node, fastapi, django or command.'),
+    adapter: z.enum(ADAPTERS).describe('Launch preset: node, fastapi, flask, django, static or command.'),
     nativeJobs: z.literal('node_ipc/v1').optional().describe('Opt in to the application-owned native Node job bridge.'),
     root: z.string().default('.').describe('App directory relative to this file; the launch cwd.'),
-    entry: z.string().optional().describe('node: script path; fastapi: module:app; django: folder containing manage.py.'),
+    entry: z.string().optional().describe('node: script path; fastapi/flask: module:app; django: folder containing manage.py; static: public HTML entry relative to root.'),
     run: z.string().optional().describe('command adapter: shell command that starts the app on $PORT.'),
-    python: z.string().optional().describe('fastapi/django: interpreter (default .venv/bin/python when present, else python3).'),
+    python: z.string().optional().describe('Python adapter: interpreter (default .venv/bin/python when present, else python3).'),
     health: Path.default('/health').describe('GET path that returns 2xx once the app is ready.'),
     readyTimeoutMs: z.number().int().positive().max(300_000).default(20_000),
     sources: z.array(z.string()).min(1).optional().describe('Globs (relative to root) whose bytes are attested as the tested source.'),

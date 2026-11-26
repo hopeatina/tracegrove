@@ -137,6 +137,8 @@
               "launch_executable_missing",
               "application_runtime_unrecognized",
               "command_adapter_unqualified",
+              "static_assets_missing",
+              "too_many_source_files",
               "run_not_found",
               "execution_not_found",
               "invalid_request_file",

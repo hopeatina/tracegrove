@@ -1,25 +1,47 @@
+import { isDeepStrictEqual } from 'node:util';
 import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { stringify } from 'yaml';
-import { chromium, type Page } from 'playwright';
+import { chromium } from 'playwright';
 import { z } from 'zod';
 import { Blocked } from '../core/errors.ts';
-import { BrowserCommand, type BrowserLocator } from '../protocol/schemas/browser.ts';
+import { browserLocator } from '../adapters/browser/locator.ts';
+import { BrowserCommand } from '../protocol/schemas/browser.ts';
 import { caseIdFor, loadAuthoringConfig } from '../authoring/compile.ts';
 import { Flow, HttpFlowStep, StandInFlowStep, type FlowStep } from '../authoring/schema.ts';
 import { runTests } from '../authoring/run.ts';
 
 function stop(detail: string): never { throw new Blocked([{ code: 'record_blocked', detail }]); }
+async function readElement(el: ReturnType<typeof browserLocator>, property?: 'value') {
+  if (!property) return (await el.textContent()) ?? '';
+  if (await el.evaluate(e => e.matches('input[type=password],[autocomplete*=password],[autocomplete=one-time-code],[autocomplete^=cc-]'))) stop('Use synthetic, non-secret inputs');
+  return el.inputValue();
+}
 const Selection = z.union([
   HttpFlowStep.refine(s => !!s.GET && s.observe === true && typeof s.expect === 'object' &&
     Object.keys(s.expect).some(k => k !== 'status'), 'select a GET readback with a body assertion'),
   StandInFlowStep.refine(s => !!s.received && !s.fail && s.expect && Object.keys(s.expect).length > 0, 'select a provider call assertion'),
 ]);
-function locator(page: Page, t: BrowserLocator) {
-  if (t.by === 'testId') return page.getByTestId(t.name);
-  if (t.by === 'label') return page.getByLabel(t.name, { exact: true });
-  return page.getByRole(t.role, { name: t.name, exact: true });
+// Static sites can prove a visible state transition without manufacturing a backend read.
+export function recordedTransition(steps: FlowStep[]): boolean {
+  const seen: { target: unknown; element: unknown; text: string; action: number }[] = [];
+  let action = 0;
+  for (const step of steps) {
+    if (!('browser' in step)) continue;
+    const command = step.browser;
+    if (command.kind === 'navigate') { seen.length = 0; continue; }
+    if (command.kind === 'fill' || command.kind === 'click') {
+      for (let i = seen.length - 1; i >= 0; i--) if (isDeepStrictEqual(seen[i]!.element, command.target)) seen.splice(i, 1);
+      action++; continue;
+    }
+    if (step.expect?.text === undefined) continue;
+    const { target } = command;
+    if (seen.some(previous => previous.action < action && previous.text !== step.expect!.text && isDeepStrictEqual(previous.target, target))) return true;
+    const element = target.by === 'document' ? target : { by: target.by, name: target.name, ...(target.by === 'role' ? { role: target.role } : {}) };
+    seen.push({ target, element, text: step.expect.text, action });
+  }
+  return false;
 }
 
 // This function runs in the page. Only an explicit, replayable semantic target is recorded.
@@ -32,7 +54,8 @@ function installCapture() {
     const label = e.getAttribute('aria-label') || input.labels?.[0]?.textContent?.trim();
     if (label) return { by: 'label', name: label };
     const role = e.getAttribute('role') || ({ BUTTON: 'button', A: 'link' } as Record<string, string>)[e.tagName];
-    return role && { by: 'role', role, name: e.textContent?.trim() };
+    if (role && e.textContent?.trim()) return { by: 'role', role, name: e.textContent.trim() };
+    return e.id ? { by: 'id', name: e.id } : null;
   }
   document.addEventListener('click', ev => {
     if (!ev.isTrusted) return;
@@ -103,8 +126,9 @@ export async function recordFlow(input: { config: string; url: string; name: str
         const msg: unknown = JSON.parse(line);
         if (msg === 'save') {
           if (unsupported) stop('The click-through included an unsupported or sensitive interaction');
-          if (!steps.some(s => 'standin' in s || ('GET' in s && s.observe))) stop('Choose an independent readback before saving');
-          const flow = Flow.parse({ title: input.title, steps, browser: { allowPaths: [...paths], allowMethods: [...methods] } });
+          if (!steps.some(s => 'standin' in s || ('GET' in s && s.observe)) && !(config.app.adapter === 'static' && recordedTransition(steps)))
+            stop(config.app.adapter === 'static' ? 'Read the same result before and after an action and assert its changed value' : 'Choose an independent readback before saving');
+          const flow = Flow.parse({ title: input.title, steps, ...(config.app.adapter === 'static' ? { as: 'none' } : {}), browser: { allowPaths: [...paths], allowMethods: [...methods] } });
           const caseId = caseIdFor(config.project, testDir, file);
           const { report } = await runTests({ configPath: input.config, caseIds: [caseId], draftFlow: { file, flow } });
           if (!report.bundleVerified || report.outcome !== 'passed' || report.cases.length !== 1 || report.cases[0]?.caseId !== caseId)
@@ -121,9 +145,13 @@ export async function recordFlow(input: { config: string; url: string; name: str
         }
         const read = z.object({ browser: BrowserCommand, expect: z.object({ text: z.string() }) }).strict().safeParse(msg);
         if (read.success && read.data.browser.kind === 'read') {
-          const el = locator(page, read.data.browser.target);
-          await el.filter({ hasText: read.data.expect.text }).waitFor({ timeout: 5000 });
-          if (await el.innerText() !== read.data.expect.text) stop('Observed text differs');
+          if (read.data.browser.target.by === 'document') {
+            if (await page.title() !== read.data.expect.text) stop('Observed title differs');
+            append({ browser: read.data.browser, expect: read.data.expect }); continue;
+          }
+          const el = browserLocator(page, read.data.browser.target);
+          await el.waitFor({ state: 'visible', timeout: 5000 });
+          if (await readElement(el, read.data.browser.target.property) !== read.data.expect.text) stop('Observed text differs');
           append({ browser: read.data.browser, expect: read.data.expect });
           continue;
         }
@@ -135,13 +163,17 @@ export async function recordFlow(input: { config: string; url: string; name: str
             if (to.origin !== url.origin || to.search || to.hash) stop('Use a path on the same app');
             await page.goto(to.href);
           } else {
-            const el = locator(page, c.target);
+            if (c.kind === 'read' && c.target.by === 'document') {
+              append({ browser: c, expect: { text: await page.title() } }); continue;
+            }
+            if (c.target.by === 'document') stop('Document title is read-only');
+            const el = browserLocator(page, c.target);
             if (await el.count() !== 1) stop('Locator must match exactly one element');
             if (c.kind === 'fill') {
               if (await el.evaluate(e => e.matches('input[type=password],[autocomplete*=password],[autocomplete=one-time-code],[autocomplete^=cc-]'))) stop('Use synthetic, non-secret inputs');
               await el.fill(c.value);
             } else if (c.kind === 'click') await el.click();
-            else { append({ browser: c, expect: { text: await el.innerText() } }); continue; }
+            else { append({ browser: c, expect: { text: await readElement(el, c.target.property) } }); continue; }
           }
           append({ browser: c });
         } else append(Selection.parse(msg));

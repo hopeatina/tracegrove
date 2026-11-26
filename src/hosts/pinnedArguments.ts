@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { GitSourceSnapshot } from '../protocol/schemas/gitSources.ts';
 import { Conflict } from '../core/errors.ts';
+import { staticExecutable } from './staticSite.ts';
 import { djangoBootstrap } from './launchTemplates.ts';
 
 /** Bind qualified launch templates to pinned files; opaque eval/shell wrappers cannot claim a snapshot. */
@@ -10,9 +11,21 @@ export function pinnedArguments(args: string[], cwd: string, root: string, snaps
     const within = relative(root, resolve(cwd, path)).split(sep).join('/');
     if (within.startsWith('..') || isAbsolute(within) || !files.has(within)) throw new Conflict('snapshot launch entry is not a pinned regular file');
   };
+  if (family === 'node' && args.length === 3 && args[0] === staticExecutable && /^\d+$/.test(args[2]!)) {
+    pinned(args[1]!);
+    return args;
+  }
   if (family === 'node' && args.length === 1) {
     pinned(args[0]!);
     return [`./${relative(cwd, resolve(cwd, args[0]!)).split(sep).join('/')}`];
+  }
+  if (family === 'python' && args.length === 11 && args[0] === '-m' && args[1] === 'flask' && args[2] === '--app' &&
+      args.slice(4, 10).join(' ') === 'run --no-reload --no-debugger --host 127.0.0.1 --port' && /^\d+$/.test(args[10]!)) {
+    const match = /^([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*):[A-Za-z_]\w*$/.exec(args[3]!);
+    if (!match) throw new Conflict('snapshot Flask entry needs a qualified module:attribute');
+    const module = match[1]!.replaceAll('.', '/');
+    try { pinned(module + '.py'); } catch { pinned(module + '/__init__.py'); }
+    return args;
   }
   if (family === 'python' && args.length === 7 && args[0] === '-m' && args[1] === 'uvicorn' &&
       args[3] === '--host' && args[4] === '127.0.0.1' && args[5] === '--port' && /^\d+$/.test(args[6]!)) {
@@ -26,5 +39,5 @@ export function pinnedArguments(args: string[], cwd: string, root: string, snaps
     const port = /127\.0\.0\.1:(\d+)/.exec(args[1]!)?.[1];
     if (port && args[1] === djangoBootstrap(port)) { pinned('manage.py'); return args; }
   }
-  throw new Conflict('snapshot launch requires a qualified Node, FastAPI or Django template');
+  throw new Conflict('snapshot launch requires a qualified launch template');
 }

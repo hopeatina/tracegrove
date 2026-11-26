@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { BrowserLocator } from './browser.ts';
+import { BrowserReadTarget } from './browser.ts';
 import { CaseSpec, Persona, SeedEntity, RegisteredAction } from './definitions.ts';
 import { EnvironmentBinding, Outcome, StepResult, SelectionManifest, Coverage } from './execution.ts';
 import { DigestSchema, IdString, IsoDateTime, RefSchema, ScopeSchema, ShortText, refList, idList } from '../primitives.ts';
 
 export const WorkflowMapStep = z.object({
   stepId: IdString, operation: ShortText, declaredRoute: z.string().max(4096).nullable(),
-  declaredLandmark: BrowserLocator.nullable(),
+  declaredLandmark: BrowserReadTarget.nullable(),
   observation: z.object({ result: StepResult, reasonCode: ShortText.nullable(),
     observedRoute: z.string().max(4096).nullable(), browserCommandObserved: z.boolean(),
     inputDigest: DigestSchema, outputDigest: DigestSchema.nullable(), eventIds: idList(),

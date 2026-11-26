@@ -22,6 +22,7 @@ import { NATIVE_JOB_RUNNER_CAPABILITIES } from '../adapters/job/capabilities.ts'
 import { MCP_RUNNER_CAPABILITIES } from '../adapters/mcp/capabilities.ts';
 import { withStandIns } from '../adapters/standin/capabilities.ts';
 import { CONVERSATION_RUNNER_CAPABILITIES } from '../adapters/conversation/capabilities.ts';
+import { staticPage } from './staticPage.ts';
 import { defaultSourceGlobs, expandSources } from './sources.ts';
 import { readAuthoringModule } from './module.ts';
 import { applicationLaunch } from './appLaunch.ts';
@@ -319,7 +320,7 @@ export function compileProject(configPath: string, options: CompileOptions = {})
   const launchCwd = launch?.cwd ?? root;
   const sourceSnapshot = launch ? snapshotSource?.bind(launchCwd, compiledDir, options.sourceRepositoryRole) : undefined;
   const sourceSelection = sourceSnapshot?.repositoryRole ? snapshotSource!.selection(sourceSnapshot) : null;
-  if (launched && config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'use the node, fastapi or django preset until a qualified command host is configured');
+  if (launched && config.app.adapter === 'command') fail('command_adapter_unqualified', 'Shell wrappers cannot supply an independently observed application runtime.', 'select a matching node, fastapi, flask, django or static launch preset');
   let sourceFiles: string[] = [];
   let identity: ReturnType<typeof sourceIdentityDigest> | null = null;
   if (launch) {
@@ -327,7 +328,12 @@ export function compileProject(configPath: string, options: CompileOptions = {})
     launch.command = runtime.executable;
     launch.runtime = runtime.runtime;
     const extraSkip = [relative(launchCwd, testDir).split(sep).join('/')].filter((p) => p && !p.startsWith('..'));
-    sourceFiles = expandSources(launchCwd, config.app.sources ?? defaultSourceGlobs(), extraSkip);
+    if (config.app.adapter === 'static') {
+      const extras = config.app.sources ? expandSources(launchCwd, config.app.sources, extraSkip, true) : [];
+      const page = staticPage(launchCwd, config.app.entry!, extras);
+      if (page.missingRequired.length) fail('static_assets_missing', `Missing local scripts or stylesheets: ${page.missingRequired.join(', ')}`, 'build the site first and select its published HTML entry');
+      sourceFiles = page.assets;
+    } else sourceFiles = expandSources(launchCwd, config.app.sources ?? defaultSourceGlobs(), extraSkip);
     identity = sourceIdentityDigest(launchCwd, sourceFiles);
   }
   const declared = targetBinding(environment, config, root, compiledDir);

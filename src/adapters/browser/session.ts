@@ -1,5 +1,5 @@
 import { BrowserDriver, BrowserStepError } from './driver.ts';
-import { BrowserAction, BrowserLocator, type BrowserObservation, type BrowserNetworkObservation, type CaseSpec, type Persona, type Step } from '../../protocol/index.ts';
+import { BrowserAction, BrowserReadTarget, type BrowserObservation, type BrowserNetworkObservation, type CaseSpec, type Persona, type Step } from '../../protocol/index.ts';
 import { applyTemplate, applyTemplateDeep } from '../../core/compiler.ts';
 import { Deadline, sleep } from '../../core/deadline.ts';
 import { monotonicMs } from '../../core/clock.ts';
@@ -38,7 +38,7 @@ export class CaseBrowserSession {
     }
     const command = step.kind === 'ui.navigate' ? { kind: 'navigate', path: applyTemplate(step.path, variables) }
       : step.kind === 'ui.action' ? BrowserAction.parse(applyTemplateDeep(step.command, variables))
-      : step.kind === 'ui.observe' ? { kind: 'read', target: BrowserLocator.parse(applyTemplateDeep(step.target, variables)) } : null;
+      : step.kind === 'ui.observe' ? { kind: 'read', target: BrowserReadTarget.parse(applyTemplateDeep(step.target, variables)) } : null;
     if (!command) throw new BrowserStepError('not_browser_step');
     let last: BrowserObservation | null = null;
     for (;;) {

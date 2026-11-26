@@ -203,7 +203,7 @@ export function pythonCandidates(root: string, config: AuthoringConfig): string[
   const appRoot = resolve(root, config.app.root);
   const local = [appRoot, root].flatMap((dir) => ['.venv', 'venv', 'env', '.env'].map((v) => join(dir, v, 'bin', 'python')));
   const onPath = (process.env.PATH ?? '').split(delimiter).filter(Boolean).flatMap((dir) => ['python3', 'python'].map((n) => join(dir, n)));
-  const probe = config.app.adapter === 'django' ? 'import django' : 'import fastapi, uvicorn';
+  const probe = config.app.adapter === 'django' ? 'import django' : config.app.adapter === 'flask' ? 'import flask' : 'import fastapi, uvicorn';
   const seen = new Set<string>();
   return [...local, ...onPath].filter((p) => { if (seen.has(p) || !existsSync(p) || p === config.app.python) return false; seen.add(p); return true; })
     .filter((p) => spawnSync(p, ['-c', probe], { timeout: 10_000, stdio: 'ignore' }).status === 0)
@@ -231,8 +231,8 @@ async function fixHealth(ctx: Ctx, finding: HealFinding, config: AuthoringConfig
 }
 
 async function fixPython(ctx: Ctx, finding: HealFinding, config: AuthoringConfig, dryRun: boolean): Promise<void> {
-  if (config.app.adapter !== 'fastapi' && config.app.adapter !== 'django') return;
-  ctx.progress('Looking for a Python interpreter', `with ${config.app.adapter === 'django' ? 'django' : 'fastapi and uvicorn'} installed`);
+  if (!['fastapi', 'django', 'flask'].includes(config.app.adapter)) return;
+  ctx.progress('Looking for a Python interpreter', `with ${config.app.adapter === 'django' ? 'django' : config.app.adapter === 'flask' ? 'flask' : 'fastapi and uvicorn'} installed`);
   const candidates = pythonCandidates(ctx.root, config);
   if (candidates.length === 0) { finding.fix = `create a virtualenv with the app's dependencies (python3 -m venv .venv && .venv/bin/pip install -r requirements.txt), then rerun heal`; return; }
   backup(ctx, ctx.configPath);

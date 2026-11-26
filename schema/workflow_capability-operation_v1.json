@@ -1744,7 +1744,6 @@
                                     },
                                     "name": {
                                       "maxLength": 512,
-                                      "minLength": 1,
                                       "type": "string"
                                     },
                                     "role": {
@@ -1790,6 +1789,25 @@
                                   "properties": {
                                     "by": {
                                       "const": "testId",
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "maxLength": 512,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "by",
+                                    "name"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "by": {
+                                      "const": "id",
                                       "type": "string"
                                     },
                                     "name": {
@@ -1831,7 +1849,6 @@
                                     },
                                     "name": {
                                       "maxLength": 512,
-                                      "minLength": 1,
                                       "type": "string"
                                     },
                                     "role": {
@@ -1877,6 +1894,25 @@
                                   "properties": {
                                     "by": {
                                       "const": "testId",
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "maxLength": 512,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "by",
+                                    "name"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "by": {
+                                      "const": "id",
                                       "type": "string"
                                     },
                                     "name": {
@@ -2240,12 +2276,33 @@
                           "additionalProperties": false,
                           "properties": {
                             "by": {
+                              "const": "document",
+                              "type": "string"
+                            },
+                            "name": {
+                              "const": "title",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "by",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "by": {
                               "const": "role",
                               "type": "string"
                             },
                             "name": {
                               "maxLength": 512,
-                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "property": {
+                              "const": "value",
                               "type": "string"
                             },
                             "role": {
@@ -2278,6 +2335,10 @@
                               "maxLength": 512,
                               "minLength": 1,
                               "type": "string"
+                            },
+                            "property": {
+                              "const": "value",
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -2296,6 +2357,33 @@
                             "name": {
                               "maxLength": 512,
                               "minLength": 1,
+                              "type": "string"
+                            },
+                            "property": {
+                              "const": "value",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "by",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "by": {
+                              "const": "id",
+                              "type": "string"
+                            },
+                            "name": {
+                              "maxLength": 512,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "property": {
+                              "const": "value",
                               "type": "string"
                             }
                           },
